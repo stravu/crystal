@@ -49,3 +49,6 @@ coverage/
 # Claude Code session data
 sessions/
 .claude-sessions/
+
+# Application configuration
+.ccc-config.json
