@@ -49,7 +49,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   addSessionOutput: (output) => set((state) => ({
     sessions: state.sessions.map(session => 
       session.id === output.sessionId
-        ? { ...session, output: [...session.output, output.data] }
+        ? output.type === 'json'
+          ? { ...session, jsonMessages: [...(session.jsonMessages || []), {...output.data, timestamp: output.timestamp}] }
+          : { ...session, output: [...session.output, output.data] }
         : session
     )
   })),

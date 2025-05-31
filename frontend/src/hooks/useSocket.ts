@@ -17,19 +17,27 @@ export function useSocket() {
       });
       
       socket.on('sessions:initial', (sessions: Session[]) => {
-        loadSessions(sessions); // Use loadSessions to mark as loaded
+        const sessionsWithJsonMessages = sessions.map(session => ({
+          ...session,
+          jsonMessages: session.jsonMessages || []
+        }));
+        loadSessions(sessionsWithJsonMessages); // Use loadSessions to mark as loaded
       });
       
       socket.on('sessions:loaded', (sessions: Session[]) => {
-        loadSessions(sessions);
+        const sessionsWithJsonMessages = sessions.map(session => ({
+          ...session,
+          jsonMessages: session.jsonMessages || []
+        }));
+        loadSessions(sessionsWithJsonMessages);
       });
       
       socket.on('session:created', (session: Session) => {
-        addSession(session);
+        addSession({...session, jsonMessages: session.jsonMessages || []});
       });
       
       socket.on('session:updated', (session: Session) => {
-        updateSession(session);
+        updateSession({...session, jsonMessages: session.jsonMessages || []});
       });
       
       socket.on('session:deleted', (session: Session) => {

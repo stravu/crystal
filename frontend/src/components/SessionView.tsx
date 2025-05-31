@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { JsonMessageView } from './JsonMessageView';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -12,6 +13,7 @@ export function SessionView() {
   const fitAddon = useRef<FitAddon | null>(null);
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
+  const [viewMode, setViewMode] = useState<'terminal' | 'messages'>('terminal');
   const lastProcessedOutputLength = useRef(0);
   
   useEffect(() => {
@@ -57,26 +59,28 @@ export function SessionView() {
     terminalInstance.current.clear();
     lastProcessedOutputLength.current = 0;
 
-    // Fetch existing outputs when session is selected
-    if (activeSession.output.length === 0) {
-      setIsLoadingOutput(true);
-      fetch(`/api/sessions/${activeSession.id}/output`)
-        .then(res => res.json())
-        .then(outputs => {
-          const outputData = outputs.map((o: any) => o.data).join('');
-          if (outputData) {
-            setSessionOutput(activeSession.id, outputData);
-            terminalInstance.current?.write(outputData);
-          }
-        })
-        .catch(error => console.error('Error fetching session output:', error))
-        .finally(() => setIsLoadingOutput(false));
-    } else {
-      // Write existing output
-      const fullOutput = activeSession.output.join('');
-      terminalInstance.current.write(fullOutput);
-      lastProcessedOutputLength.current = fullOutput.length;
-    }
+    // Always fetch existing outputs when session is selected (to get both terminal and JSON data)
+    setIsLoadingOutput(true);
+    fetch(`/api/sessions/${activeSession.id}/output`)
+      .then(res => res.json())
+      .then(outputs => {
+        // Handle terminal outputs
+        const terminalOutputs = outputs.filter((o: any) => o.type !== 'json');
+        const outputData = terminalOutputs.map((o: any) => o.data).join('');
+        if (outputData) {
+          setSessionOutput(activeSession.id, outputData);
+          terminalInstance.current?.write(outputData);
+          lastProcessedOutputLength.current = outputData.length;
+        }
+        
+        // Handle JSON messages - add them to the store via addSessionOutput
+        const jsonOutputs = outputs.filter((o: any) => o.type === 'json');
+        jsonOutputs.forEach((jsonOutput: any) => {
+          useSessionStore.getState().addSessionOutput(jsonOutput);
+        });
+      })
+      .catch(error => console.error('Error fetching session output:', error))
+      .finally(() => setIsLoadingOutput(false));
   }, [activeSession?.id]);
 
   useEffect(() => {
@@ -153,19 +157,51 @@ export function SessionView() {
   return (
     <div className="flex-1 flex flex-col">
       <div className="bg-gray-100 border-b border-gray-300 px-4 py-3">
-        <h2 className="font-semibold text-gray-800">{activeSession.name}</h2>
-        <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
-          <span className="capitalize">{activeSession.status}</span>
-          <span>•</span>
-          <span>{activeSession.prompt.substring(0, 50)}...</span>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-800">{activeSession.name}</h2>
+            <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
+              <span className="capitalize">{activeSession.status}</span>
+              <span>•</span>
+              <span>{activeSession.prompt.substring(0, 50)}...</span>
+            </div>
+          </div>
+          <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden">
+            <button
+              onClick={() => setViewMode('terminal')}
+              className={`px-3 py-1 text-sm ${
+                viewMode === 'terminal' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Terminal
+            </button>
+            <button
+              onClick={() => setViewMode('messages')}
+              className={`px-3 py-1 text-sm ${
+                viewMode === 'messages' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Messages ({activeSession.jsonMessages?.length || 0})
+            </button>
+          </div>
         </div>
       </div>
       
-      <div className="flex-1 relative bg-gray-900 overflow-hidden">
+      <div className="flex-1 relative overflow-hidden">
         {isLoadingOutput && (
           <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
         )}
-        <div ref={terminalRef} className="h-full" />
+        {viewMode === 'terminal' ? (
+          <div className="bg-gray-900 h-full">
+            <div ref={terminalRef} className="h-full" />
+          </div>
+        ) : (
+          <JsonMessageView messages={activeSession.jsonMessages || []} />
+        )}
       </div>
       
       {activeSession.status === 'waiting' && (

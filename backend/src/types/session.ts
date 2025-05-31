@@ -8,6 +8,7 @@ export interface Session {
   createdAt: Date;
   lastActivity?: Date;
   output: string[];
+  jsonMessages: any[];
   error?: string;
 }
 
@@ -25,7 +26,7 @@ export interface SessionUpdate {
 
 export interface SessionOutput {
   sessionId: string;
-  type: 'stdout' | 'stderr';
-  data: string;
+  type: 'stdout' | 'stderr' | 'json';
+  data: string | any;
   timestamp: Date;
 }

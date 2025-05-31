@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import * as pty from 'node-pty';
 import type { Logger } from '../utils/logger.js';
@@ -42,7 +42,7 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.verbose(`Claude works in target directory`);
       }
       
-      const ptyProcess = pty.spawn('claude', ['-p', prompt, '--verbose'], {
+      const ptyProcess = pty.spawn('claude', ['-p', prompt, '--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
@@ -61,17 +61,40 @@ export class ClaudeCodeManager extends EventEmitter {
 
       let hasReceivedOutput = false;
       let lastOutput = '';
+      let buffer = '';
 
       ptyProcess.onData((data: string) => {
         hasReceivedOutput = true;
         lastOutput += data;
-        this.logger?.verbose(`Output from session ${sessionId}: ${data.substring(0, 200)}`);
-        this.emit('output', {
-          sessionId,
-          type: 'stdout',
-          data,
-          timestamp: new Date()
-        });
+        buffer += data;
+        
+        // Process complete JSON lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const jsonMessage = JSON.parse(line.trim());
+              this.logger?.verbose(`JSON message from session ${sessionId}: ${JSON.stringify(jsonMessage)}`);
+              this.emit('output', {
+                sessionId,
+                type: 'json',
+                data: jsonMessage,
+                timestamp: new Date()
+              });
+            } catch (error) {
+              // If not valid JSON, treat as regular output
+              this.logger?.verbose(`Raw output from session ${sessionId}: ${line.substring(0, 200)}`);
+              this.emit('output', {
+                sessionId,
+                type: 'stdout',
+                data: line,
+                timestamp: new Date()
+              });
+            }
+          }
+        }
       });
 
       ptyProcess.onExit(({ exitCode, signal }) => {

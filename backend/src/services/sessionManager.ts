@@ -35,6 +35,7 @@ export class SessionManager extends EventEmitter {
       createdAt: new Date(dbSession.created_at),
       lastActivity: new Date(dbSession.updated_at),
       output: [], // Will be loaded separately by frontend when needed
+      jsonMessages: [], // Will be loaded separately by frontend when needed
       error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined
     };
   }
@@ -110,13 +111,18 @@ export class SessionManager extends EventEmitter {
   }
 
   async addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): Promise<void> {
-    // Store in database
-    await this.db.addSessionOutput(id, output.type, output.data);
+    // Store in database (stringify JSON objects)
+    const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
+    await this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Update in-memory session
     const session = this.activeSessions.get(id);
     if (session) {
-      session.output.push(output.data);
+      if (output.type === 'json') {
+        session.jsonMessages.push(output.data);
+      } else {
+        session.output.push(output.data);
+      }
       session.lastActivity = new Date();
     }
     
@@ -132,8 +138,8 @@ export class SessionManager extends EventEmitter {
     const dbOutputs = await this.db.getSessionOutputs(id, limit);
     return dbOutputs.map(dbOutput => ({
       sessionId: dbOutput.session_id,
-      type: dbOutput.type as 'stdout' | 'stderr',
-      data: dbOutput.data,
+      type: dbOutput.type as 'stdout' | 'stderr' | 'json',
+      data: dbOutput.type === 'json' ? JSON.parse(dbOutput.data) : dbOutput.data,
       timestamp: new Date(dbOutput.timestamp)
     }));
   }

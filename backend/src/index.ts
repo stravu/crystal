@@ -66,7 +66,10 @@ async function initialize() {
   });
 
   sessionManager.on('session-output', (output) => {
-    console.log('Emitting session output to WebSocket:', output.sessionId, output.data.substring(0, 50));
+    const dataPreview = typeof output.data === 'string' 
+      ? output.data.substring(0, 50) 
+      : JSON.stringify(output.data).substring(0, 50);
+    console.log('Emitting session output to WebSocket:', output.sessionId, dataPreview);
     io.emit('session:output', output);
   });
 
