@@ -27,14 +27,30 @@ export class WorktreeManager {
     const branchName = branch || name;
 
     try {
-      const checkBranchCmd = `cd ${this.mainRepoPath} && git show-ref --verify --quiet refs/heads/${branchName}`;
+      // Clean up any existing worktree directory first
       try {
-        await execAsync(checkBranchCmd);
+        await execAsync(`cd "${this.mainRepoPath}" && git worktree remove "${worktreePath}" --force 2>/dev/null || true`);
       } catch {
-        await execAsync(`cd ${this.mainRepoPath} && git branch ${branchName}`);
+        // Ignore cleanup errors
       }
 
-      await execAsync(`cd ${this.mainRepoPath} && git worktree add "${worktreePath}" ${branchName}`);
+      // Check if branch already exists
+      const checkBranchCmd = `cd "${this.mainRepoPath}" && git show-ref --verify --quiet refs/heads/${branchName}`;
+      let branchExists = false;
+      try {
+        await execAsync(checkBranchCmd);
+        branchExists = true;
+      } catch {
+        // Branch doesn't exist, will create it
+      }
+
+      if (branchExists) {
+        // Use existing branch
+        await execAsync(`cd "${this.mainRepoPath}" && git worktree add "${worktreePath}" ${branchName}`);
+      } else {
+        // Create new branch from current HEAD and add worktree
+        await execAsync(`cd "${this.mainRepoPath}" && git worktree add -b ${branchName} "${worktreePath}"`);
+      }
       
       return worktreePath;
     } catch (error) {

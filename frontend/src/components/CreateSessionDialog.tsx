@@ -57,7 +57,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
               id="prompt"
               value={formData.prompt}
               onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
               rows={4}
               required
               placeholder="Enter the prompt for Claude Code..."
@@ -73,7 +73,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
               type="text"
               value={formData.worktreeTemplate}
               onChange={(e) => setFormData({ ...formData, worktreeTemplate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
               required
               placeholder="e.g., feature-auth"
             />
@@ -90,7 +90,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
               max="10"
               value={formData.count}
               onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
             />
             <p className="text-xs text-gray-500 mt-1">
               Creates multiple sessions with numbered suffixes
