@@ -6,7 +6,7 @@ import type { Session, SessionOutput } from '../types/session';
 let socket: Socket | null = null;
 
 export function useSocket() {
-  const { setSessions, addSession, updateSession, deleteSession, addSessionOutput } = useSessionStore();
+  const { setSessions, loadSessions, addSession, updateSession, deleteSession, addSessionOutput } = useSessionStore();
   
   useEffect(() => {
     if (!socket) {
@@ -17,7 +17,11 @@ export function useSocket() {
       });
       
       socket.on('sessions:initial', (sessions: Session[]) => {
-        setSessions(sessions);
+        loadSessions(sessions); // Use loadSessions to mark as loaded
+      });
+      
+      socket.on('sessions:loaded', (sessions: Session[]) => {
+        loadSessions(sessions);
       });
       
       socket.on('session:created', (session: Session) => {
@@ -47,7 +51,7 @@ export function useSocket() {
         socket = null;
       }
     };
-  }, [setSessions, addSession, updateSession, deleteSession, addSessionOutput]);
+  }, [setSessions, loadSessions, addSession, updateSession, deleteSession, addSessionOutput]);
   
   return socket;
 }

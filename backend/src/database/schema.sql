@@ -1,0 +1,28 @@
+-- Sessions table to store persistent session data
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  worktree_name TEXT NOT NULL,
+  worktree_path TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_output TEXT,
+  exit_code INTEGER,
+  pid INTEGER
+);
+
+-- Session outputs table to store terminal output history
+CREATE TABLE IF NOT EXISTS session_outputs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  data TEXT NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_session_outputs_session_id ON session_outputs(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_outputs_timestamp ON session_outputs(timestamp);

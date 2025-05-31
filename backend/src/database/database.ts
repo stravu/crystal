@@ -1,0 +1,160 @@
+import sqlite3 from 'sqlite3';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { promisify } from 'util';
+import type { Session, SessionOutput, CreateSessionData, UpdateSessionData } from './models.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export class DatabaseService {
+  private db: sqlite3.Database;
+  private dbAll: (sql: string, params?: any[]) => Promise<any[]>;
+  private dbGet: (sql: string, params?: any[]) => Promise<any>;
+  private dbRun: (sql: string, params?: any[]) => Promise<{ lastID?: number; changes?: number }>;
+
+  constructor(dbPath: string) {
+    this.db = new sqlite3.Database(dbPath);
+    
+    // Promisify database methods
+    this.dbAll = promisify(this.db.all.bind(this.db));
+    this.dbGet = promisify(this.db.get.bind(this.db));
+    this.dbRun = promisify(this.db.run.bind(this.db));
+  }
+
+  async initialize(): Promise<void> {
+    await this.initializeSchema();
+  }
+
+  private async initializeSchema(): Promise<void> {
+    const schemaPath = join(__dirname, 'schema.sql');
+    const schema = readFileSync(schemaPath, 'utf-8');
+    
+    // Execute schema in parts (sqlite3 doesn't support multiple statements in exec)
+    const statements = schema.split(';').filter(stmt => stmt.trim());
+    for (const statement of statements) {
+      if (statement.trim()) {
+        await this.dbRun(statement.trim());
+      }
+    }
+  }
+
+  // Session operations
+  async createSession(data: CreateSessionData): Promise<Session> {
+    await this.dbRun(`
+      INSERT INTO sessions (id, name, prompt, worktree_name, worktree_path, status)
+      VALUES (?, ?, ?, ?, ?, 'pending')
+    `, [data.id, data.name, data.prompt, data.worktree_name, data.worktree_path]);
+    
+    const session = await this.getSession(data.id);
+    if (!session) {
+      throw new Error('Failed to create session');
+    }
+    return session;
+  }
+
+  async getSession(id: string): Promise<Session | undefined> {
+    return await this.dbGet('SELECT * FROM sessions WHERE id = ?', [id]) as Session | undefined;
+  }
+
+  async getAllSessions(): Promise<Session[]> {
+    return await this.dbAll('SELECT * FROM sessions ORDER BY created_at DESC') as Session[];
+  }
+
+  async updateSession(id: string, data: UpdateSessionData): Promise<Session | undefined> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (data.status !== undefined) {
+      updates.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.last_output !== undefined) {
+      updates.push('last_output = ?');
+      values.push(data.last_output);
+    }
+    if (data.exit_code !== undefined) {
+      updates.push('exit_code = ?');
+      values.push(data.exit_code);
+    }
+    if (data.pid !== undefined) {
+      updates.push('pid = ?');
+      values.push(data.pid);
+    }
+
+    if (updates.length === 0) {
+      return await this.getSession(id);
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    await this.dbRun(`
+      UPDATE sessions 
+      SET ${updates.join(', ')} 
+      WHERE id = ?
+    `, values);
+    
+    return await this.getSession(id);
+  }
+
+  async deleteSession(id: string): Promise<boolean> {
+    const result = await this.dbRun('DELETE FROM sessions WHERE id = ?', [id]);
+    return (result.changes || 0) > 0;
+  }
+
+  // Session output operations
+  async addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system', data: string): Promise<void> {
+    await this.dbRun(`
+      INSERT INTO session_outputs (session_id, type, data)
+      VALUES (?, ?, ?)
+    `, [sessionId, type, data]);
+  }
+
+  async getSessionOutputs(sessionId: string, limit?: number): Promise<SessionOutput[]> {
+    const limitClause = limit ? `LIMIT ${limit}` : '';
+    return await this.dbAll(`
+      SELECT * FROM session_outputs 
+      WHERE session_id = ? 
+      ORDER BY timestamp ASC 
+      ${limitClause}
+    `, [sessionId]) as SessionOutput[];
+  }
+
+  async getRecentSessionOutputs(sessionId: string, since?: Date): Promise<SessionOutput[]> {
+    if (since) {
+      return await this.dbAll(`
+        SELECT * FROM session_outputs 
+        WHERE session_id = ? AND timestamp > ? 
+        ORDER BY timestamp ASC
+      `, [sessionId, since.toISOString()]) as SessionOutput[];
+    } else {
+      return await this.getSessionOutputs(sessionId);
+    }
+  }
+
+  async clearSessionOutputs(sessionId: string): Promise<void> {
+    await this.dbRun('DELETE FROM session_outputs WHERE session_id = ?', [sessionId]);
+  }
+
+  // Cleanup operations
+  async getActiveSessions(): Promise<Session[]> {
+    return await this.dbAll("SELECT * FROM sessions WHERE status IN ('running', 'pending')") as Session[];
+  }
+
+  async markSessionsAsStopped(sessionIds: string[]): Promise<void> {
+    if (sessionIds.length === 0) return;
+    
+    const placeholders = sessionIds.map(() => '?').join(',');
+    await this.dbRun(`
+      UPDATE sessions 
+      SET status = 'stopped', updated_at = CURRENT_TIMESTAMP 
+      WHERE id IN (${placeholders})
+    `, sessionIds);
+  }
+
+  close(): void {
+    this.db.close();
+  }
+}

@@ -52,4 +52,8 @@ export class ConfigManager extends EventEmitter {
   isVerbose(): boolean {
     return this.config.verbose || false;
   }
+
+  getDatabasePath(): string {
+    return path.join(this.configDir, 'sessions.db');
+  }
 }

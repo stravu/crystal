@@ -6,6 +6,7 @@ import { Settings } from './Settings';
 
 export function Sidebar() {
   const sessions = useSessionStore((state) => state.sessions);
+  const isLoaded = useSessionStore((state) => state.isLoaded);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   return (
@@ -32,7 +33,11 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-2 text-sm text-gray-400 uppercase">Sessions</div>
         <div className="space-y-1 px-2">
-          {sessions.length === 0 ? (
+          {!isLoaded ? (
+            <div className="px-2 py-4 text-gray-500 text-sm text-center">
+              Loading sessions...
+            </div>
+          ) : sessions.length === 0 ? (
             <div className="px-2 py-4 text-gray-500 text-sm text-center">
               No sessions yet
             </div>

@@ -17,6 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.6",
+    "sqlite3": "^5.1.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -24,6 +25,7 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
+    "@types/sqlite3": "^3.1.11",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.29",

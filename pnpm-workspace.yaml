@@ -1,4 +1,6 @@
 packages:
-  - 'frontend'
-  - 'backend'
-  - 'shared'
+  - frontend
+  - backend
+  - shared
+ignoredBuiltDependencies:
+  - better-sqlite3

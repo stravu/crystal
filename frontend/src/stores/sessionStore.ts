@@ -4,8 +4,10 @@ import type { Session, SessionOutput } from '../types/session';
 interface SessionStore {
   sessions: Session[];
   activeSessionId: string | null;
+  isLoaded: boolean;
   
   setSessions: (sessions: Session[]) => void;
+  loadSessions: (sessions: Session[]) => void;
   addSession: (session: Session) => void;
   updateSession: (session: Session) => void;
   deleteSession: (session: Session) => void;
@@ -18,8 +20,11 @@ interface SessionStore {
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
+  isLoaded: false,
   
   setSessions: (sessions) => set({ sessions }),
+  
+  loadSessions: (sessions) => set({ sessions, isLoaded: true }),
   
   addSession: (session) => set((state) => ({
     sessions: [...state.sessions, session]

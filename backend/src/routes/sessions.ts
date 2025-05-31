@@ -13,17 +13,40 @@ export function createSessionRouter(
 ): Router {
   const router = Router();
 
-  router.get('/', (req: Request, res: Response) => {
-    const sessions = sessionManager.getAllSessions();
-    res.json(sessions);
+  router.get('/', async (req: Request, res: Response) => {
+    try {
+      const sessions = await sessionManager.getAllSessions();
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get sessions' });
+    }
   });
 
-  router.get('/:id', (req: Request, res: Response) => {
-    const session = sessionManager.getSession(req.params.id);
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+  router.get('/:id', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get session' });
     }
-    res.json(session);
+  });
+
+  router.get('/:id/output', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const outputs = await sessionManager.getSessionOutputs(req.params.id, limit);
+      res.json(outputs);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get session outputs' });
+    }
   });
 
   router.post('/', async (req: Request, res: Response) => {
@@ -46,16 +69,13 @@ export function createSessionRouter(
         const worktreePath = await getWorktreeManager().createWorktree(name);
         logger?.verbose(`Worktree created at: ${worktreePath}`);
         
-        const session = sessionManager.createSession(name, worktreePath, prompt);
+        const session = await sessionManager.createSession(name, worktreePath, prompt, name);
         logger?.verbose(`Session ${session.id} created`);
         
-        sessionManager.updateSession(session.id, { status: 'ready' });
+        await sessionManager.updateSession(session.id, { status: 'ready' });
         logger?.verbose(`Session ${session.id} marked as ready`);
         
         await claudeCodeManager.spawnClaudeCode(session.id, worktreePath, prompt);
-        
-        sessionManager.updateSession(session.id, { status: 'running' });
-        logger?.verbose(`Session ${session.id} marked as running`);
         
         sessions.push(session);
       }
@@ -72,7 +92,7 @@ export function createSessionRouter(
     }
   });
 
-  router.post('/:id/input', (req: Request, res: Response) => {
+  router.post('/:id/input', async (req: Request, res: Response) => {
     try {
       const { input } = req.body;
       
@@ -80,7 +100,7 @@ export function createSessionRouter(
         return res.status(400).json({ error: 'Input is required' });
       }
 
-      const session = sessionManager.getSession(req.params.id);
+      const session = await sessionManager.getSession(req.params.id);
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
@@ -99,19 +119,17 @@ export function createSessionRouter(
 
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
-      const session = sessionManager.getSession(req.params.id);
+      const session = await sessionManager.getSession(req.params.id);
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
 
       claudeCodeManager.killProcess(req.params.id);
       
-      const worktreeName = session.worktreePath.split('/').pop();
-      if (worktreeName) {
-        await getWorktreeManager().removeWorktree(worktreeName);
-      }
+      // Use the stored worktree name from the database
+      await getWorktreeManager().removeWorktree(session.name);
       
-      sessionManager.deleteSession(req.params.id);
+      await sessionManager.deleteSession(req.params.id);
       
       res.json({ success: true });
     } catch (error) {
