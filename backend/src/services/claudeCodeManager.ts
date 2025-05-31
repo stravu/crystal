@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import * as pty from 'node-pty';
 import type { Logger } from '../utils/logger.js';
+import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../utils/claudeCodeTest.js';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
@@ -20,6 +21,26 @@ export class ClaudeCodeManager extends EventEmitter {
     try {
       this.logger?.verbose(`Spawning Claude Code for session ${sessionId} in ${worktreePath}`);
       this.logger?.verbose(`Command: claude-code --prompt "${prompt}"`);
+      this.logger?.verbose(`Working directory: ${worktreePath}`);
+      
+      // Test if claude-code command exists and works
+      const availability = await testClaudeCodeAvailability();
+      if (!availability.available) {
+        this.logger?.error(`Claude Code not available: ${availability.error}`);
+        throw new Error(`Claude Code CLI not available: ${availability.error}`);
+      }
+      this.logger?.verbose(`Claude Code found: ${availability.version || 'version unknown'}`);
+      
+      // Test claude-code in the target directory
+      const directoryTest = await testClaudeCodeInDirectory(worktreePath);
+      if (!directoryTest.success) {
+        this.logger?.error(`Claude Code test failed in directory ${worktreePath}: ${directoryTest.error}`);
+        if (directoryTest.output) {
+          this.logger?.error(`Claude Code output: ${directoryTest.output}`);
+        }
+      } else {
+        this.logger?.verbose(`Claude Code works in target directory`);
+      }
       
       const ptyProcess = pty.spawn('claude-code', ['--prompt', prompt], {
         name: 'xterm-color',
@@ -38,8 +59,13 @@ export class ClaudeCodeManager extends EventEmitter {
       this.processes.set(sessionId, claudeProcess);
       this.logger?.verbose(`Claude Code process created for session ${sessionId}`);
 
+      let hasReceivedOutput = false;
+      let lastOutput = '';
+
       ptyProcess.onData((data: string) => {
-        this.logger?.verbose(`Output from session ${sessionId}: ${data.substring(0, 100)}...`);
+        hasReceivedOutput = true;
+        lastOutput += data;
+        this.logger?.verbose(`Output from session ${sessionId}: ${data.substring(0, 200)}`);
         this.emit('output', {
           sessionId,
           type: 'stdout',
@@ -49,7 +75,17 @@ export class ClaudeCodeManager extends EventEmitter {
       });
 
       ptyProcess.onExit(({ exitCode, signal }) => {
-        this.logger?.info(`Claude Code process exited for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
+        if (exitCode !== 0) {
+          this.logger?.error(`Claude Code process failed for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
+          if (!hasReceivedOutput) {
+            this.logger?.error(`No output received from Claude Code. This might indicate a startup failure.`);
+          } else {
+            this.logger?.error(`Last output from Claude Code: ${lastOutput.substring(-500)}`);
+          }
+        } else {
+          this.logger?.info(`Claude Code process exited normally for session ${sessionId}`);
+        }
+        
         this.emit('exit', {
           sessionId,
           exitCode,
