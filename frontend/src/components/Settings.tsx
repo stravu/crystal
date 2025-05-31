@@ -9,6 +9,7 @@ interface SettingsProps {
 export function Settings({ isOpen, onClose }: SettingsProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [gitRepoPath, setGitRepoPath] = useState('');
+  const [verbose, setVerbose] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +26,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       const data = await response.json();
       setConfig(data);
       setGitRepoPath(data.gitRepoPath);
+      setVerbose(data.verbose || false);
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -41,7 +43,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ gitRepoPath }),
+        body: JSON.stringify({ gitRepoPath, verbose }),
       });
 
       if (!response.ok) {
@@ -82,6 +84,21 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             />
             <p className="text-xs text-gray-500 mt-1">
               The path to the git repository where worktrees will be created
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={verbose}
+                onChange={(e) => setVerbose(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Enable verbose logging</span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1">
+              Shows detailed logs for debugging session creation and Claude Code execution
             </p>
           </div>
 

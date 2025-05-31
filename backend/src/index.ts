@@ -9,6 +9,7 @@ import { ClaudeCodeManager } from './services/claudeCodeManager.js';
 import { ConfigManager } from './services/configManager.js';
 import { createSessionRouter } from './routes/sessions.js';
 import { createConfigRouter } from './routes/config.js';
+import { Logger } from './utils/logger.js';
 
 dotenv.config();
 
@@ -22,9 +23,10 @@ const io = new Server(httpServer, {
 });
 
 const configManager = new ConfigManager(process.env.GIT_REPO_PATH);
+const logger = new Logger(configManager);
 const sessionManager = new SessionManager();
 let worktreeManager = new WorktreeManager(configManager.getGitRepoPath());
-const claudeCodeManager = new ClaudeCodeManager();
+const claudeCodeManager = new ClaudeCodeManager(logger);
 
 async function initialize() {
   await configManager.initialize();
@@ -60,11 +62,13 @@ async function initialize() {
     });
   });
 
-  claudeCodeManager.on('exit', ({ sessionId }) => {
+  claudeCodeManager.on('exit', ({ sessionId, exitCode, signal }) => {
+    logger.info(`Session ${sessionId} exited with code ${exitCode}, signal ${signal}`);
     sessionManager.updateSession(sessionId, { status: 'stopped' });
   });
 
   claudeCodeManager.on('error', ({ sessionId, error }) => {
+    logger.error(`Session ${sessionId} encountered an error: ${error}`);
     sessionManager.updateSession(sessionId, { 
       status: 'error',
       error 
@@ -79,7 +83,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager));
+app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, logger));
 app.use('/api/config', createConfigRouter(configManager));
 
 io.on('connection', (socket) => {

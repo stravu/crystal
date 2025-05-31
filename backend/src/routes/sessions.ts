@@ -3,11 +3,13 @@ import type { CreateSessionRequest } from '../types/session.js';
 import { SessionManager } from '../services/sessionManager.js';
 import { WorktreeManager } from '../services/worktreeManager.js';
 import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
+import type { Logger } from '../utils/logger.js';
 
 export function createSessionRouter(
   sessionManager: SessionManager,
   getWorktreeManager: () => WorktreeManager,
-  claudeCodeManager: ClaudeCodeManager
+  claudeCodeManager: ClaudeCodeManager,
+  logger?: Logger
 ): Router {
   const router = Router();
 
@@ -29,33 +31,43 @@ export function createSessionRouter(
       const { prompt, worktreeTemplate, count = 1 }: CreateSessionRequest = req.body;
 
       if (!prompt || !worktreeTemplate) {
+        logger?.warn('Session creation failed: missing prompt or worktree template');
         return res.status(400).json({ error: 'Prompt and worktreeTemplate are required' });
       }
 
+      logger?.info(`Creating ${count} session(s) with template: ${worktreeTemplate}`);
       const sessions = [];
 
       for (let i = 0; i < count; i++) {
         const name = count > 1 ? `${worktreeTemplate}-${i + 1}` : worktreeTemplate;
         
+        logger?.verbose(`Creating session ${name}...`);
+        
         const worktreePath = await getWorktreeManager().createWorktree(name);
+        logger?.verbose(`Worktree created at: ${worktreePath}`);
         
         const session = sessionManager.createSession(name, worktreePath, prompt);
+        logger?.verbose(`Session ${session.id} created`);
         
         sessionManager.updateSession(session.id, { status: 'ready' });
+        logger?.verbose(`Session ${session.id} marked as ready`);
         
         await claudeCodeManager.spawnClaudeCode(session.id, worktreePath, prompt);
         
         sessionManager.updateSession(session.id, { status: 'running' });
+        logger?.verbose(`Session ${session.id} marked as running`);
         
         sessions.push(session);
       }
 
+      logger?.info(`Successfully created ${sessions.length} session(s)`);
       res.status(201).json(sessions);
     } catch (error) {
-      console.error('Error creating session:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger?.error('Error creating session', error instanceof Error ? error : undefined);
       res.status(500).json({ 
         error: 'Failed to create session', 
-        details: error instanceof Error ? error.message : String(error) 
+        details: errorMessage 
       });
     }
   });

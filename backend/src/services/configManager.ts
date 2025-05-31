@@ -14,7 +14,8 @@ export class ConfigManager extends EventEmitter {
     this.configDir = path.join(os.homedir(), '.ccc');
     this.configPath = path.join(this.configDir, 'config.json');
     this.config = {
-      gitRepoPath: defaultGitPath || os.homedir()
+      gitRepoPath: defaultGitPath || os.homedir(),
+      verbose: false
     };
   }
 
@@ -46,5 +47,9 @@ export class ConfigManager extends EventEmitter {
 
   getGitRepoPath(): string {
     return this.config.gitRepoPath;
+  }
+
+  isVerbose(): boolean {
+    return this.config.verbose || false;
   }
 }
