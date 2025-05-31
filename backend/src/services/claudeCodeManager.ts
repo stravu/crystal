@@ -19,8 +19,8 @@ export class ClaudeCodeManager extends EventEmitter {
 
   async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string): Promise<void> {
     try {
-      this.logger?.verbose(`Spawning Claude Code for session ${sessionId} in ${worktreePath}`);
-      this.logger?.verbose(`Command: claude-code --prompt "${prompt}"`);
+      this.logger?.verbose(`Spawning Claude for session ${sessionId} in ${worktreePath}`);
+      this.logger?.verbose(`Command: claude -p "${prompt}"`);
       this.logger?.verbose(`Working directory: ${worktreePath}`);
       
       // Test if claude-code command exists and works
@@ -29,20 +29,20 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.error(`Claude Code not available: ${availability.error}`);
         throw new Error(`Claude Code CLI not available: ${availability.error}`);
       }
-      this.logger?.verbose(`Claude Code found: ${availability.version || 'version unknown'}`);
+      this.logger?.verbose(`Claude found: ${availability.version || 'version unknown'}`);
       
-      // Test claude-code in the target directory
+      // Test claude in the target directory
       const directoryTest = await testClaudeCodeInDirectory(worktreePath);
       if (!directoryTest.success) {
-        this.logger?.error(`Claude Code test failed in directory ${worktreePath}: ${directoryTest.error}`);
+        this.logger?.error(`Claude test failed in directory ${worktreePath}: ${directoryTest.error}`);
         if (directoryTest.output) {
-          this.logger?.error(`Claude Code output: ${directoryTest.output}`);
+          this.logger?.error(`Claude output: ${directoryTest.output}`);
         }
       } else {
-        this.logger?.verbose(`Claude Code works in target directory`);
+        this.logger?.verbose(`Claude works in target directory`);
       }
       
-      const ptyProcess = pty.spawn('claude-code', ['--prompt', prompt], {
+      const ptyProcess = pty.spawn('claude', ['-p', prompt], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
@@ -76,14 +76,14 @@ export class ClaudeCodeManager extends EventEmitter {
 
       ptyProcess.onExit(({ exitCode, signal }) => {
         if (exitCode !== 0) {
-          this.logger?.error(`Claude Code process failed for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
+          this.logger?.error(`Claude process failed for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
           if (!hasReceivedOutput) {
-            this.logger?.error(`No output received from Claude Code. This might indicate a startup failure.`);
+            this.logger?.error(`No output received from Claude. This might indicate a startup failure.`);
           } else {
-            this.logger?.error(`Last output from Claude Code: ${lastOutput.substring(-500)}`);
+            this.logger?.error(`Last output from Claude: ${lastOutput.substring(-500)}`);
           }
         } else {
-          this.logger?.info(`Claude Code process exited normally for session ${sessionId}`);
+          this.logger?.info(`Claude process exited normally for session ${sessionId}`);
         }
         
         this.emit('exit', {
@@ -95,10 +95,10 @@ export class ClaudeCodeManager extends EventEmitter {
       });
 
       this.emit('spawned', { sessionId });
-      this.logger?.info(`Claude Code spawned successfully for session ${sessionId}`);
+      this.logger?.info(`Claude spawned successfully for session ${sessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger?.error(`Failed to spawn Claude Code for session ${sessionId}`, error instanceof Error ? error : undefined);
+      this.logger?.error(`Failed to spawn Claude for session ${sessionId}`, error instanceof Error ? error : undefined);
       
       this.emit('error', {
         sessionId,

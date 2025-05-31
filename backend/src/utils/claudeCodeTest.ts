@@ -5,12 +5,12 @@ const execAsync = promisify(exec);
 
 export async function testClaudeCodeAvailability(): Promise<{ available: boolean; error?: string; version?: string }> {
   try {
-    // Test if claude-code exists
-    await execAsync('which claude-code');
+    // Test if claude exists
+    await execAsync('which claude');
     
     // Try to get version
     try {
-      const { stdout } = await execAsync('claude-code --version', { timeout: 5000 });
+      const { stdout } = await execAsync('claude --version', { timeout: 5000 });
       return { available: true, version: stdout.trim() };
     } catch (versionError) {
       // Command exists but version failed - might still work
@@ -26,7 +26,7 @@ export async function testClaudeCodeAvailability(): Promise<{ available: boolean
 
 export async function testClaudeCodeInDirectory(directory: string): Promise<{ success: boolean; error?: string; output?: string }> {
   try {
-    const { stdout, stderr } = await execAsync('claude-code --help', { 
+    const { stdout, stderr } = await execAsync('claude --help', { 
       cwd: directory,
       timeout: 10000 
     });
