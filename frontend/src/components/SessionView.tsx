@@ -1,16 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
   const activeSession = useSessionStore((state) => state.getActiveSession());
   const setSessionOutput = useSessionStore((state) => state.setSessionOutput);
-  const outputRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const terminalInstance = useRef<Terminal | null>(null);
+  const fitAddon = useRef<FitAddon | null>(null);
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
+  const lastProcessedOutputLength = useRef(0);
   
   useEffect(() => {
-    if (activeSession && activeSession.output.length === 0) {
-      // Fetch existing outputs when session is selected
+    if (!terminalRef.current || !activeSession) return;
+
+    // Initialize terminal if not already created
+    if (!terminalInstance.current) {
+      terminalInstance.current = new Terminal({
+        cursorBlink: true,
+        convertEol: true,
+        rows: 30,
+        cols: 80,
+        theme: {
+          background: '#1a1a1a',
+          foreground: '#d4d4d4',
+          cursor: '#d4d4d4',
+          black: '#000000',
+          red: '#cd3131',
+          green: '#0dbc79',
+          yellow: '#e5e510',
+          blue: '#2472c8',
+          magenta: '#bc3fbc',
+          cyan: '#11a8cd',
+          white: '#e5e5e5',
+          brightBlack: '#666666',
+          brightRed: '#f14c4c',
+          brightGreen: '#23d18b',
+          brightYellow: '#f5f543',
+          brightBlue: '#3b8eea',
+          brightMagenta: '#d670d6',
+          brightCyan: '#29b8db',
+          brightWhite: '#e5e5e5'
+        }
+      });
+      
+      fitAddon.current = new FitAddon();
+      terminalInstance.current.loadAddon(fitAddon.current);
+      terminalInstance.current.open(terminalRef.current);
+      fitAddon.current.fit();
+    }
+
+    // Clear terminal when switching sessions
+    terminalInstance.current.clear();
+    lastProcessedOutputLength.current = 0;
+
+    // Fetch existing outputs when session is selected
+    if (activeSession.output.length === 0) {
       setIsLoadingOutput(true);
       fetch(`/api/sessions/${activeSession.id}/output`)
         .then(res => res.json())
@@ -18,18 +66,52 @@ export function SessionView() {
           const outputData = outputs.map((o: any) => o.data).join('');
           if (outputData) {
             setSessionOutput(activeSession.id, outputData);
+            terminalInstance.current?.write(outputData);
           }
         })
         .catch(error => console.error('Error fetching session output:', error))
         .finally(() => setIsLoadingOutput(false));
+    } else {
+      // Write existing output
+      const fullOutput = activeSession.output.join('');
+      terminalInstance.current.write(fullOutput);
+      lastProcessedOutputLength.current = fullOutput.length;
     }
   }, [activeSession?.id]);
-  
+
   useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    if (!terminalInstance.current || !activeSession) return;
+
+    // Write only new output
+    const fullOutput = activeSession.output.join('');
+    if (fullOutput.length > lastProcessedOutputLength.current) {
+      const newOutput = fullOutput.substring(lastProcessedOutputLength.current);
+      terminalInstance.current.write(newOutput);
+      lastProcessedOutputLength.current = fullOutput.length;
     }
   }, [activeSession?.output]);
+
+  useEffect(() => {
+    // Cleanup terminal on unmount
+    return () => {
+      if (terminalInstance.current) {
+        terminalInstance.current.dispose();
+        terminalInstance.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Handle window resize
+    const handleResize = () => {
+      if (fitAddon.current && terminalInstance.current) {
+        fitAddon.current.fit();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   if (!activeSession) {
     return (
@@ -79,17 +161,11 @@ export function SessionView() {
         </div>
       </div>
       
-      <div 
-        ref={outputRef}
-        className="flex-1 bg-gray-900 text-gray-100 p-4 font-mono text-sm overflow-y-auto"
-      >
-        {isLoadingOutput ? (
-          <div className="text-gray-400">Loading output...</div>
-        ) : (
-          <pre className="whitespace-pre-wrap">
-            {activeSession.output.join('')}
-          </pre>
+      <div className="flex-1 relative bg-gray-900 overflow-hidden">
+        {isLoadingOutput && (
+          <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
         )}
+        <div ref={terminalRef} className="h-full" />
       </div>
       
       {activeSession.status === 'waiting' && (

@@ -42,7 +42,7 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.verbose(`Claude works in target directory`);
       }
       
-      const ptyProcess = pty.spawn('claude', ['-p', prompt], {
+      const ptyProcess = pty.spawn('claude', ['-p', prompt, '--verbose'], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
