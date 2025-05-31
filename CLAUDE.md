@@ -5,9 +5,9 @@
 Claude Code Commander (CCC) is a locally-run web application designed to manage multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
 
 ## References
-
-https://docs.anthropic.com/en/docs/claude-code/sdk
-https://docs.anthropic.com/en/docs/claude-code/tutorials#run-parallel-claude-code-sessions-with-git-worktrees
+Use these reference pages for more information:
+How to invoke Claude Code through the command line as an SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
+How to run multiple Claude Code instances with Git Worktrees: https://docs.anthropic.com/en/docs/claude-code/tutorials#run-parallel-claude-code-sessions-with-git-worktrees
 
 
 ## Original Prompt
