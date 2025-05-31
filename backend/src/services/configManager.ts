@@ -2,16 +2,19 @@ import { EventEmitter } from 'events';
 import type { AppConfig } from '../types/config.js';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 
 export class ConfigManager extends EventEmitter {
   private config: AppConfig;
   private configPath: string;
+  private configDir: string;
 
-  constructor(defaultGitPath: string) {
+  constructor(defaultGitPath?: string) {
     super();
-    this.configPath = path.join(process.cwd(), '.ccc-config.json');
+    this.configDir = path.join(os.homedir(), '.ccc');
+    this.configPath = path.join(this.configDir, 'config.json');
     this.config = {
-      gitRepoPath: defaultGitPath
+      gitRepoPath: defaultGitPath || os.homedir()
     };
   }
 
@@ -26,6 +29,7 @@ export class ConfigManager extends EventEmitter {
   }
 
   private async saveConfig(): Promise<void> {
+    await fs.mkdir(this.configDir, { recursive: true });
     await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
   }
 

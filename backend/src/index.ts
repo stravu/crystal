@@ -21,7 +21,7 @@ const io = new Server(httpServer, {
   }
 });
 
-const configManager = new ConfigManager(process.env.GIT_REPO_PATH || process.cwd());
+const configManager = new ConfigManager(process.env.GIT_REPO_PATH);
 const sessionManager = new SessionManager();
 let worktreeManager = new WorktreeManager(configManager.getGitRepoPath());
 const claudeCodeManager = new ClaudeCodeManager();
@@ -79,7 +79,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/sessions', createSessionRouter(sessionManager, worktreeManager, claudeCodeManager));
+app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager));
 app.use('/api/config', createConfigRouter(configManager));
 
 io.on('connection', (socket) => {

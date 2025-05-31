@@ -6,7 +6,7 @@ import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
 
 export function createSessionRouter(
   sessionManager: SessionManager,
-  worktreeManager: WorktreeManager,
+  getWorktreeManager: () => WorktreeManager,
   claudeCodeManager: ClaudeCodeManager
 ): Router {
   const router = Router();
@@ -37,7 +37,7 @@ export function createSessionRouter(
       for (let i = 0; i < count; i++) {
         const name = count > 1 ? `${worktreeTemplate}-${i + 1}` : worktreeTemplate;
         
-        const worktreePath = await worktreeManager.createWorktree(name);
+        const worktreePath = await getWorktreeManager().createWorktree(name);
         
         const session = sessionManager.createSession(name, worktreePath, prompt);
         
@@ -96,7 +96,7 @@ export function createSessionRouter(
       
       const worktreeName = session.worktreePath.split('/').pop();
       if (worktreeName) {
-        await worktreeManager.removeWorktree(worktreeName);
+        await getWorktreeManager().removeWorktree(worktreeName);
       }
       
       sessionManager.deleteSession(req.params.id);
