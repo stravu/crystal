@@ -1,0 +1,17 @@
+{
+  "name": "claude-code-commander",
+  "version": "1.0.0",
+  "description": "A locally-run web application for managing multiple Claude Code instances using git worktrees",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run -r build",
+    "preview": "pnpm run --filter frontend preview",
+    "lint": "pnpm run -r lint",
+    "typecheck": "pnpm run -r typecheck"
+  },
+  "keywords": ["claude", "code", "git", "worktree", "development"],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.7.0"
+}
