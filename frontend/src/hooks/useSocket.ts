@@ -37,6 +37,7 @@ export function useSocket() {
       });
       
       socket.on('session:output', (output: SessionOutput) => {
+        console.log('Received session output:', output);
         addSessionOutput(output);
       });
       

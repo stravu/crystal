@@ -66,6 +66,7 @@ async function initialize() {
   });
 
   sessionManager.on('session-output', (output) => {
+    console.log('Emitting session output to WebSocket:', output.sessionId, output.data.substring(0, 50));
     io.emit('session:output', output);
   });
 

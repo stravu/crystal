@@ -34,7 +34,7 @@ export class SessionManager extends EventEmitter {
       pid: dbSession.pid,
       createdAt: new Date(dbSession.created_at),
       lastActivity: new Date(dbSession.updated_at),
-      output: [], // Will be loaded separately if needed
+      output: [], // Will be loaded separately by frontend when needed
       error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined
     };
   }

@@ -13,6 +13,7 @@ interface SessionStore {
   deleteSession: (session: Session) => void;
   setActiveSession: (sessionId: string | null) => void;
   addSessionOutput: (output: SessionOutput) => void;
+  setSessionOutput: (sessionId: string, output: string) => void;
   
   getActiveSession: () => Session | undefined;
 }
@@ -32,7 +33,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   updateSession: (updatedSession) => set((state) => ({
     sessions: state.sessions.map(session => 
-      session.id === updatedSession.id ? updatedSession : session
+      session.id === updatedSession.id 
+        ? { ...updatedSession, output: session.output } // Preserve existing output
+        : session
     )
   })),
   
@@ -47,6 +50,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     sessions: state.sessions.map(session => 
       session.id === output.sessionId
         ? { ...session, output: [...session.output, output.data] }
+        : session
+    )
+  })),
+  
+  setSessionOutput: (sessionId, output) => set((state) => ({
+    sessions: state.sessions.map(session => 
+      session.id === sessionId
+        ? { ...session, output: [output] }
         : session
     )
   })),

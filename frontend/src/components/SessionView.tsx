@@ -3,8 +3,27 @@ import { useSessionStore } from '../stores/sessionStore';
 
 export function SessionView() {
   const activeSession = useSessionStore((state) => state.getActiveSession());
+  const setSessionOutput = useSessionStore((state) => state.setSessionOutput);
   const outputRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState('');
+  const [isLoadingOutput, setIsLoadingOutput] = useState(false);
+  
+  useEffect(() => {
+    if (activeSession && activeSession.output.length === 0) {
+      // Fetch existing outputs when session is selected
+      setIsLoadingOutput(true);
+      fetch(`/api/sessions/${activeSession.id}/output`)
+        .then(res => res.json())
+        .then(outputs => {
+          const outputData = outputs.map((o: any) => o.data).join('');
+          if (outputData) {
+            setSessionOutput(activeSession.id, outputData);
+          }
+        })
+        .catch(error => console.error('Error fetching session output:', error))
+        .finally(() => setIsLoadingOutput(false));
+    }
+  }, [activeSession?.id]);
   
   useEffect(() => {
     if (outputRef.current) {
@@ -64,9 +83,13 @@ export function SessionView() {
         ref={outputRef}
         className="flex-1 bg-gray-900 text-gray-100 p-4 font-mono text-sm overflow-y-auto"
       >
-        <pre className="whitespace-pre-wrap">
-          {activeSession.output.join('')}
-        </pre>
+        {isLoadingOutput ? (
+          <div className="text-gray-400">Loading output...</div>
+        ) : (
+          <pre className="whitespace-pre-wrap">
+            {activeSession.output.join('')}
+          </pre>
+        )}
       </div>
       
       {activeSession.status === 'waiting' && (
