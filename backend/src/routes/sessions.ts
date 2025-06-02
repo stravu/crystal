@@ -202,6 +202,48 @@ export function createSessionRouter(
     }
   });
 
+  router.get('/:id/diff/:compareId', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      const compareSession = await sessionManager.getSession(req.params.compareId);
+      
+      if (!session || !compareSession) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const worktreeManager = getWorktreeManager();
+      const fileChanges = await worktreeManager.getFileChanges(session.worktreePath, compareSession.worktreePath);
+      
+      res.json({ files: fileChanges });
+    } catch (error) {
+      logger?.error('Error getting session diff:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to get session diff', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  router.get('/:id/diff/:compareId/:filePath(*)', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      const compareSession = await sessionManager.getSession(req.params.compareId);
+      
+      if (!session || !compareSession) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const filePath = decodeURIComponent(req.params.filePath);
+      const worktreeManager = getWorktreeManager();
+      const diff = await worktreeManager.getFileDiff(session.worktreePath, compareSession.worktreePath, filePath);
+      
+      res.text(diff);
+    } catch (error) {
+      logger?.error('Error getting file diff:', error instanceof Error ? error : undefined);
+      res.status(500).text('Error loading diff');
+    }
+  });
+
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
       const session = await sessionManager.getSession(req.params.id);

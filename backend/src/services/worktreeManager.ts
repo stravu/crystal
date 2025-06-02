@@ -103,4 +103,57 @@ export class WorktreeManager {
       throw new Error(`Failed to list worktrees: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  async getFileChanges(worktreePath1: string, worktreePath2: string): Promise<Array<{ path: string; status: 'added' | 'modified' | 'deleted' }>> {
+    try {
+      // Use git diff to compare the two worktrees by comparing their working directories
+      const { stdout } = await execAsync(`cd "${worktreePath1}" && git diff --name-status "${worktreePath2}"`);
+      
+      const changes: Array<{ path: string; status: 'added' | 'modified' | 'deleted' }> = [];
+      const lines = stdout.trim().split('\n').filter(line => line.length > 0);
+      
+      for (const line of lines) {
+        const [statusChar, ...pathParts] = line.split('\t');
+        const path = pathParts.join('\t'); // Handle paths with tabs
+        
+        let status: 'added' | 'modified' | 'deleted';
+        switch (statusChar) {
+          case 'A':
+            status = 'added';
+            break;
+          case 'M':
+            status = 'modified';
+            break;
+          case 'D':
+            status = 'deleted';
+            break;
+          default:
+            status = 'modified'; // Default for other status codes
+        }
+        
+        changes.push({ path, status });
+      }
+      
+      return changes;
+    } catch (error) {
+      // If git diff fails, return empty array (no changes)
+      return [];
+    }
+  }
+
+  async getFileDiff(worktreePath1: string, worktreePath2: string, filePath: string): Promise<string> {
+    try {
+      // Get diff for a specific file between two worktrees
+      const { stdout } = await execAsync(`cd "${worktreePath1}" && git diff --no-index "${worktreePath2}/${filePath}" "${filePath}" || true`);
+      return stdout;
+    } catch (error) {
+      // If file doesn't exist in one or both locations, try different approaches
+      try {
+        const { stdout } = await execAsync(`cd "${this.mainRepoPath}" && git diff --no-index "${worktreePath1}/${filePath}" "${worktreePath2}/${filePath}" || true`);
+        return stdout;
+      } catch {
+        return `Error: Could not generate diff for ${filePath}`;
+      }
+    }
+  }
 }
