@@ -3,7 +3,6 @@ import { useSessionStore } from '../stores/sessionStore';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { JsonMessageView } from './JsonMessageView';
-import { DiffView } from './DiffView';
 import { StatusIndicator } from './StatusIndicator';
 import '@xterm/xterm/css/xterm.css';
 
@@ -15,7 +14,7 @@ export function SessionView() {
   const fitAddon = useRef<FitAddon | null>(null);
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
-  const [viewMode, setViewMode] = useState<'terminal' | 'messages' | 'diff'>('terminal');
+  const [viewMode, setViewMode] = useState<'terminal' | 'messages'>('terminal');
   const lastProcessedOutputLength = useRef(0);
   
   useEffect(() => {
@@ -217,16 +216,6 @@ export function SessionView() {
             >
               Messages ({activeSession.jsonMessages?.length || 0})
             </button>
-            <button
-              onClick={() => setViewMode('diff')}
-              className={`px-3 py-1 text-sm ${
-                viewMode === 'diff' 
-                  ? 'bg-blue-500 text-white' 
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Diff
-            </button>
           </div>
         </div>
       </div>
@@ -240,9 +229,6 @@ export function SessionView() {
         </div>
         <div className={`h-full ${viewMode === 'messages' ? 'block' : 'hidden'}`}>
           <JsonMessageView messages={activeSession.jsonMessages || []} />
-        </div>
-        <div className={`h-full ${viewMode === 'diff' ? 'block' : 'hidden'}`}>
-          <DiffView activeSession={activeSession} />
         </div>
       </div>
       
