@@ -249,6 +249,26 @@ export function createSessionRouter(
     }
   });
 
+  router.post('/:id/stop', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      claudeCodeManager.killProcess(req.params.id);
+      await sessionManager.updateSession(req.params.id, { status: 'stopped' });
+      
+      res.json({ success: true });
+    } catch (error) {
+      logger?.error('Error stopping session:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to stop session', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
       const session = await sessionManager.getSession(req.params.id);

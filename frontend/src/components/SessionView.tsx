@@ -191,6 +191,23 @@ export function SessionView() {
       terminalInstance.current.scrollToLine(marker.terminal_line);
     }
   };
+
+  const handleStopSession = async () => {
+    try {
+      const response = await fetch(`/api/sessions/${activeSession.id}/stop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to stop session');
+      }
+    } catch (error) {
+      console.error('Error stopping session:', error);
+    }
+  };
   
   return (
     <div className="flex-1 flex flex-col">
@@ -270,6 +287,16 @@ export function SessionView() {
                   <div className="text-xs text-gray-400">
                     {activeSession.status === 'initializing' ? '⚡' : '🧠'}
                   </div>
+                  <button
+                    onClick={handleStopSession}
+                    className="ml-2 px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors flex items-center space-x-1"
+                    title="Stop Claude Code"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>Cancel</span>
+                  </button>
                 </div>
               </div>
             )}
