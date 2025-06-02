@@ -11,6 +11,7 @@ import { DatabaseService } from './database/database.js';
 import { createSessionRouter } from './routes/sessions.js';
 import { createConfigRouter } from './routes/config.js';
 import { Logger } from './utils/logger.js';
+import { formatJsonForTerminal } from './utils/formatters.js';
 
 dotenv.config();
 
@@ -74,11 +75,26 @@ async function initialize() {
   });
 
   claudeCodeManager.on('output', async (output) => {
+    // Store the original output
     await sessionManager.addSessionOutput(output.sessionId, {
       type: output.type,
       data: output.data,
       timestamp: output.timestamp
     });
+    
+    // If it's a JSON message, also emit a formatted terminal version
+    if (output.type === 'json') {
+      const terminalText = formatJsonForTerminal(output.data);
+      if (terminalText) {
+        // Emit the terminal format immediately for real-time display
+        sessionManager.emit('session-output', {
+          sessionId: output.sessionId,
+          type: 'stdout',
+          data: terminalText,
+          timestamp: output.timestamp
+        });
+      }
+    }
   });
 
   claudeCodeManager.on('spawned', async ({ sessionId }) => {

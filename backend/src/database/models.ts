@@ -15,7 +15,7 @@ export interface Session {
 export interface SessionOutput {
   id: number;
   session_id: string;
-  type: 'stdout' | 'stderr' | 'system';
+  type: 'stdout' | 'stderr' | 'system' | 'json';
   data: string;
   timestamp: string;
 }

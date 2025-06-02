@@ -105,7 +105,7 @@ export class DatabaseService {
   }
 
   // Session output operations
-  async addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system', data: string): Promise<void> {
+  async addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json', data: string): Promise<void> {
     await this.dbRun(`
       INSERT INTO session_outputs (session_id, type, data)
       VALUES (?, ?, ?)

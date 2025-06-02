@@ -4,6 +4,7 @@ import { SessionManager } from '../services/sessionManager.js';
 import { WorktreeManager } from '../services/worktreeManager.js';
 import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
 import type { Logger } from '../utils/logger.js';
+import { formatJsonForTerminal } from '../utils/formatters.js';
 
 export function createSessionRouter(
   sessionManager: SessionManager,
@@ -43,7 +44,29 @@ export function createSessionRouter(
       
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const outputs = await sessionManager.getSessionOutputs(req.params.id, limit);
-      res.json(outputs);
+      
+      // Transform JSON messages to terminal format on the fly
+      const transformedOutputs = outputs.map(output => {
+        if (output.type === 'json') {
+          // Generate terminal format from JSON
+          const terminalText = formatJsonForTerminal(output.data);
+          if (terminalText) {
+            // Return both the JSON and a generated terminal version
+            return [
+              output, // Keep the JSON message for Messages view
+              {
+                ...output,
+                type: 'stdout' as const,
+                data: terminalText
+              }
+            ];
+          }
+          return [output]; // If no terminal format, just return JSON
+        }
+        return [output]; // Non-JSON outputs pass through
+      }).flat();
+      
+      res.json(transformedOutputs);
     } catch (error) {
       res.status(500).json({ error: 'Failed to get session outputs' });
     }
