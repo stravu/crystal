@@ -226,4 +226,9 @@ export class SessionManager extends EventEmitter {
   async getPromptMarkers(sessionId: string): Promise<PromptMarker[]> {
     return await this.db.getPromptMarkers(sessionId);
   }
+
+  async addInitialPromptMarker(sessionId: string, prompt: string): Promise<void> {
+    // Add the initial prompt as the first prompt marker (index 0)
+    await this.db.addPromptMarker(sessionId, prompt, 0, 0);
+  }
 }

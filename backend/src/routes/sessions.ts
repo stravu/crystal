@@ -114,6 +114,9 @@ export function createSessionRouter(
         // Store the initial prompt in conversation history
         await sessionManager.addConversationMessage(session.id, 'user', prompt);
         
+        // Add the initial prompt as a prompt marker so it shows in navigation
+        await sessionManager.addInitialPromptMarker(session.id, prompt);
+        
         await sessionManager.updateSession(session.id, { status: 'ready' });
         logger?.verbose(`Session ${session.id} marked as ready`);
         
