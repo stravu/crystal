@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom animations for the working indicator */
+@keyframes slide-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-slide-progress {
+  animation: slide-progress 2s ease-in-out infinite;
+}
+
+@keyframes typing-dots {
+  0%, 20% {
+    color: rgb(96 165 250); /* blue-400 */
+    transform: scale(1);
+  }
+  50% {
+    color: rgb(167 139 250); /* violet-400 */
+    transform: scale(1.2);
+  }
+  100% {
+    color: rgb(96 165 250); /* blue-400 */
+    transform: scale(1);
+  }
+}
+
+.animate-typing-dot {
+  animation: typing-dots 1.5s ease-in-out infinite;
+}

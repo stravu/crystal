@@ -248,8 +248,31 @@ export function SessionView() {
           {isLoadingOutput && (
             <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
           )}
-          <div className={`bg-gray-900 h-full ${viewMode === 'terminal' ? 'block' : 'hidden'}`}>
+          <div className={`bg-gray-900 h-full ${viewMode === 'terminal' ? 'block' : 'hidden'} relative`}>
             <div ref={terminalRef} className="h-full" />
+            {/* Working indicator */}
+            {(activeSession.status === 'running' || activeSession.status === 'initializing') && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-4 py-2">
+                <div className="flex items-center space-x-3 text-gray-300">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot"></div>
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                  <span className="text-sm font-medium">
+                    {activeSession.status === 'initializing' ? 'Starting Claude Code...' : 'Claude is working...'}
+                  </span>
+                  <div className="flex-1 ml-4">
+                    <div className="h-1 bg-gray-600 rounded-full overflow-hidden relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-400 to-transparent w-1/3 animate-slide-progress"></div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {activeSession.status === 'initializing' ? '⚡' : '🧠'}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className={`h-full ${viewMode === 'messages' ? 'block' : 'hidden'}`}>
             <JsonMessageView messages={activeSession.jsonMessages || []} />
