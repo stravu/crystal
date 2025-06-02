@@ -14,6 +14,7 @@ import { createConfigRouter } from './routes/config.js';
 import { createPromptsRouter } from './routes/prompts.js';
 import { Logger } from './utils/logger.js';
 import { formatJsonForTerminal } from './utils/formatters.js';
+import { formatJsonForTerminalEnhanced } from './utils/toolFormatter.js';
 
 dotenv.config();
 
@@ -129,7 +130,8 @@ async function initialize() {
     
     // If it's a JSON message, also emit a formatted terminal version
     if (output.type === 'json') {
-      const terminalText = formatJsonForTerminal(output.data);
+      // Use enhanced formatter for better tool display
+      const terminalText = formatJsonForTerminalEnhanced(output.data, configManager.getGitRepoPath());
       if (terminalText) {
         // Emit the terminal format immediately for real-time display
         sessionManager.emit('session-output', {
@@ -166,7 +168,7 @@ async function initialize() {
   });
 
   // Add routes after everything is initialized
-  app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, worktreeNameGenerator, logger));
+  app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, worktreeNameGenerator, logger, () => configManager.getGitRepoPath()));
   app.use('/api/config', createConfigRouter(configManager));
   app.use('/api/prompts', createPromptsRouter(sessionManager, logger));
 

@@ -6,13 +6,15 @@ import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
 import { WorktreeNameGenerator } from '../services/worktreeNameGenerator.js';
 import type { Logger } from '../utils/logger.js';
 import { formatJsonForTerminal } from '../utils/formatters.js';
+import { formatJsonForTerminalEnhanced } from '../utils/toolFormatter.js';
 
 export function createSessionRouter(
   sessionManager: SessionManager,
   getWorktreeManager: () => WorktreeManager,
   claudeCodeManager: ClaudeCodeManager,
   worktreeNameGenerator: WorktreeNameGenerator,
-  logger?: Logger
+  logger?: Logger,
+  getGitRepoPath?: () => string
 ): Router {
   const router = Router();
 
@@ -50,8 +52,8 @@ export function createSessionRouter(
       // Transform JSON messages to terminal format on the fly
       const transformedOutputs = outputs.map(output => {
         if (output.type === 'json') {
-          // Generate terminal format from JSON
-          const terminalText = formatJsonForTerminal(output.data);
+          // Generate terminal format from JSON using enhanced formatter
+          const terminalText = formatJsonForTerminalEnhanced(output.data, getGitRepoPath?.());
           if (terminalText) {
             // Return both the JSON and a generated terminal version
             return [
