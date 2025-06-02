@@ -10,6 +10,7 @@ export interface Session {
   last_output?: string;
   exit_code?: number;
   pid?: number;
+  archived?: boolean;
 }
 
 export interface SessionOutput {

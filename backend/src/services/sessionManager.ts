@@ -144,14 +144,14 @@ export class SessionManager extends EventEmitter {
     }));
   }
 
-  async deleteSession(id: string): Promise<void> {
-    const success = await this.db.deleteSession(id);
+  async archiveSession(id: string): Promise<void> {
+    const success = await this.db.archiveSession(id);
     if (!success) {
       throw new Error(`Session ${id} not found`);
     }
 
     this.activeSessions.delete(id);
-    this.emit('session-deleted', { id });
+    this.emit('session-deleted', { id }); // Keep the same event name for frontend compatibility
   }
 
   async stopSession(id: string): Promise<void> {

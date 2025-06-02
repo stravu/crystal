@@ -25,6 +25,7 @@ export class DatabaseService {
 
   async initialize(): Promise<void> {
     await this.initializeSchema();
+    await this.runMigrations();
   }
 
   private async initializeSchema(): Promise<void> {
@@ -37,6 +38,18 @@ export class DatabaseService {
       if (statement.trim()) {
         await this.dbRun(statement.trim());
       }
+    }
+  }
+
+  private async runMigrations(): Promise<void> {
+    // Check if archived column exists
+    const tableInfo = await this.dbAll("PRAGMA table_info(sessions)");
+    const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
+    
+    if (!hasArchivedColumn) {
+      // Run migration to add archived column
+      await this.dbRun("ALTER TABLE sessions ADD COLUMN archived BOOLEAN DEFAULT 0");
+      await this.dbRun("CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived)");
     }
   }
 
@@ -59,7 +72,7 @@ export class DatabaseService {
   }
 
   async getAllSessions(): Promise<Session[]> {
-    return await this.dbAll('SELECT * FROM sessions ORDER BY created_at DESC') as Session[];
+    return await this.dbAll('SELECT * FROM sessions WHERE archived = 0 OR archived IS NULL ORDER BY created_at DESC') as Session[];
   }
 
   async updateSession(id: string, data: UpdateSessionData): Promise<Session | undefined> {
@@ -99,8 +112,8 @@ export class DatabaseService {
     return await this.getSession(id);
   }
 
-  async deleteSession(id: string): Promise<boolean> {
-    const result = await this.dbRun('DELETE FROM sessions WHERE id = ?', [id]);
+  async archiveSession(id: string): Promise<boolean> {
+    const result = await this.dbRun('UPDATE sessions SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
     return (result.changes || 0) > 0;
   }
 

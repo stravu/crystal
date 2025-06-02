@@ -152,7 +152,7 @@ export function createSessionRouter(
       // Use the stored worktree name from the database
       await getWorktreeManager().removeWorktree(session.name);
       
-      await sessionManager.deleteSession(req.params.id);
+      await sessionManager.archiveSession(req.params.id);
       
       res.json({ success: true });
     } catch (error) {
