@@ -13,6 +13,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [gitRepoPath, setGitRepoPath] = useState('');
   const [verbose, setVerbose] = useState(false);
   const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [systemPromptAppend, setSystemPromptAppend] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications'>('general');
@@ -33,6 +34,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setGitRepoPath(data.gitRepoPath);
       setVerbose(data.verbose || false);
       setOpenaiApiKey(data.openaiApiKey || '');
+      setSystemPromptAppend(data.systemPromptAppend || '');
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -49,7 +51,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ gitRepoPath, verbose, openaiApiKey }),
+        body: JSON.stringify({ gitRepoPath, verbose, openaiApiKey, systemPromptAppend }),
       });
 
       if (!response.ok) {
@@ -157,6 +159,23 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             />
             <p className="text-xs text-gray-500 mt-1">
               Required for auto-generating worktree names with AI. If not provided, fallback names will be used.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="systemPromptAppend" className="block text-sm font-medium text-gray-700 mb-1">
+              System Prompt Append (Optional)
+            </label>
+            <textarea
+              id="systemPromptAppend"
+              value={systemPromptAppend}
+              onChange={(e) => setSystemPromptAppend(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+              placeholder="Additional instructions to append to every prompt..."
+              rows={3}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This text will be automatically appended to every initial prompt sent to Claude Code. Useful for enforcing coding standards, preferences, or project-specific instructions.
             </p>
           </div>
 

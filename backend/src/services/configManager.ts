@@ -16,7 +16,8 @@ export class ConfigManager extends EventEmitter {
     this.config = {
       gitRepoPath: defaultGitPath || os.homedir(),
       verbose: false,
-      openaiApiKey: undefined
+      openaiApiKey: undefined,
+      systemPromptAppend: undefined
     };
   }
 
@@ -60,5 +61,9 @@ export class ConfigManager extends EventEmitter {
 
   getOpenAIApiKey(): string | undefined {
     return this.config.openaiApiKey;
+  }
+
+  getSystemPromptAppend(): string | undefined {
+    return this.config.systemPromptAppend;
   }
 }

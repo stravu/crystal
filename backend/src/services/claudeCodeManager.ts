@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import * as pty from 'node-pty';
 import type { Logger } from '../utils/logger.js';
 import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../utils/claudeCodeTest.js';
+import type { ConfigManager } from './configManager.js';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
@@ -12,7 +13,7 @@ interface ClaudeCodeProcess {
 export class ClaudeCodeManager extends EventEmitter {
   private processes: Map<string, ClaudeCodeProcess> = new Map();
 
-  constructor(private logger?: Logger) {
+  constructor(private logger?: Logger, private configManager?: ConfigManager) {
     super();
   }
 
@@ -44,12 +45,20 @@ export class ClaudeCodeManager extends EventEmitter {
       // Build the command arguments for conversation continuation
       const args = ['--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'];
       
+      // Get system prompt append from config
+      const systemPromptAppend = this.configManager?.getSystemPromptAppend();
+      
       if (conversationHistory && conversationHistory.length > 0) {
         // If we have conversation history, use it to continue the conversation
         args.push('-p', conversationHistory.join('\n\n'));
       } else {
         // Initial prompt for new session
-        args.push('-p', prompt);
+        let finalPrompt = prompt;
+        if (systemPromptAppend) {
+          // Append the system prompt to the user's prompt
+          finalPrompt = `${prompt}\n\n${systemPromptAppend}`;
+        }
+        args.push('-p', finalPrompt);
       }
 
       const ptyProcess = pty.spawn('claude', args, {

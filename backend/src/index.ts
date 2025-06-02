@@ -32,7 +32,7 @@ const logger = new Logger(configManager);
 let databaseService: DatabaseService;
 let sessionManager: SessionManager;
 let worktreeManager = new WorktreeManager(configManager.getGitRepoPath());
-const claudeCodeManager = new ClaudeCodeManager(logger);
+const claudeCodeManager = new ClaudeCodeManager(logger, configManager);
 let worktreeNameGenerator: WorktreeNameGenerator;
 
 async function initialize() {
