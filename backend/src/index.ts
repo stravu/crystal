@@ -7,6 +7,7 @@ import { SessionManager } from './services/sessionManager.js';
 import { WorktreeManager } from './services/worktreeManager.js';
 import { ClaudeCodeManager } from './services/claudeCodeManager.js';
 import { ConfigManager } from './services/configManager.js';
+import { WorktreeNameGenerator } from './services/worktreeNameGenerator.js';
 import { DatabaseService } from './database/database.js';
 import { createSessionRouter } from './routes/sessions.js';
 import { createConfigRouter } from './routes/config.js';
@@ -31,6 +32,7 @@ let databaseService: DatabaseService;
 let sessionManager: SessionManager;
 let worktreeManager = new WorktreeManager(configManager.getGitRepoPath());
 const claudeCodeManager = new ClaudeCodeManager(logger);
+let worktreeNameGenerator: WorktreeNameGenerator;
 
 async function initialize() {
   await configManager.initialize();
@@ -42,6 +44,9 @@ async function initialize() {
   
   worktreeManager = new WorktreeManager(configManager.getGitRepoPath());
   await worktreeManager.initialize();
+  
+  // Initialize worktree name generator
+  worktreeNameGenerator = new WorktreeNameGenerator(configManager);
   
   // Initialize session manager with persisted sessions
   await sessionManager.initializeFromDatabase();
@@ -161,7 +166,7 @@ async function initialize() {
   });
 
   // Add routes after everything is initialized
-  app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, logger));
+  app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, worktreeNameGenerator, logger));
   app.use('/api/config', createConfigRouter(configManager));
   app.use('/api/prompts', createPromptsRouter(sessionManager, logger));
 

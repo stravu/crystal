@@ -12,6 +12,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [_config, setConfig] = useState<AppConfig | null>(null);
   const [gitRepoPath, setGitRepoPath] = useState('');
   const [verbose, setVerbose] = useState(false);
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications'>('general');
@@ -31,6 +32,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setConfig(data);
       setGitRepoPath(data.gitRepoPath);
       setVerbose(data.verbose || false);
+      setOpenaiApiKey(data.openaiApiKey || '');
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -47,7 +49,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ gitRepoPath, verbose }),
+        body: JSON.stringify({ gitRepoPath, verbose, openaiApiKey }),
       });
 
       if (!response.ok) {
@@ -138,6 +140,23 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             </label>
             <p className="text-xs text-gray-500 mt-1">
               Shows detailed logs for debugging session creation and Claude Code execution
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="openaiApiKey" className="block text-sm font-medium text-gray-700 mb-1">
+              OpenAI API Key (Optional)
+            </label>
+            <input
+              id="openaiApiKey"
+              type="password"
+              value={openaiApiKey}
+              onChange={(e) => setOpenaiApiKey(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+              placeholder="sk-..."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Required for auto-generating worktree names with AI. If not provided, fallback names will be used.
             </p>
           </div>
 

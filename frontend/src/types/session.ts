@@ -14,7 +14,7 @@ export interface Session {
 
 export interface CreateSessionRequest {
   prompt: string;
-  worktreeTemplate: string;
+  worktreeTemplate?: string;
   count?: number;
 }
 

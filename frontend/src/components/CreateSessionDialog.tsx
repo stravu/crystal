@@ -66,7 +66,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
           
           <div>
             <label htmlFor="worktreeTemplate" className="block text-sm font-medium text-gray-700 mb-1">
-              Worktree Name Template
+              Worktree Name Template (Optional)
             </label>
             <input
               id="worktreeTemplate"
@@ -74,9 +74,11 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
               value={formData.worktreeTemplate}
               onChange={(e) => setFormData({ ...formData, worktreeTemplate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              required
-              placeholder="e.g., feature-auth"
+              placeholder="Leave empty for auto-generated name"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Names are auto-generated using AI based on your prompt. You can override by entering a custom name.
+            </p>
           </div>
           
           <div>

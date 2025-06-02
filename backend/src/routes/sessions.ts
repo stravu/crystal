@@ -3,6 +3,7 @@ import type { CreateSessionRequest } from '../types/session.js';
 import { SessionManager } from '../services/sessionManager.js';
 import { WorktreeManager } from '../services/worktreeManager.js';
 import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
+import { WorktreeNameGenerator } from '../services/worktreeNameGenerator.js';
 import type { Logger } from '../utils/logger.js';
 import { formatJsonForTerminal } from '../utils/formatters.js';
 
@@ -10,6 +11,7 @@ export function createSessionRouter(
   sessionManager: SessionManager,
   getWorktreeManager: () => WorktreeManager,
   claudeCodeManager: ClaudeCodeManager,
+  worktreeNameGenerator: WorktreeNameGenerator,
   logger?: Logger
 ): Router {
   const router = Router();
@@ -76,16 +78,28 @@ export function createSessionRouter(
     try {
       const { prompt, worktreeTemplate, count = 1 }: CreateSessionRequest = req.body;
 
-      if (!prompt || !worktreeTemplate) {
-        logger?.warn('Session creation failed: missing prompt or worktree template');
-        return res.status(400).json({ error: 'Prompt and worktreeTemplate are required' });
+      if (!prompt) {
+        logger?.warn('Session creation failed: missing prompt');
+        return res.status(400).json({ error: 'Prompt is required' });
       }
 
-      logger?.info(`Creating ${count} session(s) with template: ${worktreeTemplate}`);
+      logger?.info(`Creating ${count} session(s) with auto-generated names`);
       const sessions = [];
 
       for (let i = 0; i < count; i++) {
-        const name = count > 1 ? `${worktreeTemplate}-${i + 1}` : worktreeTemplate;
+        // Generate a unique worktree name using the prompt
+        let name: string;
+        if (worktreeTemplate) {
+          // Use provided template if available
+          name = count > 1 ? `${worktreeTemplate}-${i + 1}` : worktreeTemplate;
+        } else {
+          // Auto-generate name using GPT-4.1
+          name = await worktreeNameGenerator.generateUniqueWorktreeName(prompt);
+          // If multiple sessions, add counter
+          if (count > 1) {
+            name = `${name}-${i + 1}`;
+          }
+        }
         
         logger?.verbose(`Creating session ${name}...`);
         

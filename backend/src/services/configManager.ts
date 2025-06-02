@@ -15,7 +15,8 @@ export class ConfigManager extends EventEmitter {
     this.configPath = path.join(this.configDir, 'config.json');
     this.config = {
       gitRepoPath: defaultGitPath || os.homedir(),
-      verbose: false
+      verbose: false,
+      openaiApiKey: undefined
     };
   }
 
@@ -55,5 +56,9 @@ export class ConfigManager extends EventEmitter {
 
   getDatabasePath(): string {
     return path.join(this.configDir, 'sessions.db');
+  }
+
+  getOpenAIApiKey(): string | undefined {
+    return this.config.openaiApiKey;
   }
 }
