@@ -26,7 +26,16 @@ export function formatJsonForTerminal(jsonMessage: any): string {
         content = jsonMessage.message.content
           .map((item: any) => {
             if (item.type === 'text') return item.text;
-            if (item.type === 'tool_result') return `Tool result: ${item.content}`;
+            if (item.type === 'tool_result') {
+              // Limit tool results to 10 lines
+              const toolContent = item.content || '';
+              const lines = toolContent.split('\n');
+              const truncated = lines.slice(0, 10);
+              const truncatedContent = truncated.join('\n');
+              const hasMore = lines.length > 10;
+              
+              return `Tool result: ${item.tool_use_id ? `[${item.tool_use_id}]` : ''}\n${truncatedContent}${hasMore ? `\n... (${lines.length - 10} more lines)` : ''}`;
+            }
             return JSON.stringify(item);
           })
           .join(' ');
@@ -49,11 +58,23 @@ export function formatJsonForTerminal(jsonMessage: any): string {
       if (Array.isArray(jsonMessage.message.content)) {
         content = jsonMessage.message.content
           .map((item: any) => {
-            if (item.type === 'text') return item.text;
-            if (item.type === 'tool_use') return `[Using tool: ${item.name}]`;
+            if (item.type === 'text') {
+              // Don't truncate text content
+              return item.text;
+            }
+            if (item.type === 'tool_use') {
+              // Show tool use with parameters, but limit parameter display
+              const params = item.input ? JSON.stringify(item.input, null, 2) : '';
+              const lines = params.split('\n');
+              if (lines.length > 10) {
+                const truncated = lines.slice(0, 10).join('\n');
+                return `[Using tool: ${item.name}]\nParameters:\n${truncated}\n... (${lines.length - 10} more lines)`;
+              }
+              return `[Using tool: ${item.name}]${params ? `\nParameters:\n${params}` : ''}`;
+            }
             return JSON.stringify(item);
           })
-          .join(' ');
+          .join('\n\n');
       } else if (typeof jsonMessage.message.content === 'string') {
         content = jsonMessage.message.content;
       }
