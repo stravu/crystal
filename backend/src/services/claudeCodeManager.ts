@@ -191,15 +191,51 @@ export class ClaudeCodeManager extends EventEmitter {
     }
     
     if (jsonMessage.type === 'user') {
-      const content = jsonMessage.content || '';
-      const preview = content.length > 100 ? content.substring(0, 100) + '...' : content;
+      let content = '';
+      
+      // Extract content from the message structure
+      if (jsonMessage.message?.content) {
+        if (Array.isArray(jsonMessage.message.content)) {
+          content = jsonMessage.message.content
+            .map((item: any) => {
+              if (item.type === 'text') return item.text;
+              if (item.type === 'tool_result') return `Tool result: ${item.content}`;
+              return JSON.stringify(item);
+            })
+            .join(' ');
+        } else if (typeof jsonMessage.message.content === 'string') {
+          content = jsonMessage.message.content;
+        }
+      }
+      
+      if (!content) return ''; // Skip if no content
+      
+      const preview = content.length > 150 ? content.substring(0, 150) + '...' : content;
       return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[32m👤 User Input\x1b[0m\r\n` +
              `\x1b[37m${preview}\x1b[0m\r\n\r\n`;
     }
     
     if (jsonMessage.type === 'assistant') {
-      const content = jsonMessage.content || '';
-      const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+      let content = '';
+      
+      // Extract content from the message structure
+      if (jsonMessage.message?.content) {
+        if (Array.isArray(jsonMessage.message.content)) {
+          content = jsonMessage.message.content
+            .map((item: any) => {
+              if (item.type === 'text') return item.text;
+              if (item.type === 'tool_use') return `[Using tool: ${item.name}]`;
+              return JSON.stringify(item);
+            })
+            .join(' ');
+        } else if (typeof jsonMessage.message.content === 'string') {
+          content = jsonMessage.message.content;
+        }
+      }
+      
+      if (!content) return ''; // Skip if no content
+      
+      const preview = content.length > 300 ? content.substring(0, 300) + '...' : content;
       return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[35m🤖 Assistant Response\x1b[0m\r\n` +
              `\x1b[37m${preview}\x1b[0m\r\n\r\n`;
     }
