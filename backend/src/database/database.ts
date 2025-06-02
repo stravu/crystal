@@ -86,6 +86,24 @@ export class DatabaseService {
         await this.dbRun("CREATE INDEX idx_conversation_messages_timestamp ON conversation_messages(timestamp)");
       }
     }
+
+    // Check if prompt_markers table exists
+    const promptMarkersTable = await this.dbAll("SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_markers'");
+    if (promptMarkersTable.length === 0) {
+      await this.dbRun(`
+        CREATE TABLE prompt_markers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          prompt_text TEXT NOT NULL,
+          output_index INTEGER NOT NULL,
+          terminal_line INTEGER,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        )
+      `);
+      await this.dbRun("CREATE INDEX idx_prompt_markers_session_id ON prompt_markers(session_id)");
+      await this.dbRun("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)");
+    }
   }
 
   // Session operations
