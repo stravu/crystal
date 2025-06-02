@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import type { Session, SessionOutput } from '../types/session';
 
+interface CreateSessionRequest {
+  prompt: string;
+  worktreeTemplate: string;
+  count: number;
+}
+
 interface SessionStore {
   sessions: Session[];
   activeSessionId: string | null;
@@ -14,6 +20,7 @@ interface SessionStore {
   setActiveSession: (sessionId: string | null) => void;
   addSessionOutput: (output: SessionOutput) => void;
   setSessionOutput: (sessionId: string, output: string) => void;
+  createSession: (request: CreateSessionRequest) => Promise<void>;
   
   getActiveSession: () => Session | undefined;
 }
@@ -63,6 +70,27 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         : session
     )
   })),
+  
+  createSession: async (request) => {
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create session');
+      }
+
+      // Sessions will be added via WebSocket, no need to manually add here
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
+  },
   
   getActiveSession: () => {
     const state = get();

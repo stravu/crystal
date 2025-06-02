@@ -190,4 +190,24 @@ export class SessionManager extends EventEmitter {
     await this.db.clearConversationMessages(id);
     await this.db.clearSessionOutputs(id);
   }
+
+  async getPromptHistory(): Promise<Array<{
+    id: string;
+    prompt: string;
+    sessionName: string;
+    sessionId: string;
+    createdAt: string;
+    status: string;
+  }>> {
+    const sessions = await this.db.getAllSessions();
+    
+    return sessions.map(session => ({
+      id: session.id,
+      prompt: session.initial_prompt,
+      sessionName: session.name,
+      sessionId: session.id,
+      createdAt: session.created_at,
+      status: session.status
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
 }

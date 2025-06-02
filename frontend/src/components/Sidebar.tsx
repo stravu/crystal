@@ -4,7 +4,14 @@ import { SessionListItem } from './SessionListItem';
 import { CreateSessionButton } from './CreateSessionButton';
 import { Settings } from './Settings';
 
-export function Sidebar() {
+type ViewMode = 'sessions' | 'prompts';
+
+interface SidebarProps {
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+}
+
+export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
   const sessions = useSessionStore((state) => state.sessions);
   const isLoaded = useSessionStore((state) => state.isLoaded);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -26,28 +33,58 @@ export function Sidebar() {
           </button>
         </div>
         
-        <div className="p-4">
-          <CreateSessionButton />
+        {/* Navigation Tabs */}
+        <div className="border-b border-gray-700">
+          <div className="flex">
+            <button
+              onClick={() => onViewModeChange('sessions')}
+              className={`flex-1 px-4 py-3 text-sm font-medium ${
+                viewMode === 'sessions'
+                  ? 'bg-gray-700 text-white border-b-2 border-blue-500'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              Sessions
+            </button>
+            <button
+              onClick={() => onViewModeChange('prompts')}
+              className={`flex-1 px-4 py-3 text-sm font-medium ${
+                viewMode === 'prompts'
+                  ? 'bg-gray-700 text-white border-b-2 border-blue-500'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              Prompts
+            </button>
+          </div>
         </div>
+        
+        {viewMode === 'sessions' && (
+          <div className="p-4">
+            <CreateSessionButton />
+          </div>
+        )}
       
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-2 text-sm text-gray-400 uppercase">Sessions</div>
-        <div className="space-y-1 px-2">
-          {!isLoaded ? (
-            <div className="px-2 py-4 text-gray-500 text-sm text-center">
-              Loading sessions...
-            </div>
-          ) : sessions.length === 0 ? (
-            <div className="px-2 py-4 text-gray-500 text-sm text-center">
-              No sessions yet
-            </div>
-          ) : (
-            sessions.map((session) => (
-              <SessionListItem key={session.id} session={session} />
-            ))
-          )}
+      {viewMode === 'sessions' && (
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 py-2 text-sm text-gray-400 uppercase">Sessions</div>
+          <div className="space-y-1 px-2">
+            {!isLoaded ? (
+              <div className="px-2 py-4 text-gray-500 text-sm text-center">
+                Loading sessions...
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="px-2 py-4 text-gray-500 text-sm text-center">
+                No sessions yet
+              </div>
+            ) : (
+              sessions.map((session) => (
+                <SessionListItem key={session.id} session={session} />
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
       
       <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

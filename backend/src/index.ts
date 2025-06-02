@@ -10,6 +10,7 @@ import { ConfigManager } from './services/configManager.js';
 import { DatabaseService } from './database/database.js';
 import { createSessionRouter } from './routes/sessions.js';
 import { createConfigRouter } from './routes/config.js';
+import { createPromptsRouter } from './routes/prompts.js';
 import { Logger } from './utils/logger.js';
 import { formatJsonForTerminal } from './utils/formatters.js';
 
@@ -162,6 +163,7 @@ async function initialize() {
   // Add routes after everything is initialized
   app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, logger));
   app.use('/api/config', createConfigRouter(configManager));
+  app.use('/api/prompts', createPromptsRouter(sessionManager, logger));
 
   // Set up WebSocket handling after sessionManager is ready
   io.on('connection', async (socket) => {
