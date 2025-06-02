@@ -110,6 +110,10 @@ export class DatabaseService {
     return await this.dbAll('SELECT * FROM sessions WHERE archived = 0 OR archived IS NULL ORDER BY created_at DESC') as Session[];
   }
 
+  async getAllSessionsIncludingArchived(): Promise<Session[]> {
+    return await this.dbAll('SELECT * FROM sessions ORDER BY created_at DESC') as Session[];
+  }
+
   async updateSession(id: string, data: UpdateSessionData): Promise<Session | undefined> {
     const updates: string[] = [];
     const values: any[] = [];

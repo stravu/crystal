@@ -199,7 +199,7 @@ export class SessionManager extends EventEmitter {
     createdAt: string;
     status: string;
   }>> {
-    const sessions = await this.db.getAllSessions();
+    const sessions = await this.db.getAllSessionsIncludingArchived();
     
     return sessions.map(session => ({
       id: session.id,
