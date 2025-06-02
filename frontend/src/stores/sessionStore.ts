@@ -35,7 +35,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   loadSessions: (sessions) => set({ sessions, isLoaded: true }),
   
   addSession: (session) => set((state) => ({
-    sessions: [...state.sessions, session]
+    sessions: [session, ...state.sessions],  // Add new sessions at the top
+    activeSessionId: session.id  // Automatically set as active
   })),
   
   updateSession: (updatedSession) => set((state) => ({
