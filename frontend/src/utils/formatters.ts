@@ -37,8 +37,7 @@ export function formatJsonForWeb(jsonMessage: any): string {
     
     if (!content) return ''; // Skip if no content
     
-    const preview = content.length > 150 ? content.substring(0, 150) + '...' : content;
-    return `\n[${timestamp}] 👤 User Input\n${preview}\n\n`;
+    return `\n[${timestamp}] 👤 User Input\n${content}\n\n`;
   }
   
   if (jsonMessage.type === 'assistant') {
@@ -61,8 +60,7 @@ export function formatJsonForWeb(jsonMessage: any): string {
     
     if (!content) return ''; // Skip if no content
     
-    const preview = content.length > 300 ? content.substring(0, 300) + '...' : content;
-    return `\n[${timestamp}] 🤖 Assistant Response\n${preview}\n\n`;
+    return `\n[${timestamp}] 🤖 Assistant Response\n${content}\n\n`;
   }
   
   // For other message types, show a generic format

@@ -20,7 +20,16 @@ export class DatabaseService {
     // Promisify database methods
     this.dbAll = promisify(this.db.all.bind(this.db));
     this.dbGet = promisify(this.db.get.bind(this.db));
-    this.dbRun = promisify(this.db.run.bind(this.db));
+    
+    // Custom wrapper for run to properly return results
+    this.dbRun = (sql: string, params?: any[]): Promise<{ lastID?: number; changes?: number }> => {
+      return new Promise((resolve, reject) => {
+        this.db.run(sql, params, function(err) {
+          if (err) reject(err);
+          else resolve({ lastID: this.lastID, changes: this.changes });
+        });
+      });
+    };
   }
 
   async initialize(): Promise<void> {

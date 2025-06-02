@@ -37,9 +37,8 @@ export function formatJsonForTerminal(jsonMessage: any): string {
     
     if (!content) return ''; // Skip if no content
     
-    const preview = content.length > 150 ? content.substring(0, 150) + '...' : content;
     return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[32m👤 User Input\x1b[0m\r\n` +
-           `\x1b[37m${preview}\x1b[0m\r\n\r\n`;
+           `\x1b[37m${content}\x1b[0m\r\n\r\n`;
   }
   
   if (jsonMessage.type === 'assistant') {
@@ -62,9 +61,8 @@ export function formatJsonForTerminal(jsonMessage: any): string {
     
     if (!content) return ''; // Skip if no content
     
-    const preview = content.length > 300 ? content.substring(0, 300) + '...' : content;
     return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[35m🤖 Assistant Response\x1b[0m\r\n` +
-           `\x1b[37m${preview}\x1b[0m\r\n\r\n`;
+           `\x1b[37m${content}\x1b[0m\r\n\r\n`;
   }
   
   // For other message types, show a generic format
