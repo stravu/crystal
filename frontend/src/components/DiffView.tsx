@@ -58,8 +58,7 @@ export function DiffView({ activeSession }: DiffViewProps) {
   useEffect(() => {
     if (!selectedFile || !selectedSession) return;
 
-    const params = new URLSearchParams({ path: selectedFile });
-    fetch(`/api/sessions/${activeSession.id}/diff/${selectedSession}/file?${params}`)
+    fetch(`/api/sessions/${activeSession.id}/diff/${selectedSession}/${encodeURIComponent(selectedFile)}`)
       .then(res => res.text())
       .then(diffText => setDiff(diffText))
       .catch(error => {

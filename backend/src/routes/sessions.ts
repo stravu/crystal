@@ -224,7 +224,7 @@ export function createSessionRouter(
     }
   });
 
-  router.get('/:id/diff/:compareId/file', async (req: Request, res: Response) => {
+  router.get('/:id/diff/:compareId/:filePath(*)', async (req: Request, res: Response) => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       const compareSession = await sessionManager.getSession(req.params.compareId);
@@ -233,11 +233,7 @@ export function createSessionRouter(
         return res.status(404).json({ error: 'Session not found' });
       }
 
-      const filePath = req.query.path as string;
-      if (!filePath) {
-        return res.status(400).json({ error: 'File path is required' });
-      }
-
+      const filePath = decodeURIComponent(req.params.filePath);
       const worktreeManager = getWorktreeManager();
       const diff = await worktreeManager.getFileDiff(session.worktreePath, compareSession.worktreePath, filePath);
       
