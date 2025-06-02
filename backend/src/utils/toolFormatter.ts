@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { formatJsonForTerminal } from './formatters.js';
 
 interface ToolCall {
   type: 'tool_use';
@@ -252,4 +253,4 @@ export function formatJsonForTerminalEnhanced(jsonMessage: any, gitRepoPath?: st
 }
 
 // Re-export the original formatter for backwards compatibility
-export { formatJsonForTerminal } from './formatters.js';
+export { formatJsonForTerminal };
