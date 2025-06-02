@@ -95,6 +95,7 @@ export function SessionView() {
     }
   }, [activeSession?.output]);
 
+
   useEffect(() => {
     // Cleanup terminal on unmount
     return () => {
@@ -195,13 +196,12 @@ export function SessionView() {
         {isLoadingOutput && (
           <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
         )}
-        {viewMode === 'terminal' ? (
-          <div className="bg-gray-900 h-full">
-            <div ref={terminalRef} className="h-full" />
-          </div>
-        ) : (
+        <div className={`bg-gray-900 h-full ${viewMode === 'terminal' ? 'block' : 'hidden'}`}>
+          <div ref={terminalRef} className="h-full" />
+        </div>
+        <div className={`h-full ${viewMode === 'messages' ? 'block' : 'hidden'}`}>
           <JsonMessageView messages={activeSession.jsonMessages || []} />
-        )}
+        </div>
       </div>
       
       {activeSession.status === 'waiting' && (
