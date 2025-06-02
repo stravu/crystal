@@ -117,6 +117,16 @@ export function createSessionRouter(
         // Add the initial prompt as a prompt marker so it shows in navigation
         await sessionManager.addInitialPromptMarker(session.id, prompt);
         
+        // Add the initial prompt to terminal output so it's visible
+        const timestamp = new Date().toLocaleTimeString();
+        const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[32m👤 Initial Prompt\x1b[0m\r\n` +
+                                     `\x1b[37m${prompt}\x1b[0m\r\n\r\n`;
+        await sessionManager.addSessionOutput(session.id, {
+          type: 'stdout',
+          data: initialPromptDisplay,
+          timestamp: new Date()
+        });
+        
         await sessionManager.updateSession(session.id, { status: 'ready' });
         logger?.verbose(`Session ${session.id} marked as ready`);
         
