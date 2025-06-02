@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
-import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage } from './models.js';
+import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -224,6 +224,32 @@ export class DatabaseService {
       SET status = 'stopped', updated_at = CURRENT_TIMESTAMP 
       WHERE id IN (${placeholders})
     `, sessionIds);
+  }
+
+  // Prompt marker operations
+  async addPromptMarker(sessionId: string, promptText: string, outputIndex: number, terminalLine?: number): Promise<number> {
+    const result = await this.dbRun(`
+      INSERT INTO prompt_markers (session_id, prompt_text, output_index, terminal_line)
+      VALUES (?, ?, ?, ?)
+    `, [sessionId, promptText, outputIndex, terminalLine]);
+    
+    return result.lastID!;
+  }
+
+  async getPromptMarkers(sessionId: string): Promise<PromptMarker[]> {
+    return await this.dbAll(`
+      SELECT * FROM prompt_markers 
+      WHERE session_id = ? 
+      ORDER BY timestamp ASC
+    `, [sessionId]) as PromptMarker[];
+  }
+
+  async updatePromptMarkerLine(id: number, terminalLine: number): Promise<void> {
+    await this.dbRun(`
+      UPDATE prompt_markers 
+      SET terminal_line = ? 
+      WHERE id = ?
+    `, [terminalLine, id]);
   }
 
   close(): void {

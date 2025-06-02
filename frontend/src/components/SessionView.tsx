@@ -4,6 +4,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { JsonMessageView } from './JsonMessageView';
 import { StatusIndicator } from './StatusIndicator';
+import { PromptNavigation } from './PromptNavigation';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -15,6 +16,7 @@ export function SessionView() {
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
   const [viewMode, setViewMode] = useState<'terminal' | 'messages'>('terminal');
+  const [showPromptNav, setShowPromptNav] = useState(true);
   const lastProcessedOutputLength = useRef(0);
   
   useEffect(() => {
@@ -181,6 +183,14 @@ export function SessionView() {
       }
     }
   };
+
+  const handleNavigateToPrompt = (marker: any) => {
+    // For now, we'll just scroll to the approximate position
+    // In a real implementation, we'd calculate the actual line position
+    if (terminalInstance.current && marker.terminal_line) {
+      terminalInstance.current.scrollToLine(marker.terminal_line);
+    }
+  };
   
   return (
     <div className="flex-1 flex flex-col">
@@ -217,19 +227,40 @@ export function SessionView() {
               Messages ({activeSession.jsonMessages?.length || 0})
             </button>
           </div>
+          <button
+            onClick={() => setShowPromptNav(!showPromptNav)}
+            className="ml-2 p-1 text-gray-600 hover:bg-gray-200 rounded"
+            title={showPromptNav ? 'Hide prompt navigation' : 'Show prompt navigation'}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {showPromptNav ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
       
-      <div className="flex-1 relative overflow-hidden">
-        {isLoadingOutput && (
-          <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
+      <div className="flex-1 flex relative overflow-hidden">
+        <div className="flex-1 relative">
+          {isLoadingOutput && (
+            <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
+          )}
+          <div className={`bg-gray-900 h-full ${viewMode === 'terminal' ? 'block' : 'hidden'}`}>
+            <div ref={terminalRef} className="h-full" />
+          </div>
+          <div className={`h-full ${viewMode === 'messages' ? 'block' : 'hidden'}`}>
+            <JsonMessageView messages={activeSession.jsonMessages || []} />
+          </div>
+        </div>
+        {showPromptNav && (
+          <PromptNavigation 
+            sessionId={activeSession.id} 
+            onNavigateToPrompt={handleNavigateToPrompt}
+          />
         )}
-        <div className={`bg-gray-900 h-full ${viewMode === 'terminal' ? 'block' : 'hidden'}`}>
-          <div ref={terminalRef} className="h-full" />
-        </div>
-        <div className={`h-full ${viewMode === 'messages' ? 'block' : 'hidden'}`}>
-          <JsonMessageView messages={activeSession.jsonMessages || []} />
-        </div>
       </div>
       
       <div className="border-t border-gray-300 p-4 bg-white">

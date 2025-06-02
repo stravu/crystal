@@ -43,3 +43,12 @@ export interface UpdateSessionData {
   exit_code?: number;
   pid?: number;
 }
+
+export interface PromptMarker {
+  id: number;
+  session_id: string;
+  prompt_text: string;
+  output_index: number;
+  terminal_line?: number;
+  timestamp: string;
+}

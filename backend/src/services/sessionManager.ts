@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import type { Session, SessionUpdate, SessionOutput } from '../types/session.js';
 import type { DatabaseService } from '../database/database.js';
-import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage } from '../database/models.js';
+import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker } from '../database/models.js';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
@@ -113,7 +113,19 @@ export class SessionManager extends EventEmitter {
   async addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): Promise<void> {
     // Store in database (stringify JSON objects)
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
-    await this.db.addSessionOutput(id, output.type, dataToStore);
+    const outputId = await this.db.addSessionOutput(id, output.type, dataToStore);
+    
+    // Check if this is a user input prompt to track it
+    if (output.type === 'stdout' && dataToStore.includes('> ')) {
+      // Extract the prompt text after "> "
+      const promptMatch = dataToStore.match(/> (.+)/);
+      if (promptMatch) {
+        const promptText = promptMatch[1].trim();
+        // Get current output count to use as index
+        const outputs = await this.db.getSessionOutputs(id);
+        await this.db.addPromptMarker(id, promptText, outputs.length - 1);
+      }
+    }
     
     // Update in-memory session
     const session = this.activeSessions.get(id);
@@ -209,5 +221,9 @@ export class SessionManager extends EventEmitter {
       createdAt: session.created_at,
       status: session.status
     })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getPromptMarkers(sessionId: string): Promise<PromptMarker[]> {
+    return await this.db.getPromptMarkers(sessionId);
   }
 }

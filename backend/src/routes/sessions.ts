@@ -218,6 +218,24 @@ export function createSessionRouter(
     }
   });
 
+  router.get('/:id/prompts', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const markers = await sessionManager.getPromptMarkers(req.params.id);
+      res.json(markers);
+    } catch (error) {
+      logger?.error('Error getting prompt markers:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to get prompt markers', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
       const session = await sessionManager.getSession(req.params.id);
