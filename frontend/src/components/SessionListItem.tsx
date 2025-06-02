@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { StatusIndicator } from './StatusIndicator';
 import type { Session } from '../types/session';
 
 interface SessionListItemProps {
@@ -11,37 +12,6 @@ export function SessionListItem({ session }: SessionListItemProps) {
   const isActive = activeSessionId === session.id;
   const [isDeleting, setIsDeleting] = useState(false);
   
-  const getStatusIcon = () => {
-    switch (session.status) {
-      case 'initializing':
-        return '⏳';
-      case 'ready':
-        return '✅';
-      case 'running':
-        return '▶️';
-      case 'waiting':
-        return '⏸️';
-      case 'stopped':
-        return '⏹️';
-      case 'error':
-        return '❌';
-      default:
-        return '•';
-    }
-  };
-  
-  const getStatusColor = () => {
-    switch (session.status) {
-      case 'waiting':
-        return 'text-yellow-400';
-      case 'error':
-        return 'text-red-400';
-      case 'running':
-        return 'text-green-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the session
@@ -81,11 +51,9 @@ export function SessionListItem({ session }: SessionListItemProps) {
     >
       <button
         onClick={() => setActiveSession(session.id)}
-        className="flex items-center space-x-2 flex-1 min-w-0"
+        className="flex items-center space-x-3 flex-1 min-w-0"
       >
-        <span className={`text-sm ${getStatusColor()}`}>
-          {getStatusIcon()}
-        </span>
+        <StatusIndicator session={session} size="small" />
         <span className="flex-1 truncate text-sm">
           {session.name}
         </span>

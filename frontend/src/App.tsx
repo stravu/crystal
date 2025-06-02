@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSocket } from './hooks/useSocket';
+import { useNotifications } from './hooks/useNotifications';
 import { Sidebar } from './components/Sidebar';
 import { SessionView } from './components/SessionView';
 import { PromptHistory } from './components/PromptHistory';
@@ -9,6 +10,7 @@ type ViewMode = 'sessions' | 'prompts';
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   useSocket();
+  useNotifications();
 
   return (
     <div className="h-screen flex">

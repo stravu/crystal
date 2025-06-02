@@ -4,6 +4,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { JsonMessageView } from './JsonMessageView';
 import { DiffView } from './DiffView';
+import { StatusIndicator } from './StatusIndicator';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -186,12 +187,13 @@ export function SessionView() {
     <div className="flex-1 flex flex-col">
       <div className="bg-gray-100 border-b border-gray-300 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-gray-800">{activeSession.name}</h2>
-            <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
-              <span className="capitalize">{activeSession.status}</span>
-              <span>•</span>
-              <span>{activeSession.prompt.substring(0, 50)}...</span>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-gray-800 truncate">{activeSession.name}</h2>
+            <div className="flex items-center space-x-3 mt-2">
+              <StatusIndicator session={activeSession} size="medium" showText showProgress />
+            </div>
+            <div className="text-sm text-gray-600 mt-1 truncate">
+              {activeSession.prompt.substring(0, 80)}...
             </div>
           </div>
           <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden">
