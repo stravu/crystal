@@ -7,7 +7,7 @@ import { join } from 'path';
 export function createConfigRouter(configManager: ConfigManager): Router {
   const router = Router();
 
-  router.get('/', (req: Request, res: Response) => {
+  router.get('/', (_req: Request, res: Response) => {
     const config = configManager.getConfig();
     res.json(config);
   });

@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
-import type { Session, SessionOutput, CreateSessionData, UpdateSessionData } from './models.js';
+import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,20 +54,46 @@ export class DatabaseService {
     // Check if archived column exists
     const tableInfo = await this.dbAll("PRAGMA table_info(sessions)");
     const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
+    const hasInitialPromptColumn = tableInfo.some((col: any) => col.name === 'initial_prompt');
     
     if (!hasArchivedColumn) {
       // Run migration to add archived column
       await this.dbRun("ALTER TABLE sessions ADD COLUMN archived BOOLEAN DEFAULT 0");
       await this.dbRun("CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived)");
     }
+
+    // Check if we need to rename prompt to initial_prompt
+    if (!hasInitialPromptColumn) {
+      const hasPromptColumn = tableInfo.some((col: any) => col.name === 'prompt');
+      if (hasPromptColumn) {
+        await this.dbRun("ALTER TABLE sessions RENAME COLUMN prompt TO initial_prompt");
+      }
+      
+      // Create conversation messages table if it doesn't exist
+      const tables = await this.dbAll("SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_messages'");
+      if (tables.length === 0) {
+        await this.dbRun(`
+          CREATE TABLE conversation_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            message_type TEXT NOT NULL CHECK (message_type IN ('user', 'assistant')),
+            content TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+          )
+        `);
+        await this.dbRun("CREATE INDEX idx_conversation_messages_session_id ON conversation_messages(session_id)");
+        await this.dbRun("CREATE INDEX idx_conversation_messages_timestamp ON conversation_messages(timestamp)");
+      }
+    }
   }
 
   // Session operations
   async createSession(data: CreateSessionData): Promise<Session> {
     await this.dbRun(`
-      INSERT INTO sessions (id, name, prompt, worktree_name, worktree_path, status)
+      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status)
       VALUES (?, ?, ?, ?, ?, 'pending')
-    `, [data.id, data.name, data.prompt, data.worktree_name, data.worktree_path]);
+    `, [data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path]);
     
     const session = await this.getSession(data.id);
     if (!session) {
@@ -158,6 +184,26 @@ export class DatabaseService {
 
   async clearSessionOutputs(sessionId: string): Promise<void> {
     await this.dbRun('DELETE FROM session_outputs WHERE session_id = ?', [sessionId]);
+  }
+
+  // Conversation message operations
+  async addConversationMessage(sessionId: string, messageType: 'user' | 'assistant', content: string): Promise<void> {
+    await this.dbRun(`
+      INSERT INTO conversation_messages (session_id, message_type, content)
+      VALUES (?, ?, ?)
+    `, [sessionId, messageType, content]);
+  }
+
+  async getConversationMessages(sessionId: string): Promise<ConversationMessage[]> {
+    return await this.dbAll(`
+      SELECT * FROM conversation_messages 
+      WHERE session_id = ? 
+      ORDER BY timestamp ASC
+    `, [sessionId]) as ConversationMessage[];
+  }
+
+  async clearConversationMessages(sessionId: string): Promise<void> {
+    await this.dbRun('DELETE FROM conversation_messages WHERE session_id = ?', [sessionId]);
   }
 
   // Cleanup operations

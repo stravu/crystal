@@ -16,7 +16,7 @@ export class ClaudeCodeManager extends EventEmitter {
     super();
   }
 
-  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string): Promise<void> {
+  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[]): Promise<void> {
     try {
       this.logger?.verbose(`Spawning Claude for session ${sessionId} in ${worktreePath}`);
       this.logger?.verbose(`Command: claude -p "${prompt}"`);
@@ -41,7 +41,18 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.verbose(`Claude works in target directory`);
       }
       
-      const ptyProcess = pty.spawn('claude', ['-p', prompt, '--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'], {
+      // Build the command arguments for conversation continuation
+      const args = ['--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'];
+      
+      if (conversationHistory && conversationHistory.length > 0) {
+        // If we have conversation history, use it to continue the conversation
+        args.push('-p', conversationHistory.join('\n\n'));
+      } else {
+        // Initial prompt for new session
+        args.push('-p', prompt);
+      }
+
+      const ptyProcess = pty.spawn('claude', args, {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
@@ -157,5 +168,17 @@ export class ClaudeCodeManager extends EventEmitter {
 
   getAllProcesses(): string[] {
     return Array.from(this.processes.keys());
+  }
+
+  async restartSessionWithHistory(sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: string[]): Promise<void> {
+    // Kill existing process if it exists
+    this.killProcess(sessionId);
+    
+    // Restart with conversation history
+    await this.spawnClaudeCode(sessionId, worktreePath, initialPrompt, conversationHistory);
+  }
+
+  isSessionRunning(sessionId: string): boolean {
+    return this.processes.has(sessionId);
   }
 }

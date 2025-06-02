@@ -74,6 +74,45 @@ async function initialize() {
     io.emit('session:output', output);
   });
 
+  sessionManager.on('conversation-continue', async ({ sessionId }) => {
+    try {
+      const session = await sessionManager.getSession(sessionId);
+      if (!session) {
+        logger.error(`Session ${sessionId} not found for conversation continuation`);
+        return;
+      }
+
+      // Get conversation history
+      const conversationMessages = await sessionManager.getConversationMessages(sessionId);
+      
+      // Build conversation history array starting with initial prompt
+      const conversationHistory = [session.prompt];
+      
+      // Add all previous conversation messages
+      for (const msg of conversationMessages) {
+        if (msg.message_type === 'user') {
+          conversationHistory.push(`User: ${msg.content}`);
+        } else {
+          conversationHistory.push(`Assistant: ${msg.content}`);
+        }
+      }
+
+      // Restart the session with conversation history
+      await claudeCodeManager.restartSessionWithHistory(
+        sessionId, 
+        session.worktreePath, 
+        session.prompt, 
+        conversationHistory
+      );
+
+      await sessionManager.updateSession(sessionId, { status: 'running' });
+      
+    } catch (error) {
+      logger.error(`Failed to continue conversation for session ${sessionId}:`, error instanceof Error ? error : undefined);
+      await sessionManager.updateSession(sessionId, { status: 'error' });
+    }
+  });
+
   claudeCodeManager.on('output', async (output) => {
     // Store the original output
     await sessionManager.addSessionOutput(output.sessionId, {
@@ -93,6 +132,11 @@ async function initialize() {
           data: terminalText,
           timestamp: output.timestamp
         });
+
+        // Store assistant responses in conversation history
+        if (terminalText.trim()) {
+          await sessionManager.addConversationMessage(output.sessionId, 'assistant', terminalText.trim());
+        }
       }
     }
   });
@@ -140,13 +184,13 @@ async function initialize() {
 app.use(cors());
 app.use(express.json());
 
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Routes will be added after initialization
 
-const PORT = process.env.PORT || 3521;
+const PORT = parseInt(process.env.PORT || '3521', 10);
 
 initialize().then(() => {
   httpServer.listen(PORT, '127.0.0.1', () => {

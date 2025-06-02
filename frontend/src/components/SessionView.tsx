@@ -147,11 +147,37 @@ export function SessionView() {
       console.error('Error sending input:', error);
     }
   };
+
+  const handleContinueConversation = async () => {
+    if (!input.trim()) return;
+    
+    try {
+      const response = await fetch(`/api/sessions/${activeSession.id}/continue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: input }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to continue conversation');
+      }
+      
+      setInput('');
+    } catch (error) {
+      console.error('Error continuing conversation:', error);
+    }
+  };
   
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendInput();
+      if (activeSession.status === 'waiting') {
+        handleSendInput();
+      } else {
+        handleContinueConversation();
+      }
     }
   };
   
@@ -204,26 +230,33 @@ export function SessionView() {
         </div>
       </div>
       
-      {activeSession.status === 'waiting' && (
-        <div className="border-t border-gray-300 p-4 bg-white">
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              placeholder="Enter your response..."
-            />
-            <button
-              onClick={handleSendInput}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Send
-            </button>
-          </div>
+      <div className="border-t border-gray-300 p-4 bg-white">
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+            placeholder={
+              activeSession.status === 'waiting' 
+                ? "Enter your response..." 
+                : "Continue conversation with a new message..."
+            }
+          />
+          <button
+            onClick={activeSession.status === 'waiting' ? handleSendInput : handleContinueConversation}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            {activeSession.status === 'waiting' ? 'Send' : 'Continue'}
+          </button>
         </div>
-      )}
+        {activeSession.status !== 'waiting' && (
+          <p className="text-sm text-gray-500 mt-2">
+            This will interrupt the current session if running and restart with conversation history.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

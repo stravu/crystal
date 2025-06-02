@@ -7,7 +7,7 @@ interface SettingsProps {
 }
 
 export function Settings({ isOpen, onClose }: SettingsProps) {
-  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [_config, setConfig] = useState<AppConfig | null>(null);
   const [gitRepoPath, setGitRepoPath] = useState('');
   const [verbose, setVerbose] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

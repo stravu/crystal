@@ -1,7 +1,7 @@
 export interface Session {
   id: string;
   name: string;
-  prompt: string;
+  initial_prompt: string;
   worktree_name: string;
   worktree_path: string;
   status: 'pending' | 'running' | 'stopped' | 'completed' | 'failed';
@@ -21,10 +21,18 @@ export interface SessionOutput {
   timestamp: string;
 }
 
+export interface ConversationMessage {
+  id: number;
+  session_id: string;
+  message_type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
 export interface CreateSessionData {
   id: string;
   name: string;
-  prompt: string;
+  initial_prompt: string;
   worktree_name: string;
   worktree_path: string;
 }

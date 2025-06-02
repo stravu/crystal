@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import type { Session, SessionUpdate, SessionOutput } from '../types/session.js';
 import type { DatabaseService } from '../database/database.js';
-import type { Session as DbSession, CreateSessionData, UpdateSessionData } from '../database/models.js';
+import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage } from '../database/models.js';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
@@ -29,7 +29,7 @@ export class SessionManager extends EventEmitter {
       id: dbSession.id,
       name: dbSession.name,
       worktreePath: dbSession.worktree_path,
-      prompt: dbSession.prompt,
+      prompt: dbSession.initial_prompt,
       status: this.mapDbStatusToSessionStatus(dbSession.status),
       pid: dbSession.pid,
       createdAt: new Date(dbSession.created_at),
@@ -77,7 +77,7 @@ export class SessionManager extends EventEmitter {
     const sessionData: CreateSessionData = {
       id: randomUUID(),
       name,
-      prompt,
+      initial_prompt: prompt,
       worktree_name: worktreeName,
       worktree_path: worktreePath
     };
@@ -168,5 +168,26 @@ export class SessionManager extends EventEmitter {
 
   async setSessionExitCode(id: string, exitCode: number): Promise<void> {
     await this.db.updateSession(id, { exit_code: exitCode });
+  }
+
+  async addConversationMessage(id: string, messageType: 'user' | 'assistant', content: string): Promise<void> {
+    await this.db.addConversationMessage(id, messageType, content);
+  }
+
+  async getConversationMessages(id: string): Promise<ConversationMessage[]> {
+    return await this.db.getConversationMessages(id);
+  }
+
+  async continueConversation(id: string, userMessage: string): Promise<void> {
+    // Store the user's message
+    await this.addConversationMessage(id, 'user', userMessage);
+    
+    // Emit event for the Claude Code manager to handle
+    this.emit('conversation-continue', { sessionId: id, message: userMessage });
+  }
+
+  async clearConversation(id: string): Promise<void> {
+    await this.db.clearConversationMessages(id);
+    await this.db.clearSessionOutputs(id);
   }
 }

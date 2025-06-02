@@ -35,7 +35,7 @@ export async function testClaudeCodeInDirectory(directory: string): Promise<{ su
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error testing Claude Code in directory',
-      output: error instanceof Error && 'stdout' in error ? String(error.stdout) + String(error.stderr) : undefined
+      output: error instanceof Error && 'stdout' in error ? String((error as any).stdout) + String((error as any).stderr) : undefined
     };
   }
 }
