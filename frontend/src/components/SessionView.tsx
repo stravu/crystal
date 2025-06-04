@@ -5,6 +5,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { JsonMessageView } from './JsonMessageView';
 import { StatusIndicator } from './StatusIndicator';
 import { PromptNavigation } from './PromptNavigation';
+import CombinedDiffView from './CombinedDiffView';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -15,7 +16,7 @@ export function SessionView() {
   const fitAddon = useRef<FitAddon | null>(null);
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
-  const [viewMode, setViewMode] = useState<'terminal' | 'messages'>('terminal');
+  const [viewMode, setViewMode] = useState<'terminal' | 'messages' | 'changes'>('terminal');
   const [showPromptNav, setShowPromptNav] = useState(true);
   const lastProcessedOutputLength = useRef(0);
   
@@ -243,6 +244,16 @@ export function SessionView() {
             >
               Messages ({activeSession.jsonMessages?.length || 0})
             </button>
+            <button
+              onClick={() => setViewMode('changes')}
+              className={`px-3 py-1 text-sm ${
+                viewMode === 'changes' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Changes
+            </button>
           </div>
           <button
             onClick={() => setShowPromptNav(!showPromptNav)}
@@ -303,6 +314,9 @@ export function SessionView() {
           </div>
           <div className={`h-full ${viewMode === 'messages' ? 'block' : 'hidden'}`}>
             <JsonMessageView messages={activeSession.jsonMessages || []} />
+          </div>
+          <div className={`h-full ${viewMode === 'changes' ? 'block' : 'hidden'}`}>
+            <CombinedDiffView sessionId={activeSession.id} selectedExecutions={[]} />
           </div>
         </div>
         {showPromptNav && (

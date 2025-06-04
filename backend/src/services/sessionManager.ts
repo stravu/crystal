@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import type { Session, SessionUpdate, SessionOutput } from '../types/session.js';
 import type { DatabaseService } from '../database/database.js';
-import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker } from '../database/models.js';
+import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from '../database/models.js';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
@@ -113,7 +113,7 @@ export class SessionManager extends EventEmitter {
   async addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): Promise<void> {
     // Store in database (stringify JSON objects)
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
-    const outputId = await this.db.addSessionOutput(id, output.type, dataToStore);
+    await this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Check if this is a user input prompt to track it
     if (output.type === 'stdout' && dataToStore.includes('> ')) {
@@ -230,5 +230,22 @@ export class SessionManager extends EventEmitter {
   async addInitialPromptMarker(sessionId: string, prompt: string): Promise<void> {
     // Add the initial prompt as the first prompt marker (index 0)
     await this.db.addPromptMarker(sessionId, prompt, 0, 0);
+  }
+
+  // Execution diff operations
+  async createExecutionDiff(data: CreateExecutionDiffData): Promise<ExecutionDiff> {
+    return await this.db.createExecutionDiff(data);
+  }
+
+  async getExecutionDiffs(sessionId: string): Promise<ExecutionDiff[]> {
+    return await this.db.getExecutionDiffs(sessionId);
+  }
+
+  async getExecutionDiff(id: number): Promise<ExecutionDiff | undefined> {
+    return await this.db.getExecutionDiff(id);
+  }
+
+  async getNextExecutionSequence(sessionId: string): Promise<number> {
+    return await this.db.getNextExecutionSequence(sessionId);
   }
 }

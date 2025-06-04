@@ -111,9 +111,10 @@ export function StatusIndicator({
     return 0;
   };
 
-  const formatLastActivity = (lastActivity: Date): string => {
+  const formatLastActivity = (lastActivity: string): string => {
     const now = new Date();
-    const diff = now.getTime() - lastActivity.getTime();
+    const lastActivityDate = new Date(lastActivity);
+    const diff = now.getTime() - lastActivityDate.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -156,7 +157,7 @@ export function StatusIndicator({
           <span className={`${sizeClasses.text} font-medium ${config.textColor}`}>
             {config.text}
           </span>
-          {size === 'large' && (
+          {size === 'large' && session.lastActivity && (
             <span className="text-xs text-gray-500">
               {formatLastActivity(session.lastActivity)}
             </span>

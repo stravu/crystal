@@ -52,3 +52,31 @@ export interface PromptMarker {
   terminal_line?: number;
   timestamp: string;
 }
+
+export interface ExecutionDiff {
+  id: number;
+  session_id: string;
+  prompt_marker_id?: number;
+  execution_sequence: number;
+  git_diff?: string;
+  files_changed?: string[]; // JSON array of changed file paths
+  stats_additions: number;
+  stats_deletions: number;
+  stats_files_changed: number;
+  before_commit_hash?: string;
+  after_commit_hash?: string;
+  timestamp: string;
+}
+
+export interface CreateExecutionDiffData {
+  session_id: string;
+  prompt_marker_id?: number;
+  execution_sequence: number;
+  git_diff?: string;
+  files_changed?: string[];
+  stats_additions?: number;
+  stats_deletions?: number;
+  stats_files_changed?: number;
+  before_commit_hash?: string;
+  after_commit_hash?: string;
+}

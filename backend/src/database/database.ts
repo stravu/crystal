@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
-import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker } from './models.js';
+import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -103,6 +103,33 @@ export class DatabaseService {
       `);
       await this.dbRun("CREATE INDEX idx_prompt_markers_session_id ON prompt_markers(session_id)");
       await this.dbRun("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)");
+    }
+
+    // Check if execution_diffs table exists
+    const executionDiffsTable = await this.dbAll("SELECT name FROM sqlite_master WHERE type='table' AND name='execution_diffs'");
+    if (executionDiffsTable.length === 0) {
+      await this.dbRun(`
+        CREATE TABLE execution_diffs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          prompt_marker_id INTEGER,
+          execution_sequence INTEGER NOT NULL,
+          git_diff TEXT,
+          files_changed TEXT,
+          stats_additions INTEGER DEFAULT 0,
+          stats_deletions INTEGER DEFAULT 0,
+          stats_files_changed INTEGER DEFAULT 0,
+          before_commit_hash TEXT,
+          after_commit_hash TEXT,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          FOREIGN KEY (prompt_marker_id) REFERENCES prompt_markers(id) ON DELETE SET NULL
+        )
+      `);
+      await this.dbRun("CREATE INDEX idx_execution_diffs_session_id ON execution_diffs(session_id)");
+      await this.dbRun("CREATE INDEX idx_execution_diffs_prompt_marker_id ON execution_diffs(prompt_marker_id)");
+      await this.dbRun("CREATE INDEX idx_execution_diffs_timestamp ON execution_diffs(timestamp)");
+      await this.dbRun("CREATE INDEX idx_execution_diffs_sequence ON execution_diffs(session_id, execution_sequence)");
     }
   }
 
@@ -268,6 +295,74 @@ export class DatabaseService {
       SET terminal_line = ? 
       WHERE id = ?
     `, [terminalLine, id]);
+  }
+
+  // Execution diff operations
+  async createExecutionDiff(data: CreateExecutionDiffData): Promise<ExecutionDiff> {
+    const result = await this.dbRun(`
+      INSERT INTO execution_diffs (
+        session_id, prompt_marker_id, execution_sequence, git_diff, 
+        files_changed, stats_additions, stats_deletions, stats_files_changed,
+        before_commit_hash, after_commit_hash
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      data.session_id,
+      data.prompt_marker_id || null,
+      data.execution_sequence,
+      data.git_diff || null,
+      data.files_changed ? JSON.stringify(data.files_changed) : null,
+      data.stats_additions || 0,
+      data.stats_deletions || 0,
+      data.stats_files_changed || 0,
+      data.before_commit_hash || null,
+      data.after_commit_hash || null
+    ]);
+
+    const diff = await this.dbGet('SELECT * FROM execution_diffs WHERE id = ?', [result.lastID!]);
+    return this.convertDbExecutionDiff(diff);
+  }
+
+  async getExecutionDiffs(sessionId: string): Promise<ExecutionDiff[]> {
+    const rows = await this.dbAll(`
+      SELECT * FROM execution_diffs 
+      WHERE session_id = ? 
+      ORDER BY execution_sequence ASC
+    `, [sessionId]);
+    
+    return rows.map(this.convertDbExecutionDiff);
+  }
+
+  async getExecutionDiff(id: number): Promise<ExecutionDiff | undefined> {
+    const row = await this.dbGet('SELECT * FROM execution_diffs WHERE id = ?', [id]);
+    return row ? this.convertDbExecutionDiff(row) : undefined;
+  }
+
+  async getNextExecutionSequence(sessionId: string): Promise<number> {
+    const result = await this.dbGet(`
+      SELECT MAX(execution_sequence) as max_seq 
+      FROM execution_diffs 
+      WHERE session_id = ?
+    `, [sessionId]);
+    
+    return (result?.max_seq || 0) + 1;
+  }
+
+  private convertDbExecutionDiff(row: any): ExecutionDiff {
+    return {
+      id: row.id,
+      session_id: row.session_id,
+      prompt_marker_id: row.prompt_marker_id,
+      execution_sequence: row.execution_sequence,
+      git_diff: row.git_diff,
+      files_changed: row.files_changed ? JSON.parse(row.files_changed) : [],
+      stats_additions: row.stats_additions,
+      stats_deletions: row.stats_deletions,
+      stats_files_changed: row.stats_files_changed,
+      before_commit_hash: row.before_commit_hash,
+      after_commit_hash: row.after_commit_hash,
+      timestamp: row.timestamp
+    };
   }
 
   close(): void {

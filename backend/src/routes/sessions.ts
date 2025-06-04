@@ -4,8 +4,8 @@ import { SessionManager } from '../services/sessionManager.js';
 import { WorktreeManager } from '../services/worktreeManager.js';
 import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
 import { WorktreeNameGenerator } from '../services/worktreeNameGenerator.js';
+import type { ExecutionTracker } from '../services/executionTracker.js';
 import type { Logger } from '../utils/logger.js';
-import { formatJsonForTerminal } from '../utils/formatters.js';
 import { formatJsonForTerminalEnhanced } from '../utils/toolFormatter.js';
 
 export function createSessionRouter(
@@ -14,7 +14,8 @@ export function createSessionRouter(
   claudeCodeManager: ClaudeCodeManager,
   worktreeNameGenerator: WorktreeNameGenerator,
   logger?: Logger,
-  getGitRepoPath?: () => string
+  getGitRepoPath?: () => string,
+  executionTracker?: ExecutionTracker
 ): Router {
   const router = Router();
 
@@ -288,6 +289,101 @@ export function createSessionRouter(
       console.error('Error deleting session:', error);
       res.status(500).json({ 
         error: 'Failed to delete session', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Execution diff endpoints
+  router.get('/:id/executions', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const executions = await sessionManager.getExecutionDiffs(req.params.id);
+      res.json(executions);
+    } catch (error) {
+      logger?.error('Error getting execution diffs:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to get execution diffs', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  router.get('/:id/executions/:executionId/diff', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const executionId = parseInt(req.params.executionId);
+      if (isNaN(executionId)) {
+        return res.status(400).json({ error: 'Invalid execution ID' });
+      }
+
+      const execution = await sessionManager.getExecutionDiff(executionId);
+      if (!execution || execution.session_id !== req.params.id) {
+        return res.status(404).json({ error: 'Execution not found' });
+      }
+
+      res.json(execution);
+    } catch (error) {
+      logger?.error('Error getting execution diff:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to get execution diff', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  router.get('/:id/combined-diff', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      if (!executionTracker) {
+        return res.status(503).json({ error: 'Execution tracking not available' });
+      }
+
+      const combinedDiff = await executionTracker.getCombinedDiff(req.params.id);
+      res.json(combinedDiff);
+    } catch (error) {
+      logger?.error('Error getting combined diff:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to get combined diff', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  router.post('/:id/combined-diff', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const { executionIds } = req.body;
+      if (!Array.isArray(executionIds) || !executionIds.every(id => typeof id === 'number')) {
+        return res.status(400).json({ error: 'Invalid execution IDs array' });
+      }
+
+      if (!executionTracker) {
+        return res.status(503).json({ error: 'Execution tracking not available' });
+      }
+
+      const combinedDiff = await executionTracker.getCombinedDiff(req.params.id, executionIds);
+      res.json(combinedDiff);
+    } catch (error) {
+      logger?.error('Error getting combined diff for selected executions:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to get combined diff', 
         details: error instanceof Error ? error.message : String(error) 
       });
     }

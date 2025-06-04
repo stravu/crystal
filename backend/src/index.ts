@@ -8,12 +8,12 @@ import { WorktreeManager } from './services/worktreeManager.js';
 import { ClaudeCodeManager } from './services/claudeCodeManager.js';
 import { ConfigManager } from './services/configManager.js';
 import { WorktreeNameGenerator } from './services/worktreeNameGenerator.js';
+import { ExecutionTracker } from './services/executionTracker.js';
 import { DatabaseService } from './database/database.js';
 import { createSessionRouter } from './routes/sessions.js';
 import { createConfigRouter } from './routes/config.js';
 import { createPromptsRouter } from './routes/prompts.js';
 import { Logger } from './utils/logger.js';
-import { formatJsonForTerminal } from './utils/formatters.js';
 import { formatJsonForTerminalEnhanced } from './utils/toolFormatter.js';
 
 dotenv.config();
@@ -34,6 +34,7 @@ let sessionManager: SessionManager;
 let worktreeManager = new WorktreeManager(configManager.getGitRepoPath());
 const claudeCodeManager = new ClaudeCodeManager(logger, configManager);
 let worktreeNameGenerator: WorktreeNameGenerator;
+let executionTracker: ExecutionTracker;
 
 async function initialize() {
   await configManager.initialize();
@@ -48,6 +49,9 @@ async function initialize() {
   
   // Initialize worktree name generator
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
+  
+  // Initialize execution tracker
+  executionTracker = new ExecutionTracker(sessionManager, logger);
   
   // Initialize session manager with persisted sessions
   await sessionManager.initializeFromDatabase();
@@ -151,12 +155,31 @@ async function initialize() {
 
   claudeCodeManager.on('spawned', async ({ sessionId }) => {
     await sessionManager.updateSession(sessionId, { status: 'running' });
+    
+    // Start execution tracking
+    try {
+      const session = await sessionManager.getSession(sessionId);
+      if (session) {
+        await executionTracker.startExecution(sessionId, session.worktreePath);
+      }
+    } catch (error) {
+      logger.error(`Failed to start execution tracking for session ${sessionId}:`, error instanceof Error ? error : undefined);
+    }
   });
 
   claudeCodeManager.on('exit', async ({ sessionId, exitCode, signal }) => {
     logger.info(`Session ${sessionId} exited with code ${exitCode}, signal ${signal}`);
     await sessionManager.setSessionExitCode(sessionId, exitCode);
     await sessionManager.updateSession(sessionId, { status: 'stopped' });
+    
+    // End execution tracking
+    try {
+      if (executionTracker.isTracking(sessionId)) {
+        await executionTracker.endExecution(sessionId);
+      }
+    } catch (error) {
+      logger.error(`Failed to end execution tracking for session ${sessionId}:`, error instanceof Error ? error : undefined);
+    }
   });
 
   claudeCodeManager.on('error', async ({ sessionId, error }) => {
@@ -165,10 +188,19 @@ async function initialize() {
       status: 'error',
       error 
     });
+    
+    // Cancel execution tracking on error
+    try {
+      if (executionTracker.isTracking(sessionId)) {
+        executionTracker.cancelExecution(sessionId);
+      }
+    } catch (trackingError) {
+      logger.error(`Failed to cancel execution tracking for session ${sessionId}:`, trackingError instanceof Error ? trackingError : undefined);
+    }
   });
 
   // Add routes after everything is initialized
-  app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, worktreeNameGenerator, logger, () => configManager.getGitRepoPath()));
+  app.use('/api/sessions', createSessionRouter(sessionManager, () => worktreeManager, claudeCodeManager, worktreeNameGenerator, logger, () => configManager.getGitRepoPath(), executionTracker));
   app.use('/api/config', createConfigRouter(configManager));
   app.use('/api/prompts', createPromptsRouter(sessionManager, logger));
 
