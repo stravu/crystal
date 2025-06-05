@@ -25,13 +25,22 @@ const pendingToolCalls = new Map<string, PendingToolCall>();
 /**
  * Convert absolute file paths to relative paths based on the git repository root
  */
-function makePathsRelative(content: string, gitRepoPath?: string): string {
+function makePathsRelative(content: any, gitRepoPath?: string): string {
+  // Handle non-string content
+  if (typeof content !== 'string') {
+    if (content === null || content === undefined) {
+      return '';
+    }
+    // Convert to string if it's an object or array
+    content = typeof content === 'object' ? JSON.stringify(content, null, 2) : String(content);
+  }
+  
   if (!gitRepoPath) return content;
   
   // Match common file path patterns
   const pathRegex = /([\/\\](?:Users|home|var|tmp|mnt|opt)[\/\\][^\s\n]+)/g;
   
-  return content.replace(pathRegex, (match) => {
+  return content.replace(pathRegex, (match: string) => {
     try {
       // Find the worktree path in the match
       const worktreeMatch = match.match(/worktrees[\/\\][^\/\\]+/);
