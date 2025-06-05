@@ -96,13 +96,25 @@ export class DatabaseService {
           session_id TEXT NOT NULL,
           prompt_text TEXT NOT NULL,
           output_index INTEGER NOT NULL,
-          terminal_line INTEGER,
+          output_line INTEGER,
           timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
         )
       `);
       await this.dbRun("CREATE INDEX idx_prompt_markers_session_id ON prompt_markers(session_id)");
       await this.dbRun("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)");
+    } else {
+      // Check if the table has the correct column name
+      const promptMarkersInfo = await this.dbAll("PRAGMA table_info(prompt_markers)");
+      const hasOutputLineColumn = promptMarkersInfo.some((col: any) => col.name === 'output_line');
+      const hasTerminalLineColumn = promptMarkersInfo.some((col: any) => col.name === 'terminal_line');
+      
+      if (hasTerminalLineColumn && !hasOutputLineColumn) {
+        // Rename the column from terminal_line to output_line
+        await this.dbRun(`
+          ALTER TABLE prompt_markers RENAME COLUMN terminal_line TO output_line
+        `);
+      }
     }
 
     // Check if execution_diffs table exists
