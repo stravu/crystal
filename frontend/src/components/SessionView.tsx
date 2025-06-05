@@ -322,8 +322,9 @@ export function SessionView() {
                 <p className="text-sm text-red-700">{mergeError}</p>
               </div>
             )}
-            <div className="text-sm text-gray-600 mt-1 truncate">
-              {activeSession.prompt.substring(0, 80)}...
+            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200 max-h-32 overflow-y-auto">
+              <p className="text-sm text-gray-700 font-medium mb-1">Original Prompt:</p>
+              <p className="text-sm text-gray-600 whitespace-pre-wrap break-words">{activeSession.prompt}</p>
             </div>
           </div>
           <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden">
