@@ -3,4 +3,5 @@ export interface AppConfig {
   verbose?: boolean;
   openaiApiKey?: string;
   systemPromptAppend?: string;
+  runScript?: string[];
 }

@@ -85,6 +85,11 @@ async function initialize() {
     io.emit('session:output', output);
   });
 
+  sessionManager.on('script-output', (output) => {
+    console.log('Emitting script output to WebSocket:', output.sessionId, output.type);
+    io.emit('script:output', output);
+  });
+
   sessionManager.on('conversation-continue', async ({ sessionId }) => {
     try {
       const session = await sessionManager.getSession(sessionId);
@@ -242,4 +247,21 @@ initialize().then(() => {
   console.error('Failed to initialize server:', error);
   console.error('Error stack:', error.stack);
   process.exit(1);
+});
+
+// Cleanup on exit
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT, cleaning up...');
+  if (sessionManager) {
+    await sessionManager.cleanup();
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM, cleaning up...');
+  if (sessionManager) {
+    await sessionManager.cleanup();
+  }
+  process.exit(0);
 });

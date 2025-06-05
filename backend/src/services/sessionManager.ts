@@ -1,11 +1,14 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
+import { spawn, ChildProcess, exec } from 'child_process';
 import type { Session, SessionUpdate, SessionOutput } from '../types/session.js';
 import type { DatabaseService } from '../database/database.js';
 import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from '../database/models.js';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
+  private runningScriptProcess: ChildProcess | null = null;
+  private currentRunningSessionId: string | null = null;
 
   constructor(private db: DatabaseService) {
     super();
@@ -36,7 +39,8 @@ export class SessionManager extends EventEmitter {
       lastActivity: new Date(dbSession.updated_at),
       output: [], // Will be loaded separately by frontend when needed
       jsonMessages: [], // Will be loaded separately by frontend when needed
-      error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined
+      error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined,
+      isRunning: false
     };
   }
 
@@ -247,5 +251,127 @@ export class SessionManager extends EventEmitter {
 
   async getNextExecutionSequence(sessionId: string): Promise<number> {
     return await this.db.getNextExecutionSequence(sessionId);
+  }
+
+  async runScript(sessionId: string, commands: string[], workingDirectory: string): Promise<void> {
+    // Stop any currently running script
+    await this.stopRunningScript();
+    
+    // Mark session as running
+    await this.setSessionRunning(sessionId, true);
+    this.currentRunningSessionId = sessionId;
+    
+    // Join commands with && to run them sequentially
+    const command = commands.join(' && ');
+    
+    // Spawn the process with its own process group for easier termination
+    this.runningScriptProcess = spawn('sh', ['-c', command], {
+      cwd: workingDirectory,
+      stdio: 'pipe',
+      detached: true // Create a new process group
+    });
+
+    // Handle output
+    this.runningScriptProcess.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      this.emit('script-output', { sessionId, type: 'stdout', data: output });
+    });
+
+    this.runningScriptProcess.stderr?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      this.emit('script-output', { sessionId, type: 'stderr', data: output });
+    });
+
+    // Handle process exit
+    this.runningScriptProcess.on('exit', async (code) => {
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stdout', 
+        data: `\nProcess exited with code: ${code}\n` 
+      });
+      
+      await this.setSessionRunning(sessionId, false);
+      this.currentRunningSessionId = null;
+      this.runningScriptProcess = null;
+    });
+
+    this.runningScriptProcess.on('error', async (error) => {
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stderr', 
+        data: `Error: ${error.message}\n` 
+      });
+      
+      await this.setSessionRunning(sessionId, false);
+      this.currentRunningSessionId = null;
+      this.runningScriptProcess = null;
+    });
+  }
+
+  async stopRunningScript(): Promise<void> {
+    if (this.runningScriptProcess && this.currentRunningSessionId) {
+      const sessionId = this.currentRunningSessionId;
+      const process = this.runningScriptProcess;
+      
+      // Immediately clear references to prevent new output
+      this.currentRunningSessionId = null;
+      this.runningScriptProcess = null;
+      
+      // Kill the entire process group to ensure all child processes are terminated
+      try {
+        if (process.pid) {
+          console.log(`Terminating script process ${process.pid} and its children...`);
+          
+          // Since we used detached: true, we need to kill the process group
+          // Use negative PID to kill the entire process group
+          try {
+            process.kill('SIGKILL');
+            // Kill the process group using the system kill command
+            exec(`kill -9 -${process.pid}`, (error) => {
+              if (error) {
+                console.warn(`Error killing process group: ${error.message}`);
+              } else {
+                console.log(`Successfully killed process group ${process.pid}`);
+              }
+            });
+          } catch (error) {
+            console.warn('Process already terminated:', error);
+          }
+          
+          // Also kill any remaining child processes
+          exec(`pkill -P ${process.pid}`, (error) => {
+            // Ignore errors - child processes might not exist
+          });
+        }
+      } catch (error) {
+        console.warn('Error killing script process:', error);
+      }
+      
+      // Update session state
+      await this.setSessionRunning(sessionId, false);
+      
+      // Emit a final message to indicate the script was stopped
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stdout', 
+        data: '\n[Script stopped by user]\n' 
+      });
+    }
+  }
+
+  private async setSessionRunning(sessionId: string, isRunning: boolean): Promise<void> {
+    const session = this.activeSessions.get(sessionId);
+    if (session) {
+      session.isRunning = isRunning;
+      this.emit('session-updated', session);
+    }
+  }
+
+  getCurrentRunningSessionId(): string | null {
+    return this.currentRunningSessionId;
+  }
+
+  async cleanup(): Promise<void> {
+    await this.stopRunningScript();
   }
 }

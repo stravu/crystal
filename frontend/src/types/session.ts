@@ -10,6 +10,7 @@ export interface Session {
   output: string[];
   jsonMessages: any[];
   error?: string;
+  isRunning?: boolean;
 }
 
 export interface CreateSessionRequest {

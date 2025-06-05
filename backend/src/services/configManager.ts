@@ -17,7 +17,8 @@ export class ConfigManager extends EventEmitter {
       gitRepoPath: defaultGitPath || os.homedir(),
       verbose: false,
       openaiApiKey: undefined,
-      systemPromptAppend: undefined
+      systemPromptAppend: undefined,
+      runScript: undefined
     };
   }
 
@@ -65,5 +66,9 @@ export class ConfigManager extends EventEmitter {
 
   getSystemPromptAppend(): string | undefined {
     return this.config.systemPromptAppend;
+  }
+
+  getRunScript(): string[] | undefined {
+    return this.config.runScript;
   }
 }

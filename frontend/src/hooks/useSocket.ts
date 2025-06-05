@@ -48,13 +48,29 @@ export function useSocket() {
         console.log('Received session output:', output);
         addSessionOutput(output);
       });
+
+      socket.on('script:output', (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
+        console.log('Received script output for session', output.sessionId, ':', output.data.substring(0, 100));
+        // Store script output in session store for display
+        useSessionStore.getState().addScriptOutput(output);
+      });
       
       socket.on('disconnect', () => {
         console.log('Disconnected from server');
       });
     }
     
+    // Add beforeunload handler to stop scripts on page close
+    const handleBeforeUnload = () => {
+      // Send stop script request on page close
+      fetch('/api/sessions/stop-script', { method: 'POST', keepalive: true })
+        .catch(() => {}); // Ignore errors on page close
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (socket) {
         socket.disconnect();
         socket = null;

@@ -11,6 +11,7 @@ interface SessionStore {
   sessions: Session[];
   activeSessionId: string | null;
   isLoaded: boolean;
+  scriptOutput: Record<string, string[]>; // sessionId -> script output lines
   
   setSessions: (sessions: Session[]) => void;
   loadSessions: (sessions: Session[]) => void;
@@ -20,6 +21,9 @@ interface SessionStore {
   setActiveSession: (sessionId: string | null) => void;
   addSessionOutput: (output: SessionOutput) => void;
   setSessionOutput: (sessionId: string, output: string) => void;
+  addScriptOutput: (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => void;
+  clearScriptOutput: (sessionId: string) => void;
+  getScriptOutput: (sessionId: string) => string[];
   createSession: (request: CreateSessionRequest) => Promise<void>;
   
   getActiveSession: () => Session | undefined;
@@ -29,6 +33,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   isLoaded: false,
+  scriptOutput: {},
   
   setSessions: (sessions) => set({ sessions }),
   
@@ -91,6 +96,31 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       console.error('Error creating session:', error);
       throw error;
     }
+  },
+  
+  addScriptOutput: (output) => {
+    console.log('Adding script output to store for session', output.sessionId, ':', output.data.substring(0, 100));
+    return set((state) => ({
+      scriptOutput: {
+        ...state.scriptOutput,
+        [output.sessionId]: [
+          ...(state.scriptOutput[output.sessionId] || []),
+          output.data
+        ]
+      }
+    }));
+  },
+
+  clearScriptOutput: (sessionId: string) => set((state) => ({
+    scriptOutput: {
+      ...state.scriptOutput,
+      [sessionId]: []
+    }
+  })),
+
+  getScriptOutput: (sessionId) => {
+    const state = get();
+    return state.scriptOutput[sessionId] || [];
   },
   
   getActiveSession: () => {

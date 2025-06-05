@@ -568,5 +568,51 @@ export function createSessionRouter(
     }
   });
 
+  // Script execution endpoints
+  router.post('/:id/run-script', async (req: Request, res: Response) => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const { commands } = req.body;
+      if (!Array.isArray(commands) || commands.length === 0) {
+        return res.status(400).json({ error: 'Commands array is required' });
+      }
+
+      await sessionManager.runScript(req.params.id, commands, session.worktreePath);
+      res.json({ success: true });
+    } catch (error) {
+      logger?.error('Error running script:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to run script', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  router.post('/stop-script', async (req: Request, res: Response) => {
+    try {
+      await sessionManager.stopRunningScript();
+      res.json({ success: true });
+    } catch (error) {
+      logger?.error('Error stopping script:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to stop script', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  router.get('/running-session', async (req: Request, res: Response) => {
+    try {
+      const runningSessionId = sessionManager.getCurrentRunningSessionId();
+      res.json({ sessionId: runningSessionId });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get running session' });
+    }
+  });
+
   return router;
 }

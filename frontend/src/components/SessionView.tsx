@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -11,17 +11,44 @@ import '@xterm/xterm/css/xterm.css';
 export function SessionView() {
   const activeSession = useSessionStore((state) => state.getActiveSession());
   const setSessionOutput = useSessionStore((state) => state.setSessionOutput);
+  
+  // Instead of subscribing to script output, we'll get it when needed
+  const [scriptOutput, setScriptOutput] = useState<string[]>([]);
+  
+  // Subscribe to script output changes manually
+  useEffect(() => {
+    if (!activeSession) {
+      setScriptOutput([]);
+      return;
+    }
+    
+    const unsubscribe = useSessionStore.subscribe((state) => {
+      const sessionScriptOutput = state.scriptOutput[activeSession.id] || [];
+      setScriptOutput(sessionScriptOutput);
+    });
+    
+    // Get initial value
+    const initialOutput = useSessionStore.getState().scriptOutput[activeSession.id] || [];
+    setScriptOutput(initialOutput);
+    
+    return unsubscribe;
+  }, [activeSession?.id]);
+  
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
+  const scriptTerminalRef = useRef<HTMLDivElement>(null);
+  const scriptTerminalInstance = useRef<Terminal | null>(null);
+  const scriptFitAddon = useRef<FitAddon | null>(null);
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
-  const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes'>('output');
+  const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes' | 'terminal'>('output');
   const [showPromptNav, setShowPromptNav] = useState(true);
   const [isMerging, setIsMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const lastProcessedOutputLength = useRef(0);
+  const lastProcessedScriptOutputLength = useRef(0);
   
   const loadOutputContent = async (retryCount = 0) => {
     if (!activeSession || !terminalInstance.current) return;
@@ -122,6 +149,87 @@ export function SessionView() {
   }, [activeSession?.id]);
 
   useEffect(() => {
+    if (!scriptTerminalInstance.current || !activeSession) return;
+
+    // Clear script terminal when switching sessions
+    scriptTerminalInstance.current.clear();
+    scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
+    lastProcessedScriptOutputLength.current = 0;
+  }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (!scriptTerminalInstance.current || !activeSession) return;
+
+    // Load existing script output for this session after terminal is cleared
+    const existingOutput = scriptOutput.join('');
+    if (existingOutput && lastProcessedScriptOutputLength.current === 0) {
+      scriptTerminalInstance.current.write(existingOutput);
+      lastProcessedScriptOutputLength.current = existingOutput.length;
+    }
+  }, [activeSession?.id, scriptOutput]);
+
+  useEffect(() => {
+    if (!scriptTerminalRef.current || viewMode !== 'terminal') return;
+
+    // Initialize script terminal if not already created
+    if (!scriptTerminalInstance.current) {
+      scriptTerminalInstance.current = new Terminal({
+        cursorBlink: false,
+        convertEol: true,
+        rows: 30,
+        cols: 80,
+        theme: {
+          background: '#0f172a',
+          foreground: '#e2e8f0',
+          cursor: '#e2e8f0',
+          black: '#1e293b',
+          red: '#ef4444',
+          green: '#22c55e',
+          yellow: '#eab308',
+          blue: '#3b82f6',
+          magenta: '#a855f7',
+          cyan: '#06b6d4',
+          white: '#f1f5f9',
+          brightBlack: '#475569',
+          brightRed: '#f87171',
+          brightGreen: '#4ade80',
+          brightYellow: '#facc15',
+          brightBlue: '#60a5fa',
+          brightMagenta: '#c084fc',
+          brightCyan: '#22d3ee',
+          brightWhite: '#ffffff'
+        }
+      });
+      
+      scriptFitAddon.current = new FitAddon();
+      scriptTerminalInstance.current.loadAddon(scriptFitAddon.current);
+      scriptTerminalInstance.current.open(scriptTerminalRef.current);
+      scriptFitAddon.current.fit();
+      
+      // Add initial message
+      scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
+      lastProcessedScriptOutputLength.current = 0;
+    }
+    
+    // We'll load existing output in a separate effect
+  }, [viewMode]);
+
+  // Separate effect to load existing script output when switching to terminal view
+  useEffect(() => {
+    if (!scriptTerminalInstance.current || !activeSession || viewMode !== 'terminal') return;
+    
+    // Get the current script output from the store without subscribing
+    const currentScriptOutput = useSessionStore.getState().scriptOutput[activeSession.id] || [];
+    
+    // Only load if we haven't processed any output yet
+    if (lastProcessedScriptOutputLength.current === 0 && currentScriptOutput.length > 0) {
+      const existingOutput = currentScriptOutput.join('');
+      scriptTerminalInstance.current.write(existingOutput);
+      lastProcessedScriptOutputLength.current = existingOutput.length;
+    }
+  }, [viewMode, activeSession?.id]);
+
+  useEffect(() => {
     if (!terminalInstance.current || !activeSession) return;
 
     // Write only new output
@@ -133,22 +241,49 @@ export function SessionView() {
     }
   }, [activeSession?.output]);
 
+  useEffect(() => {
+    if (!scriptTerminalInstance.current || !activeSession) return;
+
+    const fullScriptOutput = scriptOutput.join('');
+    
+    // If script output is empty or shorter than what we've processed, clear terminal
+    if (fullScriptOutput.length < lastProcessedScriptOutputLength.current || fullScriptOutput.length === 0) {
+      scriptTerminalInstance.current.clear();
+      scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
+      lastProcessedScriptOutputLength.current = 0;
+    }
+    
+    // Write only new script output
+    if (fullScriptOutput.length > lastProcessedScriptOutputLength.current) {
+      const newOutput = fullScriptOutput.substring(lastProcessedScriptOutputLength.current);
+      scriptTerminalInstance.current.write(newOutput);
+      lastProcessedScriptOutputLength.current = fullScriptOutput.length;
+    }
+  }, [scriptOutput, activeSession?.id]);
+
 
   useEffect(() => {
-    // Cleanup terminal on unmount
+    // Cleanup terminals on unmount
     return () => {
       if (terminalInstance.current) {
         terminalInstance.current.dispose();
         terminalInstance.current = null;
       }
+      if (scriptTerminalInstance.current) {
+        scriptTerminalInstance.current.dispose();
+        scriptTerminalInstance.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
-    // Handle window resize
+    // Handle window resize for both terminals
     const handleResize = () => {
       if (fitAddon.current && terminalInstance.current) {
         fitAddon.current.fit();
+      }
+      if (scriptFitAddon.current && scriptTerminalInstance.current) {
+        scriptFitAddon.current.fit();
       }
     };
 
@@ -390,6 +525,18 @@ export function SessionView() {
             >
               Changes
             </button>
+            <button
+              onClick={() => setViewMode('terminal')}
+              className={`px-3 py-1 text-sm ${
+                viewMode === 'terminal' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Terminal {activeSession.isRunning && (
+                <span className="ml-1 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              )}
+            </button>
           </div>
           <button
             onClick={() => loadOutputContent()}
@@ -481,6 +628,9 @@ export function SessionView() {
           </div>
           <div className={`h-full ${viewMode === 'changes' ? 'block' : 'hidden'}`}>
             <CombinedDiffView sessionId={activeSession.id} selectedExecutions={[]} />
+          </div>
+          <div className={`h-full ${viewMode === 'terminal' ? 'block' : 'hidden'} bg-gray-900`}>
+            <div ref={scriptTerminalRef} className="h-full" />
           </div>
         </div>
         {showPromptNav && (

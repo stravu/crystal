@@ -3,6 +3,7 @@ export interface AppConfig {
   verbose?: boolean;
   openaiApiKey?: string;
   systemPromptAppend?: string;
+  runScript?: string[];
 }
 
 export interface UpdateConfigRequest {
@@ -10,4 +11,5 @@ export interface UpdateConfigRequest {
   verbose?: boolean;
   openaiApiKey?: string;
   systemPromptAppend?: string;
+  runScript?: string[];
 }

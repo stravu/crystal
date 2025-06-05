@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { StatusIndicator } from './StatusIndicator';
 import type { Session } from '../types/session';
+import type { AppConfig } from '../types/config';
 
 interface SessionListItemProps {
   session: Session;
@@ -11,7 +12,96 @@ export function SessionListItem({ session }: SessionListItemProps) {
   const { activeSessionId, setActiveSession } = useSessionStore();
   const isActive = activeSessionId === session.id;
   const [isDeleting, setIsDeleting] = useState(false);
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
   
+  useEffect(() => {
+    // Load config to check if run script is available
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => setConfig(data))
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    // Check if this session is currently running
+    fetch('/api/sessions/running-session')
+      .then(res => res.json())
+      .then(data => setIsRunning(data.sessionId === session.id))
+      .catch(console.error);
+  }, [session.id]);
+
+  useEffect(() => {
+    // Listen for script session changes
+    const handleScriptSessionChange = (event: CustomEvent) => {
+      setIsRunning(event.detail === session.id);
+    };
+
+    window.addEventListener('script-session-changed', handleScriptSessionChange as EventListener);
+    return () => {
+      window.removeEventListener('script-session-changed', handleScriptSessionChange as EventListener);
+    };
+  }, [session.id]);
+
+  const handleRunScript = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!config?.runScript || config.runScript.length === 0) {
+      alert('No run script configured. Please configure run script in Settings.');
+      return;
+    }
+
+    try {
+      // First stop any currently running script
+      const stopResponse = await fetch('/api/sessions/stop-script', {
+        method: 'POST',
+      });
+      
+      // Clear any previous script output for this session
+      useSessionStore.getState().clearScriptOutput(session.id);
+      
+      // Then run the script for this session
+      const response = await fetch(`/api/sessions/${session.id}/run-script`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ commands: config.runScript }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to run script');
+      }
+
+      // Update running state for all sessions
+      window.dispatchEvent(new CustomEvent('script-session-changed', { detail: session.id }));
+    } catch (error) {
+      console.error('Error running script:', error);
+      alert('Failed to run script');
+    }
+  };
+
+  const handleStopScript = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      console.log('Stopping script...');
+      const response = await fetch('/api/sessions/stop-script', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to stop script');
+      }
+
+      console.log('Script stop request successful');
+      // Update running state for all sessions
+      window.dispatchEvent(new CustomEvent('script-session-changed', { detail: null }));
+    } catch (error) {
+      console.error('Error stopping script:', error);
+      alert('Failed to stop script');
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the session
@@ -57,21 +147,39 @@ export function SessionListItem({ session }: SessionListItemProps) {
         <span className="flex-1 truncate text-sm">
           {session.name}
         </span>
-      </button>
-      <button
-        onClick={handleDelete}
-        disabled={isDeleting}
-        className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-600/20 ${
-          isDeleting ? 'cursor-not-allowed' : ''
-        }`}
-        title="Delete session and worktree"
-      >
-        {isDeleting ? (
-          <span className="text-gray-400">⏳</span>
-        ) : (
-          <span className="text-red-400 hover:text-red-300">🗑️</span>
+        {isRunning && (
+          <span className="text-green-400 text-xs">▶️ Running</span>
         )}
       </button>
+      <div className="flex items-center space-x-1">
+        {config?.runScript && config.runScript.length > 0 && (
+          <button
+            onClick={isRunning ? handleStopScript : handleRunScript}
+            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
+              isRunning 
+                ? 'hover:bg-red-600/20 text-red-400 hover:text-red-300' 
+                : 'hover:bg-green-600/20 text-green-400 hover:text-green-300'
+            }`}
+            title={isRunning ? 'Stop script' : 'Run script'}
+          >
+            {isRunning ? '⏹️' : '▶️'}
+          </button>
+        )}
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-600/20 ${
+            isDeleting ? 'cursor-not-allowed' : ''
+          }`}
+          title="Delete session and worktree"
+        >
+          {isDeleting ? (
+            <span className="text-gray-400">⏳</span>
+          ) : (
+            <span className="text-red-400 hover:text-red-300">🗑️</span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
