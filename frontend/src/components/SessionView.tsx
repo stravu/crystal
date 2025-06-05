@@ -18,6 +18,8 @@ export function SessionView() {
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
   const [viewMode, setViewMode] = useState<'terminal' | 'messages' | 'changes'>('terminal');
   const [showPromptNav, setShowPromptNav] = useState(true);
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
   const lastProcessedOutputLength = useRef(0);
   
   useEffect(() => {
@@ -209,6 +211,64 @@ export function SessionView() {
       console.error('Error stopping session:', error);
     }
   };
+
+  const handleMergeMainToWorktree = async () => {
+    setIsMerging(true);
+    setMergeError(null);
+    
+    try {
+      const response = await fetch(`/api/sessions/${activeSession.id}/merge-main-to-worktree`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to merge main to worktree');
+      }
+      
+      // If successful, you might want to show a success message
+      // For now, we'll just clear any errors
+      setMergeError(null);
+    } catch (error) {
+      console.error('Error merging main to worktree:', error);
+      setMergeError(error instanceof Error ? error.message : 'Failed to merge main to worktree');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const handleMergeWorktreeToMain = async () => {
+    setIsMerging(true);
+    setMergeError(null);
+    
+    try {
+      const response = await fetch(`/api/sessions/${activeSession.id}/merge-worktree-to-main`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to merge worktree to main');
+      }
+      
+      // If successful, you might want to show a success message
+      // For now, we'll just clear any errors
+      setMergeError(null);
+    } catch (error) {
+      console.error('Error merging worktree to main:', error);
+      setMergeError(error instanceof Error ? error.message : 'Failed to merge worktree to main');
+    } finally {
+      setIsMerging(false);
+    }
+  };
   
   return (
     <div className="flex-1 flex flex-col">
@@ -224,7 +284,44 @@ export function SessionView() {
             </div>
             <div className="flex items-center space-x-3 mt-2">
               <StatusIndicator session={activeSession} size="medium" showText showProgress />
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleMergeMainToWorktree}
+                  disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors flex items-center space-x-1 ${
+                    isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                  title="Merge main branch into this worktree"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                  <span>{isMerging ? 'Merging...' : 'Main → Worktree'}</span>
+                </button>
+                <button
+                  onClick={handleMergeWorktreeToMain}
+                  disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors flex items-center space-x-1 ${
+                    isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                  title="Rebase worktree on main and fast-forward merge (no merge commits)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  <span>{isMerging ? 'Rebasing...' : 'Worktree → Main (FF)'}</span>
+                </button>
+              </div>
             </div>
+            {mergeError && (
+              <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded-md">
+                <p className="text-sm text-red-700">{mergeError}</p>
+              </div>
+            )}
             <div className="text-sm text-gray-600 mt-1 truncate">
               {activeSession.prompt.substring(0, 80)}...
             </div>

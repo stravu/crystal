@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { CreateSessionRequest } from '../types/session.js';
 import { SessionManager } from '../services/sessionManager.js';
 import { WorktreeManager } from '../services/worktreeManager.js';
@@ -7,6 +9,8 @@ import { WorktreeNameGenerator } from '../services/worktreeNameGenerator.js';
 import type { ExecutionTracker } from '../services/executionTracker.js';
 import type { Logger } from '../utils/logger.js';
 import { formatJsonForTerminalEnhanced } from '../utils/toolFormatter.js';
+
+const execAsync = promisify(exec);
 
 export function createSessionRouter(
   sessionManager: SessionManager,
@@ -386,6 +390,168 @@ export function createSessionRouter(
         error: 'Failed to get combined diff', 
         details: error instanceof Error ? error.message : String(error) 
       });
+    }
+  });
+
+  // Merge main branch into session worktree
+  router.post('/:id/merge-main-to-worktree', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    
+    try {
+      // Get session to find worktree path
+      const session = await sessionManager.getSession(id);
+      
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      // First, fetch the latest changes from origin
+      try {
+        await execAsync(`cd "${session.worktreePath}" && git fetch origin main`);
+      } catch (fetchError) {
+        console.error('Error fetching from origin:', fetchError);
+        // Continue anyway - might work with local main
+      }
+      
+      // Execute git merge command in the worktree
+      try {
+        const { stdout, stderr } = await execAsync(`cd "${session.worktreePath}" && git merge origin/main || git merge main`);
+        
+        // Check if merge was successful
+        if (stdout.includes('Already up to date')) {
+          return res.json({ success: true, message: 'Already up to date with main branch' });
+        }
+        
+        res.json({ success: true, message: 'Successfully merged main branch' });
+      } catch (mergeError: any) {
+        // Check if it's a merge conflict
+        const errorMessage = mergeError.stderr || mergeError.stdout || mergeError.message;
+        
+        if (errorMessage.includes('CONFLICT')) {
+          // Get conflict details
+          try {
+            const { stdout: statusOutput } = await execAsync(`cd "${session.worktreePath}" && git status --porcelain`);
+            const conflictFiles = statusOutput
+              .split('\n')
+              .filter(line => line.startsWith('UU '))
+              .map(line => line.substring(3).trim());
+            
+            return res.status(409).json({ 
+              error: 'Merge conflict detected', 
+              conflictFiles,
+              message: `Merge conflict in ${conflictFiles.length} file(s). Please resolve conflicts manually.`
+            });
+          } catch {
+            return res.status(409).json({ 
+              error: 'Merge conflict detected. Please resolve conflicts manually.' 
+            });
+          }
+        }
+        
+        // Other git errors
+        return res.status(400).json({ 
+          error: errorMessage || 'Failed to merge main branch' 
+        });
+      }
+    } catch (error) {
+      console.error('Error merging main branch:', error);
+      res.status(500).json({ error: 'Failed to merge main branch' });
+    }
+  });
+
+  // Merge session worktree into main branch (using rebase to avoid merge commits)
+  router.post('/:id/merge-worktree-to-main', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    
+    try {
+      // Get session to find worktree path
+      const session = await sessionManager.getSession(id);
+      
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      // Get the worktree branch name
+      const { stdout: worktreeBranch } = await execAsync(`cd "${session.worktreePath}" && git branch --show-current`);
+      const worktreeBranchName = worktreeBranch.trim();
+      
+      try {
+        // Check if there are uncommitted changes in the worktree
+        const { stdout: worktreeStatus } = await execAsync(`cd "${session.worktreePath}" && git status --porcelain`);
+        if (worktreeStatus.trim()) {
+          return res.status(400).json({ 
+            error: 'Worktree has uncommitted changes. Please commit or stash changes first.' 
+          });
+        }
+        
+        // Fetch latest changes from origin
+        await execAsync(`cd "${session.worktreePath}" && git fetch origin main`);
+        
+        // First, rebase the worktree branch onto latest main
+        try {
+          await execAsync(`cd "${session.worktreePath}" && git rebase origin/main`);
+        } catch (rebaseError: any) {
+          const errorMessage = rebaseError.stderr || rebaseError.stdout || rebaseError.message;
+          
+          if (errorMessage.includes('CONFLICT')) {
+            // Abort the rebase
+            await execAsync(`cd "${session.worktreePath}" && git rebase --abort`).catch(() => {});
+            
+            return res.status(409).json({ 
+              error: 'Rebase conflict detected. Please resolve conflicts manually or merge main into your worktree first.' 
+            });
+          }
+          
+          throw rebaseError;
+        }
+        
+        // Now switch to main repo and do a fast-forward merge
+        const gitRepoPath = getGitRepoPath ? getGitRepoPath() : process.cwd();
+        
+        // Ensure we're on main branch
+        const { stdout: currentBranch } = await execAsync(`cd "${gitRepoPath}" && git branch --show-current`);
+        const branch = currentBranch.trim();
+        
+        if (branch !== 'main' && branch !== 'master') {
+          return res.status(400).json({ 
+            error: `Main repository is on branch '${branch}', not 'main'. Please switch to main branch first.` 
+          });
+        }
+        
+        // Pull latest main
+        await execAsync(`cd "${gitRepoPath}" && git pull origin main --ff-only`);
+        
+        // Do a fast-forward only merge
+        try {
+          const { stdout } = await execAsync(`cd "${gitRepoPath}" && git merge "${worktreeBranchName}" --ff-only`);
+          
+          if (stdout.includes('Already up to date')) {
+            return res.json({ success: true, message: 'Already up to date - no changes to merge' });
+          }
+          
+          res.json({ success: true, message: 'Successfully merged worktree into main branch (fast-forward)' });
+        } catch (mergeError: any) {
+          const errorMessage = mergeError.stderr || mergeError.stdout || mergeError.message;
+          
+          if (errorMessage.includes('Not possible to fast-forward')) {
+            return res.status(400).json({ 
+              error: 'Cannot fast-forward merge. The worktree branch has diverged from main. Please rebase your worktree branch first.' 
+            });
+          }
+          
+          return res.status(400).json({ 
+            error: errorMessage || 'Failed to merge worktree into main branch' 
+          });
+        }
+      } catch (error: any) {
+        // Other git errors
+        return res.status(400).json({ 
+          error: error.message || 'Failed to merge worktree into main branch' 
+        });
+      }
+    } catch (error) {
+      console.error('Error merging worktree to main:', error);
+      res.status(500).json({ error: 'Failed to merge worktree to main branch' });
     }
   });
 
