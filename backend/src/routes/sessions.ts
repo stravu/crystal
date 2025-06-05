@@ -281,11 +281,24 @@ export function createSessionRouter(
         return res.status(404).json({ error: 'Session not found' });
       }
 
-      claudeCodeManager.killProcess(req.params.id);
+      // Kill the process if it's running
+      try {
+        claudeCodeManager.killProcess(req.params.id);
+      } catch (error) {
+        console.error('Error killing process:', error);
+        // Continue with deletion even if process killing fails
+      }
       
-      // Use the stored worktree name from the database
-      await getWorktreeManager().removeWorktree(session.name);
+      // Try to remove the worktree
+      try {
+        await getWorktreeManager().removeWorktree(session.name);
+      } catch (error) {
+        console.error('Error removing worktree:', error);
+        // Continue with archiving even if worktree removal fails
+        // The WorktreeManager already handles missing worktrees gracefully
+      }
       
+      // Archive the session - this should always happen
       await sessionManager.archiveSession(req.params.id);
       
       res.json({ success: true });

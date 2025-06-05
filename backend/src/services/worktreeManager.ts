@@ -63,8 +63,19 @@ export class WorktreeManager {
     
     try {
       await execAsync(`cd ${this.mainRepoPath} && git worktree remove "${worktreePath}" --force`);
-    } catch (error) {
-      throw new Error(`Failed to remove worktree: ${error instanceof Error ? error.message : String(error)}`);
+    } catch (error: any) {
+      const errorMessage = error.stderr || error.stdout || error.message || String(error);
+      
+      // If the worktree is not found, that's okay - it might have been manually deleted
+      if (errorMessage.includes('is not a working tree') || 
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('No such file or directory')) {
+        console.log(`Worktree ${worktreePath} already removed or doesn't exist, skipping...`);
+        return;
+      }
+      
+      // For other errors, still throw
+      throw new Error(`Failed to remove worktree: ${errorMessage}`);
     }
   }
 
