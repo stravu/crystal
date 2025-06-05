@@ -20,7 +20,59 @@ export function SessionView() {
   const [showPromptNav, setShowPromptNav] = useState(true);
   const [isMerging, setIsMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const lastProcessedOutputLength = useRef(0);
+  
+  const loadTerminalContent = async (retryCount = 0) => {
+    if (!activeSession || !terminalInstance.current) return;
+    
+    setIsLoadingOutput(true);
+    setLoadError(null);
+    
+    try {
+      const response = await fetch(`/api/sessions/${activeSession.id}/output`);
+      if (!response.ok) {
+        throw new Error(`Failed to load output: ${response.statusText}`);
+      }
+      
+      const outputs = await response.json();
+      
+      // Handle terminal outputs
+      const terminalOutputs = outputs.filter((o: any) => o.type !== 'json');
+      const outputData = terminalOutputs.map((o: any) => o.data).join('');
+      if (outputData && terminalInstance.current) {
+        setSessionOutput(activeSession.id, outputData);
+        
+        // Small delay to ensure terminal is ready
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Double-check terminal still exists before writing
+        if (terminalInstance.current) {
+          terminalInstance.current.write(outputData);
+          lastProcessedOutputLength.current = outputData.length;
+        }
+      }
+      
+      // Handle JSON messages
+      const jsonOutputs = outputs.filter((o: any) => o.type === 'json');
+      jsonOutputs.forEach((jsonOutput: any) => {
+        useSessionStore.getState().addSessionOutput(jsonOutput);
+      });
+      
+      setLoadError(null);
+    } catch (error) {
+      console.error('Error fetching session output:', error);
+      
+      if (retryCount < 2) {
+        // Retry after a short delay
+        setTimeout(() => loadTerminalContent(retryCount + 1), 1000);
+      } else {
+        setLoadError(error instanceof Error ? error.message : 'Failed to load terminal content');
+      }
+    } finally {
+      setIsLoadingOutput(false);
+    }
+  };
   
   useEffect(() => {
     if (!terminalRef.current || !activeSession) return;
@@ -65,28 +117,8 @@ export function SessionView() {
     terminalInstance.current.clear();
     lastProcessedOutputLength.current = 0;
 
-    // Always fetch existing outputs when session is selected (to get both terminal and JSON data)
-    setIsLoadingOutput(true);
-    fetch(`/api/sessions/${activeSession.id}/output`)
-      .then(res => res.json())
-      .then(outputs => {
-        // Handle terminal outputs
-        const terminalOutputs = outputs.filter((o: any) => o.type !== 'json');
-        const outputData = terminalOutputs.map((o: any) => o.data).join('');
-        if (outputData) {
-          setSessionOutput(activeSession.id, outputData);
-          terminalInstance.current?.write(outputData);
-          lastProcessedOutputLength.current = outputData.length;
-        }
-        
-        // Handle JSON messages - add them to the store via addSessionOutput
-        const jsonOutputs = outputs.filter((o: any) => o.type === 'json');
-        jsonOutputs.forEach((jsonOutput: any) => {
-          useSessionStore.getState().addSessionOutput(jsonOutput);
-        });
-      })
-      .catch(error => console.error('Error fetching session output:', error))
-      .finally(() => setIsLoadingOutput(false));
+    // Load terminal content with retry logic
+    loadTerminalContent();
   }, [activeSession?.id]);
 
   useEffect(() => {
@@ -360,6 +392,16 @@ export function SessionView() {
             </button>
           </div>
           <button
+            onClick={() => loadTerminalContent()}
+            disabled={isLoadingOutput}
+            className="ml-2 p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-50"
+            title="Reload terminal content"
+          >
+            <svg className={`w-5 h-5 ${isLoadingOutput ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button
             onClick={() => setShowPromptNav(!showPromptNav)}
             className="ml-2 p-1 text-gray-600 hover:bg-gray-200 rounded"
             title={showPromptNav ? 'Hide prompt navigation' : 'Show prompt navigation'}
@@ -382,6 +424,24 @@ export function SessionView() {
           )}
           <div className={`bg-gray-900 h-full ${viewMode === 'terminal' ? 'block' : 'hidden'} relative`}>
             <div ref={terminalRef} className="h-full" />
+            {/* Error state with reload button */}
+            {loadError && viewMode === 'terminal' && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                  <svg className="w-12 h-12 text-red-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-gray-300 mb-2">Failed to load terminal content</p>
+                  <p className="text-gray-500 text-sm mb-4">{loadError}</p>
+                  <button
+                    onClick={() => loadTerminalContent()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Reload Terminal
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Working indicator */}
             {(activeSession.status === 'running' || activeSession.status === 'initializing') && (
               <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-4 py-2">
