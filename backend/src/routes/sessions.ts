@@ -8,7 +8,7 @@ import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
 import { WorktreeNameGenerator } from '../services/worktreeNameGenerator.js';
 import type { ExecutionTracker } from '../services/executionTracker.js';
 import type { Logger } from '../utils/logger.js';
-import { formatJsonForTerminalEnhanced } from '../utils/toolFormatter.js';
+import { formatJsonForOutputEnhanced } from '../utils/toolFormatter.js';
 
 const execAsync = promisify(exec);
 
@@ -54,23 +54,23 @@ export function createSessionRouter(
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const outputs = await sessionManager.getSessionOutputs(req.params.id, limit);
       
-      // Transform JSON messages to terminal format on the fly
+      // Transform JSON messages to output format on the fly
       const transformedOutputs = outputs.map(output => {
         if (output.type === 'json') {
-          // Generate terminal format from JSON using enhanced formatter
-          const terminalText = formatJsonForTerminalEnhanced(output.data, getGitRepoPath?.());
-          if (terminalText) {
-            // Return both the JSON and a generated terminal version
+          // Generate output format from JSON using enhanced formatter
+          const outputText = formatJsonForOutputEnhanced(output.data, getGitRepoPath?.());
+          if (outputText) {
+            // Return both the JSON and a generated output version
             return [
               output, // Keep the JSON message for Messages view
               {
                 ...output,
                 type: 'stdout' as const,
-                data: terminalText
+                data: outputText
               }
             ];
           }
-          return [output]; // If no terminal format, just return JSON
+          return [output]; // If no output format, just return JSON
         }
         return [output]; // Non-JSON outputs pass through
       }).flat();
@@ -122,7 +122,7 @@ export function createSessionRouter(
         // Add the initial prompt as a prompt marker so it shows in navigation
         await sessionManager.addInitialPromptMarker(session.id, prompt);
         
-        // Add the initial prompt to terminal output so it's visible
+        // Add the initial prompt to output so it's visible
         const timestamp = new Date().toLocaleTimeString();
         const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[32m👤 Initial Prompt\x1b[0m\r\n` +
                                      `\x1b[37m${prompt}\x1b[0m\r\n\r\n`;

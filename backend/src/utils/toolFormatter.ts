@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { formatJsonForTerminal } from './formatters.js';
+import { formatJsonForOutput } from './formatters.js';
 
 interface ToolCall {
   type: 'tool_use';
@@ -168,9 +168,9 @@ export function formatToolInteraction(
 }
 
 /**
- * Enhanced JSON to terminal formatter that unifies tool calls and responses
+ * Enhanced JSON to output formatter that unifies tool calls and responses
  */
-export function formatJsonForTerminalEnhanced(jsonMessage: any, gitRepoPath?: string): string {
+export function formatJsonForOutputEnhanced(jsonMessage: any, gitRepoPath?: string): string {
   const timestamp = jsonMessage.timestamp || new Date().toISOString();
   
   // Handle tool calls from assistant
@@ -258,8 +258,8 @@ export function formatJsonForTerminalEnhanced(jsonMessage: any, gitRepoPath?: st
   }
   
   // Fall back to original formatter for other message types
-  return formatJsonForTerminal(jsonMessage);
+  return formatJsonForOutput(jsonMessage);
 }
 
 // Re-export the original formatter for backwards compatibility
-export { formatJsonForTerminal };
+export { formatJsonForOutput };

@@ -1,4 +1,4 @@
-export function formatJsonForTerminal(jsonMessage: any): string {
+export function formatJsonForOutput(jsonMessage: any): string {
   const timestamp = new Date(jsonMessage.timestamp || new Date()).toLocaleTimeString();
   
   if (jsonMessage.type === 'system') {

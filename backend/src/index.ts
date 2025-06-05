@@ -14,7 +14,7 @@ import { createSessionRouter } from './routes/sessions.js';
 import { createConfigRouter } from './routes/config.js';
 import { createPromptsRouter } from './routes/prompts.js';
 import { Logger } from './utils/logger.js';
-import { formatJsonForTerminalEnhanced } from './utils/toolFormatter.js';
+import { formatJsonForOutputEnhanced } from './utils/toolFormatter.js';
 
 dotenv.config();
 
@@ -132,22 +132,22 @@ async function initialize() {
       timestamp: output.timestamp
     });
     
-    // If it's a JSON message, also emit a formatted terminal version
+    // If it's a JSON message, also emit a formatted output version
     if (output.type === 'json') {
       // Use enhanced formatter for better tool display
-      const terminalText = formatJsonForTerminalEnhanced(output.data, configManager.getGitRepoPath());
-      if (terminalText) {
-        // Emit the terminal format immediately for real-time display
+      const outputText = formatJsonForOutputEnhanced(output.data, configManager.getGitRepoPath());
+      if (outputText) {
+        // Emit the output format immediately for real-time display
         sessionManager.emit('session-output', {
           sessionId: output.sessionId,
           type: 'stdout',
-          data: terminalText,
+          data: outputText,
           timestamp: output.timestamp
         });
 
         // Store assistant responses in conversation history
-        if (terminalText.trim()) {
-          await sessionManager.addConversationMessage(output.sessionId, 'assistant', terminalText.trim());
+        if (outputText.trim()) {
+          await sessionManager.addConversationMessage(output.sessionId, 'assistant', outputText.trim());
         }
       }
     }

@@ -6,7 +6,7 @@ interface PromptMarker {
   session_id: string;
   prompt_text: string;
   output_index: number;
-  terminal_line?: number;
+  output_line?: number;
   timestamp: string;
 }
 

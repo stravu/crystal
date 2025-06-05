@@ -272,11 +272,11 @@ export class DatabaseService {
   }
 
   // Prompt marker operations
-  async addPromptMarker(sessionId: string, promptText: string, outputIndex: number, terminalLine?: number): Promise<number> {
+  async addPromptMarker(sessionId: string, promptText: string, outputIndex: number, outputLine?: number): Promise<number> {
     const result = await this.dbRun(`
-      INSERT INTO prompt_markers (session_id, prompt_text, output_index, terminal_line)
+      INSERT INTO prompt_markers (session_id, prompt_text, output_index, output_line)
       VALUES (?, ?, ?, ?)
-    `, [sessionId, promptText, outputIndex, terminalLine]);
+    `, [sessionId, promptText, outputIndex, outputLine]);
     
     return result.lastID!;
   }
@@ -289,12 +289,12 @@ export class DatabaseService {
     `, [sessionId]) as PromptMarker[];
   }
 
-  async updatePromptMarkerLine(id: number, terminalLine: number): Promise<void> {
+  async updatePromptMarkerLine(id: number, outputLine: number): Promise<void> {
     await this.dbRun(`
       UPDATE prompt_markers 
-      SET terminal_line = ? 
+      SET output_line = ? 
       WHERE id = ?
-    `, [terminalLine, id]);
+    `, [outputLine, id]);
   }
 
   // Execution diff operations
