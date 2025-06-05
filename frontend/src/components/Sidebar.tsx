@@ -66,9 +66,9 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
         )}
       
       {viewMode === 'sessions' && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="px-4 py-2 text-sm text-gray-400 uppercase">Sessions</div>
-          <div className="space-y-1 px-2">
+          <div className="space-y-1 px-2 pb-2">
             {!isLoaded ? (
               <div className="px-2 py-4 text-gray-500 text-sm text-center">
                 Loading sessions...

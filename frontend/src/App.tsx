@@ -13,7 +13,7 @@ function App() {
   useNotifications();
 
   return (
-    <div className="h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       <Sidebar viewMode={viewMode} onViewModeChange={setViewMode} />
       {viewMode === 'sessions' ? <SessionView /> : <PromptHistory />}
     </div>

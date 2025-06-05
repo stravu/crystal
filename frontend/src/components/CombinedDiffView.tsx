@@ -112,7 +112,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
   }
 
   return (
-    <div className="combined-diff-view h-full flex flex-col">
+    <div className="combined-diff-view h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
         <h2 className="text-xl font-semibold text-gray-900">File Changes</h2>
@@ -133,11 +133,11 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {viewMode === 'list' ? (
           <>
             {/* Execution selection sidebar */}
-            <div className="w-1/3 border-r border-gray-200 bg-white overflow-hidden">
+            <div className="w-1/3 border-r border-gray-200 bg-white overflow-hidden flex flex-col">
               <ExecutionList
                 sessionId={sessionId}
                 executions={executions}
@@ -147,7 +147,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
             </div>
 
             {/* Diff preview */}
-            <div className="flex-1 overflow-auto bg-white">
+            <div className="flex-1 overflow-auto bg-white min-w-0">
               {loading && combinedDiff === null ? (
                 <div className="flex items-center justify-center h-32">
                   <div className="text-gray-500">Loading diff...</div>

@@ -50,7 +50,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
   }
 
   return (
-    <div className="execution-list">
+    <div className="execution-list h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <h3 className="text-lg font-medium text-gray-900">
@@ -65,7 +65,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
       </div>
 
       {/* Execution list */}
-      <div className="max-h-96 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {executions.map((execution) => {
           const isSelected = selectedExecutions.includes(execution.id);
           

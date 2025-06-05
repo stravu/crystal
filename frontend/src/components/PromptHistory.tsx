@@ -74,9 +74,9 @@ export function PromptHistory() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white overflow-hidden">
       {/* Header */}
-      <div className="border-b border-gray-200 p-6">
+      <div className="border-b border-gray-200 p-6 flex-shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Prompt History</h1>
         <div className="relative">
           <input

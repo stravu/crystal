@@ -127,14 +127,16 @@ export function JsonMessageView({ messages }: JsonMessageViewProps) {
   }
 
   return (
-    <div className="h-full overflow-auto p-4 bg-gray-50">
-      <div className="max-w-4xl mx-auto">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Claude Code Messages ({messages.length})
-        </h3>
-        {messages.map((message, index) => (
-          <JsonMessageItem key={index} message={message} index={index} />
-        ))}
+    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
+      <div className="flex-1 overflow-auto p-4">
+        <div className="max-w-4xl mx-auto">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            Claude Code Messages ({messages.length})
+          </h3>
+          {messages.map((message, index) => (
+            <JsonMessageItem key={index} message={message} index={index} />
+          ))}
+        </div>
       </div>
     </div>
   );

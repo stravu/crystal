@@ -137,7 +137,12 @@ export function SessionView() {
       fitAddon.current = new FitAddon();
       terminalInstance.current.loadAddon(fitAddon.current);
       terminalInstance.current.open(terminalRef.current);
-      fitAddon.current.fit();
+      // Delay initial fit to ensure container is properly sized
+      setTimeout(() => {
+        if (fitAddon.current) {
+          fitAddon.current.fit();
+        }
+      }, 100);
     }
 
     // Clear terminal when switching sessions
@@ -204,7 +209,12 @@ export function SessionView() {
       scriptFitAddon.current = new FitAddon();
       scriptTerminalInstance.current.loadAddon(scriptFitAddon.current);
       scriptTerminalInstance.current.open(scriptTerminalRef.current);
-      scriptFitAddon.current.fit();
+      // Delay initial fit to ensure container is properly sized
+      setTimeout(() => {
+        if (scriptFitAddon.current) {
+          scriptFitAddon.current.fit();
+        }
+      }, 100);
       
       // Add initial message
       scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
@@ -290,6 +300,59 @@ export function SessionView() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Fit terminal when view mode changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (viewMode === 'output' && fitAddon.current && terminalInstance.current) {
+        fitAddon.current.fit();
+      } else if (viewMode === 'terminal' && scriptFitAddon.current && scriptTerminalInstance.current) {
+        scriptFitAddon.current.fit();
+      }
+    }, 100); // Small delay to ensure DOM is updated
+    
+    return () => clearTimeout(timer);
+  }, [viewMode]);
+
+  // Use ResizeObserver for more reliable resize detection
+  useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    
+    if (terminalRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (fitAddon.current && terminalInstance.current && viewMode === 'output') {
+          fitAddon.current.fit();
+        }
+      });
+      resizeObserver.observe(terminalRef.current);
+    }
+    
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [viewMode]);
+
+  // Use ResizeObserver for script terminal
+  useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    
+    if (scriptTerminalRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (scriptFitAddon.current && scriptTerminalInstance.current && viewMode === 'terminal') {
+          scriptFitAddon.current.fit();
+        }
+      });
+      resizeObserver.observe(scriptTerminalRef.current);
+    }
+    
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [viewMode]);
   
   if (!activeSession) {
     return (
@@ -438,9 +501,9 @@ export function SessionView() {
   };
   
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="bg-gray-100 border-b border-gray-300 px-4 py-3">
-        <div className="flex items-center justify-between">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="bg-gray-100 border-b border-gray-300 px-4 py-3 flex-shrink-0">
+        <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-gray-800 truncate">{activeSession.name}</h2>
             <div className="flex items-center space-x-2 mt-1">
@@ -449,38 +512,40 @@ export function SessionView() {
               </svg>
               <span className="text-sm text-gray-600 font-mono">{activeSession.worktreePath}</span>
             </div>
-            <div className="flex items-center space-x-3 mt-2">
+            <div className="flex flex-wrap items-center gap-2 mt-2">
               <StatusIndicator session={activeSession} size="medium" showText showProgress />
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleMergeMainToWorktree}
                   disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors flex items-center space-x-1 ${
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md transition-colors flex items-center space-x-1 whitespace-nowrap ${
                     isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-blue-500 text-white hover:bg-blue-600'
                   }`}
                   title="Merge main branch into this worktree"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                   </svg>
-                  <span>{isMerging ? 'Merging...' : 'Main → Worktree'}</span>
+                  <span className="hidden sm:inline">{isMerging ? 'Merging...' : 'Main → Worktree'}</span>
+                  <span className="sm:hidden">{isMerging ? '...' : 'M→W'}</span>
                 </button>
                 <button
                   onClick={handleMergeWorktreeToMain}
                   disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors flex items-center space-x-1 ${
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md transition-colors flex items-center space-x-1 whitespace-nowrap ${
                     isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-green-500 text-white hover:bg-green-600'
                   }`}
                   title="Rebase worktree on main and fast-forward merge (no merge commits)"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                   </svg>
-                  <span>{isMerging ? 'Rebasing...' : 'Worktree → Main (FF)'}</span>
+                  <span className="hidden sm:inline">{isMerging ? 'Rebasing...' : 'Worktree → Main (FF)'}</span>
+                  <span className="sm:hidden">{isMerging ? '...' : 'W→M'}</span>
                 </button>
               </div>
             </div>
@@ -489,15 +554,16 @@ export function SessionView() {
                 <p className="text-sm text-red-700">{mergeError}</p>
               </div>
             )}
-            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200 max-h-32 overflow-y-auto">
+            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200 max-h-40 overflow-y-auto">
               <p className="text-sm text-gray-700 font-medium mb-1">Original Prompt:</p>
               <p className="text-sm text-gray-600 whitespace-pre-wrap break-words">{activeSession.prompt}</p>
             </div>
           </div>
-          <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden">
+          <div className="flex flex-col gap-2">
+            <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden flex-shrink-0">
             <button
               onClick={() => setViewMode('output')}
-              className={`px-3 py-1 text-sm ${
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 ${
                 viewMode === 'output' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -507,7 +573,7 @@ export function SessionView() {
             </button>
             <button
               onClick={() => setViewMode('messages')}
-              className={`px-3 py-1 text-sm ${
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 ${
                 viewMode === 'messages' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -517,7 +583,7 @@ export function SessionView() {
             </button>
             <button
               onClick={() => setViewMode('changes')}
-              className={`px-3 py-1 text-sm ${
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 ${
                 viewMode === 'changes' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -527,7 +593,7 @@ export function SessionView() {
             </button>
             <button
               onClick={() => setViewMode('terminal')}
-              className={`px-3 py-1 text-sm ${
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 inline-flex items-center ${
                 viewMode === 'terminal' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -537,34 +603,37 @@ export function SessionView() {
                 <span className="ml-1 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
               )}
             </button>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => loadOutputContent()}
+                disabled={isLoadingOutput}
+                className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-50"
+                title="Reload output content"
+              >
+                <svg className={`w-5 h-5 ${isLoadingOutput ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setShowPromptNav(!showPromptNav)}
+                className="p-1 text-gray-600 hover:bg-gray-200 rounded"
+                title={showPromptNav ? 'Hide prompt navigation' : 'Show prompt navigation'}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {showPromptNav ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  )}
+                </svg>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => loadOutputContent()}
-            disabled={isLoadingOutput}
-            className="ml-2 p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-50"
-            title="Reload output content"
-          >
-            <svg className={`w-5 h-5 ${isLoadingOutput ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setShowPromptNav(!showPromptNav)}
-            className="ml-2 p-1 text-gray-600 hover:bg-gray-200 rounded"
-            title={showPromptNav ? 'Hide prompt navigation' : 'Show prompt navigation'}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {showPromptNav ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-              )}
-            </svg>
-          </button>
         </div>
       </div>
       
-      <div className="flex-1 flex relative overflow-hidden">
+      <div className="flex-1 flex relative overflow-hidden min-h-0">
         <div className="flex-1 relative">
           {isLoadingOutput && (
             <div className="absolute top-4 left-4 text-gray-400 z-10">Loading output...</div>
@@ -641,19 +710,28 @@ export function SessionView() {
         )}
       </div>
       
-      <div className="border-t border-gray-300 p-4 bg-white">
+      <div className="border-t border-gray-300 p-4 bg-white flex-shrink-0">
         <div className="flex space-x-2">
-          <input
-            type="text"
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (activeSession.status === 'waiting') {
+                  handleSendInput();
+                } else {
+                  handleContinueConversation();
+                }
+              }
+            }}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white resize-none min-h-[42px] max-h-[150px] overflow-y-auto"
             placeholder={
               activeSession.status === 'waiting' 
                 ? "Enter your response..." 
                 : "Continue conversation with a new message..."
             }
+            rows={2}
           />
           <button
             onClick={activeSession.status === 'waiting' ? handleSendInput : handleContinueConversation}
