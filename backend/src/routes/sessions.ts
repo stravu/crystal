@@ -99,24 +99,47 @@ export function createSessionRouter(
       logger?.info(`Creating ${count} session(s) with auto-generated names`);
       const sessions = [];
 
+      // Generate base name once for all sessions to avoid multiple API calls
+      let baseName: string;
+      if (worktreeTemplate) {
+        baseName = worktreeTemplate;
+      } else {
+        // Auto-generate name using GPT-4.1 - only call once
+        baseName = await worktreeNameGenerator.generateUniqueWorktreeName(prompt);
+      }
+
       for (let i = 0; i < count; i++) {
-        // Generate a unique worktree name using the prompt
+        // Apply numbering to the base name
         let name: string;
-        if (worktreeTemplate) {
-          // Use provided template if available
-          name = count > 1 ? `${worktreeTemplate}-${i + 1}` : worktreeTemplate;
+        if (count > 1) {
+          name = `${baseName}-${i + 1}`;
         } else {
-          // Auto-generate name using GPT-4.1
-          name = await worktreeNameGenerator.generateUniqueWorktreeName(prompt);
-          // If multiple sessions, add counter
-          if (count > 1) {
-            name = `${name}-${i + 1}`;
+          name = baseName;
+        }
+        
+        // Ensure the name is unique by checking existing worktrees
+        let finalName = name;
+        let retryCount = 0;
+        let worktreePath: string;
+        
+        while (true) {
+          try {
+            logger?.verbose(`Creating session ${finalName}...`);
+            worktreePath = await getWorktreeManager().createWorktree(finalName);
+            // If successful, use this name
+            name = finalName;
+            break; // Exit the retry loop
+          } catch (error) {
+            retryCount++;
+            if (retryCount > 10) {
+              throw new Error(`Failed to create unique worktree name after ${retryCount} attempts`);
+            }
+            // Try with a higher number
+            finalName = `${baseName}-${i + retryCount + (count > 1 ? 0 : 1)}`;
+            logger?.verbose(`Worktree name conflict, trying: ${finalName}`);
           }
         }
         
-        logger?.verbose(`Creating session ${name}...`);
-        
-        const worktreePath = await getWorktreeManager().createWorktree(name);
         logger?.verbose(`Worktree created at: ${worktreePath}`);
         
         const session = await sessionManager.createSession(name, worktreePath, prompt, name);
