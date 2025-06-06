@@ -582,8 +582,8 @@ export function createSessionRouter(
           });
         }
         
-        // Pull latest main
-        await execAsync(`cd "${gitRepoPath}" && git pull origin main --ff-only`);
+        // Pull latest main - use rebase to handle diverging branches
+        await execAsync(`cd "${gitRepoPath}" && git pull --rebase origin main`);
         
         // Do a fast-forward only merge
         try {
