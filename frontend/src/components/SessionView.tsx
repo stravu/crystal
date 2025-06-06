@@ -77,6 +77,8 @@ export function SessionView() {
         if (terminalInstance.current) {
           terminalInstance.current.write(outputData);
           lastProcessedOutputLength.current = outputData.length;
+          // Scroll to bottom to show latest output
+          terminalInstance.current.scrollToBottom();
         }
       }
       
@@ -111,6 +113,7 @@ export function SessionView() {
         convertEol: true,
         rows: 30,
         cols: 80,
+        scrollback: 50000, // Increase scrollback buffer to 50k lines
         theme: {
           background: '#1a1a1a',
           foreground: '#d4d4d4',
@@ -145,8 +148,8 @@ export function SessionView() {
       }, 100);
     }
 
-    // Clear terminal when switching sessions
-    terminalInstance.current.clear();
+    // Reset terminal when switching sessions (preserves scrollback capability)
+    terminalInstance.current.reset();
     lastProcessedOutputLength.current = 0;
 
     // Load output content with retry logic
@@ -156,8 +159,8 @@ export function SessionView() {
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
 
-    // Clear script terminal when switching sessions
-    scriptTerminalInstance.current.clear();
+    // Reset script terminal when switching sessions (preserves scrollback capability)
+    scriptTerminalInstance.current.reset();
     scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
     lastProcessedScriptOutputLength.current = 0;
   }, [activeSession?.id]);
@@ -183,6 +186,7 @@ export function SessionView() {
         convertEol: true,
         rows: 30,
         cols: 80,
+        scrollback: 50000, // Increase scrollback buffer to 50k lines
         theme: {
           background: '#0f172a',
           foreground: '#e2e8f0',
@@ -248,6 +252,8 @@ export function SessionView() {
       const newOutput = fullOutput.substring(lastProcessedOutputLength.current);
       terminalInstance.current.write(newOutput);
       lastProcessedOutputLength.current = fullOutput.length;
+      // Scroll to bottom to show latest output
+      terminalInstance.current.scrollToBottom();
     }
   }, [activeSession?.output]);
 
@@ -256,9 +262,9 @@ export function SessionView() {
 
     const fullScriptOutput = scriptOutput.join('');
     
-    // If script output is empty or shorter than what we've processed, clear terminal
+    // If script output is empty or shorter than what we've processed, reset terminal
     if (fullScriptOutput.length < lastProcessedScriptOutputLength.current || fullScriptOutput.length === 0) {
-      scriptTerminalInstance.current.clear();
+      scriptTerminalInstance.current.reset();
       scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
       lastProcessedScriptOutputLength.current = 0;
     }
@@ -268,6 +274,8 @@ export function SessionView() {
       const newOutput = fullScriptOutput.substring(lastProcessedScriptOutputLength.current);
       scriptTerminalInstance.current.write(newOutput);
       lastProcessedScriptOutputLength.current = fullScriptOutput.length;
+      // Scroll to bottom to show latest output
+      scriptTerminalInstance.current.scrollToBottom();
     }
   }, [scriptOutput, activeSession?.id]);
 
