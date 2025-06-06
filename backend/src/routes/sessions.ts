@@ -647,5 +647,24 @@ export function createSessionRouter(
     }
   });
 
+  router.post('/:id/mark-viewed', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await sessionManager.getSession(req.params.id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      await sessionManager.markSessionAsViewed(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger?.error('Error marking session as viewed:', error instanceof Error ? error : undefined);
+      res.status(500).json({ 
+        error: 'Failed to mark session as viewed', 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   return router;
 }

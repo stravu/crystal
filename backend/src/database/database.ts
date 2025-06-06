@@ -55,6 +55,7 @@ export class DatabaseService {
     const tableInfo = await this.dbAll("PRAGMA table_info(sessions)");
     const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
     const hasInitialPromptColumn = tableInfo.some((col: any) => col.name === 'initial_prompt');
+    const hasLastViewedAtColumn = tableInfo.some((col: any) => col.name === 'last_viewed_at');
     
     if (!hasArchivedColumn) {
       // Run migration to add archived column
@@ -143,6 +144,11 @@ export class DatabaseService {
       await this.dbRun("CREATE INDEX idx_execution_diffs_timestamp ON execution_diffs(timestamp)");
       await this.dbRun("CREATE INDEX idx_execution_diffs_sequence ON execution_diffs(session_id, execution_sequence)");
     }
+
+    // Add last_viewed_at column if it doesn't exist
+    if (!hasLastViewedAtColumn) {
+      await this.dbRun("ALTER TABLE sessions ADD COLUMN last_viewed_at TEXT");
+    }
   }
 
   // Session operations
@@ -204,6 +210,16 @@ export class DatabaseService {
       SET ${updates.join(', ')} 
       WHERE id = ?
     `, values);
+    
+    return await this.getSession(id);
+  }
+
+  async markSessionAsViewed(id: string): Promise<Session | undefined> {
+    await this.dbRun(`
+      UPDATE sessions 
+      SET last_viewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `, [id]);
     
     return await this.getSession(id);
   }

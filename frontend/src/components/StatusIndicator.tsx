@@ -52,6 +52,16 @@ export function StatusIndicator({
           text: 'Completed',
           animated: false,
         };
+      case 'completed_unviewed':
+        return {
+          color: 'bg-yellow-500',
+          textColor: 'text-yellow-600',
+          bgColor: 'bg-yellow-50',
+          icon: '🔔',
+          text: 'New results',
+          animated: true,
+          pulse: true,
+        };
       case 'error':
         return {
           color: 'bg-red-500',

@@ -33,23 +33,30 @@ export class SessionManager extends EventEmitter {
       name: dbSession.name,
       worktreePath: dbSession.worktree_path,
       prompt: dbSession.initial_prompt,
-      status: this.mapDbStatusToSessionStatus(dbSession.status),
+      status: this.mapDbStatusToSessionStatus(dbSession.status, dbSession.last_viewed_at, dbSession.updated_at),
       pid: dbSession.pid,
       createdAt: new Date(dbSession.created_at),
       lastActivity: new Date(dbSession.updated_at),
       output: [], // Will be loaded separately by frontend when needed
       jsonMessages: [], // Will be loaded separately by frontend when needed
       error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined,
-      isRunning: false
+      isRunning: false,
+      lastViewedAt: dbSession.last_viewed_at
     };
   }
 
-  private mapDbStatusToSessionStatus(dbStatus: string): Session['status'] {
+  private mapDbStatusToSessionStatus(dbStatus: string, lastViewedAt?: string, updatedAt?: string): Session['status'] {
     switch (dbStatus) {
       case 'pending': return 'initializing';
       case 'running': return 'running';
-      case 'stopped': return 'stopped';
-      case 'completed': return 'stopped';
+      case 'stopped': 
+      case 'completed': {
+        // If session is completed but hasn't been viewed since last update, show as unviewed
+        if (!lastViewedAt || (updatedAt && new Date(lastViewedAt) < new Date(updatedAt))) {
+          return 'completed_unviewed';
+        }
+        return 'stopped';
+      }
       case 'failed': return 'error';
       default: return 'stopped';
     }
@@ -62,6 +69,7 @@ export class SessionManager extends EventEmitter {
       case 'running': return 'running';
       case 'waiting': return 'running';
       case 'stopped': return 'stopped';
+      case 'completed_unviewed': return 'stopped';
       case 'error': return 'failed';
       default: return 'stopped';
     }
@@ -205,6 +213,15 @@ export class SessionManager extends EventEmitter {
   async clearConversation(id: string): Promise<void> {
     await this.db.clearConversationMessages(id);
     await this.db.clearSessionOutputs(id);
+  }
+
+  async markSessionAsViewed(id: string): Promise<void> {
+    const updatedDbSession = await this.db.markSessionAsViewed(id);
+    if (updatedDbSession) {
+      const session = this.convertDbSessionToSession(updatedDbSession);
+      this.activeSessions.set(id, session);
+      this.emit('session-updated', session);
+    }
   }
 
   async getPromptHistory(): Promise<Array<{

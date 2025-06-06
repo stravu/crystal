@@ -3,7 +3,7 @@ export interface Session {
   name: string;
   worktreePath: string;
   prompt: string;
-  status: 'initializing' | 'ready' | 'running' | 'waiting' | 'stopped' | 'error';
+  status: 'initializing' | 'ready' | 'running' | 'waiting' | 'stopped' | 'completed_unviewed' | 'error';
   pid?: number;
   createdAt: string;
   lastActivity?: string;
@@ -11,6 +11,7 @@ export interface Session {
   jsonMessages: any[];
   error?: string;
   isRunning?: boolean;
+  lastViewedAt?: string;
 }
 
 export interface CreateSessionRequest {

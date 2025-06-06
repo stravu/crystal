@@ -11,6 +11,7 @@ export interface Session {
   exit_code?: number;
   pid?: number;
   archived?: boolean;
+  last_viewed_at?: string;
 }
 
 export interface SessionOutput {

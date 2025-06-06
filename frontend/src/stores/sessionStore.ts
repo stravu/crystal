@@ -25,6 +25,7 @@ interface SessionStore {
   clearScriptOutput: (sessionId: string) => void;
   getScriptOutput: (sessionId: string) => string[];
   createSession: (request: CreateSessionRequest) => Promise<void>;
+  markSessionAsViewed: (sessionId: string) => Promise<void>;
   
   getActiveSession: () => Session | undefined;
 }
@@ -57,7 +58,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     activeSessionId: state.activeSessionId === deletedSession.id ? null : state.activeSessionId
   })),
   
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId });
+    // Mark session as viewed when it becomes active
+    if (sessionId) {
+      get().markSessionAsViewed(sessionId);
+    }
+  },
   
   addSessionOutput: (output) => set((state) => ({
     sessions: state.sessions.map(session => 
@@ -126,5 +133,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   getActiveSession: () => {
     const state = get();
     return state.sessions.find(session => session.id === state.activeSessionId);
+  },
+
+  markSessionAsViewed: async (sessionId) => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/mark-viewed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to mark session as viewed');
+      }
+
+      // Session will be updated via WebSocket, no need to manually update here
+    } catch (error) {
+      console.error('Error marking session as viewed:', error);
+    }
   }
 }));
