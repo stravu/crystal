@@ -339,7 +339,7 @@ export class SessionManager extends EventEmitter {
           }
           
           // Also kill any remaining child processes
-          exec(`pkill -P ${process.pid}`, (error) => {
+          exec(`pkill -P ${process.pid}`, () => {
             // Ignore errors - child processes might not exist
           });
         }

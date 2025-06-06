@@ -12,18 +12,20 @@ export function createConfigRouter(configManager: ConfigManager): Router {
     res.json(config);
   });
 
-  router.put('/', async (req: Request, res: Response) => {
+  router.put('/', async (req: Request, res: Response): Promise<void> => {
     try {
       const { gitRepoPath }: UpdateConfigRequest = req.body;
 
       if (gitRepoPath) {
         // Validate that the path exists and is a git repository
         if (!existsSync(gitRepoPath)) {
-          return res.status(400).json({ error: 'Path does not exist' });
+          res.status(400).json({ error: 'Path does not exist' });
+          return;
         }
 
         if (!existsSync(join(gitRepoPath, '.git'))) {
-          return res.status(400).json({ error: 'Path is not a git repository' });
+          res.status(400).json({ error: 'Path is not a git repository' });
+          return;
         }
       }
 

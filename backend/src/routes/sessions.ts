@@ -23,32 +23,36 @@ export function createSessionRouter(
 ): Router {
   const router = Router();
 
-  router.get('/', async (_req: Request, res: Response) => {
+  router.get('/', async (_req: Request, res: Response): Promise<void> => {
     try {
       const sessions = await sessionManager.getAllSessions();
       res.json(sessions);
     } catch (error) {
       res.status(500).json({ error: 'Failed to get sessions' });
+        return;
     }
   });
 
-  router.get('/:id', async (req: Request, res: Response) => {
+  router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
       res.json(session);
     } catch (error) {
       res.status(500).json({ error: 'Failed to get session' });
+        return;
     }
   });
 
-  router.get('/:id/output', async (req: Request, res: Response) => {
+  router.get('/:id/output', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
       
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
@@ -78,16 +82,18 @@ export function createSessionRouter(
       res.json(transformedOutputs);
     } catch (error) {
       res.status(500).json({ error: 'Failed to get session outputs' });
+        return;
     }
   });
 
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', async (req: Request, res: Response): Promise<void> => {
     try {
       const { prompt, worktreeTemplate, count = 1 }: CreateSessionRequest = req.body;
 
       if (!prompt) {
         logger?.warn('Session creation failed: missing prompt');
-        return res.status(400).json({ error: 'Prompt is required' });
+        res.status(400).json({ error: 'Prompt is required' });
+        return;
       }
 
       logger?.info(`Creating ${count} session(s) with auto-generated names`);
@@ -142,6 +148,7 @@ export function createSessionRouter(
 
       logger?.info(`Successfully created ${sessions.length} session(s)`);
       res.status(201).json(sessions);
+        return;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger?.error('Error creating session', error instanceof Error ? error : undefined);
@@ -152,17 +159,19 @@ export function createSessionRouter(
     }
   });
 
-  router.post('/:id/input', async (req: Request, res: Response) => {
+  router.post('/:id/input', async (req: Request, res: Response): Promise<void> => {
     try {
       const { input } = req.body;
       
       if (!input) {
-        return res.status(400).json({ error: 'Input is required' });
+        res.status(400).json({ error: 'Input is required' });
+        return;
       }
 
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       // Store user input in session outputs for persistence and emit via WebSocket
@@ -185,17 +194,19 @@ export function createSessionRouter(
     }
   });
 
-  router.post('/:id/continue', async (req: Request, res: Response) => {
+  router.post('/:id/continue', async (req: Request, res: Response): Promise<void> => {
     try {
       const { message } = req.body;
       
       if (!message) {
-        return res.status(400).json({ error: 'Message is required' });
+        res.status(400).json({ error: 'Message is required' });
+        return;
       }
 
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       // Store continuation message in session outputs for persistence and emit via WebSocket
@@ -218,11 +229,12 @@ export function createSessionRouter(
     }
   });
 
-  router.get('/:id/conversation', async (req: Request, res: Response) => {
+  router.get('/:id/conversation', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       const messages = await sessionManager.getConversationMessages(req.params.id);
@@ -236,11 +248,12 @@ export function createSessionRouter(
     }
   });
 
-  router.get('/:id/prompts', async (req: Request, res: Response) => {
+  router.get('/:id/prompts', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       const markers = await sessionManager.getPromptMarkers(req.params.id);
@@ -254,11 +267,12 @@ export function createSessionRouter(
     }
   });
 
-  router.post('/:id/stop', async (req: Request, res: Response) => {
+  router.post('/:id/stop', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       claudeCodeManager.killProcess(req.params.id);
@@ -274,11 +288,12 @@ export function createSessionRouter(
     }
   });
 
-  router.delete('/:id', async (req: Request, res: Response) => {
+  router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       // Kill the process if it's running
@@ -312,11 +327,12 @@ export function createSessionRouter(
   });
 
   // Execution diff endpoints
-  router.get('/:id/executions', async (req: Request, res: Response) => {
+  router.get('/:id/executions', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       const executions = await sessionManager.getExecutionDiffs(req.params.id);
@@ -330,21 +346,24 @@ export function createSessionRouter(
     }
   });
 
-  router.get('/:id/executions/:executionId/diff', async (req: Request, res: Response) => {
+  router.get('/:id/executions/:executionId/diff', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       const executionId = parseInt(req.params.executionId);
       if (isNaN(executionId)) {
-        return res.status(400).json({ error: 'Invalid execution ID' });
+        res.status(400).json({ error: 'Invalid execution ID' });
+        return;
       }
 
       const execution = await sessionManager.getExecutionDiff(executionId);
       if (!execution || execution.session_id !== req.params.id) {
-        return res.status(404).json({ error: 'Execution not found' });
+        res.status(404).json({ error: 'Execution not found' });
+        return;
       }
 
       res.json(execution);
@@ -357,15 +376,17 @@ export function createSessionRouter(
     }
   });
 
-  router.get('/:id/combined-diff', async (req: Request, res: Response) => {
+  router.get('/:id/combined-diff', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       if (!executionTracker) {
-        return res.status(503).json({ error: 'Execution tracking not available' });
+        res.status(503).json({ error: 'Execution tracking not available' });
+        return;
       }
 
       const combinedDiff = await executionTracker.getCombinedDiff(req.params.id);
@@ -379,20 +400,23 @@ export function createSessionRouter(
     }
   });
 
-  router.post('/:id/combined-diff', async (req: Request, res: Response) => {
+  router.post('/:id/combined-diff', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       const { executionIds } = req.body;
       if (!Array.isArray(executionIds) || !executionIds.every(id => typeof id === 'number')) {
-        return res.status(400).json({ error: 'Invalid execution IDs array' });
+        res.status(400).json({ error: 'Invalid execution IDs array' });
+        return;
       }
 
       if (!executionTracker) {
-        return res.status(503).json({ error: 'Execution tracking not available' });
+        res.status(503).json({ error: 'Execution tracking not available' });
+        return;
       }
 
       const combinedDiff = await executionTracker.getCombinedDiff(req.params.id, executionIds);
@@ -407,7 +431,7 @@ export function createSessionRouter(
   });
 
   // Merge main branch into session worktree
-  router.post('/:id/merge-main-to-worktree', async (req: Request, res: Response) => {
+  router.post('/:id/merge-main-to-worktree', async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     
     try {
@@ -415,7 +439,8 @@ export function createSessionRouter(
       const session = await sessionManager.getSession(id);
       
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
       
       // First, fetch the latest changes from origin
@@ -428,11 +453,12 @@ export function createSessionRouter(
       
       // Execute git merge command in the worktree
       try {
-        const { stdout, stderr } = await execAsync(`cd "${session.worktreePath}" && git merge origin/main || git merge main`);
+        const { stdout } = await execAsync(`cd "${session.worktreePath}" && git merge origin/main || git merge main`);
         
         // Check if merge was successful
         if (stdout.includes('Already up to date')) {
-          return res.json({ success: true, message: 'Already up to date with main branch' });
+          res.json({ success: true, message: 'Already up to date with main branch' });
+          return;
         }
         
         res.json({ success: true, message: 'Successfully merged main branch' });
@@ -449,31 +475,32 @@ export function createSessionRouter(
               .filter(line => line.startsWith('UU '))
               .map(line => line.substring(3).trim());
             
-            return res.status(409).json({ 
+            res.status(409).json({ 
               error: 'Merge conflict detected', 
               conflictFiles,
               message: `Merge conflict in ${conflictFiles.length} file(s). Please resolve conflicts manually.`
             });
           } catch {
-            return res.status(409).json({ 
+            res.status(409).json({ 
               error: 'Merge conflict detected. Please resolve conflicts manually.' 
             });
           }
         }
         
         // Other git errors
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: errorMessage || 'Failed to merge main branch' 
         });
       }
     } catch (error) {
       console.error('Error merging main branch:', error);
       res.status(500).json({ error: 'Failed to merge main branch' });
+        return;
     }
   });
 
   // Merge session worktree into main branch (using rebase to avoid merge commits)
-  router.post('/:id/merge-worktree-to-main', async (req: Request, res: Response) => {
+  router.post('/:id/merge-worktree-to-main', async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     
     try {
@@ -481,7 +508,8 @@ export function createSessionRouter(
       const session = await sessionManager.getSession(id);
       
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
       
       // Get the worktree branch name
@@ -492,7 +520,7 @@ export function createSessionRouter(
         // Check if there are uncommitted changes in the worktree
         const { stdout: worktreeStatus } = await execAsync(`cd "${session.worktreePath}" && git status --porcelain`);
         if (worktreeStatus.trim()) {
-          return res.status(400).json({ 
+          res.status(400).json({ 
             error: 'Worktree has uncommitted changes. Please commit or stash changes first.' 
           });
         }
@@ -510,7 +538,7 @@ export function createSessionRouter(
             // Abort the rebase
             await execAsync(`cd "${session.worktreePath}" && git rebase --abort`).catch(() => {});
             
-            return res.status(409).json({ 
+            res.status(409).json({ 
               error: 'Rebase conflict detected. Please resolve conflicts manually or merge main into your worktree first.' 
             });
           }
@@ -526,7 +554,7 @@ export function createSessionRouter(
         const branch = currentBranch.trim();
         
         if (branch !== 'main' && branch !== 'master') {
-          return res.status(400).json({ 
+          res.status(400).json({ 
             error: `Main repository is on branch '${branch}', not 'main'. Please switch to main branch first.` 
           });
         }
@@ -539,7 +567,8 @@ export function createSessionRouter(
           const { stdout } = await execAsync(`cd "${gitRepoPath}" && git merge "${worktreeBranchName}" --ff-only`);
           
           if (stdout.includes('Already up to date')) {
-            return res.json({ success: true, message: 'Already up to date - no changes to merge' });
+            res.json({ success: true, message: 'Already up to date - no changes to merge' });
+            return;
           }
           
           res.json({ success: true, message: 'Successfully merged worktree into main branch (fast-forward)' });
@@ -547,38 +576,41 @@ export function createSessionRouter(
           const errorMessage = mergeError.stderr || mergeError.stdout || mergeError.message;
           
           if (errorMessage.includes('Not possible to fast-forward')) {
-            return res.status(400).json({ 
+            res.status(400).json({ 
               error: 'Cannot fast-forward merge. The worktree branch has diverged from main. Please rebase your worktree branch first.' 
             });
           }
           
-          return res.status(400).json({ 
+          res.status(400).json({ 
             error: errorMessage || 'Failed to merge worktree into main branch' 
           });
         }
       } catch (error: any) {
         // Other git errors
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: error.message || 'Failed to merge worktree into main branch' 
         });
       }
     } catch (error) {
       console.error('Error merging worktree to main:', error);
       res.status(500).json({ error: 'Failed to merge worktree to main branch' });
+        return;
     }
   });
 
   // Script execution endpoints
-  router.post('/:id/run-script', async (req: Request, res: Response) => {
+  router.post('/:id/run-script', async (req: Request, res: Response): Promise<void> => {
     try {
       const session = await sessionManager.getSession(req.params.id);
       if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+        res.status(404).json({ error: 'Session not found' });
+        return;
       }
 
       const { commands } = req.body;
       if (!Array.isArray(commands) || commands.length === 0) {
-        return res.status(400).json({ error: 'Commands array is required' });
+        res.status(400).json({ error: 'Commands array is required' });
+        return;
       }
 
       await sessionManager.runScript(req.params.id, commands, session.worktreePath);
@@ -592,7 +624,7 @@ export function createSessionRouter(
     }
   });
 
-  router.post('/stop-script', async (req: Request, res: Response) => {
+  router.post('/stop-script', async (_req: Request, res: Response): Promise<void> => {
     try {
       await sessionManager.stopRunningScript();
       res.json({ success: true });
@@ -605,12 +637,13 @@ export function createSessionRouter(
     }
   });
 
-  router.get('/running-session', async (req: Request, res: Response) => {
+  router.get('/running-session', async (_req: Request, res: Response): Promise<void> => {
     try {
       const runningSessionId = sessionManager.getCurrentRunningSessionId();
       res.json({ sessionId: runningSessionId });
     } catch (error) {
       res.status(500).json({ error: 'Failed to get running session' });
+        return;
     }
   });
 

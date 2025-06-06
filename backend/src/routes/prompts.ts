@@ -8,7 +8,7 @@ export function createPromptsRouter(
 ): Router {
   const router = Router();
 
-  router.get('/history', async (_req: Request, res: Response) => {
+  router.get('/history', async (_req: Request, res: Response): Promise<void> => {
     try {
       const promptHistory = await sessionManager.getPromptHistory();
       res.json(promptHistory);

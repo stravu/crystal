@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -411,17 +411,6 @@ export function SessionView() {
       setInput('');
     } catch (error) {
       console.error('Error continuing conversation:', error);
-    }
-  };
-  
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (activeSession.status === 'waiting') {
-        handleSendInput();
-      } else {
-        handleContinueConversation();
-      }
     }
   };
 

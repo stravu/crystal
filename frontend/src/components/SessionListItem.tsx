@@ -53,7 +53,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
 
     try {
       // First stop any currently running script
-      const stopResponse = await fetch('/api/sessions/stop-script', {
+      await fetch('/api/sessions/stop-script', {
         method: 'POST',
       });
       
