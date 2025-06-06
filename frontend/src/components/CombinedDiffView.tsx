@@ -3,6 +3,7 @@ import DiffViewer from './DiffViewer';
 import ExecutionList from './ExecutionList';
 import type { CombinedDiffViewProps } from '../types/diff';
 import type { ExecutionDiff, GitDiffResult } from '../types/diff';
+import { parseDiff } from 'react-diff-view';
 
 const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({ 
   sessionId, 
@@ -13,7 +14,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
   const [combinedDiff, setCombinedDiff] = useState<GitDiffResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'diff'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'files' | 'diff'>('list');
 
   // Load executions for the session
   useEffect(() => {
@@ -90,9 +91,6 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
     setSelectedExecutions(newSelection);
   };
 
-  const toggleViewMode = () => {
-    setViewMode(viewMode === 'list' ? 'diff' : 'list');
-  };
 
   if (loading && executions.length === 0) {
     return (
@@ -124,12 +122,26 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
               <span className="text-gray-600">{combinedDiff.stats.filesChanged} files</span>
             </div>
           )}
-          <button
-            onClick={toggleViewMode}
-            className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-          >
-            {viewMode === 'list' ? 'View Diff' : 'Select Executions'}
-          </button>
+          <div className="flex border border-gray-300 rounded overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1 text-sm transition-colors ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-100'}`}
+            >
+              Executions
+            </button>
+            <button
+              onClick={() => setViewMode('files')}
+              className={`px-3 py-1 text-sm transition-colors border-l border-gray-300 ${viewMode === 'files' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-100'}`}
+            >
+              Files
+            </button>
+            <button
+              onClick={() => setViewMode('diff')}
+              className={`px-3 py-1 text-sm transition-colors border-l border-gray-300 ${viewMode === 'diff' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-100'}`}
+            >
+              Full Diff
+            </button>
+          </div>
         </div>
       </div>
 
@@ -168,6 +180,94 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
               )}
             </div>
           </>
+        ) : viewMode === 'files' ? (
+          /* Files list view */
+          <div className="flex-1 overflow-auto bg-white">
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="text-gray-500">Loading files...</div>
+              </div>
+            ) : error ? (
+              <div className="p-4 text-red-600 bg-red-50 border border-red-200 rounded m-4">
+                <h3 className="font-medium mb-2">Error loading files</h3>
+                <p>{error}</p>
+              </div>
+            ) : combinedDiff ? (
+              <div className="p-4">
+                {(() => {
+                  try {
+                    const files = parseDiff(combinedDiff.diff);
+                    if (files.length === 0) {
+                      return (
+                        <div className="text-center text-gray-500 py-8">
+                          No files changed
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold mb-4">
+                          Changed Files ({files.length})
+                        </h3>
+                        {files.map((file, index) => (
+                          <div 
+                            key={`${file.oldPath}-${file.newPath}-${index}`} 
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="text-lg">
+                                {file.type === 'delete' && <span className="text-red-600">🗑️</span>}
+                                {file.type === 'add' && <span className="text-green-600">➕</span>}
+                                {file.type === 'modify' && <span className="text-blue-600">📝</span>}
+                                {file.type === 'rename' && <span className="text-purple-600">🔄</span>}
+                              </div>
+                              <div>
+                                <div className="font-mono text-sm font-medium text-gray-900">
+                                  {file.newPath || file.oldPath}
+                                </div>
+                                {file.type === 'rename' && file.oldPath !== file.newPath && (
+                                  <div className="text-xs text-gray-500 font-mono">
+                                    {file.oldPath} → {file.newPath}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm">
+                              <span className="text-gray-600 capitalize">{file.type}</span>
+                              <div className="flex items-center space-x-2">
+                                {file.hunks && file.hunks.length > 0 && (
+                                  <>
+                                    <span className="text-green-600">
+                                      +{file.hunks.reduce((acc, hunk) => acc + hunk.changes.filter(c => c.type === 'insert').length, 0)}
+                                    </span>
+                                    <span className="text-red-600">
+                                      -{file.hunks.reduce((acc, hunk) => acc + hunk.changes.filter(c => c.type === 'delete').length, 0)}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  } catch (error) {
+                    return (
+                      <div className="p-4 text-red-500 bg-red-50 border border-red-200 rounded">
+                        <h3 className="font-medium mb-2">Error parsing diff</h3>
+                        <p>Unable to parse file changes</p>
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-gray-500">
+                No changes to display
+              </div>
+            )}
+          </div>
         ) : (
           /* Full diff view */
           <div className="flex-1 overflow-auto bg-white">
