@@ -1,0 +1,209 @@
+import Bull from 'bull';
+import { SimpleQueue } from './simpleTaskQueue';
+import type { SessionManager } from './sessionManager';
+import type { WorktreeManager } from './worktreeManager';
+import type { ClaudeCodeManager } from './claudeCodeManager';
+import type { GitDiffManager } from './gitDiffManager';
+import type { ExecutionTracker } from './executionTracker';
+
+interface TaskQueueOptions {
+  sessionManager: SessionManager;
+  worktreeManager: WorktreeManager;
+  claudeCodeManager: ClaudeCodeManager;
+  gitDiffManager: GitDiffManager;
+  executionTracker: ExecutionTracker;
+}
+
+interface CreateSessionJob {
+  prompt: string;
+  worktreeTemplate: string;
+  index?: number;
+}
+
+interface ContinueSessionJob {
+  sessionId: string;
+  prompt: string;
+}
+
+interface SendInputJob {
+  sessionId: string;
+  input: string;
+}
+
+export class TaskQueue {
+  private sessionQueue: Bull.Queue<CreateSessionJob> | SimpleQueue<CreateSessionJob>;
+  private inputQueue: Bull.Queue<SendInputJob> | SimpleQueue<SendInputJob>;
+  private continueQueue: Bull.Queue<ContinueSessionJob> | SimpleQueue<ContinueSessionJob>;
+  private useSimpleQueue: boolean;
+
+  constructor(private options: TaskQueueOptions) {
+    console.log('[TaskQueue] Initializing task queue...');
+    
+    // Check if we're in Electron without Redis
+    this.useSimpleQueue = !process.env.REDIS_URL && typeof process.versions.electron !== 'undefined';
+    
+    if (this.useSimpleQueue) {
+      console.log('[TaskQueue] Using SimpleQueue for Electron environment');
+      
+      this.sessionQueue = new SimpleQueue<CreateSessionJob>('session-creation', 5);
+      this.inputQueue = new SimpleQueue<SendInputJob>('session-input', 10);
+      this.continueQueue = new SimpleQueue<ContinueSessionJob>('session-continue', 10);
+    } else {
+      // Use Bull with Redis
+      const redisOptions = process.env.REDIS_URL ? {
+        redis: process.env.REDIS_URL
+      } : undefined;
+      
+      console.log('[TaskQueue] Using Bull with Redis:', process.env.REDIS_URL || 'default');
+
+      this.sessionQueue = new Bull('session-creation', redisOptions || {
+        defaultJobOptions: {
+          removeOnComplete: true,
+          removeOnFail: false
+        }
+      });
+
+      this.inputQueue = new Bull('session-input', redisOptions || {
+        defaultJobOptions: {
+          removeOnComplete: true,
+          removeOnFail: false
+        }
+      });
+
+      this.continueQueue = new Bull('session-continue', redisOptions || {
+        defaultJobOptions: {
+          removeOnComplete: true,
+          removeOnFail: false
+        }
+      });
+    }
+    
+    // Add event handlers for debugging
+    this.sessionQueue.on('active', (job: any) => {
+      console.log(`[TaskQueue] Job ${job.id} is active`);
+    });
+    
+    this.sessionQueue.on('completed', (job: any, result: any) => {
+      console.log(`[TaskQueue] Job ${job.id} completed:`, result);
+    });
+    
+    this.sessionQueue.on('failed', (job: any, err: any) => {
+      console.error(`[TaskQueue] Job ${job.id} failed:`, err);
+    });
+    
+    this.sessionQueue.on('error', (error: any) => {
+      console.error('[TaskQueue] Queue error:', error);
+    });
+
+    console.log('[TaskQueue] Setting up processors...');
+    this.setupProcessors();
+    console.log('[TaskQueue] Task queue initialized');
+  }
+
+  private setupProcessors() {
+    this.sessionQueue.process(5, async (job) => {
+      const { prompt, worktreeTemplate, index } = job.data;
+      const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
+
+      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index });
+
+      try {
+        const activeProject = sessionManager.getActiveProject();
+        console.log(`[TaskQueue] Active project:`, activeProject);
+        
+        if (!activeProject) {
+          throw new Error('No active project selected');
+        }
+
+        let worktreeName = worktreeTemplate;
+        
+        // Generate a name if template is empty
+        if (!worktreeName || worktreeName.trim() === '') {
+          console.log(`[TaskQueue] No worktree template provided, generating name...`);
+          // Generate a simple timestamp-based name as fallback
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+          worktreeName = `session-${timestamp}`;
+        }
+        
+        // Add index suffix for multiple sessions
+        if (index !== undefined) {
+          worktreeName = `${worktreeName}-${index + 1}`;
+        }
+        
+        console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
+
+        const worktreePath = await worktreeManager.createWorktree(activeProject.path, worktreeName);
+        console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
+        
+        const sessionName = `Session: ${prompt.substring(0, 50)}...`;
+        console.log(`[TaskQueue] Creating session in database`);
+        
+        const session = await sessionManager.createSession(
+          sessionName,
+          worktreePath,
+          prompt,
+          worktreeName
+        );
+        console.log(`[TaskQueue] Session created with ID: ${session.id}`);
+
+        console.log(`[TaskQueue] Starting Claude Code for session ${session.id}`);
+        await claudeCodeManager.startSession(session.id, session.worktreePath, prompt);
+        console.log(`[TaskQueue] Claude Code started successfully for session ${session.id}`);
+
+        return { sessionId: session.id };
+      } catch (error) {
+        console.error(`[TaskQueue] Failed to create session:`, error);
+        throw error;
+      }
+    });
+
+    this.inputQueue.process(10, async (job) => {
+      const { sessionId, input } = job.data;
+      const { claudeCodeManager } = this.options;
+      
+      await claudeCodeManager.sendInput(sessionId, input);
+    });
+
+    this.continueQueue.process(10, async (job) => {
+      const { sessionId, prompt } = job.data;
+      const { sessionManager, claudeCodeManager } = this.options;
+      
+      const session = await sessionManager.getSession(sessionId);
+      if (!session) {
+        throw new Error(`Session ${sessionId} not found`);
+      }
+
+      const messages = await sessionManager.getConversationMessages(sessionId);
+      await claudeCodeManager.continueSession(sessionId, session.worktreePath, prompt, messages);
+    });
+  }
+
+  async createSession(data: CreateSessionJob): Promise<Bull.Job<CreateSessionJob> | any> {
+    console.log('[TaskQueue] Adding session creation job to queue:', data);
+    const job = await this.sessionQueue.add(data);
+    console.log('[TaskQueue] Job added successfully with ID:', job.id);
+    return job;
+  }
+
+  async createMultipleSessions(prompt: string, worktreeTemplate: string, count: number): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
+    const jobs = [];
+    for (let i = 0; i < count; i++) {
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate, index: i }));
+    }
+    return Promise.all(jobs);
+  }
+
+  async sendInput(sessionId: string, input: string): Promise<Bull.Job<SendInputJob> | any> {
+    return this.inputQueue.add({ sessionId, input });
+  }
+
+  async continueSession(sessionId: string, prompt: string): Promise<Bull.Job<ContinueSessionJob> | any> {
+    return this.continueQueue.add({ sessionId, prompt });
+  }
+
+  async close() {
+    await this.sessionQueue.close();
+    await this.inputQueue.close();
+    await this.continueQueue.close();
+  }
+}

@@ -79,6 +79,3 @@ release/
 # Backend worktrees directory
 backend/worktrees/
 worktrees/
-
-# Main process (Electron main) - entire directory
-main/

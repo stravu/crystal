@@ -1,0 +1,467 @@
+import { randomUUID } from 'crypto';
+import { EventEmitter } from 'events';
+import { spawn, ChildProcess, exec } from 'child_process';
+import type { Session, SessionUpdate, SessionOutput } from '../types/session';
+import type { DatabaseService } from '../database/database';
+import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, Project } from '../database/models';
+
+export class SessionManager extends EventEmitter {
+  private activeSessions: Map<string, Session> = new Map();
+  private runningScriptProcess: ChildProcess | null = null;
+  private currentRunningSessionId: string | null = null;
+  private activeProject: Project | null = null;
+
+  constructor(private db: DatabaseService) {
+    super();
+  }
+
+  setActiveProject(project: Project): void {
+    this.activeProject = project;
+    this.emit('active-project-changed', project);
+  }
+
+  getActiveProject(): Project | null {
+    if (!this.activeProject) {
+      this.activeProject = this.db.getActiveProject() || null;
+    }
+    return this.activeProject;
+  }
+
+  getDbSession(id: string): DbSession | undefined {
+    return this.db.getSession(id);
+  }
+
+  getProjectById(id: number): Project | undefined {
+    return this.db.getProject(id);
+  }
+
+  initializeFromDatabase(): void {
+    // Mark any previously running sessions as stopped
+    const activeSessions = this.db.getActiveSessions();
+    const activeIds = activeSessions.map(s => s.id);
+    if (activeIds.length > 0) {
+      this.db.markSessionsAsStopped(activeIds);
+    }
+    
+    // Load all sessions from database
+    const dbSessions = this.db.getAllSessions();
+    this.emit('sessions-loaded', dbSessions.map(this.convertDbSessionToSession.bind(this)));
+  }
+
+  private convertDbSessionToSession(dbSession: DbSession): Session {
+    return {
+      id: dbSession.id,
+      name: dbSession.name,
+      worktreePath: dbSession.worktree_path,
+      prompt: dbSession.initial_prompt,
+      status: this.mapDbStatusToSessionStatus(dbSession.status, dbSession.last_viewed_at, dbSession.updated_at),
+      pid: dbSession.pid,
+      createdAt: new Date(dbSession.created_at),
+      lastActivity: new Date(dbSession.updated_at),
+      output: [], // Will be loaded separately by frontend when needed
+      jsonMessages: [], // Will be loaded separately by frontend when needed
+      error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined,
+      isRunning: false,
+      lastViewedAt: dbSession.last_viewed_at
+    };
+  }
+
+  private mapDbStatusToSessionStatus(dbStatus: string, lastViewedAt?: string, updatedAt?: string): Session['status'] {
+    switch (dbStatus) {
+      case 'pending': return 'initializing';
+      case 'running': return 'running';
+      case 'stopped': 
+      case 'completed': {
+        // If session is completed but hasn't been viewed since last update, show as unviewed
+        if (!lastViewedAt || (updatedAt && new Date(lastViewedAt) < new Date(updatedAt))) {
+          return 'completed_unviewed';
+        }
+        return 'stopped';
+      }
+      case 'failed': return 'error';
+      default: return 'stopped';
+    }
+  }
+
+  private mapSessionStatusToDbStatus(status: Session['status']): DbSession['status'] {
+    switch (status) {
+      case 'initializing': return 'pending';
+      case 'ready': return 'running';
+      case 'running': return 'running';
+      case 'waiting': return 'running';
+      case 'stopped': return 'stopped';
+      case 'completed_unviewed': return 'stopped';
+      case 'error': return 'failed';
+      default: return 'stopped';
+    }
+  }
+
+  getAllSessions(): Session[] {
+    const activeProject = this.getActiveProject();
+    const dbSessions = this.db.getAllSessions(activeProject?.id);
+    return dbSessions.map(this.convertDbSessionToSession.bind(this));
+  }
+
+  getSession(id: string): Session | undefined {
+    const dbSession = this.db.getSession(id);
+    return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
+  }
+
+  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string): Session {
+    console.log(`[SessionManager] Creating session: ${name}`);
+    
+    const activeProject = this.getActiveProject();
+    console.log(`[SessionManager] Active project:`, activeProject);
+    
+    if (!activeProject) {
+      throw new Error('No active project selected');
+    }
+
+    const sessionData: CreateSessionData = {
+      id: randomUUID(),
+      name,
+      initial_prompt: prompt,
+      worktree_name: worktreeName,
+      worktree_path: worktreePath,
+      project_id: activeProject.id
+    };
+    console.log(`[SessionManager] Session data:`, sessionData);
+
+    const dbSession = this.db.createSession(sessionData);
+    console.log(`[SessionManager] Database session created:`, dbSession);
+    
+    const session = this.convertDbSessionToSession(dbSession);
+    console.log(`[SessionManager] Converted session:`, session);
+    
+    this.activeSessions.set(session.id, session);
+    this.emit('session-created', session);
+    console.log(`[SessionManager] Session created event emitted`);
+    
+    return session;
+  }
+
+  updateSession(id: string, update: SessionUpdate): void {
+    const dbUpdate: UpdateSessionData = {};
+    
+    if (update.status !== undefined) {
+      dbUpdate.status = this.mapSessionStatusToDbStatus(update.status);
+    }
+    
+    const updatedDbSession = this.db.updateSession(id, dbUpdate);
+    if (!updatedDbSession) {
+      throw new Error(`Session ${id} not found`);
+    }
+
+    const session = this.convertDbSessionToSession(updatedDbSession);
+    Object.assign(session, update); // Apply any additional updates not stored in DB
+    
+    this.activeSessions.set(id, session);
+    this.emit('session-updated', session);
+  }
+
+  addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): void {
+    // Store in database (stringify JSON objects)
+    const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
+    this.db.addSessionOutput(id, output.type, dataToStore);
+    
+    // Check if this is a user message in JSON format to track prompts
+    if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
+      // Extract text content from user messages
+      const content = output.data.message.content;
+      let promptText = '';
+      
+      if (Array.isArray(content)) {
+        // Look for text content in the array
+        const textContent = content.find((item: any) => item.type === 'text');
+        if (textContent?.text) {
+          promptText = textContent.text;
+        }
+      } else if (typeof content === 'string') {
+        promptText = content;
+      }
+      
+      if (promptText) {
+        // Get current output count to use as index
+        const outputs = this.db.getSessionOutputs(id);
+        this.db.addPromptMarker(id, promptText, outputs.length - 1);
+      }
+    }
+    
+    // Update in-memory session
+    const session = this.activeSessions.get(id);
+    if (session) {
+      if (output.type === 'json') {
+        session.jsonMessages.push(output.data);
+      } else {
+        session.output.push(output.data);
+      }
+      session.lastActivity = new Date();
+    }
+    
+    const fullOutput: SessionOutput = {
+      sessionId: id,
+      ...output
+    };
+    
+    this.emit('session-output', fullOutput);
+  }
+
+  getSessionOutput(id: string, limit?: number): SessionOutput[] {
+    return this.getSessionOutputs(id, limit);
+  }
+
+  getSessionOutputs(id: string, limit?: number): SessionOutput[] {
+    const dbOutputs = this.db.getSessionOutputs(id, limit);
+    return dbOutputs.map(dbOutput => ({
+      sessionId: dbOutput.session_id,
+      type: dbOutput.type as 'stdout' | 'stderr' | 'json',
+      data: dbOutput.type === 'json' ? JSON.parse(dbOutput.data) : dbOutput.data,
+      timestamp: new Date(dbOutput.timestamp)
+    }));
+  }
+
+  archiveSession(id: string): void {
+    const success = this.db.archiveSession(id);
+    if (!success) {
+      throw new Error(`Session ${id} not found`);
+    }
+
+    this.activeSessions.delete(id);
+    this.emit('session-deleted', { id }); // Keep the same event name for frontend compatibility
+  }
+
+  stopSession(id: string): void {
+    this.updateSession(id, { status: 'stopped' });
+  }
+
+  setSessionPid(id: string, pid: number): void {
+    this.db.updateSession(id, { pid });
+    const session = this.activeSessions.get(id);
+    if (session) {
+      session.pid = pid;
+    }
+  }
+
+  setSessionExitCode(id: string, exitCode: number): void {
+    this.db.updateSession(id, { exit_code: exitCode });
+  }
+
+  addConversationMessage(id: string, messageType: 'user' | 'assistant', content: string): void {
+    this.db.addConversationMessage(id, messageType, content);
+  }
+
+  getConversationMessages(id: string): ConversationMessage[] {
+    return this.db.getConversationMessages(id);
+  }
+
+  continueConversation(id: string, userMessage: string): void {
+    // Store the user's message
+    this.addConversationMessage(id, 'user', userMessage);
+    
+    // Emit event for the Claude Code manager to handle
+    this.emit('conversation-continue', { sessionId: id, message: userMessage });
+  }
+
+  clearConversation(id: string): void {
+    this.db.clearConversationMessages(id);
+    this.db.clearSessionOutputs(id);
+  }
+
+  markSessionAsViewed(id: string): void {
+    const updatedDbSession = this.db.markSessionAsViewed(id);
+    if (updatedDbSession) {
+      const session = this.convertDbSessionToSession(updatedDbSession);
+      this.activeSessions.set(id, session);
+      this.emit('session-updated', session);
+    }
+  }
+
+  getPromptHistory(): Array<{
+    id: string;
+    prompt: string;
+    sessionName: string;
+    sessionId: string;
+    createdAt: string;
+    status: string;
+  }> {
+    const sessions = this.db.getAllSessionsIncludingArchived();
+    
+    return sessions.map(session => ({
+      id: session.id,
+      prompt: session.initial_prompt,
+      sessionName: session.name,
+      sessionId: session.id,
+      createdAt: session.created_at,
+      status: session.status
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  getPromptMarkers(sessionId: string): PromptMarker[] {
+    return this.db.getPromptMarkers(sessionId);
+  }
+
+  getSessionPrompts(sessionId: string): Array<{ prompt: string; index: number; timestamp: string }> {
+    const markers = this.getPromptMarkers(sessionId);
+    return markers.map(marker => ({
+      prompt: marker.prompt_text,
+      index: marker.output_index,
+      timestamp: marker.timestamp
+    }));
+  }
+
+  addInitialPromptMarker(sessionId: string, prompt: string): void {
+    // Add the initial prompt as the first prompt marker (index 0)
+    this.db.addPromptMarker(sessionId, prompt, 0, 0);
+  }
+
+  // Execution diff operations
+  createExecutionDiff(data: CreateExecutionDiffData): ExecutionDiff {
+    return this.db.createExecutionDiff(data);
+  }
+
+  getExecutionDiffs(sessionId: string): ExecutionDiff[] {
+    return this.db.getExecutionDiffs(sessionId);
+  }
+
+  getExecutionDiff(id: number): ExecutionDiff | undefined {
+    return this.db.getExecutionDiff(id);
+  }
+
+  getNextExecutionSequence(sessionId: string): number {
+    return this.db.getNextExecutionSequence(sessionId);
+  }
+
+  getProjectRunScript(sessionId: string): string[] | null {
+    const dbSession = this.getDbSession(sessionId);
+    if (dbSession?.project_id) {
+      const project = this.getProjectById(dbSession.project_id);
+      if (project?.run_script) {
+        // Split by newlines to get array of commands
+        return project.run_script.split('\n').filter(cmd => cmd.trim());
+      }
+    }
+    return null;
+  }
+
+  runScript(sessionId: string, commands: string[], workingDirectory: string): void {
+    // Stop any currently running script
+    this.stopRunningScript();
+    
+    // Mark session as running
+    this.setSessionRunning(sessionId, true);
+    this.currentRunningSessionId = sessionId;
+    
+    // Join commands with && to run them sequentially
+    const command = commands.join(' && ');
+    
+    // Spawn the process with its own process group for easier termination
+    this.runningScriptProcess = spawn('sh', ['-c', command], {
+      cwd: workingDirectory,
+      stdio: 'pipe',
+      detached: true // Create a new process group
+    });
+
+    // Handle output
+    this.runningScriptProcess.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      this.emit('script-output', { sessionId, type: 'stdout', data: output });
+    });
+
+    this.runningScriptProcess.stderr?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      this.emit('script-output', { sessionId, type: 'stderr', data: output });
+    });
+
+    // Handle process exit
+    this.runningScriptProcess.on('exit', (code) => {
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stdout', 
+        data: `\nProcess exited with code: ${code}\n` 
+      });
+      
+      this.setSessionRunning(sessionId, false);
+      this.currentRunningSessionId = null;
+      this.runningScriptProcess = null;
+    });
+
+    this.runningScriptProcess.on('error', (error) => {
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stderr', 
+        data: `Error: ${error.message}\n` 
+      });
+      
+      this.setSessionRunning(sessionId, false);
+      this.currentRunningSessionId = null;
+      this.runningScriptProcess = null;
+    });
+  }
+
+  stopRunningScript(): void {
+    if (this.runningScriptProcess && this.currentRunningSessionId) {
+      const sessionId = this.currentRunningSessionId;
+      const process = this.runningScriptProcess;
+      
+      // Immediately clear references to prevent new output
+      this.currentRunningSessionId = null;
+      this.runningScriptProcess = null;
+      
+      // Kill the entire process group to ensure all child processes are terminated
+      try {
+        if (process.pid) {
+          console.log(`Terminating script process ${process.pid} and its children...`);
+          
+          // Since we used detached: true, we need to kill the process group
+          // Use negative PID to kill the entire process group
+          try {
+            process.kill('SIGKILL');
+            // Kill the process group using the system kill command
+            exec(`kill -9 -${process.pid}`, (error) => {
+              if (error) {
+                console.warn(`Error killing process group: ${error.message}`);
+              } else {
+                console.log(`Successfully killed process group ${process.pid}`);
+              }
+            });
+          } catch (error) {
+            console.warn('Process already terminated:', error);
+          }
+          
+          // Also kill any remaining child processes
+          exec(`pkill -P ${process.pid}`, () => {
+            // Ignore errors - child processes might not exist
+          });
+        }
+      } catch (error) {
+        console.warn('Error killing script process:', error);
+      }
+      
+      // Update session state
+      this.setSessionRunning(sessionId, false);
+      
+      // Emit a final message to indicate the script was stopped
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stdout', 
+        data: '\n[Script stopped by user]\n' 
+      });
+    }
+  }
+
+  private setSessionRunning(sessionId: string, isRunning: boolean): void {
+    const session = this.activeSessions.get(sessionId);
+    if (session) {
+      session.isRunning = isRunning;
+      this.emit('session-updated', session);
+    }
+  }
+
+  getCurrentRunningSessionId(): string | null {
+    return this.currentRunningSessionId;
+  }
+
+  cleanup(): void {
+    this.stopRunningScript();
+  }
+}
