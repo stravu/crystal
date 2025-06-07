@@ -34,7 +34,7 @@ export function NotificationSettings({ settings, onUpdateSettings }: Notificatio
 
   const testNotification = () => {
     if (Notification.permission === 'granted') {
-      new Notification('Claude Code Commander', {
+      new Notification('Crystal', {
         body: 'This is a test notification! 🎉',
         icon: '/favicon.ico',
       });

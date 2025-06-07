@@ -21,7 +21,7 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
     <>
       <div className="w-64 bg-gray-800 text-white h-full flex flex-col">
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Claude Code Commander</h1>
+          <h1 className="text-xl font-bold">Crystal</h1>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="text-gray-400 hover:text-white transition-colors"

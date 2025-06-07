@@ -1,8 +1,8 @@
-# Claude Code Commander
+# Crystal
 
 ## Project Overview
 
-Claude Code Commander (CCC) is a fully-implemented Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
+Crystal is a fully-implemented Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
 
 ## References
 Use these reference pages for more information:

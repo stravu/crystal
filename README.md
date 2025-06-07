@@ -1,10 +1,10 @@
-# Claude Code Commander (CCC)
+# Crystal
 
-Claude Code Commander is a cross-platform Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
+Crystal is a cross-platform Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
 
 ## Architecture
 
-CCC is built as an Electron desktop application with:
+Crystal is built as an Electron desktop application with:
 - **Main Process**: Handles system operations, Claude Code spawning, and database management
 - **Renderer Process**: React-based UI with real-time terminal output
 - **Async Task Processing**: Bull queue for managing concurrent Claude Code sessions
@@ -23,7 +23,7 @@ CCC is built as an Electron desktop application with:
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd ccc
+cd crystal
 ```
 
 2. Install dependencies:

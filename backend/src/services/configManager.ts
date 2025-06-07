@@ -11,7 +11,7 @@ export class ConfigManager extends EventEmitter {
 
   constructor(defaultGitPath?: string) {
     super();
-    this.configDir = path.join(os.homedir(), '.ccc');
+    this.configDir = path.join(os.homedir(), '.crystal');
     this.configPath = path.join(this.configDir, 'config.json');
     this.config = {
       gitRepoPath: defaultGitPath || os.homedir(),

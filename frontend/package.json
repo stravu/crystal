@@ -1,7 +1,7 @@
 {
-  "name": "@ccc/frontend",
+  "name": "@crystal/frontend",
   "version": "1.0.0",
-  "description": "Frontend for Claude Code Commander",
+  "description": "Frontend for Crystal",
   "private": true,
   "type": "module",
   "scripts": {

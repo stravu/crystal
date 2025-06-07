@@ -1,7 +1,7 @@
 {
-  "name": "@ccc/backend",
+  "name": "@crystal/backend",
   "version": "1.0.0",
-  "description": "Backend server for Claude Code Commander",
+  "description": "Backend server for Crystal",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

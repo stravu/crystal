@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-commander",
+  "name": "crystal",
   "version": "1.0.0",
   "description": "An Electron desktop application for managing multiple Claude Code instances using git worktrees",
   "private": true,
@@ -27,8 +27,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.claudecodecommander.app",
-    "productName": "Claude Code Commander",
+    "appId": "com.crystal.app",
+    "productName": "Crystal",
     "directories": {
       "output": "dist-electron"
     },
@@ -42,13 +42,16 @@
       "main": "main/dist/index.js"
     },
     "mac": {
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "build/icon.png"
     }
   }
 }

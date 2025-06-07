@@ -1,6 +1,6 @@
-# Claude Code Commander - Feature Suggestions
+# Crystal - Feature Suggestions
 
-This document contains 20 feature suggestions for enhancing Claude Code Commander based on analysis of the current codebase, architecture, and user workflows.
+This document contains 20 feature suggestions for enhancing Crystal based on analysis of the current codebase, architecture, and user workflows.
 
 ## 1. Visual Diff Viewer 🔍
 **Priority: High**
