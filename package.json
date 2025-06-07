@@ -21,10 +21,13 @@
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.7.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
+    "electron": "^36.4.0",
+    "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9"
   },
   "build": {

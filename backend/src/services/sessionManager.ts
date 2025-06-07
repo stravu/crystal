@@ -91,7 +91,8 @@ export class SessionManager extends EventEmitter {
       name,
       initial_prompt: prompt,
       worktree_name: worktreeName,
-      worktree_path: worktreePath
+      worktree_path: worktreePath,
+      project_id: 1
     };
 
     const dbSession = await this.db.createSession(sessionData);
