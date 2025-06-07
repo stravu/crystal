@@ -15,7 +15,7 @@
     "preview": "pnpm run build:main && pnpm run build:renderer && NODE_ENV=production electron main/dist/index.js",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps && electron-rebuild"
   },
   "keywords": ["claude", "code", "git", "worktree", "development", "electron"],
   "author": "",
@@ -24,7 +24,8 @@
   "devDependencies": {
     "concurrently": "^8.2.2",
     "electron": "^28.1.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9"
   },
   "build": {
     "appId": "com.crystal.app",
