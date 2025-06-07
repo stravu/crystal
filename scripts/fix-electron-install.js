@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('Checking Electron installation...');
+console.log('🔧 Fixing Electron and native module installation...');
 
 // Find all electron installations in node_modules
 function findElectronPaths(dir) {
@@ -41,7 +41,7 @@ function fixElectronInstall(electronPath) {
   const distDir = path.join(electronPath, 'dist');
   
   if (!fs.existsSync(pathFile) || !fs.existsSync(distDir)) {
-    console.log(`Fixing Electron installation at: ${electronPath}`);
+    console.log(`🔧 Fixing Electron installation at: ${electronPath}`);
     const installScript = path.join(electronPath, 'install.js');
     
     if (fs.existsSync(installScript)) {
@@ -50,25 +50,80 @@ function fixElectronInstall(electronPath) {
           cwd: electronPath,
           stdio: 'inherit'
         });
-        console.log(`✓ Fixed Electron at: ${electronPath}`);
+        console.log(`✅ Fixed Electron at: ${electronPath}`);
       } catch (e) {
-        console.error(`Failed to fix Electron at ${electronPath}:`, e.message);
+        console.error(`❌ Failed to fix Electron at ${electronPath}:`, e.message);
       }
     }
   } else {
-    console.log(`✓ Electron already properly installed at: ${electronPath}`);
+    console.log(`✅ Electron already properly installed at: ${electronPath}`);
+  }
+}
+
+// Find and rebuild better-sqlite3 in pnpm structure
+function rebuildBetterSqlite3() {
+  const projectRoot = path.resolve(__dirname, '..');
+  
+  try {
+    console.log('🔧 Rebuilding better-sqlite3 for Electron...');
+    
+    // Try multiple rebuild approaches
+    const commands = [
+      // Standard electron-rebuild
+      'npx electron-rebuild -f -w better-sqlite3',
+      // Force rebuild with module-dir for pnpm
+      'npx electron-rebuild -f --module-dir node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3',
+      // Manual rebuild of better-sqlite3 in pnpm location
+      'cd node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3 && npm run rebuild || npm run install || node-gyp rebuild --runtime=electron --target=36.4.0 --arch=arm64'
+    ];
+    
+    for (const cmd of commands) {
+      try {
+        console.log(`🔄 Running: ${cmd}`);
+        execSync(cmd, { 
+          cwd: projectRoot,
+          stdio: 'inherit'
+        });
+        console.log(`✅ Successfully rebuilt with: ${cmd}`);
+        break;
+      } catch (e) {
+        console.log(`⚠️  Command failed, trying next approach...`);
+      }
+    }
+    
+    // Also rebuild in main package if it exists
+    const mainBetterSqlite = path.join(projectRoot, 'main', 'node_modules', 'better-sqlite3');
+    if (fs.existsSync(mainBetterSqlite)) {
+      console.log('🔧 Rebuilding better-sqlite3 in main package...');
+      try {
+        execSync('npx electron-rebuild -f -w better-sqlite3', {
+          cwd: path.join(projectRoot, 'main'),
+          stdio: 'inherit'
+        });
+        console.log('✅ Main package better-sqlite3 rebuilt');
+      } catch (e) {
+        console.log('⚠️  Main package rebuild failed');
+      }
+    }
+    
+  } catch (e) {
+    console.error('❌ Failed to rebuild better-sqlite3:', e.message);
   }
 }
 
 // Main execution
 const projectRoot = path.resolve(__dirname, '..');
-const electronPaths = findElectronPaths(projectRoot);
 
+// Fix Electron installation
+const electronPaths = findElectronPaths(projectRoot);
 if (electronPaths.length === 0) {
-  console.error('No Electron installations found!');
+  console.error('❌ No Electron installations found!');
   process.exit(1);
 }
 
 electronPaths.forEach(fixElectronInstall);
 
-console.log('\nElectron installation check complete!');
+// Rebuild native modules
+rebuildBetterSqlite3();
+
+console.log('\n🎉 Installation fixes complete!');

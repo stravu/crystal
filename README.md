@@ -20,6 +20,25 @@ Crystal is built as an Electron desktop application with:
 
 ## Installation
 
+### Automatic Installation (Recommended)
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd crystal
+```
+
+2. Run the installation script:
+```bash
+./install.sh
+```
+
+This will automatically handle all installation steps including native module compilation.
+
+### Manual Installation
+
+If the automatic installer doesn't work:
+
 1. Clone the repository:
 ```bash
 git clone <repository-url>
@@ -31,12 +50,29 @@ cd crystal
 pnpm install
 ```
 
-The installation process will automatically:
-- Download Electron binaries
-- Rebuild native modules for Electron compatibility
-- Set up all required dependencies
+3. Fix native modules (try these in order until one works):
+```bash
+# Option 1: Run the fix script
+node scripts/fix-electron-install.js
 
-**Note**: If you encounter any issues during installation, the postinstall script will attempt to fix them automatically. For manual troubleshooting, see the Troubleshooting section below.
+# Option 2: Manual rebuild
+npx electron-rebuild -f
+
+# Option 3: Manual compilation (if others fail)
+cd node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3
+npm run install
+cd ../../../../../
+```
+
+### Installation Issues?
+
+The native module compilation can be tricky with pnpm. If you continue having issues, try using npm instead:
+
+```bash
+rm -rf node_modules pnpm-lock.yaml
+npm install
+npx electron-rebuild -f
+```
 
 ## Running the Application
 
