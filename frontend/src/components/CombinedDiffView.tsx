@@ -29,10 +29,9 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
         const data = await response.json();
         setExecutions(data);
         
-        // If no initial selection, select all executions with changes
+        // If no initial selection, select all executions
         if (initialSelected.length === 0) {
-          const executionsWithChanges = data.filter((exec: ExecutionDiff) => exec.stats_files_changed > 0);
-          setSelectedExecutions(executionsWithChanges.map((exec: ExecutionDiff) => exec.id));
+          setSelectedExecutions(data.map((exec: ExecutionDiff) => exec.id));
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load executions');
