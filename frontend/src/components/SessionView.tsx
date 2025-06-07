@@ -11,10 +11,10 @@ import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
   const activeSession = useSessionStore((state) => state.getActiveSession());
-  const setSessionOutput = useSessionStore((state) => state.setSessionOutput);
   
   // Instead of subscribing to script output, we'll get it when needed
   const [scriptOutput, setScriptOutput] = useState<string[]>([]);
+  const [formattedOutput, setFormattedOutput] = useState<string>('');
   
   // Subscribe to script output changes manually
   useEffect(() => {
@@ -34,6 +34,35 @@ export function SessionView() {
     
     return unsubscribe;
   }, [activeSession?.id]);
+  
+  // Format JSON messages for terminal display whenever they change
+  useEffect(() => {
+    if (!activeSession) {
+      setFormattedOutput('');
+      return;
+    }
+    
+    const formatOutput = async () => {
+      const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
+      let formatted = '';
+      
+      // Format JSON messages
+      if (activeSession.jsonMessages) {
+        for (const msg of activeSession.jsonMessages) {
+          formatted += formatJsonForOutputEnhanced(msg);
+        }
+      }
+      
+      // Add any non-JSON output
+      if (activeSession.output && activeSession.output.length > 0) {
+        formatted += activeSession.output.join('');
+      }
+      
+      setFormattedOutput(formatted);
+    };
+    
+    formatOutput();
+  }, [activeSession?.jsonMessages, activeSession?.output]);
   
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
@@ -65,27 +94,31 @@ export function SessionView() {
       
       const outputs = await response.json();
       
-      // Handle output entries
-      const outputEntries = outputs.filter((o: any) => o.type !== 'json');
-      const outputData = outputEntries.map((o: any) => o.data).join('');
-      if (outputData && terminalInstance.current) {
-        setSessionOutput(activeSession.id, outputData);
-        
-        // Small delay to ensure terminal is ready
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Double-check terminal still exists before writing
-        if (terminalInstance.current) {
-          terminalInstance.current.write(outputData);
-          lastProcessedOutputLength.current = outputData.length;
-          // Scroll to bottom to show latest output
-          terminalInstance.current.scrollToBottom();
+      // Import the formatter
+      const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
+      
+      // Format all outputs for terminal display
+      let terminalOutput = '';
+      const jsonMessages: any[] = [];
+      
+      for (const output of outputs) {
+        if (output.type === 'json') {
+          // Format JSON for terminal display
+          const formatted = formatJsonForOutputEnhanced(output.data);
+          terminalOutput += formatted;
+          // Store the JSON message for the JSON view
+          jsonMessages.push(output);
+        } else {
+          // Regular stdout/stderr
+          terminalOutput += output.data;
         }
       }
       
-      // Handle JSON messages
-      const jsonOutputs = outputs.filter((o: any) => o.type === 'json');
-      jsonOutputs.forEach((jsonOutput: any) => {
+      // Don't write directly to terminal here - let the formattedOutput effect handle it
+      // This prevents double-writing
+      
+      // Store JSON messages for the JSON Messages view
+      jsonMessages.forEach((jsonOutput: any) => {
         useSessionStore.getState().addSessionOutput(jsonOutput);
       });
       
@@ -152,6 +185,7 @@ export function SessionView() {
     // Reset terminal when switching sessions (preserves scrollback capability)
     terminalInstance.current.reset();
     lastProcessedOutputLength.current = 0;
+    setFormattedOutput(''); // Reset formatted output
 
     // Load output content with retry logic
     loadOutputContent();
@@ -245,18 +279,17 @@ export function SessionView() {
   }, [viewMode, activeSession?.id]);
 
   useEffect(() => {
-    if (!terminalInstance.current || !activeSession) return;
+    if (!terminalInstance.current || !activeSession || !formattedOutput) return;
 
-    // Write only new output
-    const fullOutput = activeSession.output.join('');
-    if (fullOutput.length > lastProcessedOutputLength.current) {
-      const newOutput = fullOutput.substring(lastProcessedOutputLength.current);
+    // Write only new formatted output
+    if (formattedOutput.length > lastProcessedOutputLength.current) {
+      const newOutput = formattedOutput.substring(lastProcessedOutputLength.current);
       terminalInstance.current.write(newOutput);
-      lastProcessedOutputLength.current = fullOutput.length;
+      lastProcessedOutputLength.current = formattedOutput.length;
       // Scroll to bottom to show latest output
       terminalInstance.current.scrollToBottom();
     }
-  }, [activeSession?.output]);
+  }, [formattedOutput, activeSession?.id]);
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;

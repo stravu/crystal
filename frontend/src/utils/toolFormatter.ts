@@ -1,4 +1,23 @@
-import { formatJsonForOutput } from './formatters';
+// Simple fallback formatter for unknown message types
+function formatJsonForOutput(jsonMessage: any): string {
+  const timestamp = jsonMessage.timestamp || new Date().toISOString();
+  const time = new Date(timestamp).toLocaleTimeString();
+  
+  // Handle system messages
+  if (jsonMessage.type === 'system') {
+    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[90m⚙️  System: ${jsonMessage.subtype || 'info'}\x1b[0m\r\n\r\n`;
+  }
+  
+  // Handle result messages
+  if (jsonMessage.type === 'result') {
+    const status = jsonMessage.is_error ? '❌ Error' : '✅ Success';
+    const cost = jsonMessage.cost_usd ? ` ($${jsonMessage.cost_usd.toFixed(4)})` : '';
+    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[90m${status}${cost}\x1b[0m\r\n\r\n`;
+  }
+  
+  // Default formatting
+  return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[90m${JSON.stringify(jsonMessage, null, 2)}\x1b[0m\r\n\r\n`;
+}
 
 interface ToolCall {
   type: 'tool_use';
