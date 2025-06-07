@@ -23,7 +23,7 @@ export function PromptHistory() {
   const fetchPromptHistory = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/prompts/history');
+      const response = await fetch('/api/prompts');
       const data = await response.json();
       setPrompts(data);
     } catch (error) {

@@ -137,7 +137,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   markSessionAsViewed: async (sessionId) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/mark-viewed`, {
+      const response = await fetch(`/api/sessions/${sessionId}/view`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

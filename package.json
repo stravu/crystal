@@ -12,7 +12,7 @@
     "build:main": "pnpm run --filter main build",
     "build:renderer": "pnpm run --filter frontend build",
     "build:electron": "electron-builder",
-    "preview": "pnpm run build:main && electron main/dist/index.js",
+    "preview": "pnpm run build:main && pnpm run build:renderer && NODE_ENV=production electron main/dist/index.js",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
     "postinstall": "electron-builder install-app-deps"
