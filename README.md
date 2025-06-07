@@ -1,7 +1,14 @@
 # Claude Code Commander (CCC)
 
+Claude Code Commander is a cross-platform Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
 
-Claude Code Commander is a locally-run web application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
+## Architecture
+
+CCC is built as an Electron desktop application with:
+- **Main Process**: Handles system operations, Claude Code spawning, and database management
+- **Renderer Process**: React-based UI with real-time terminal output
+- **Async Task Processing**: Bull queue for managing concurrent Claude Code sessions
+- **Local Database**: SQLite for session persistence and history
 
 ## Prerequisites
 
@@ -29,19 +36,21 @@ pnpm install
 pnpm run build
 ```
 
+4. Rebuild native modules for Electron:
+```bash
+npx electron-rebuild -f -w better-sqlite3
+npx electron-rebuild -f -w @homebridge/node-pty-prebuilt-multiarch
+```
+
 ## Running the Application
 
 ### Development Mode
 
-Start both frontend and backend in development mode with hot reloading:
+Start the Electron app in development mode with hot reloading:
 
 ```bash
 pnpm run dev
 ```
-
-The application will be available at:
-- Frontend: http://localhost:4521
-- Backend API: http://localhost:3521
 
 ### Production Mode
 
@@ -50,16 +59,23 @@ The application will be available at:
 pnpm run build
 ```
 
-2. Start the backend server:
-```bash
-cd backend
-pnpm run start
-```
-
-3. In a separate terminal, preview the frontend:
+2. Run the built Electron app:
 ```bash
 pnpm run preview
 ```
+
+### Building for Distribution
+
+To create platform-specific installers:
+
+```bash
+pnpm run build:electron
+```
+
+This will create:
+- **macOS**: DMG installer in `dist-electron/`
+- **Windows**: NSIS installer in `dist-electron/`
+- **Linux**: AppImage in `dist-electron/`
 
 ## Configuration
 
@@ -81,14 +97,13 @@ The following environment variables can be used to configure the application:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 3521 | Backend server port |
-| `FRONTEND_URL` | http://localhost:4521 | Frontend URL for CORS configuration |
-| `GIT_REPO_PATH` | Home directory | Default git repository path |
+| `REDIS_URL` | undefined | Redis URL for Bull queue (optional) |
+| `NODE_ENV` | development | Environment mode |
 
-Example:
-```bash
-PORT=8080 FRONTEND_URL=http://localhost:3000 pnpm run dev
-```
+The Electron app uses Electron Store for configuration persistence, storing data in:
+- **macOS**: `~/Library/Application Support/Claude Code Commander/`
+- **Windows**: `%APPDATA%/Claude Code Commander/`
+- **Linux**: `~/.config/Claude Code Commander/`
 
 ## Usage
 
@@ -143,12 +158,22 @@ Enable detailed logging for debugging:
 
 ## Troubleshooting
 
-### Port Already in Use
+### Electron Installation Issues
 
-If you see an error about ports being in use, you can change them:
+If Electron fails to install:
 
 ```bash
-PORT=8080 pnpm run dev  # Changes backend port to 8080
+cd node_modules/.pnpm/electron@*/node_modules/electron
+node install.js
+```
+
+### Native Module Issues
+
+If you encounter native module errors (node-pty, better-sqlite3):
+
+```bash
+npx electron-rebuild -f -w better-sqlite3
+npx electron-rebuild -f -w @homebridge/node-pty-prebuilt-multiarch
 ```
 
 ### Database Issues
@@ -173,16 +198,19 @@ git worktree remove <worktree-path>
 
 ### Available Scripts
 
-- `pnpm run dev` - Start development servers
-- `pnpm run build` - Build for production
-- `pnpm run preview` - Preview production build
-- `pnpm run lint` - Run linting
+- `pnpm run dev` - Start Electron app in development mode
+- `pnpm run build` - Build all components for production
+- `pnpm run build:main` - Build main process only
+- `pnpm run build:renderer` - Build renderer process only
+- `pnpm run build:electron` - Package Electron app for distribution
+- `pnpm run preview` - Run built Electron app
+- `pnpm run lint` - Run linting across all packages
 - `pnpm run typecheck` - Run TypeScript type checking
 
 
 ## API Reference
 
-The backend provides a REST API for session management:
+The embedded Express server provides a REST API for session management on port 3001:
 
 - `GET /api/sessions` - List all sessions
 - `POST /api/sessions` - Create new session(s)
@@ -190,7 +218,10 @@ The backend provides a REST API for session management:
 - `DELETE /api/sessions/:id` - Archive a session
 - `POST /api/sessions/:id/input` - Send input to session
 - `POST /api/sessions/:id/continue` - Continue conversation
+- `GET /api/sessions/:id/executions` - Get execution diffs
 - `GET /api/config` - Get configuration
 - `POST /api/config` - Update configuration
 
-WebSocket events are used for real-time updates on port 3521.
+Communication between renderer and main process uses:
+- **Production**: Electron IPC for secure communication
+- **Development**: WebSocket for hot reload support

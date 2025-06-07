@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import type { UpdateConfigRequest } from '../types/config.js';
-import { ConfigManager } from '../services/configManager.js';
+import type { UpdateConfigRequest } from '../types/config';
+import { ConfigManager } from '../services/configManager';
 import { existsSync } from 'fs';
 import { join } from 'path';
 

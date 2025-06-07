@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { ConfigManager } from './configManager.js';
+import { ConfigManager } from './configManager';
 import fs from 'fs/promises';
 import path from 'path';
 

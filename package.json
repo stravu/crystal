@@ -1,17 +1,54 @@
 {
   "name": "claude-code-commander",
   "version": "1.0.0",
-  "description": "A locally-run web application for managing multiple Claude Code instances using git worktrees",
+  "description": "An Electron desktop application for managing multiple Claude Code instances using git worktrees",
   "private": true,
+  "main": "main/dist/index.js",
   "scripts": {
-    "dev": "pnpm run --parallel dev",
-    "build": "pnpm run -r build",
-    "preview": "pnpm run --filter frontend preview",
+    "dev": "pnpm run build:main && concurrently \"pnpm run dev:main\" \"pnpm run dev:renderer\"",
+    "dev:main": "electron main/dist/index.js",
+    "dev:renderer": "pnpm run --filter frontend dev",
+    "build": "pnpm run build:main && pnpm run build:renderer && pnpm run build:electron",
+    "build:main": "pnpm run --filter main build",
+    "build:renderer": "pnpm run --filter frontend build",
+    "build:electron": "electron-builder",
+    "preview": "pnpm run build:main && electron main/dist/index.js",
     "lint": "pnpm run -r lint",
-    "typecheck": "pnpm run -r typecheck"
+    "typecheck": "pnpm run -r typecheck",
+    "postinstall": "electron-builder install-app-deps"
   },
-  "keywords": ["claude", "code", "git", "worktree", "development"],
+  "keywords": ["claude", "code", "git", "worktree", "development", "electron"],
   "author": "",
   "license": "MIT",
-  "packageManager": "pnpm@10.7.0"
+  "packageManager": "pnpm@10.7.0",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.claudecodecommander.app",
+    "productName": "Claude Code Commander",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "main/dist/**/*",
+      "frontend/dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "main/dist/index.js"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
 }

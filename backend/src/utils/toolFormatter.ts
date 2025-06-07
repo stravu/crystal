@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { formatJsonForOutput } from './formatters.js';
+import { formatJsonForOutput } from './formatters';
 
 interface ToolCall {
   type: 'tool_use';

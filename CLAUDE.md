@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Claude Code Commander (CCC) is a fully-implemented, locally-run web application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
+Claude Code Commander (CCC) is a fully-implemented Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
 
 ## References
 Use these reference pages for more information:
@@ -45,6 +45,12 @@ All core features have been successfully implemented with significant enhancemen
 
 ## Technical Stack
 
+### Electron Application
+- **Main Process**: Electron main process with IPC communication
+  - Window management with native OS integration
+  - Electron Store for configuration persistence
+  - IPC handlers for renderer communication
+
 ### Frontend (React 19 + TypeScript)
 - **Framework**: React 19 with TypeScript
   - Modern React features and strong typing
@@ -57,15 +63,21 @@ All core features have been successfully implemented with significant enhancemen
   - Professional terminal emulator with theme support
 - **Build Tool**: Vite
   - Fast development server with hot reload
+- **Communication**: Dual mode support
+  - Electron IPC for production
+  - WebSockets for development
 
-### Backend (Node.js + TypeScript + Express)
+### Backend Services (Integrated in Main Process)
 - **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
+- **Framework**: Express.js embedded server
   - RESTful API endpoints
   - Comprehensive route structure
-- **Database**: SQLite3
-  - Local database with migration support
+- **Database**: Better-SQLite3
+  - Synchronous SQLite operations
   - Session persistence and history
+- **Task Queue**: Bull with optional Redis
+  - Async task processing for session creation
+  - In-memory queue for standalone Electron
 - **Claude Integration**: @anthropic-ai/claude-code
   - Official Claude Code SDK
 - **Process Management**: node-pty
@@ -73,47 +85,66 @@ All core features have been successfully implemented with significant enhancemen
 - **Git Integration**: Command-line git worktree management
 
 ### Communication
-- **WebSockets**: Socket.io
+- **Electron IPC**: Inter-process communication
+  - Main-to-renderer messaging
+  - Secure context isolation
+- **WebSockets**: Socket.io (development mode)
   - Real-time bidirectional communication
   - Session status updates
   - Live terminal output streaming
-- **API Proxy**: Vite dev server proxy configuration
+- **API Server**: Embedded Express server
+  - Runs on port 3001
+  - Serves API endpoints
 
 ### Data Persistence
-- **Database**: SQLite3 with proper schema
+- **Database**: Better-SQLite3 with synchronous operations
   - `sessions` table: Core session metadata
   - `session_outputs` table: Terminal output history  
   - `conversation_messages` table: Conversation history for continuations
+  - `execution_diffs` table: Git diff tracking
+  - `prompt_markers` table: Prompt execution markers
 - **Migrations**: SQL migration system for schema evolution
+- **Electron Store**: Application configuration
 
 ### Development Tools
 - **Package Manager**: pnpm with workspace configuration
-- **Monorepo Structure**: Frontend, backend, and shared types
+- **Monorepo Structure**: Frontend, main process, and shared types
 - **TypeScript**: Comprehensive type safety across all packages
+- **Electron Builder**: Cross-platform desktop app packaging
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│             Frontend (React 19 + XTerm.js)              │
+│              Electron Desktop Application                │
+├─────────────────────────────────────────────────────────┤
+│             Renderer Process (Frontend)                  │
 │  ┌─────────────────┐ ┌─────────────────┐ ┌────────────┐  │
 │  │    Sidebar      │ │   Terminal      │ │  Settings  │  │
 │  │   (Sessions)    │ │   (XTerm.js)    │ │  (Config)  │  │
 │  └─────────────────┘ └─────────────────┘ └────────────┘  │
 ├─────────────────────────────────────────────────────────┤
-│            WebSocket Connection (Socket.io)              │
+│          IPC Communication / WebSocket (dev)             │
 ├─────────────────────────────────────────────────────────┤
-│               Backend (Express + TypeScript)             │
+│              Main Process (Electron + Node.js)           │
 │ ┌──────────────┐ ┌──────────────┐ ┌───────────────────┐  │
-│ │   Session    │ │   Worktree   │ │   Config         │  │
-│ │   Manager    │ │   Manager    │ │   Manager        │  │
+│ │   Express    │ │  Task Queue  │ │   Session        │  │
+│ │   Server     │ │    (Bull)    │ │   Manager        │  │
+│ └──────────────┘ └──────────────┘ └───────────────────┘  │
+│ ┌──────────────┐ ┌──────────────┐ ┌───────────────────┐  │
+│ │  Worktree    │ │ Claude Code  │ │   Config         │  │
+│ │  Manager     │ │   Manager    │ │   Manager        │  │
 │ └──────────────┘ └──────────────┘ └───────────────────┘  │
 ├─────────────────────────────────────────────────────────┤
-│                SQLite Database                           │
+│            Better-SQLite3 Database                       │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
 │  │  sessions   │ │session_     │ │conversation_        │ │
 │  │   table     │ │outputs      │ │messages             │ │
 │  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+│  ┌─────────────┐ ┌─────────────┐                         │
+│  │execution_   │ │prompt_      │                         │
+│  │diffs        │ │markers      │                         │
+│  └─────────────┘ └─────────────┘                         │
 ├─────────────────────────────────────────────────────────┤
 │         Claude Code SDK Instances (node-pty)             │
 │              ┌─────────────────────────────┐              │
@@ -152,9 +183,12 @@ All core features have been successfully implemented with significant enhancemen
 ## Available Commands
 
 All commands are working and tested:
-- `npm run dev` - Start both frontend and backend in parallel
-- `npm run build` - Build both frontend and backend for production  
-- `npm run preview` - Preview production build
+- `npm run dev` - Start Electron app in development mode
+- `npm run build` - Build Electron app for production
+- `npm run build:main` - Build main process only
+- `npm run build:renderer` - Build renderer process only
+- `npm run build:electron` - Package Electron app for distribution
+- `npm run preview` - Preview Electron app
 - `npm run lint` - Run linting across all packages
 - `npm run typecheck` - Run TypeScript checking across all packages
 
@@ -162,9 +196,22 @@ All commands are working and tested:
 
 ```
 ccc/
-├── frontend/          # React frontend with XTerm.js
-├── backend/           # Express backend with SQLite
-├── shared/           # Shared TypeScript types
-├── package.json      # Root workspace configuration
+├── frontend/         # React renderer process
+├── main/            # Electron main process
+│   ├── src/
+│   │   ├── index.ts         # Main entry point
+│   │   ├── preload.ts       # Preload script
+│   │   ├── server.ts        # Embedded Express server
+│   │   ├── database/        # SQLite database
+│   │   ├── services/        # Business logic services
+│   │   │   ├── taskQueue.ts # Bull queue for async tasks
+│   │   │   └── ...         # Other service modules
+│   │   ├── routes/          # API routes
+│   │   └── types/           # TypeScript types
+│   └── dist/               # Compiled output
+├── backend/          # Legacy backend (for reference)
+├── shared/          # Shared TypeScript types
+├── dist-electron/   # Packaged Electron app
+├── package.json     # Root workspace configuration
 └── pnpm-workspace.yaml
 ```

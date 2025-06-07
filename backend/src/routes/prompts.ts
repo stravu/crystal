@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { SessionManager } from '../services/sessionManager.js';
-import type { Logger } from '../utils/logger.js';
+import { SessionManager } from '../services/sessionManager';
+import type { Logger } from '../utils/logger';
 
 export function createPromptsRouter(
   sessionManager: SessionManager,

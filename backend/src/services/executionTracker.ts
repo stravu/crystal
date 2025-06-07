@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
-import type { Logger } from '../utils/logger.js';
-import type { SessionManager } from './sessionManager.js';
-import { GitDiffManager, type GitDiffResult } from './gitDiffManager.js';
-import type { CreateExecutionDiffData } from '../database/models.js';
+import type { Logger } from '../utils/logger';
+import type { SessionManager } from './sessionManager';
+import { GitDiffManager, type GitDiffResult } from './gitDiffManager';
+import type { CreateExecutionDiffData } from '../database/models';
 
 interface ExecutionContext {
   sessionId: string;

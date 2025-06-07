@@ -13,6 +13,10 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+dist-electron/
+main/dist/
+frontend/dist/
+backend/dist/
 
 # Logs
 logs/
@@ -49,3 +53,32 @@ coverage/
 # Claude Code session data
 sessions/
 .claude-sessions/
+
+# Electron
+*.dmg
+*.zip
+*.app
+*.exe
+*.deb
+*.AppImage
+*.snap
+*.pacman
+electron-builder.yml
+electron-builder.json5
+
+# Electron Builder directories
+packaged/
+release/
+
+# Local development
+.ccc/
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Backend worktrees directory
+backend/worktrees/
+worktrees/
+
+# Main process (Electron main) - entire directory
+main/

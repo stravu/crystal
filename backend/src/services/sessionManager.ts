@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { spawn, ChildProcess, exec } from 'child_process';
-import type { Session, SessionUpdate, SessionOutput } from '../types/session.js';
-import type { DatabaseService } from '../database/database.js';
-import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from '../database/models.js';
+import type { Session, SessionUpdate, SessionOutput } from '../types/session';
+import type { DatabaseService } from '../database/database';
+import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from '../database/models';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();

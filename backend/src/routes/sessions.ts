@@ -1,14 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { CreateSessionRequest } from '../types/session.js';
-import { SessionManager } from '../services/sessionManager.js';
-import { WorktreeManager } from '../services/worktreeManager.js';
-import { ClaudeCodeManager } from '../services/claudeCodeManager.js';
-import { WorktreeNameGenerator } from '../services/worktreeNameGenerator.js';
-import type { ExecutionTracker } from '../services/executionTracker.js';
-import type { Logger } from '../utils/logger.js';
-import { formatJsonForOutputEnhanced } from '../utils/toolFormatter.js';
+import type { CreateSessionRequest } from '../types/session';
+import { SessionManager } from '../services/sessionManager';
+import { WorktreeManager } from '../services/worktreeManager';
+import { ClaudeCodeManager } from '../services/claudeCodeManager';
+import { WorktreeNameGenerator } from '../services/worktreeNameGenerator';
+import type { ExecutionTracker } from '../services/executionTracker';
+import type { Logger } from '../utils/logger';
+import { formatJsonForOutputEnhanced } from '../utils/toolFormatter';
 
 const execAsync = promisify(exec);
 

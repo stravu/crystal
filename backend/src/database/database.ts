@@ -1,43 +1,25 @@
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { promisify } from 'util';
-import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models.js';
+import type { Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export class DatabaseService {
-  private db: sqlite3.Database;
-  private dbAll: (sql: string, params?: any[]) => Promise<any[]>;
-  private dbGet: (sql: string, params?: any[]) => Promise<any>;
-  private dbRun: (sql: string, params?: any[]) => Promise<{ lastID?: number; changes?: number }>;
+  private db: Database.Database;
 
   constructor(dbPath: string) {
-    this.db = new sqlite3.Database(dbPath);
-    
-    // Promisify database methods
-    this.dbAll = promisify(this.db.all.bind(this.db));
-    this.dbGet = promisify(this.db.get.bind(this.db));
-    
-    // Custom wrapper for run to properly return results
-    this.dbRun = (sql: string, params?: any[]): Promise<{ lastID?: number; changes?: number }> => {
-      return new Promise((resolve, reject) => {
-        this.db.run(sql, params, function(err) {
-          if (err) reject(err);
-          else resolve({ lastID: this.lastID, changes: this.changes });
-        });
-      });
-    };
+    this.db = new Database(dbPath);
   }
 
-  async initialize(): Promise<void> {
-    await this.initializeSchema();
-    await this.runMigrations();
+  initialize(): void {
+    this.initializeSchema();
+    this.runMigrations();
   }
 
-  private async initializeSchema(): Promise<void> {
+  private initializeSchema(): void {
     const schemaPath = join(__dirname, 'schema.sql');
     const schema = readFileSync(schemaPath, 'utf-8');
     
@@ -45,35 +27,35 @@ export class DatabaseService {
     const statements = schema.split(';').filter(stmt => stmt.trim());
     for (const statement of statements) {
       if (statement.trim()) {
-        await this.dbRun(statement.trim());
+        this.db.prepare(statement.trim()).run();
       }
     }
   }
 
-  private async runMigrations(): Promise<void> {
+  private runMigrations(): void {
     // Check if archived column exists
-    const tableInfo = await this.dbAll("PRAGMA table_info(sessions)");
+    const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
     const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
     const hasInitialPromptColumn = tableInfo.some((col: any) => col.name === 'initial_prompt');
     const hasLastViewedAtColumn = tableInfo.some((col: any) => col.name === 'last_viewed_at');
     
     if (!hasArchivedColumn) {
       // Run migration to add archived column
-      await this.dbRun("ALTER TABLE sessions ADD COLUMN archived BOOLEAN DEFAULT 0");
-      await this.dbRun("CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived)");
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN archived BOOLEAN DEFAULT 0").run();
+      this.db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived)").run();
     }
 
     // Check if we need to rename prompt to initial_prompt
     if (!hasInitialPromptColumn) {
       const hasPromptColumn = tableInfo.some((col: any) => col.name === 'prompt');
       if (hasPromptColumn) {
-        await this.dbRun("ALTER TABLE sessions RENAME COLUMN prompt TO initial_prompt");
+        this.db.prepare("ALTER TABLE sessions RENAME COLUMN prompt TO initial_prompt").run();
       }
       
       // Create conversation messages table if it doesn't exist
-      const tables = await this.dbAll("SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_messages'");
+      const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_messages'").all();
       if (tables.length === 0) {
-        await this.dbRun(`
+        this.db.prepare(`
           CREATE TABLE conversation_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
@@ -82,16 +64,16 @@ export class DatabaseService {
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
           )
-        `);
-        await this.dbRun("CREATE INDEX idx_conversation_messages_session_id ON conversation_messages(session_id)");
-        await this.dbRun("CREATE INDEX idx_conversation_messages_timestamp ON conversation_messages(timestamp)");
+        `).run();
+        this.db.prepare("CREATE INDEX idx_conversation_messages_session_id ON conversation_messages(session_id)").run();
+        this.db.prepare("CREATE INDEX idx_conversation_messages_timestamp ON conversation_messages(timestamp)").run();
       }
     }
 
     // Check if prompt_markers table exists
-    const promptMarkersTable = await this.dbAll("SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_markers'");
+    const promptMarkersTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_markers'").all();
     if (promptMarkersTable.length === 0) {
-      await this.dbRun(`
+      this.db.prepare(`
         CREATE TABLE prompt_markers (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           session_id TEXT NOT NULL,
@@ -101,27 +83,27 @@ export class DatabaseService {
           timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
         )
-      `);
-      await this.dbRun("CREATE INDEX idx_prompt_markers_session_id ON prompt_markers(session_id)");
-      await this.dbRun("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)");
+      `).run();
+      this.db.prepare("CREATE INDEX idx_prompt_markers_session_id ON prompt_markers(session_id)").run();
+      this.db.prepare("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)").run();
     } else {
       // Check if the table has the correct column name
-      const promptMarkersInfo = await this.dbAll("PRAGMA table_info(prompt_markers)");
+      const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
       const hasOutputLineColumn = promptMarkersInfo.some((col: any) => col.name === 'output_line');
       const hasTerminalLineColumn = promptMarkersInfo.some((col: any) => col.name === 'terminal_line');
       
       if (hasTerminalLineColumn && !hasOutputLineColumn) {
         // Rename the column from terminal_line to output_line
-        await this.dbRun(`
+        this.db.prepare(`
           ALTER TABLE prompt_markers RENAME COLUMN terminal_line TO output_line
-        `);
+        `).run();
       }
     }
 
     // Check if execution_diffs table exists
-    const executionDiffsTable = await this.dbAll("SELECT name FROM sqlite_master WHERE type='table' AND name='execution_diffs'");
+    const executionDiffsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='execution_diffs'").all();
     if (executionDiffsTable.length === 0) {
-      await this.dbRun(`
+      this.db.prepare(`
         CREATE TABLE execution_diffs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           session_id TEXT NOT NULL,
@@ -138,46 +120,46 @@ export class DatabaseService {
           FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
           FOREIGN KEY (prompt_marker_id) REFERENCES prompt_markers(id) ON DELETE SET NULL
         )
-      `);
-      await this.dbRun("CREATE INDEX idx_execution_diffs_session_id ON execution_diffs(session_id)");
-      await this.dbRun("CREATE INDEX idx_execution_diffs_prompt_marker_id ON execution_diffs(prompt_marker_id)");
-      await this.dbRun("CREATE INDEX idx_execution_diffs_timestamp ON execution_diffs(timestamp)");
-      await this.dbRun("CREATE INDEX idx_execution_diffs_sequence ON execution_diffs(session_id, execution_sequence)");
+      `).run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_session_id ON execution_diffs(session_id)").run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_prompt_marker_id ON execution_diffs(prompt_marker_id)").run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_timestamp ON execution_diffs(timestamp)").run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_sequence ON execution_diffs(session_id, execution_sequence)").run();
     }
 
     // Add last_viewed_at column if it doesn't exist
     if (!hasLastViewedAtColumn) {
-      await this.dbRun("ALTER TABLE sessions ADD COLUMN last_viewed_at TEXT");
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at TEXT").run();
     }
   }
 
   // Session operations
-  async createSession(data: CreateSessionData): Promise<Session> {
-    await this.dbRun(`
+  createSession(data: CreateSessionData): Session {
+    this.db.prepare(`
       INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status)
       VALUES (?, ?, ?, ?, ?, 'pending')
-    `, [data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path]);
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path);
     
-    const session = await this.getSession(data.id);
+    const session = this.getSession(data.id);
     if (!session) {
       throw new Error('Failed to create session');
     }
     return session;
   }
 
-  async getSession(id: string): Promise<Session | undefined> {
-    return await this.dbGet('SELECT * FROM sessions WHERE id = ?', [id]) as Session | undefined;
+  getSession(id: string): Session | undefined {
+    return this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Session | undefined;
   }
 
-  async getAllSessions(): Promise<Session[]> {
-    return await this.dbAll('SELECT * FROM sessions WHERE archived = 0 OR archived IS NULL ORDER BY created_at DESC') as Session[];
+  getAllSessions(): Session[] {
+    return this.db.prepare('SELECT * FROM sessions WHERE archived = 0 OR archived IS NULL ORDER BY created_at DESC').all() as Session[];
   }
 
-  async getAllSessionsIncludingArchived(): Promise<Session[]> {
-    return await this.dbAll('SELECT * FROM sessions ORDER BY created_at DESC') as Session[];
+  getAllSessionsIncludingArchived(): Session[] {
+    return this.db.prepare('SELECT * FROM sessions ORDER BY created_at DESC').all() as Session[];
   }
 
-  async updateSession(id: string, data: UpdateSessionData): Promise<Session | undefined> {
+  updateSession(id: string, data: UpdateSessionData): Session | undefined {
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -199,142 +181,142 @@ export class DatabaseService {
     }
 
     if (updates.length === 0) {
-      return await this.getSession(id);
+      return this.getSession(id);
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
 
-    await this.dbRun(`
+    this.db.prepare(`
       UPDATE sessions 
       SET ${updates.join(', ')} 
       WHERE id = ?
-    `, values);
+    `).run(...values);
     
-    return await this.getSession(id);
+    return this.getSession(id);
   }
 
-  async markSessionAsViewed(id: string): Promise<Session | undefined> {
-    await this.dbRun(`
+  markSessionAsViewed(id: string): Session | undefined {
+    this.db.prepare(`
       UPDATE sessions 
       SET last_viewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `, [id]);
+    `).run(id);
     
-    return await this.getSession(id);
+    return this.getSession(id);
   }
 
-  async archiveSession(id: string): Promise<boolean> {
-    const result = await this.dbRun('UPDATE sessions SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
-    return (result.changes || 0) > 0;
+  archiveSession(id: string): boolean {
+    const result = this.db.prepare('UPDATE sessions SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    return result.changes > 0;
   }
 
   // Session output operations
-  async addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json', data: string): Promise<void> {
-    await this.dbRun(`
+  addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json', data: string): void {
+    this.db.prepare(`
       INSERT INTO session_outputs (session_id, type, data)
       VALUES (?, ?, ?)
-    `, [sessionId, type, data]);
+    `).run(sessionId, type, data);
   }
 
-  async getSessionOutputs(sessionId: string, limit?: number): Promise<SessionOutput[]> {
+  getSessionOutputs(sessionId: string, limit?: number): SessionOutput[] {
     const limitClause = limit ? `LIMIT ${limit}` : '';
-    return await this.dbAll(`
+    return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE session_id = ? 
       ORDER BY timestamp ASC 
       ${limitClause}
-    `, [sessionId]) as SessionOutput[];
+    `).all(sessionId) as SessionOutput[];
   }
 
-  async getRecentSessionOutputs(sessionId: string, since?: Date): Promise<SessionOutput[]> {
+  getRecentSessionOutputs(sessionId: string, since?: Date): SessionOutput[] {
     if (since) {
-      return await this.dbAll(`
+      return this.db.prepare(`
         SELECT * FROM session_outputs 
         WHERE session_id = ? AND timestamp > ? 
         ORDER BY timestamp ASC
-      `, [sessionId, since.toISOString()]) as SessionOutput[];
+      `).all(sessionId, since.toISOString()) as SessionOutput[];
     } else {
-      return await this.getSessionOutputs(sessionId);
+      return this.getSessionOutputs(sessionId);
     }
   }
 
-  async clearSessionOutputs(sessionId: string): Promise<void> {
-    await this.dbRun('DELETE FROM session_outputs WHERE session_id = ?', [sessionId]);
+  clearSessionOutputs(sessionId: string): void {
+    this.db.prepare('DELETE FROM session_outputs WHERE session_id = ?').run(sessionId);
   }
 
   // Conversation message operations
-  async addConversationMessage(sessionId: string, messageType: 'user' | 'assistant', content: string): Promise<void> {
-    await this.dbRun(`
+  addConversationMessage(sessionId: string, messageType: 'user' | 'assistant', content: string): void {
+    this.db.prepare(`
       INSERT INTO conversation_messages (session_id, message_type, content)
       VALUES (?, ?, ?)
-    `, [sessionId, messageType, content]);
+    `).run(sessionId, messageType, content);
   }
 
-  async getConversationMessages(sessionId: string): Promise<ConversationMessage[]> {
-    return await this.dbAll(`
+  getConversationMessages(sessionId: string): ConversationMessage[] {
+    return this.db.prepare(`
       SELECT * FROM conversation_messages 
       WHERE session_id = ? 
       ORDER BY timestamp ASC
-    `, [sessionId]) as ConversationMessage[];
+    `).all(sessionId) as ConversationMessage[];
   }
 
-  async clearConversationMessages(sessionId: string): Promise<void> {
-    await this.dbRun('DELETE FROM conversation_messages WHERE session_id = ?', [sessionId]);
+  clearConversationMessages(sessionId: string): void {
+    this.db.prepare('DELETE FROM conversation_messages WHERE session_id = ?').run(sessionId);
   }
 
   // Cleanup operations
-  async getActiveSessions(): Promise<Session[]> {
-    return await this.dbAll("SELECT * FROM sessions WHERE status IN ('running', 'pending')") as Session[];
+  getActiveSessions(): Session[] {
+    return this.db.prepare("SELECT * FROM sessions WHERE status IN ('running', 'pending')").all() as Session[];
   }
 
-  async markSessionsAsStopped(sessionIds: string[]): Promise<void> {
+  markSessionsAsStopped(sessionIds: string[]): void {
     if (sessionIds.length === 0) return;
     
     const placeholders = sessionIds.map(() => '?').join(',');
-    await this.dbRun(`
+    this.db.prepare(`
       UPDATE sessions 
       SET status = 'stopped', updated_at = CURRENT_TIMESTAMP 
       WHERE id IN (${placeholders})
-    `, sessionIds);
+    `).run(...sessionIds);
   }
 
   // Prompt marker operations
-  async addPromptMarker(sessionId: string, promptText: string, outputIndex: number, outputLine?: number): Promise<number> {
-    const result = await this.dbRun(`
+  addPromptMarker(sessionId: string, promptText: string, outputIndex: number, outputLine?: number): number {
+    const result = this.db.prepare(`
       INSERT INTO prompt_markers (session_id, prompt_text, output_index, output_line)
       VALUES (?, ?, ?, ?)
-    `, [sessionId, promptText, outputIndex, outputLine]);
+    `).run(sessionId, promptText, outputIndex, outputLine);
     
-    return result.lastID!;
+    return result.lastInsertRowid as number;
   }
 
-  async getPromptMarkers(sessionId: string): Promise<PromptMarker[]> {
-    return await this.dbAll(`
+  getPromptMarkers(sessionId: string): PromptMarker[] {
+    return this.db.prepare(`
       SELECT * FROM prompt_markers 
       WHERE session_id = ? 
       ORDER BY timestamp ASC
-    `, [sessionId]) as PromptMarker[];
+    `).all(sessionId) as PromptMarker[];
   }
 
-  async updatePromptMarkerLine(id: number, outputLine: number): Promise<void> {
-    await this.dbRun(`
+  updatePromptMarkerLine(id: number, outputLine: number): void {
+    this.db.prepare(`
       UPDATE prompt_markers 
       SET output_line = ? 
       WHERE id = ?
-    `, [outputLine, id]);
+    `).run(outputLine, id);
   }
 
   // Execution diff operations
-  async createExecutionDiff(data: CreateExecutionDiffData): Promise<ExecutionDiff> {
-    const result = await this.dbRun(`
+  createExecutionDiff(data: CreateExecutionDiffData): ExecutionDiff {
+    const result = this.db.prepare(`
       INSERT INTO execution_diffs (
         session_id, prompt_marker_id, execution_sequence, git_diff, 
         files_changed, stats_additions, stats_deletions, stats_files_changed,
         before_commit_hash, after_commit_hash
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
+    `).run(
       data.session_id,
       data.prompt_marker_id || null,
       data.execution_sequence,
@@ -345,33 +327,33 @@ export class DatabaseService {
       data.stats_files_changed || 0,
       data.before_commit_hash || null,
       data.after_commit_hash || null
-    ]);
+    );
 
-    const diff = await this.dbGet('SELECT * FROM execution_diffs WHERE id = ?', [result.lastID!]);
+    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
     return this.convertDbExecutionDiff(diff);
   }
 
-  async getExecutionDiffs(sessionId: string): Promise<ExecutionDiff[]> {
-    const rows = await this.dbAll(`
+  getExecutionDiffs(sessionId: string): ExecutionDiff[] {
+    const rows = this.db.prepare(`
       SELECT * FROM execution_diffs 
       WHERE session_id = ? 
       ORDER BY execution_sequence ASC
-    `, [sessionId]);
+    `).all(sessionId);
     
     return rows.map(this.convertDbExecutionDiff);
   }
 
-  async getExecutionDiff(id: number): Promise<ExecutionDiff | undefined> {
-    const row = await this.dbGet('SELECT * FROM execution_diffs WHERE id = ?', [id]);
+  getExecutionDiff(id: number): ExecutionDiff | undefined {
+    const row = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(id);
     return row ? this.convertDbExecutionDiff(row) : undefined;
   }
 
-  async getNextExecutionSequence(sessionId: string): Promise<number> {
-    const result = await this.dbGet(`
+  getNextExecutionSequence(sessionId: string): number {
+    const result = this.db.prepare(`
       SELECT MAX(execution_sequence) as max_seq 
       FROM execution_diffs 
       WHERE session_id = ?
-    `, [sessionId]);
+    `).get(sessionId) as any;
     
     return (result?.max_seq || 0) + 1;
   }

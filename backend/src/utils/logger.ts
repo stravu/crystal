@@ -1,4 +1,4 @@
-import type { ConfigManager } from '../services/configManager.js';
+import type { ConfigManager } from '../services/configManager';
 
 export class Logger {
   constructor(private configManager: ConfigManager) {}

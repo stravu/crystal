@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
 import * as pty from 'node-pty';
-import type { Logger } from '../utils/logger.js';
-import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../utils/claudeCodeTest.js';
-import type { ConfigManager } from './configManager.js';
+import type { Logger } from '../utils/logger';
+import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../utils/claudeCodeTest';
+import type { ConfigManager } from './configManager';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;

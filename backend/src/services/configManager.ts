@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import type { AppConfig } from '../types/config.js';
+import type { AppConfig } from '../types/config';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';

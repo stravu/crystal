@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import type { Logger } from '../utils/logger.js';
+import type { Logger } from '../utils/logger';
 
 export interface GitDiffStats {
   additions: number;

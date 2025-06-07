@@ -10,7 +10,7 @@ export function useSocket() {
   
   useEffect(() => {
     if (!socket) {
-      socket = io('http://localhost:3521');
+      socket = io('http://localhost:3001');
       
       socket.on('connect', () => {
         console.log('Connected to server');
