@@ -31,16 +31,12 @@ cd crystal
 pnpm install
 ```
 
-3. Build the project:
-```bash
-pnpm run build
-```
+The installation process will automatically:
+- Download Electron binaries
+- Rebuild native modules for Electron compatibility
+- Set up all required dependencies
 
-4. Rebuild native modules for Electron:
-```bash
-npx electron-rebuild -f -w better-sqlite3
-npx electron-rebuild -f -w @homebridge/node-pty-prebuilt-multiarch
-```
+**Note**: If you encounter any issues during installation, the postinstall script will attempt to fix them automatically. For manual troubleshooting, see the Troubleshooting section below.
 
 ## Running the Application
 
@@ -158,22 +154,32 @@ Enable detailed logging for debugging:
 
 ## Troubleshooting
 
-### Electron Installation Issues
+### Common Installation Issues
 
-If Electron fails to install:
+The postinstall script should handle most issues automatically, but if you encounter problems:
 
+#### Electron Binary Not Downloaded
+This happens when pnpm's security features prevent the Electron postinstall script from running:
 ```bash
-cd node_modules/.pnpm/electron@*/node_modules/electron
-node install.js
+# The fix-electron-install.js script handles this automatically, but you can run manually:
+node scripts/fix-electron-install.js
 ```
 
-### Native Module Issues
-
-If you encounter native module errors (node-pty, better-sqlite3):
-
+#### Native Module Compilation Errors
+Native modules like better-sqlite3 need to be compiled for Electron's Node.js version:
 ```bash
-npx electron-rebuild -f -w better-sqlite3
-npx electron-rebuild -f -w @homebridge/node-pty-prebuilt-multiarch
+# This is handled by the postinstall script, but you can run manually:
+npx electron-rebuild -f
+```
+
+#### pnpm Module Resolution Issues
+If you see "Could not locate the bindings file" errors:
+```bash
+# Ensure .npmrc exists with proper settings:
+echo "shamefully-hoist=true" >> .npmrc
+echo "enable-pre-post-scripts=true" >> .npmrc
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
 ```
 
 ### Database Issues

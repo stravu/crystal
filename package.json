@@ -15,7 +15,7 @@
     "preview": "pnpm run build:main && pnpm run build:renderer && NODE_ENV=production electron main/dist/index.js",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
-    "postinstall": "electron-builder install-app-deps && electron-rebuild"
+    "postinstall": "electron-builder install-app-deps && electron-rebuild && node scripts/fix-electron-install.js"
   },
   "keywords": ["claude", "code", "git", "worktree", "development", "electron"],
   "author": "",
