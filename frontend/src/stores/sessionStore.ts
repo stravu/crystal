@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Session, SessionOutput } from '../types/session';
+import { apiFetch } from '../utils/api';
 
 interface CreateSessionRequest {
   prompt: string;
@@ -86,7 +87,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   createSession: async (request) => {
     try {
-      const response = await fetch('/api/sessions', {
+      const response = await apiFetch('/api/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   markSessionAsViewed: async (sessionId) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/view`, {
+      const response = await apiFetch(`/api/sessions/${sessionId}/view`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

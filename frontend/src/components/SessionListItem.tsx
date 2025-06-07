@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { StatusIndicator } from './StatusIndicator';
+import { apiFetch } from '../utils/api';
 import type { Session } from '../types/session';
 
 interface SessionListItemProps {
@@ -16,7 +17,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
   
   useEffect(() => {
     // Check if this session's project has a run script
-    fetch(`/api/sessions/${session.id}/has-run-script`)
+    apiFetch(`/api/sessions/${session.id}/has-run-script`)
       .then(res => res.json())
       .then(data => setHasRunScript(data.hasRunScript))
       .catch(console.error);
@@ -24,7 +25,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
 
   useEffect(() => {
     // Check if this session is currently running
-    fetch('/api/sessions/running-session')
+    apiFetch('/api/sessions/running-session')
       .then(res => res.json())
       .then(data => setIsRunning(data.sessionId === session.id))
       .catch(console.error);
@@ -52,7 +53,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
 
     try {
       // First stop any currently running script
-      await fetch('/api/sessions/stop-script', {
+      await apiFetch('/api/sessions/stop-script', {
         method: 'POST',
       });
       
@@ -60,7 +61,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
       useSessionStore.getState().clearScriptOutput(session.id);
       
       // Then run the script for this session
-      const response = await fetch(`/api/sessions/${session.id}/run-script`, {
+      const response = await apiFetch(`/api/sessions/${session.id}/run-script`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,7 +86,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
     
     try {
       console.log('Stopping script...');
-      const response = await fetch('/api/sessions/stop-script', {
+      const response = await apiFetch('/api/sessions/stop-script', {
         method: 'POST',
       });
 
@@ -110,7 +111,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
     
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/sessions/${session.id}`, {
+      const response = await apiFetch(`/api/sessions/${session.id}`, {
         method: 'DELETE',
       });
       

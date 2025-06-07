@@ -5,12 +5,22 @@ import type { Session, SessionOutput } from '../types/session';
 
 let socket: Socket | null = null;
 
+// Get the correct socket URL based on environment
+const getSocketUrl = () => {
+  // In production (Electron), always use localhost:3001
+  if (window.location.protocol === 'file:') {
+    return 'http://localhost:3001';
+  }
+  // In development, also use localhost:3001 explicitly
+  return 'http://localhost:3001';
+};
+
 export function useSocket() {
   const { setSessions, loadSessions, addSession, updateSession, deleteSession, addSessionOutput } = useSessionStore();
   
   useEffect(() => {
     if (!socket) {
-      socket = io('http://localhost:3001');
+      socket = io(getSocketUrl());
       
       socket.on('connect', () => {
         console.log('Connected to server');

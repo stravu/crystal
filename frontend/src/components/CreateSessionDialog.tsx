@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 
 interface CreateSessionDialogProps {
@@ -21,7 +22,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
     setIsSubmitting(true);
     
     try {
-      const response = await fetch('/api/sessions', {
+      const response = await apiFetch('/api/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

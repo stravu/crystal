@@ -6,6 +6,7 @@ import { JsonMessageView } from './JsonMessageView';
 import { StatusIndicator } from './StatusIndicator';
 import { PromptNavigation } from './PromptNavigation';
 import CombinedDiffView from './CombinedDiffView';
+import { apiFetch } from '../utils/api';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -57,7 +58,7 @@ export function SessionView() {
     setLoadError(null);
     
     try {
-      const response = await fetch(`/api/sessions/${activeSession.id}/output`);
+      const response = await apiFetch(`/api/sessions/${activeSession.id}/output`);
       if (!response.ok) {
         throw new Error(`Failed to load output: ${response.statusText}`);
       }
@@ -374,7 +375,7 @@ export function SessionView() {
     if (!input.trim()) return;
     
     try {
-      const response = await fetch(`/api/sessions/${activeSession.id}/input`, {
+      const response = await apiFetch(`/api/sessions/${activeSession.id}/input`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -396,7 +397,7 @@ export function SessionView() {
     if (!input.trim()) return;
     
     try {
-      const response = await fetch(`/api/sessions/${activeSession.id}/continue`, {
+      const response = await apiFetch(`/api/sessions/${activeSession.id}/continue`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -424,7 +425,7 @@ export function SessionView() {
 
   const handleStopSession = async () => {
     try {
-      const response = await fetch(`/api/sessions/${activeSession.id}/stop`, {
+      const response = await apiFetch(`/api/sessions/${activeSession.id}/stop`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -444,7 +445,7 @@ export function SessionView() {
     setMergeError(null);
     
     try {
-      const response = await fetch(`/api/sessions/${activeSession.id}/merge-main-to-worktree`, {
+      const response = await apiFetch(`/api/sessions/${activeSession.id}/merge-main-to-worktree`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -473,7 +474,7 @@ export function SessionView() {
     setMergeError(null);
     
     try {
-      const response = await fetch(`/api/sessions/${activeSession.id}/merge-worktree-to-main`, {
+      const response = await apiFetch(`/api/sessions/${activeSession.id}/merge-worktree-to-main`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
