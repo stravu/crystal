@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { StatusIndicator } from './StatusIndicator';
 import type { Session } from '../types/session';
-import type { AppConfig } from '../types/config';
 
 interface SessionListItemProps {
   session: Session;
@@ -12,16 +11,16 @@ export function SessionListItem({ session }: SessionListItemProps) {
   const { activeSessionId, setActiveSession } = useSessionStore();
   const isActive = activeSessionId === session.id;
   const [isDeleting, setIsDeleting] = useState(false);
-  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [hasRunScript, setHasRunScript] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   
   useEffect(() => {
-    // Load config to check if run script is available
-    fetch('/api/config')
+    // Check if this session's project has a run script
+    fetch(`/api/sessions/${session.id}/has-run-script`)
       .then(res => res.json())
-      .then(data => setConfig(data))
+      .then(data => setHasRunScript(data.hasRunScript))
       .catch(console.error);
-  }, []);
+  }, [session.id]);
 
   useEffect(() => {
     // Check if this session is currently running
@@ -46,8 +45,8 @@ export function SessionListItem({ session }: SessionListItemProps) {
   const handleRunScript = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!config?.runScript || config.runScript.length === 0) {
-      alert('No run script configured. Please configure run script in Settings.');
+    if (!hasRunScript) {
+      alert('No run script configured for this project. Please configure run script in Project Settings.');
       return;
     }
 
@@ -66,7 +65,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ commands: config.runScript }),
+        body: JSON.stringify({}), // Project-specific commands are fetched on the backend
       });
 
       if (!response.ok) {
@@ -152,7 +151,7 @@ export function SessionListItem({ session }: SessionListItemProps) {
         )}
       </button>
       <div className="flex items-center space-x-1">
-        {config?.runScript && config.runScript.length > 0 && (
+        {hasRunScript && (
           <button
             onClick={isRunning ? handleStopScript : handleRunScript}
             className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${

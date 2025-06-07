@@ -10,11 +10,9 @@ interface SettingsProps {
 
 export function Settings({ isOpen, onClose }: SettingsProps) {
   const [_config, setConfig] = useState<AppConfig | null>(null);
-  const [gitRepoPath, setGitRepoPath] = useState('');
   const [verbose, setVerbose] = useState(false);
   const [openaiApiKey, setOpenaiApiKey] = useState('');
-  const [systemPromptAppend, setSystemPromptAppend] = useState('');
-  const [runScript, setRunScript] = useState<string[]>([]);
+  const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications'>('general');
@@ -32,11 +30,9 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       if (!response.ok) throw new Error('Failed to fetch config');
       const data = await response.json();
       setConfig(data);
-      setGitRepoPath(data.gitRepoPath);
       setVerbose(data.verbose || false);
       setOpenaiApiKey(data.openaiApiKey || '');
-      setSystemPromptAppend(data.systemPromptAppend || '');
-      setRunScript(data.runScript || []);
+      setGlobalSystemPrompt(data.systemPromptAppend || '');
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -53,7 +49,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ gitRepoPath, verbose, openaiApiKey, systemPromptAppend, runScript }),
+        body: JSON.stringify({ verbose, openaiApiKey, systemPromptAppend: globalSystemPrompt }),
       });
 
       if (!response.ok) {
@@ -114,23 +110,6 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
         {activeTab === 'general' ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="gitRepoPath" className="block text-sm font-medium text-gray-700 mb-1">
-              Git Repository Path
-            </label>
-            <input
-              id="gitRepoPath"
-              type="text"
-              value={gitRepoPath}
-              onChange={(e) => setGitRepoPath(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              placeholder="/path/to/your/git/repo"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              The path to the git repository where worktrees will be created
-            </p>
-          </div>
 
           <div>
             <label className="flex items-center space-x-2">
@@ -165,70 +144,22 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
           </div>
 
           <div>
-            <label htmlFor="systemPromptAppend" className="block text-sm font-medium text-gray-700 mb-1">
-              System Prompt Append (Optional)
+            <label htmlFor="globalSystemPrompt" className="block text-sm font-medium text-gray-700 mb-1">
+              Global System Prompt (Optional)
             </label>
             <textarea
-              id="systemPromptAppend"
-              value={systemPromptAppend}
-              onChange={(e) => setSystemPromptAppend(e.target.value)}
+              id="globalSystemPrompt"
+              value={globalSystemPrompt}
+              onChange={(e) => setGlobalSystemPrompt(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
               placeholder="Additional instructions to append to every prompt..."
               rows={3}
             />
             <p className="text-xs text-gray-500 mt-1">
-              This text will be automatically appended to every initial prompt sent to Claude Code. Useful for enforcing coding standards, preferences, or project-specific instructions.
+              This text will be automatically appended to every initial prompt sent to Claude Code across ALL projects. For project-specific prompts, use the project settings.
             </p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Run Script Commands
-            </label>
-            <div className="space-y-2">
-              {runScript.map((command, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={command}
-                    onChange={(e) => {
-                      const newCommands = [...runScript];
-                      newCommands[index] = e.target.value;
-                      setRunScript(newCommands);
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                    placeholder="npm run dev"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newCommands = runScript.filter((_, i) => i !== index);
-                      setRunScript(newCommands);
-                    }}
-                    className="p-2 text-red-600 hover:text-red-800"
-                    title="Remove command"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setRunScript([...runScript, ''])}
-                className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>Add Command</span>
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Commands to run your code. Only one session can be running at a time. Examples: npm run dev, python app.py, cargo run
-            </p>
-          </div>
 
           {error && (
             <div className="text-red-600 text-sm">{error}</div>

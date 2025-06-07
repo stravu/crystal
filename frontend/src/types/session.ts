@@ -12,6 +12,7 @@ export interface Session {
   error?: string;
   isRunning?: boolean;
   lastViewedAt?: string;
+  projectId?: number;
 }
 
 export interface CreateSessionRequest {

@@ -1,3 +1,14 @@
+export interface Project {
+  id: number;
+  name: string;
+  path: string;
+  system_prompt?: string;
+  run_script?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Session {
   id: string;
   name: string;
@@ -12,6 +23,7 @@ export interface Session {
   pid?: number;
   archived?: boolean;
   last_viewed_at?: string;
+  project_id?: number;
 }
 
 export interface SessionOutput {
@@ -36,6 +48,7 @@ export interface CreateSessionData {
   initial_prompt: string;
   worktree_name: string;
   worktree_path: string;
+  project_id: number;
 }
 
 export interface UpdateSessionData {
