@@ -8,11 +8,8 @@
 ## Build Steps
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build main process (required before running Electron)
-pnpm run build:main
+# One-time setup (install, build, and rebuild native modules)
+pnpm run setup
 
 # Run as Electron app in development mode
 pnpm electron-dev

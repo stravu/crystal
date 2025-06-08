@@ -28,12 +28,15 @@
     "preview": "pnpm run --filter frontend preview",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "electron:rebuild": "cd main && electron-rebuild -f -w better-sqlite3",
+    "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
     "electron": "^36.4.0",
     "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
     "wait-on": "^8.0.1"
@@ -49,6 +52,8 @@
       "frontend/dist/**/*",
       "package.json"
     ],
+    "npmRebuild": true,
+    "buildDependenciesFromSource": false,
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "frontend/public/icon.icns"
