@@ -9,6 +9,6 @@
 | Auto-collapse Prompt History | Auto-collapse the empty "Prompt History" panel and reopen it only after a prompt exists | ✅ | ✅ | 1. Added auto-collapse logic 2. Checks for prompts every 5s 3. Manual toggle tracking | Panel auto-expands when prompts detected, respects manual toggle | Clean UX with automatic behavior |
 | Unread Activity Badges | Display unread-activity badges on tabs that aren't in view | ✅ | ✅ | 1. Added state tracking 2. Red dot badges 3. Clear on tab view | Red dots appear on tabs with new content | Badges clear when tab is viewed |
 | Side-by-side Diff Toggle | Offer a side-by-side diff toggle and remember the user's last choice | ✅ | ✅ | 1. Added toggle buttons 2. localStorage preference 3. CSS for split view | Toggle switches between unified/split, preference persists | Clean toggle UI with icons |
-| Auto-growing Textarea | Expand the bottom prompt input into an auto-growing textarea and send on ⌘↵ | ❌ | ❌ | - | - | - |
+| Auto-growing Textarea | Expand the bottom prompt input into an auto-growing textarea and send on ⌘↵ | ✅ | ✅ | 1. Added auto-resize logic 2. Changed to Cmd+Enter 3. Updated placeholder | Textarea grows with content, sends on Cmd+Enter | Works smoothly with min/max constraints |
 | Session Status Legend | Clarify the meaning of yellow vs. grey dots in the Sessions list with a tooltip legend or distinct icons | ❌ | ❌ | - | - | - |
 | Plural Grammar Fix | Fix singular/plural grammar in the file-change stats | ❌ | ❌ | - | - | - |
