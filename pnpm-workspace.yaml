@@ -1,8 +1,0 @@
-packages:
-  - frontend
-  - backend
-  - shared
-  - main
-ignoredBuiltDependencies:
-  - better-sqlite3
-  - electron
