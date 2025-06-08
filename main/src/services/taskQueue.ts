@@ -135,7 +135,7 @@ export class TaskQueue {
         const worktreePath = await worktreeManager.createWorktree(activeProject.path, worktreeName);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
         
-        const sessionName = `Session: ${prompt.substring(0, 50)}...`;
+        const sessionName = `${prompt.substring(0, 50)}...`;
         console.log(`[TaskQueue] Creating session in database`);
         
         const session = await sessionManager.createSession(
