@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18+ 
+- Node.js 22.15.1
 - pnpm (`npm install -g pnpm`)
 
 ## Build Steps
@@ -10,6 +10,9 @@
 ```bash
 # Install dependencies
 pnpm install
+
+# Build main process (required before running Electron)
+pnpm run build:main
 
 # Run as Electron app in development mode
 pnpm electron-dev
@@ -26,6 +29,8 @@ pnpm typecheck
 # Linting
 pnpm lint
 ```
+
+**Note:** You must run `pnpm run build:main` at least once before running `pnpm electron-dev` to compile the main process.
 
 ## Building Packaged Electron App
 

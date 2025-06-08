@@ -6,6 +6,13 @@
   "author": "Crystal Team",
   "license": "MIT",
   "main": "main/dist/index.js",
+  "engines": {
+    "node": "22.15.1",
+    "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron"]
+  },
   "type": "module",
   "scripts": {
     "dev": "pnpm run --filter frontend dev",
