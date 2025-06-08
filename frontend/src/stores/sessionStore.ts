@@ -22,6 +22,7 @@ interface SessionStore {
   setActiveSession: (sessionId: string | null) => void;
   addSessionOutput: (output: SessionOutput) => void;
   setSessionOutput: (sessionId: string, output: string) => void;
+  clearSessionOutput: (sessionId: string) => void;
   addScriptOutput: (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => void;
   clearScriptOutput: (sessionId: string) => void;
   getScriptOutput: (sessionId: string) => string[];
@@ -85,6 +86,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     )
   })),
   
+  clearSessionOutput: (sessionId) => set((state) => ({
+    sessions: state.sessions.map(session => 
+      session.id === sessionId
+        ? { ...session, output: [], jsonMessages: [] }
+        : session
+    )
+  })),
+  
   createSession: async (request) => {
     try {
       const response = await API.sessions.create(request);
@@ -100,18 +109,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  addScriptOutput: (output) => {
-    console.log('Adding script output to store for session', output.sessionId, ':', output.data.substring(0, 100));
-    return set((state) => ({
-      scriptOutput: {
-        ...state.scriptOutput,
-        [output.sessionId]: [
-          ...(state.scriptOutput[output.sessionId] || []),
-          output.data
-        ]
-      }
-    }));
-  },
+  addScriptOutput: (output) => set((state) => ({
+    scriptOutput: {
+      ...state.scriptOutput,
+      [output.sessionId]: [
+        ...(state.scriptOutput[output.sessionId] || []),
+        output.data
+      ]
+    }
+  })),
 
   clearScriptOutput: (sessionId: string) => set((state) => ({
     scriptOutput: {

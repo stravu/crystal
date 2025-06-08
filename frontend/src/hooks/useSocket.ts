@@ -42,13 +42,12 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionsLoaded);
 
     const unsubscribeSessionOutput = window.electronAPI.events.onSessionOutput((output: SessionOutput) => {
-      console.log('Received session output:', output);
+      // Only add output to session store - the SessionView will handle filtering for display
       addSessionOutput(output);
     });
     unsubscribeFunctions.push(unsubscribeSessionOutput);
 
     const unsubscribeScriptOutput = window.electronAPI.events.onScriptOutput((output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
-      console.log('Received script output for session', output.sessionId, ':', output.data.substring(0, 100));
       // Store script output in session store for display
       useSessionStore.getState().addScriptOutput(output);
     });
@@ -69,12 +68,9 @@ export function useSocket() {
         console.error('Failed to load initial sessions:', error);
       });
 
-    console.log('Connected to Electron IPC events');
-
     return () => {
       // Clean up all event listeners
       unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-      console.log('Disconnected from Electron IPC events');
     };
   }, [setSessions, loadSessions, addSession, updateSession, deleteSession, addSessionOutput]);
   

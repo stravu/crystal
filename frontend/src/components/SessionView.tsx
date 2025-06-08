@@ -12,9 +12,14 @@ import '@xterm/xterm/css/xterm.css';
 export function SessionView() {
   const activeSession = useSessionStore((state) => state.getActiveSession());
   
+  // Track previous session ID to detect changes
+  const previousSessionIdRef = useRef<string | null>(null);
+  
+  
   // Instead of subscribing to script output, we'll get it when needed
   const [scriptOutput, setScriptOutput] = useState<string[]>([]);
   const [formattedOutput, setFormattedOutput] = useState<string>('');
+  const [currentSessionIdForOutput, setCurrentSessionIdForOutput] = useState<string | null>(null);
   
   // Subscribe to script output changes manually
   useEffect(() => {
@@ -35,30 +40,90 @@ export function SessionView() {
     return unsubscribe;
   }, [activeSession?.id]);
   
-  // Format JSON messages for terminal display whenever they change
+  // Clear terminal immediately when session changes, then format new content
   useEffect(() => {
+    const currentSessionId = activeSession?.id || null;
+    const previousSessionId = previousSessionIdRef.current;
+    
+    // Update the previous session ID for next comparison
+    previousSessionIdRef.current = currentSessionId;
+    
+    // Only clear and reload if the session actually changed
+    if (currentSessionId === previousSessionId) {
+      return;
+    }
+    
     if (!activeSession) {
       setFormattedOutput('');
+      // Clear terminal immediately
+      if (terminalInstance.current) {
+        terminalInstance.current.clear();
+      }
+      return;
+    }
+    
+    const sessionId = activeSession.id; // Capture the session ID
+    
+    // Immediately clear terminal and output when session changes
+    setFormattedOutput('');
+    setCurrentSessionIdForOutput(sessionId); // Track which session this output belongs to
+    if (terminalInstance.current) {
+      terminalInstance.current.clear();
+    }
+    // Also clear script terminal to prevent cross-session contamination
+    if (scriptTerminalInstance.current) {
+      scriptTerminalInstance.current.reset();
+      scriptTerminalInstance.current.writeln('Terminal ready for script execution...\r\n');
+    }
+    // Reset output length tracking so new content gets written
+    lastProcessedOutputLength.current = 0;
+    lastProcessedScriptOutputLength.current = 0;
+    
+    // Don't format output here - let it happen after loadOutputContent completes
+  }, [activeSession?.id]); // Changed dependency to activeSession?.id to trigger on session change
+  
+  // Separate effect for updating content when messages change (but not clearing)
+  useEffect(() => {
+    if (!activeSession) return;
+    
+    const sessionId = activeSession.id; // Capture the session ID
+    
+    // Skip formatting if terminal was just cleared (output length is 0 after a session switch)
+    if (lastProcessedOutputLength.current === 0 && formattedOutput === '') {
+      // Let the loadOutputContent handle initial formatting
       return;
     }
     
     const formatOutput = async () => {
+      // Get the current session fresh from the store to avoid stale closure
+      const currentActiveSession = useSessionStore.getState().getActiveSession();
+      
+      // Only format if we're still on the same session that triggered this effect
+      if (!currentActiveSession || currentActiveSession.id !== sessionId) {
+        return;
+      }
+      
       const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
       let formatted = '';
       
       // Format JSON messages
-      if (activeSession.jsonMessages) {
-        for (const msg of activeSession.jsonMessages) {
+      if (currentActiveSession.jsonMessages) {
+        for (const msg of currentActiveSession.jsonMessages) {
           formatted += formatJsonForOutputEnhanced(msg);
         }
       }
       
       // Add any non-JSON output
-      if (activeSession.output && activeSession.output.length > 0) {
-        formatted += activeSession.output.join('');
+      if (currentActiveSession.output && currentActiveSession.output.length > 0) {
+        formatted += currentActiveSession.output.join('');
       }
       
-      setFormattedOutput(formatted);
+      // Only set the formatted output if we're still on the same session
+      const finalActiveSession = useSessionStore.getState().getActiveSession();
+      if (finalActiveSession && finalActiveSession.id === sessionId) {
+        setFormattedOutput(formatted);
+        setCurrentSessionIdForOutput(sessionId);
+      }
     };
     
     formatOutput();
@@ -80,47 +145,55 @@ export function SessionView() {
   const lastProcessedOutputLength = useRef(0);
   const lastProcessedScriptOutputLength = useRef(0);
   
-  const loadOutputContent = async (retryCount = 0) => {
-    if (!activeSession || !terminalInstance.current) return;
+  const loadOutputContent = async (sessionId: string, retryCount = 0) => {
+    if (!terminalInstance.current) return;
     
     setIsLoadingOutput(true);
     setLoadError(null);
     
     try {
-      const response = await API.sessions.getOutput(activeSession.id);
+      // First, clear any existing output for this session to prevent stale data
+      useSessionStore.getState().clearSessionOutput(sessionId);
+      
+      const response = await API.sessions.getOutput(sessionId);
       if (!response.success) {
         throw new Error(response.error || 'Failed to load output');
       }
       
       const outputs = response.data;
       
-      // Import the formatter
-      const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
-      
-      // Format all outputs for terminal display
-      let terminalOutput = '';
-      const jsonMessages: any[] = [];
-      
-      for (const output of outputs) {
-        if (output.type === 'json') {
-          // Format JSON for terminal display
-          const formatted = formatJsonForOutputEnhanced(output.data);
-          terminalOutput += formatted;
-          // Store the JSON message for the JSON view
-          jsonMessages.push(output);
-        } else {
-          // Regular stdout/stderr
-          terminalOutput += output.data;
-        }
+      // Check if we're still on the same session before adding outputs
+      const currentActiveSession = useSessionStore.getState().getActiveSession();
+      if (!currentActiveSession || currentActiveSession.id !== sessionId) {
+        return;
       }
       
-      // Don't write directly to terminal here - let the formattedOutput effect handle it
-      // This prevents double-writing
-      
-      // Store JSON messages for the JSON Messages view
-      jsonMessages.forEach((jsonOutput: any) => {
-        useSessionStore.getState().addSessionOutput(jsonOutput);
+      // Store outputs for this session
+      outputs.forEach((output: any) => {
+        useSessionStore.getState().addSessionOutput(output);
       });
+      
+      // After loading all outputs, format them for display
+      const sessionAfterLoad = useSessionStore.getState().getActiveSession();
+      if (sessionAfterLoad && sessionAfterLoad.id === sessionId) {
+        const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
+        let formatted = '';
+        
+        // Format JSON messages
+        if (sessionAfterLoad.jsonMessages) {
+          for (const msg of sessionAfterLoad.jsonMessages) {
+            formatted += formatJsonForOutputEnhanced(msg);
+          }
+        }
+        
+        // Add any non-JSON output
+        if (sessionAfterLoad.output && sessionAfterLoad.output.length > 0) {
+          formatted += sessionAfterLoad.output.join('');
+        }
+        
+        setFormattedOutput(formatted);
+        setCurrentSessionIdForOutput(sessionId);
+      }
       
       setLoadError(null);
     } catch (error) {
@@ -128,7 +201,13 @@ export function SessionView() {
       
       if (retryCount < 2) {
         // Retry after a short delay
-        setTimeout(() => loadOutputContent(retryCount + 1), 1000);
+        setTimeout(() => {
+          // Check if still the active session before retrying
+          const currentActiveSession = useSessionStore.getState().getActiveSession();
+          if (currentActiveSession && currentActiveSession.id === sessionId) {
+            loadOutputContent(sessionId, retryCount + 1);
+          }
+        }, 1000);
       } else {
         setLoadError(error instanceof Error ? error.message : 'Failed to load output content');
       }
@@ -187,8 +266,8 @@ export function SessionView() {
     lastProcessedOutputLength.current = 0;
     setFormattedOutput(''); // Reset formatted output
 
-    // Load output content with retry logic
-    loadOutputContent();
+    // Load output content with retry logic - pass session ID to avoid closure issues
+    loadOutputContent(activeSession.id);
   }, [activeSession?.id]);
 
   useEffect(() => {
@@ -279,17 +358,35 @@ export function SessionView() {
   }, [viewMode, activeSession?.id]);
 
   useEffect(() => {
-    if (!terminalInstance.current || !activeSession || !formattedOutput) return;
+    if (!terminalInstance.current) return;
 
-    // Write only new formatted output
-    if (formattedOutput.length > lastProcessedOutputLength.current) {
+    // Get the current active session directly from the store to ensure freshness
+    const currentActiveSession = useSessionStore.getState().getActiveSession();
+    if (!currentActiveSession) return;
+
+    // If we have no formatted output, don't write anything
+    if (!formattedOutput) return;
+
+    // Critical check: Only write if the formatted output belongs to the current session
+    if (currentSessionIdForOutput !== currentActiveSession.id) {
+      return;
+    }
+
+    // If terminal was cleared (lastProcessedOutputLength is 0), write all content
+    // Otherwise, write only new formatted output
+    if (lastProcessedOutputLength.current === 0) {
+      // Write all content after terminal was cleared
+      terminalInstance.current.write(formattedOutput);
+      lastProcessedOutputLength.current = formattedOutput.length;
+      terminalInstance.current.scrollToBottom();
+    } else if (formattedOutput.length > lastProcessedOutputLength.current) {
+      // Write only new content
       const newOutput = formattedOutput.substring(lastProcessedOutputLength.current);
       terminalInstance.current.write(newOutput);
       lastProcessedOutputLength.current = formattedOutput.length;
-      // Scroll to bottom to show latest output
       terminalInstance.current.scrollToBottom();
     }
-  }, [formattedOutput, activeSession?.id]);
+  }, [formattedOutput, activeSession?.id, currentSessionIdForOutput]);
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
@@ -606,8 +703,8 @@ export function SessionView() {
             </div>
             <div className="flex gap-1">
               <button
-                onClick={() => loadOutputContent()}
-                disabled={isLoadingOutput}
+                onClick={() => activeSession && loadOutputContent(activeSession.id)}
+                disabled={isLoadingOutput || !activeSession}
                 className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-50"
                 title="Reload output content"
               >
@@ -650,7 +747,7 @@ export function SessionView() {
                   <p className="text-gray-300 mb-2">Failed to load output content</p>
                   <p className="text-gray-500 text-sm mb-4">{loadError}</p>
                   <button
-                    onClick={() => loadOutputContent()}
+                    onClick={() => activeSession && loadOutputContent(activeSession.id)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
                     Reload Output
