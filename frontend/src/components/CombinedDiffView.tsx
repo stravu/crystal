@@ -113,7 +113,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
             <div className="flex items-center space-x-4 text-sm">
               <span className="text-green-600">+{combinedDiff.stats.additions}</span>
               <span className="text-red-600">-{combinedDiff.stats.deletions}</span>
-              <span className="text-gray-600">{combinedDiff.stats.filesChanged} files</span>
+              <span className="text-gray-600">{combinedDiff.stats.filesChanged} {combinedDiff.stats.filesChanged === 1 ? 'file' : 'files'}</span>
             </div>
           )}
           <div className="flex border border-gray-300 rounded overflow-hidden">

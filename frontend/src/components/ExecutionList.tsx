@@ -36,7 +36,7 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
       <div className="text-sm space-x-3">
         <span className="text-green-600">+{stats_additions}</span>
         <span className="text-red-600">-{stats_deletions}</span>
-        <span className="text-gray-600">{stats_files_changed} files</span>
+        <span className="text-gray-600">{stats_files_changed} {stats_files_changed === 1 ? 'file' : 'files'}</span>
       </div>
     );
   };
