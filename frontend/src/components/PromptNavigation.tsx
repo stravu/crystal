@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from '../utils/formatters';
-import { apiFetch } from '../utils/api';
+import { API } from '../utils/api';
 
 interface PromptMarker {
   id: number;
@@ -27,10 +27,9 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
     const fetchPrompts = async () => {
       setIsLoading(true);
       try {
-        const response = await apiFetch(`/api/sessions/${sessionId}/prompts`);
-        if (response.ok) {
-          const data = await response.json();
-          setPrompts(data);
+        const response = await API.sessions.getPrompts(sessionId);
+        if (response.success) {
+          setPrompts(response.data);
         }
       } catch (error) {
         console.error('Error fetching prompt markers:', error);

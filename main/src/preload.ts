@@ -1,22 +1,103 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Response type for IPC calls
+interface IPCResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Basic app info
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
-  
-  onSessionUpdate: (callback: (data: any) => void) => {
-    ipcRenderer.on('session-update', (_event, data) => callback(data));
+
+  // Session management
+  sessions: {
+    getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-all'),
+    get: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get', sessionId),
+    create: (request: any): Promise<IPCResponse> => ipcRenderer.invoke('sessions:create', request),
+    delete: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:delete', sessionId),
+    sendInput: (sessionId: string, input: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:input', sessionId, input),
+    continue: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId),
+    getOutput: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-output', sessionId),
+    getConversation: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-conversation', sessionId),
+    markViewed: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:mark-viewed', sessionId),
+    stop: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:stop', sessionId),
+    
+    // Execution and Git operations
+    getExecutions: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-executions', sessionId),
+    getExecutionDiff: (sessionId: string, executionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-execution-diff', sessionId, executionId),
+    gitCommit: (sessionId: string, message: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:git-commit', sessionId, message),
+    gitDiff: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:git-diff', sessionId),
+    getCombinedDiff: (sessionId: string, executionIds?: number[]): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-combined-diff', sessionId, executionIds),
+    
+    // Script operations
+    hasRunScript: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:has-run-script', sessionId),
+    getRunningSession: (): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-running-session'),
+    runScript: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:run-script', sessionId),
+    stopScript: (): Promise<IPCResponse> => ipcRenderer.invoke('sessions:stop-script'),
+    
+    // Prompt operations
+    getPrompts: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-prompts', sessionId),
+    
+    // Git merge operations
+    mergeMainToWorktree: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:merge-main-to-worktree', sessionId),
+    mergeWorktreeToMain: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:merge-worktree-to-main', sessionId),
   },
-  
-  onTerminalOutput: (callback: (data: any) => void) => {
-    ipcRenderer.on('terminal-output', (_event, data) => callback(data));
+
+  // Project management
+  projects: {
+    getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('projects:get-all'),
+    getActive: (): Promise<IPCResponse> => ipcRenderer.invoke('projects:get-active'),
+    create: (projectData: any): Promise<IPCResponse> => ipcRenderer.invoke('projects:create', projectData),
+    activate: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:activate', projectId),
+    update: (projectId: string, updates: any): Promise<IPCResponse> => ipcRenderer.invoke('projects:update', projectId, updates),
+    delete: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:delete', projectId),
   },
-  
-  sendInput: (sessionId: string, input: string) => {
-    ipcRenderer.send('session-input', { sessionId, input });
+
+  // Configuration
+  config: {
+    get: (): Promise<IPCResponse> => ipcRenderer.invoke('config:get'),
+    update: (updates: any): Promise<IPCResponse> => ipcRenderer.invoke('config:update', updates),
   },
-  
-  removeAllListeners: (channel: string) => {
-    ipcRenderer.removeAllListeners(channel);
-  }
+
+  // Prompts
+  prompts: {
+    getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-all'),
+  },
+
+  // Event listeners for real-time updates
+  events: {
+    // Session events
+    onSessionCreated: (callback: (session: any) => void) => {
+      ipcRenderer.on('session:created', (_event, session) => callback(session));
+      return () => ipcRenderer.removeAllListeners('session:created');
+    },
+    onSessionUpdated: (callback: (session: any) => void) => {
+      ipcRenderer.on('session:updated', (_event, session) => callback(session));
+      return () => ipcRenderer.removeAllListeners('session:updated');
+    },
+    onSessionDeleted: (callback: (session: any) => void) => {
+      ipcRenderer.on('session:deleted', (_event, session) => callback(session));
+      return () => ipcRenderer.removeAllListeners('session:deleted');
+    },
+    onSessionsLoaded: (callback: (sessions: any[]) => void) => {
+      ipcRenderer.on('sessions:loaded', (_event, sessions) => callback(sessions));
+      return () => ipcRenderer.removeAllListeners('sessions:loaded');
+    },
+    onSessionOutput: (callback: (output: any) => void) => {
+      ipcRenderer.on('session:output', (_event, output) => callback(output));
+      return () => ipcRenderer.removeAllListeners('session:output');
+    },
+    onScriptOutput: (callback: (output: any) => void) => {
+      ipcRenderer.on('script:output', (_event, output) => callback(output));
+      return () => ipcRenderer.removeAllListeners('script:output');
+    },
+
+    // Generic event cleanup
+    removeAllListeners: (channel: string) => {
+      ipcRenderer.removeAllListeners(channel);
+    },
+  },
 });

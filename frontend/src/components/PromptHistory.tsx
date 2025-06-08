@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { API } from '../utils/api';
 
 interface PromptHistoryItem {
   id: string;
@@ -23,9 +24,12 @@ export function PromptHistory() {
   const fetchPromptHistory = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/prompts');
-      const data = await response.json();
-      setPrompts(data);
+      const response = await API.prompts.getAll();
+      if (response.success) {
+        setPrompts(response.data);
+      } else {
+        throw new Error(response.error || 'Failed to fetch prompt history');
+      }
     } catch (error) {
       console.error('Error fetching prompt history:', error);
     } finally {

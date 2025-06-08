@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NotificationSettings } from './NotificationSettings';
 import { useNotifications } from '../hooks/useNotifications';
+import { API } from '../utils/api';
 import type { AppConfig } from '../types/config';
 
 interface SettingsProps {
@@ -27,9 +28,9 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
   const fetchConfig = async () => {
     try {
-      const response = await fetch('/api/config');
-      if (!response.ok) throw new Error('Failed to fetch config');
-      const data = await response.json();
+      const response = await API.config.get();
+      if (!response.success) throw new Error(response.error || 'Failed to fetch config');
+      const data = response.data;
       setConfig(data);
       setVerbose(data.verbose || false);
       setOpenaiApiKey(data.openaiApiKey || '');
@@ -46,21 +47,19 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
     setError(null);
 
     try {
-      const response = await fetch('/api/config', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ verbose, openaiApiKey, systemPromptAppend: globalSystemPrompt, claudeExecutablePath }),
+      const response = await API.config.update({ 
+        verbose, 
+        openaiApiKey, 
+        systemPromptAppend: globalSystemPrompt, 
+        claudeExecutablePath 
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to update configuration');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update configuration');
       }
 
-      const updatedConfig = await response.json();
-      setConfig(updatedConfig);
+      // Refresh config from server
+      await fetchConfig();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update configuration');

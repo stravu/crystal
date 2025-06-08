@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Trash2 } from 'lucide-react';
+import { API } from '../utils/api';
 import type { Project } from '../types/project';
 
 interface ProjectSettingsProps {
@@ -34,20 +35,15 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          path,
-          system_prompt: systemPrompt || null,
-          run_script: runScript || null
-        })
+      const response = await API.projects.update(project.id.toString(), {
+        name,
+        path,
+        system_prompt: systemPrompt || null,
+        run_script: runScript || null
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to update project');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update project');
       }
 
       onUpdate();
@@ -61,13 +57,10 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
 
   const handleDelete = async () => {
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
-        method: 'DELETE'
-      });
+      const response = await API.projects.delete(project.id.toString());
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to delete project');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to delete project');
       }
 
       onDelete();

@@ -1,92 +1,86 @@
 import { useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { useSessionStore } from '../stores/sessionStore';
+import { API } from '../utils/api';
 import type { Session, SessionOutput } from '../types/session';
-
-let socket: Socket | null = null;
-
-// Get the correct socket URL based on environment
-const getSocketUrl = () => {
-  // In production (Electron), always use localhost:3001
-  if (window.location.protocol === 'file:') {
-    return 'http://localhost:3001';
-  }
-  // In development, also use localhost:3001 explicitly
-  return 'http://localhost:3001';
-};
 
 export function useSocket() {
   const { setSessions, loadSessions, addSession, updateSession, deleteSession, addSessionOutput } = useSessionStore();
   
   useEffect(() => {
-    if (!socket) {
-      socket = io(getSocketUrl());
-      
-      socket.on('connect', () => {
-        console.log('Connected to server');
-      });
-      
-      socket.on('sessions:initial', (sessions: Session[]) => {
-        const sessionsWithJsonMessages = sessions.map(session => ({
-          ...session,
-          jsonMessages: session.jsonMessages || []
-        }));
-        loadSessions(sessionsWithJsonMessages); // Use loadSessions to mark as loaded
-      });
-      
-      socket.on('sessions:loaded', (sessions: Session[]) => {
-        const sessionsWithJsonMessages = sessions.map(session => ({
-          ...session,
-          jsonMessages: session.jsonMessages || []
-        }));
-        loadSessions(sessionsWithJsonMessages);
-      });
-      
-      socket.on('session:created', (session: Session) => {
-        addSession({...session, jsonMessages: session.jsonMessages || []});
-      });
-      
-      socket.on('session:updated', (session: Session) => {
-        updateSession({...session, jsonMessages: session.jsonMessages || []});
-      });
-      
-      socket.on('session:deleted', (session: Session) => {
-        deleteSession(session);
-      });
-      
-      socket.on('session:output', (output: SessionOutput) => {
-        console.log('Received session output:', output);
-        addSessionOutput(output);
-      });
-
-      socket.on('script:output', (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
-        console.log('Received script output for session', output.sessionId, ':', output.data.substring(0, 100));
-        // Store script output in session store for display
-        useSessionStore.getState().addScriptOutput(output);
-      });
-      
-      socket.on('disconnect', () => {
-        console.log('Disconnected from server');
-      });
+    // Check if we're in Electron environment
+    if (!window.electronAPI) {
+      console.warn('Electron API not available, events will not work');
+      return;
     }
-    
-    // Add beforeunload handler to stop scripts on page close
-    const handleBeforeUnload = () => {
-      // Send stop script request on page close
-      fetch('/api/sessions/stop-script', { method: 'POST', keepalive: true })
-        .catch(() => {}); // Ignore errors on page close
-    };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    // Set up IPC event listeners
+    const unsubscribeFunctions: (() => void)[] = [];
+
+    // Listen for session events
+    const unsubscribeSessionCreated = window.electronAPI.events.onSessionCreated((session: Session) => {
+      addSession({...session, jsonMessages: session.jsonMessages || []});
+    });
+    unsubscribeFunctions.push(unsubscribeSessionCreated);
+
+    const unsubscribeSessionUpdated = window.electronAPI.events.onSessionUpdated((session: Session) => {
+      updateSession({...session, jsonMessages: session.jsonMessages || []});
+    });
+    unsubscribeFunctions.push(unsubscribeSessionUpdated);
+
+    const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((session: Session) => {
+      deleteSession(session);
+    });
+    unsubscribeFunctions.push(unsubscribeSessionDeleted);
+
+    const unsubscribeSessionsLoaded = window.electronAPI.events.onSessionsLoaded((sessions: Session[]) => {
+      const sessionsWithJsonMessages = sessions.map(session => ({
+        ...session,
+        jsonMessages: session.jsonMessages || []
+      }));
+      loadSessions(sessionsWithJsonMessages);
+    });
+    unsubscribeFunctions.push(unsubscribeSessionsLoaded);
+
+    const unsubscribeSessionOutput = window.electronAPI.events.onSessionOutput((output: SessionOutput) => {
+      console.log('Received session output:', output);
+      addSessionOutput(output);
+    });
+    unsubscribeFunctions.push(unsubscribeSessionOutput);
+
+    const unsubscribeScriptOutput = window.electronAPI.events.onScriptOutput((output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
+      console.log('Received script output for session', output.sessionId, ':', output.data.substring(0, 100));
+      // Store script output in session store for display
+      useSessionStore.getState().addScriptOutput(output);
+    });
+    unsubscribeFunctions.push(unsubscribeScriptOutput);
+
+    // Load initial sessions
+    API.sessions.getAll()
+      .then(response => {
+        if (response.success && response.data) {
+          const sessionsWithJsonMessages = response.data.map((session: Session) => ({
+            ...session,
+            jsonMessages: session.jsonMessages || []
+          }));
+          loadSessions(sessionsWithJsonMessages);
+        }
+      })
+      .catch(error => {
+        console.error('Failed to load initial sessions:', error);
+      });
+
+    console.log('Connected to Electron IPC events');
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (socket) {
-        socket.disconnect();
-        socket = null;
-      }
+      // Clean up all event listeners
+      unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+      console.log('Disconnected from Electron IPC events');
     };
   }, [setSessions, loadSessions, addSession, updateSession, deleteSession, addSessionOutput]);
   
-  return socket;
+  // Return a mock socket object for compatibility
+  return {
+    connected: true,
+    disconnect: () => {},
+  };
 }

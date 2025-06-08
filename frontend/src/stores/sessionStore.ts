@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Session, SessionOutput } from '../types/session';
-import { apiFetch } from '../utils/api';
+import { API } from '../utils/api';
 
 interface CreateSessionRequest {
   prompt: string;
@@ -87,19 +87,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   createSession: async (request) => {
     try {
-      const response = await apiFetch('/api/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
+      const response = await API.sessions.create(request);
 
-      if (!response.ok) {
-        throw new Error('Failed to create session');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create session');
       }
 
-      // Sessions will be added via WebSocket, no need to manually add here
+      // Sessions will be added via IPC events, no need to manually add here
     } catch (error) {
       console.error('Error creating session:', error);
       throw error;
@@ -138,18 +132,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   markSessionAsViewed: async (sessionId) => {
     try {
-      const response = await apiFetch(`/api/sessions/${sessionId}/view`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await API.sessions.markViewed(sessionId);
 
-      if (!response.ok) {
-        throw new Error('Failed to mark session as viewed');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to mark session as viewed');
       }
 
-      // Session will be updated via WebSocket, no need to manually update here
+      // Session will be updated via IPC events, no need to manually update here
     } catch (error) {
       console.error('Error marking session as viewed:', error);
     }

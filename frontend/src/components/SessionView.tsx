@@ -6,7 +6,7 @@ import { JsonMessageView } from './JsonMessageView';
 import { StatusIndicator } from './StatusIndicator';
 import { PromptNavigation } from './PromptNavigation';
 import CombinedDiffView from './CombinedDiffView';
-import { apiFetch } from '../utils/api';
+import { API } from '../utils/api';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -87,12 +87,12 @@ export function SessionView() {
     setLoadError(null);
     
     try {
-      const response = await apiFetch(`/api/sessions/${activeSession.id}/output`);
-      if (!response.ok) {
-        throw new Error(`Failed to load output: ${response.statusText}`);
+      const response = await API.sessions.getOutput(activeSession.id);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load output');
       }
       
-      const outputs = await response.json();
+      const outputs = response.data;
       
       // Import the formatter
       const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
@@ -408,16 +408,10 @@ export function SessionView() {
     if (!input.trim()) return;
     
     try {
-      const response = await apiFetch(`/api/sessions/${activeSession.id}/input`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ input: input + '\n' }),
-      });
+      const response = await API.sessions.sendInput(activeSession.id, input + '\n');
       
-      if (!response.ok) {
-        throw new Error('Failed to send input');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to send input');
       }
       
       setInput('');
@@ -430,16 +424,10 @@ export function SessionView() {
     if (!input.trim()) return;
     
     try {
-      const response = await apiFetch(`/api/sessions/${activeSession.id}/continue`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: input }),
-      });
+      const response = await API.sessions.continue(activeSession.id);
       
-      if (!response.ok) {
-        throw new Error('Failed to continue conversation');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to continue conversation');
       }
       
       setInput('');
@@ -458,15 +446,10 @@ export function SessionView() {
 
   const handleStopSession = async () => {
     try {
-      const response = await apiFetch(`/api/sessions/${activeSession.id}/stop`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await API.sessions.stop(activeSession.id);
       
-      if (!response.ok) {
-        throw new Error('Failed to stop session');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to stop session');
       }
     } catch (error) {
       console.error('Error stopping session:', error);
@@ -478,17 +461,10 @@ export function SessionView() {
     setMergeError(null);
     
     try {
-      const response = await apiFetch(`/api/sessions/${activeSession.id}/merge-main-to-worktree`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await API.sessions.mergeMainToWorktree(activeSession.id);
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to merge main to worktree');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to merge main to worktree');
       }
       
       // If successful, you might want to show a success message
@@ -507,17 +483,10 @@ export function SessionView() {
     setMergeError(null);
     
     try {
-      const response = await apiFetch(`/api/sessions/${activeSession.id}/merge-worktree-to-main`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await API.sessions.mergeWorktreeToMain(activeSession.id);
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to merge worktree to main');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to merge worktree to main');
       }
       
       // If successful, you might want to show a success message

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DiffViewer from './DiffViewer';
 import ExecutionList from './ExecutionList';
-import { apiFetch } from '../utils/api';
+import { API } from '../utils/api';
 import type { CombinedDiffViewProps } from '../types/diff';
 import type { ExecutionDiff, GitDiffResult } from '../types/diff';
 import { parseDiff } from 'react-diff-view';
@@ -22,11 +22,11 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
     const loadExecutions = async () => {
       try {
         setLoading(true);
-        const response = await apiFetch(`/api/sessions/${sessionId}/executions`);
-        if (!response.ok) {
-          throw new Error('Failed to load executions');
+        const response = await API.sessions.getExecutions(sessionId);
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to load executions');
         }
-        const data = await response.json();
+        const data = response.data;
         setExecutions(data);
         
         // If no initial selection, select all executions
@@ -58,23 +58,17 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
         let response;
         if (selectedExecutions.length === executions.length) {
           // Get all diffs
-          response = await apiFetch(`/api/sessions/${sessionId}/combined-diff`);
+          response = await API.sessions.getCombinedDiff(sessionId);
         } else {
           // Get selected diffs
-          response = await apiFetch(`/api/sessions/${sessionId}/combined-diff`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ executionIds: selectedExecutions }),
-          });
+          response = await API.sessions.getCombinedDiff(sessionId, selectedExecutions);
         }
         
-        if (!response.ok) {
-          throw new Error('Failed to load combined diff');
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to load combined diff');
         }
         
-        const data = await response.json();
+        const data = response.data;
         setCombinedDiff(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load combined diff');

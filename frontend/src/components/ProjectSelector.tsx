@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, Plus, Check, Settings } from 'lucide-react';
+import { API } from '../utils/api';
 import type { Project } from '../types/project';
 import ProjectSettings from './ProjectSettings';
 
@@ -22,8 +23,11 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects');
-      const data = await response.json();
+      const response = await API.projects.getAll();
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch projects');
+      }
+      const data = response.data;
       setProjects(data);
       
       // Find and set the active project
@@ -38,11 +42,9 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
 
   const handleSelectProject = async (project: Project) => {
     try {
-      const response = await fetch(`/api/projects/${project.id}/activate`, {
-        method: 'POST'
-      });
+      const response = await API.projects.activate(project.id.toString());
       
-      if (response.ok) {
+      if (response.success) {
         setActiveProject(project);
         setIsOpen(false);
         onProjectChange?.(project);
@@ -52,6 +54,8 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
           ...p,
           active: p.id === project.id
         })));
+      } else {
+        throw new Error(response.error || 'Failed to activate project');
       }
     } catch (error) {
       console.error('Failed to activate project:', error);
@@ -62,16 +66,14 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
     if (!newProject.name || !newProject.path) return;
 
     try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProject)
-      });
+      const response = await API.projects.create(newProject);
 
-      if (response.ok) {
+      if (response.success) {
         setShowAddDialog(false);
         setNewProject({ name: '', path: '' });
         fetchProjects();
+      } else {
+        throw new Error(response.error || 'Failed to create project');
       }
     } catch (error) {
       console.error('Failed to create project:', error);

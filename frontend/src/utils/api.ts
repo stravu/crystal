@@ -1,19 +1,189 @@
-// Utility for making API calls that work in both dev and production modes
+// Utility for making API calls using Electron IPC
 
-const getApiBaseUrl = () => {
-  // In production (Electron), we need to use absolute URLs
-  if (window.location.protocol === 'file:') {
-    return 'http://localhost:3001';
-  }
-  // In development, we can use relative URLs (proxied by Vite)
-  return '';
+// Type for IPC response
+export interface IPCResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+// Check if we're running in Electron
+const isElectron = () => {
+  return typeof window !== 'undefined' && window.electronAPI;
 };
 
-export const apiUrl = (path: string) => {
-  const baseUrl = getApiBaseUrl();
-  return `${baseUrl}${path}`;
-};
+// Wrapper class for API calls that provides error handling and consistent interface
+export class API {
+  // Session management
+  static sessions = {
+    async getAll() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getAll();
+    },
 
-export const apiFetch = async (path: string, options?: RequestInit) => {
-  return fetch(apiUrl(path), options);
-};
+    async get(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.get(sessionId);
+    },
+
+    async create(request: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.create(request);
+    },
+
+    async delete(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.delete(sessionId);
+    },
+
+    async sendInput(sessionId: string, input: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.sendInput(sessionId, input);
+    },
+
+    async continue(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.continue(sessionId);
+    },
+
+    async getOutput(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getOutput(sessionId);
+    },
+
+    async getConversation(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getConversation(sessionId);
+    },
+
+    async markViewed(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.markViewed(sessionId);
+    },
+
+    async stop(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.stop(sessionId);
+    },
+
+    async getExecutions(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getExecutions(sessionId);
+    },
+
+    async getExecutionDiff(sessionId: string, executionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getExecutionDiff(sessionId, executionId);
+    },
+
+    async gitCommit(sessionId: string, message: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.gitCommit(sessionId, message);
+    },
+
+    async gitDiff(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.gitDiff(sessionId);
+    },
+
+    async getCombinedDiff(sessionId: string, executionIds?: number[]) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getCombinedDiff(sessionId, executionIds);
+    },
+
+    // Script operations
+    async hasRunScript(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.hasRunScript(sessionId);
+    },
+
+    async getRunningSession() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getRunningSession();
+    },
+
+    async runScript(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.runScript(sessionId);
+    },
+
+    async stopScript() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.stopScript();
+    },
+
+    // Prompt operations
+    async getPrompts(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getPrompts(sessionId);
+    },
+
+    // Git merge operations
+    async mergeMainToWorktree(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.mergeMainToWorktree(sessionId);
+    },
+
+    async mergeWorktreeToMain(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.mergeWorktreeToMain(sessionId);
+    },
+  };
+
+  // Project management
+  static projects = {
+    async getAll() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.getAll();
+    },
+
+    async getActive() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.getActive();
+    },
+
+    async create(projectData: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.create(projectData);
+    },
+
+    async activate(projectId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.activate(projectId);
+    },
+
+    async update(projectId: string, updates: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.update(projectId, updates);
+    },
+
+    async delete(projectId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.delete(projectId);
+    },
+  };
+
+  // Configuration
+  static config = {
+    async get() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.config.get();
+    },
+
+    async update(updates: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.config.update(updates);
+    },
+  };
+
+  // Prompts
+  static prompts = {
+    async getAll() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.prompts.getAll();
+    },
+  };
+}
+
+// Legacy support - removed as migration is complete
+// All HTTP API calls have been migrated to IPC via the API class

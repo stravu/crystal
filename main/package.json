@@ -16,18 +16,13 @@
     "@homebridge/node-pty-prebuilt-multiarch": "^0.12.0",
     "better-sqlite3": "^11.7.0",
     "bull": "^4.16.3",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "electron-store": "^10.0.0",
-    "express": "^4.21.2",
-    "openai": "^5.1.1",
-    "socket.io": "^4.8.1"
+    "openai": "^5.1.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/bull": "^4.10.0",
-    "@types/cors": "^2.8.18",
-    "@types/express": "^5.0.1",
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",

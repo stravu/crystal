@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { StatusIndicator } from './StatusIndicator';
-import { apiFetch } from '../utils/api';
+import { API } from '../utils/api';
 import type { Session } from '../types/session';
 
 interface SessionListItemProps {
@@ -17,17 +17,23 @@ export function SessionListItem({ session }: SessionListItemProps) {
   
   useEffect(() => {
     // Check if this session's project has a run script
-    apiFetch(`/api/sessions/${session.id}/has-run-script`)
-      .then(res => res.json())
-      .then(data => setHasRunScript(data.hasRunScript))
+    API.sessions.hasRunScript(session.id)
+      .then(response => {
+        if (response.success) {
+          setHasRunScript(response.data);
+        }
+      })
       .catch(console.error);
   }, [session.id]);
 
   useEffect(() => {
     // Check if this session is currently running
-    apiFetch('/api/sessions/running-session')
-      .then(res => res.json())
-      .then(data => setIsRunning(data.sessionId === session.id))
+    API.sessions.getRunningSession()
+      .then(response => {
+        if (response.success) {
+          setIsRunning(response.data === session.id);
+        }
+      })
       .catch(console.error);
   }, [session.id]);
 
@@ -53,24 +59,16 @@ export function SessionListItem({ session }: SessionListItemProps) {
 
     try {
       // First stop any currently running script
-      await apiFetch('/api/sessions/stop-script', {
-        method: 'POST',
-      });
+      await API.sessions.stopScript();
       
       // Clear any previous script output for this session
       useSessionStore.getState().clearScriptOutput(session.id);
       
       // Then run the script for this session
-      const response = await apiFetch(`/api/sessions/${session.id}/run-script`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}), // Project-specific commands are fetched on the backend
-      });
+      const response = await API.sessions.runScript(session.id);
 
-      if (!response.ok) {
-        throw new Error('Failed to run script');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to run script');
       }
 
       // Update running state for all sessions
@@ -86,12 +84,10 @@ export function SessionListItem({ session }: SessionListItemProps) {
     
     try {
       console.log('Stopping script...');
-      const response = await apiFetch('/api/sessions/stop-script', {
-        method: 'POST',
-      });
+      const response = await API.sessions.stopScript();
 
-      if (!response.ok) {
-        throw new Error('Failed to stop script');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to stop script');
       }
 
       console.log('Script stop request successful');
@@ -111,12 +107,10 @@ export function SessionListItem({ session }: SessionListItemProps) {
     
     setIsDeleting(true);
     try {
-      const response = await apiFetch(`/api/sessions/${session.id}`, {
-        method: 'DELETE',
-      });
+      const response = await API.sessions.delete(session.id);
       
-      if (!response.ok) {
-        throw new Error('Failed to delete session');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to delete session');
       }
       
       // If this was the active session, clear the selection

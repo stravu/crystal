@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiFetch } from '../utils/api';
+import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 
 interface CreateSessionDialogProps {
@@ -22,16 +22,10 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
     setIsSubmitting(true);
     
     try {
-      const response = await apiFetch('/api/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await API.sessions.create(formData);
       
-      if (!response.ok) {
-        throw new Error('Failed to create session');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create session');
       }
       
       onClose();
