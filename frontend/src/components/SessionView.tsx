@@ -69,6 +69,11 @@ export function SessionView() {
     const unsubscribe = useSessionStore.subscribe((state) => {
       const sessionScriptOutput = state.scriptOutput[activeSession.id] || [];
       setScriptOutput(sessionScriptOutput);
+      
+      // Mark terminal tab as having new activity if not currently viewing it
+      if (viewMode !== 'terminal' && sessionScriptOutput.length > 0) {
+        setUnreadActivity(prev => ({ ...prev, terminal: true }));
+      }
     });
     
     // Get initial value
@@ -76,7 +81,7 @@ export function SessionView() {
     setScriptOutput(initialOutput);
     
     return unsubscribe;
-  }, [activeSession?.id]);
+  }, [activeSession?.id, viewMode]);
   
   // Clear terminal immediately when session changes, then format new content
   useEffect(() => {
@@ -179,6 +184,17 @@ export function SessionView() {
   const [showPromptNav, setShowPromptNav] = useState(false);
   const [hasManuallyToggledPromptNav, setHasManuallyToggledPromptNav] = useState(false);
   const [sessionHasPrompts, setSessionHasPrompts] = useState(false);
+  const [unreadActivity, setUnreadActivity] = useState<{
+    output: boolean;
+    messages: boolean;
+    changes: boolean;
+    terminal: boolean;
+  }>({
+    output: false,
+    messages: false,
+    changes: false,
+    terminal: false,
+  });
   const [isMerging, setIsMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -533,6 +549,30 @@ export function SessionView() {
     };
   }, [viewMode]);
   
+  // Track changes in messages and mark as unread if not viewing
+  useEffect(() => {
+    if (!activeSession) return;
+    
+    const previousMessageCount = useRef(activeSession.jsonMessages?.length || 0);
+    
+    if (activeSession.jsonMessages && activeSession.jsonMessages.length > previousMessageCount.current) {
+      if (viewMode !== 'messages') {
+        setUnreadActivity(prev => ({ ...prev, messages: true }));
+      }
+      previousMessageCount.current = activeSession.jsonMessages.length;
+    }
+  }, [activeSession?.jsonMessages?.length, viewMode]);
+  
+  // Reset unread badges when session changes
+  useEffect(() => {
+    setUnreadActivity({
+      output: false,
+      messages: false,
+      changes: false,
+      terminal: false,
+    });
+  }, [activeSession?.id]);
+  
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -735,38 +775,59 @@ export function SessionView() {
           <div className="flex flex-col gap-2">
             <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden flex-shrink-0">
             <button
-              onClick={() => setViewMode('output')}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 ${
+              onClick={() => {
+                setViewMode('output');
+                setUnreadActivity(prev => ({ ...prev, output: false }));
+              }}
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 relative ${
                 viewMode === 'output' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               Output
+              {unreadActivity.output && viewMode !== 'output' && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              )}
             </button>
             <button
-              onClick={() => setViewMode('messages')}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 ${
+              onClick={() => {
+                setViewMode('messages');
+                setUnreadActivity(prev => ({ ...prev, messages: false }));
+              }}
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 relative ${
                 viewMode === 'messages' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               Messages ({activeSession.jsonMessages?.length || 0})
+              {unreadActivity.messages && viewMode !== 'messages' && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              )}
             </button>
             <button
-              onClick={() => setViewMode('changes')}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 ${
+              onClick={() => {
+                setViewMode('changes');
+                setUnreadActivity(prev => ({ ...prev, changes: false }));
+              }}
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 relative ${
                 viewMode === 'changes' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               Changes
+              {unreadActivity.changes && viewMode !== 'changes' && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              )}
             </button>
             <button
-              onClick={() => setViewMode('terminal')}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 inline-flex items-center ${
+              onClick={() => {
+                setViewMode('terminal');
+                setUnreadActivity(prev => ({ ...prev, terminal: false }));
+              }}
+              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 inline-flex items-center relative ${
                 viewMode === 'terminal' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -774,6 +835,9 @@ export function SessionView() {
             >
               Terminal {activeSession.isRunning && (
                 <span className="ml-1 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              )}
+              {unreadActivity.terminal && viewMode !== 'terminal' && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
               )}
             </button>
             </div>
