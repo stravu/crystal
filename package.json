@@ -64,15 +64,15 @@
     "buildDependenciesFromSource": false,
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "frontend/public/icon.icns"
+      "icon": "main/assets/icon.png"
     },
     "win": {
       "target": "nsis",
-      "icon": "frontend/public/icon.ico"
+      "icon": "main/assets/icon.ico"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "frontend/public/icon.png"
+      "icon": "main/assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
