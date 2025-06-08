@@ -187,6 +187,7 @@ export function SessionView() {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
+  const previousMessageCountRef = useRef(0);
   const [unreadActivity, setUnreadActivity] = useState<{
     output: boolean;
     messages: boolean;
@@ -556,14 +557,15 @@ export function SessionView() {
   useEffect(() => {
     if (!activeSession) return;
     
-    const previousMessageCount = useRef(activeSession.jsonMessages?.length || 0);
+    const currentMessageCount = activeSession.jsonMessages?.length || 0;
     
-    if (activeSession.jsonMessages && activeSession.jsonMessages.length > previousMessageCount.current) {
+    if (activeSession.jsonMessages && currentMessageCount > previousMessageCountRef.current) {
       if (viewMode !== 'messages') {
         setUnreadActivity(prev => ({ ...prev, messages: true }));
       }
-      previousMessageCount.current = activeSession.jsonMessages.length;
     }
+    
+    previousMessageCountRef.current = currentMessageCount;
   }, [activeSession?.jsonMessages?.length, viewMode]);
   
   // Reset unread badges when session changes
