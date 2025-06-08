@@ -13,7 +13,6 @@
   "pnpm": {
     "onlyBuiltDependencies": ["electron"]
   },
-  "type": "module",
   "scripts": {
     "dev": "pnpm run --filter frontend dev",
     "electron-dev": "concurrently \"pnpm run --filter frontend dev\" \"wait-on http://localhost:4521 && electron .\"",
@@ -31,6 +30,18 @@
     "postinstall": "electron-builder install-app-deps",
     "electron:rebuild": "cd main && electron-rebuild -f -w better-sqlite3",
     "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.17",
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.12.0",
+    "better-sqlite3": "^11.7.0",
+    "bull": "^4.16.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "electron-store": "^10.0.0",
+    "express": "^4.21.2",
+    "openai": "^5.1.1",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

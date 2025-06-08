@@ -14,7 +14,7 @@ let mainWindow: BrowserWindow | null = null;
 let server: Server | null = null;
 let taskQueue: TaskQueue | null = null;
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const isDevelopment = !app.isPackaged;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -33,7 +33,18 @@ async function createWindow() {
     await mainWindow.loadURL('http://localhost:4521');
     mainWindow.webContents.openDevTools();
   } else {
-    await mainWindow.loadFile(path.join(__dirname, '../../frontend/dist/index.html'));
+    // Open DevTools in production for debugging
+    mainWindow.webContents.openDevTools();
+    
+    // Log the path we're trying to load
+    const indexPath = path.join(__dirname, '../../frontend/dist/index.html');
+    console.log('Loading index.html from:', indexPath);
+    
+    try {
+      await mainWindow.loadFile(indexPath);
+    } catch (error) {
+      console.error('Failed to load index.html:', error);
+    }
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -43,6 +54,16 @@ async function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Log any console messages from the renderer
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+  });
+
+  // Log any renderer errors
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('Renderer process crashed:', details);
   });
 }
 

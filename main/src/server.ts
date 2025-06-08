@@ -187,10 +187,16 @@ export class Server {
   }
 
   async start() {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       this.httpServer.listen(this.port, () => {
         console.log(`Server running on http://localhost:${this.port}`);
+        console.log(`API endpoints available at http://localhost:${this.port}/api`);
         resolve();
+      });
+      
+      this.httpServer.on('error', (error) => {
+        console.error('Server error:', error);
+        reject(error);
       });
     });
   }
