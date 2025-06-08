@@ -17,6 +17,7 @@ export function StatusIndicator({
     switch (status) {
       case 'initializing':
         return {
+          status: 'initializing',
           color: 'bg-blue-500',
           textColor: 'text-blue-600',
           bgColor: 'bg-blue-50',
@@ -26,34 +27,38 @@ export function StatusIndicator({
         };
       case 'running':
         return {
+          status: 'running',
           color: 'bg-green-500',
           textColor: 'text-green-600',
           bgColor: 'bg-green-50',
-          icon: '🏃',
+          icon: '▶️',
           text: 'Running',
           animated: true,
         };
       case 'waiting':
         return {
+          status: 'waiting',
           color: 'bg-yellow-500',
           textColor: 'text-yellow-600',
           bgColor: 'bg-yellow-50',
           icon: '⏸️',
-          text: 'Waiting for input',
+          text: 'Waiting',
           animated: true,
           pulse: true,
         };
       case 'stopped':
         return {
+          status: 'stopped',
           color: 'bg-gray-500',
           textColor: 'text-gray-600',
           bgColor: 'bg-gray-50',
           icon: '✅',
-          text: 'Completed',
+          text: 'Success',
           animated: false,
         };
       case 'completed_unviewed':
         return {
+          status: 'completed_unviewed',
           color: 'bg-yellow-500',
           textColor: 'text-yellow-600',
           bgColor: 'bg-yellow-50',
@@ -64,6 +69,7 @@ export function StatusIndicator({
         };
       case 'error':
         return {
+          status: 'error',
           color: 'bg-red-500',
           textColor: 'text-red-600',
           bgColor: 'bg-red-50',
@@ -73,6 +79,7 @@ export function StatusIndicator({
         };
       default:
         return {
+          status: 'unknown',
           color: 'bg-gray-400',
           textColor: 'text-gray-600',
           bgColor: 'bg-gray-50',
@@ -135,6 +142,79 @@ export function StatusIndicator({
     return 'Just now';
   };
 
+  // When showText is true, render as a chip
+  if (showText) {
+    return (
+      <div className={`flex items-center ${sizeClasses.spacing}`}>
+        {/* Status Chip */}
+        <div 
+          className={`
+            inline-flex items-center 
+            px-3 py-1 
+            rounded-full 
+            ${config.bgColor} 
+            border 
+            ${config.status === 'error' ? 'border-red-200' : 
+              config.status === 'running' ? 'border-green-200' : 
+              config.status === 'waiting' ? 'border-yellow-200' :
+              config.status === 'initializing' ? 'border-blue-200' :
+              'border-gray-200'}
+            ${config.animated ? 'relative overflow-hidden' : ''}
+          `}
+        >
+          {/* Animated background effect for active states */}
+          {config.animated && (
+            <div className="absolute inset-0 -z-10">
+              <div 
+                className={`
+                  absolute inset-0 
+                  ${config.color} 
+                  opacity-20 
+                  animate-pulse
+                `} 
+              />
+              {config.status === 'running' && (
+                <div 
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"
+                  style={{
+                    animation: 'shimmer 2s infinite',
+                  }}
+                />
+              )}
+            </div>
+          )}
+          
+          {/* Status icon and text */}
+          <span className="text-lg mr-1.5">{config.icon}</span>
+          <span className={`${sizeClasses.text} font-semibold ${config.textColor}`}>
+            {config.text}
+          </span>
+          
+          {/* Pulsing dot for waiting status */}
+          {config.status === 'waiting' && (
+            <div className="ml-2 relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+            </div>
+          )}
+        </div>
+
+        {/* Progress Bar */}
+        {showProgress && (
+          <div className="flex-1 ml-2">
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className={`${config.color} h-1.5 rounded-full transition-all duration-1000 ease-out`}
+                style={{ width: `${estimateProgress()}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Original dot indicator for when showText is false
   return (
     <div className={`flex items-center ${sizeClasses.spacing}`}>
       {/* Status Indicator Dot */}
@@ -160,32 +240,6 @@ export function StatusIndicator({
           />
         )}
       </div>
-
-      {/* Status Text */}
-      {showText && (
-        <div className="flex flex-col">
-          <span className={`${sizeClasses.text} font-medium ${config.textColor}`}>
-            {config.text}
-          </span>
-          {size === 'large' && session.lastActivity && (
-            <span className="text-xs text-gray-500">
-              {formatLastActivity(session.lastActivity)}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Progress Bar */}
-      {showProgress && (
-        <div className="flex-1 ml-2">
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div
-              className={`${config.color} h-1.5 rounded-full transition-all duration-1000 ease-out`}
-              style={{ width: `${estimateProgress()}%` }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
