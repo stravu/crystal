@@ -16,10 +16,10 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
   const sessions = useSessionStore((state) => state.sessions);
   const isLoaded = useSessionStore((state) => state.isLoaded);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
+
   return (
     <>
-      <div className="w-64 bg-gray-800 text-white h-full flex flex-col">
+      <div className="w-64 bg-gray-800 text-white h-full flex flex-col pt-4">
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <h1 className="text-xl font-bold">Crystal</h1>
           <button
@@ -33,7 +33,7 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
             </svg>
           </button>
         </div>
-        
+
         {/* Project Selector */}
         <div className="p-4 border-b border-gray-700">
           <ProjectSelector onProjectChange={() => {
@@ -41,7 +41,7 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
             window.location.reload();
           }} />
         </div>
-        
+
         {/* Navigation Tabs */}
         <div className="border-b border-gray-700">
           <div className="flex">
@@ -67,13 +67,13 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
             </button>
           </div>
         </div>
-        
+
         {viewMode === 'sessions' && (
           <div className="p-4">
             <CreateSessionButton />
           </div>
         )}
-      
+
       {viewMode === 'sessions' && (
         <div className="flex-1 overflow-y-auto min-h-0">
           <div className="px-4 py-2 text-sm text-gray-400 uppercase">Sessions</div>
@@ -95,7 +95,7 @@ export function Sidebar({ viewMode, onViewModeChange }: SidebarProps) {
         </div>
       )}
     </div>
-      
+
       <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </>
   );
