@@ -15,6 +15,11 @@ export function SessionView() {
   // Track previous session ID to detect changes
   const previousSessionIdRef = useRef<string | null>(null);
   
+  // State declarations needed early
+  const [showPromptNav, setShowPromptNav] = useState(false);
+  const [hasManuallyToggledPromptNav, setHasManuallyToggledPromptNav] = useState(false);
+  const [sessionHasPrompts, setSessionHasPrompts] = useState(false);
+  
   // Check for prompts and auto-expand panel if needed
   useEffect(() => {
     if (!activeSession) return;
@@ -182,9 +187,6 @@ export function SessionView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
   const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes' | 'terminal'>('output');
-  const [showPromptNav, setShowPromptNav] = useState(false);
-  const [hasManuallyToggledPromptNav, setHasManuallyToggledPromptNav] = useState(false);
-  const [sessionHasPrompts, setSessionHasPrompts] = useState(false);
   const [unreadActivity, setUnreadActivity] = useState<{
     output: boolean;
     messages: boolean;
