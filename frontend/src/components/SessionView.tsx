@@ -15,6 +15,43 @@ export function SessionView() {
   // Track previous session ID to detect changes
   const previousSessionIdRef = useRef<string | null>(null);
   
+  // Check for prompts and auto-expand panel if needed
+  useEffect(() => {
+    if (!activeSession) return;
+    
+    // Reset manual toggle when switching sessions
+    if (previousSessionIdRef.current !== activeSession.id) {
+      setHasManuallyToggledPromptNav(false);
+    }
+    
+    const checkForPrompts = async () => {
+      try {
+        const response = await API.sessions.getPrompts(activeSession.id);
+        if (response.success && response.data.length > 0) {
+          setSessionHasPrompts(true);
+          // Auto-expand only if user hasn't manually toggled
+          if (!hasManuallyToggledPromptNav) {
+            setShowPromptNav(true);
+          }
+        } else {
+          setSessionHasPrompts(false);
+          // Auto-collapse only if user hasn't manually toggled
+          if (!hasManuallyToggledPromptNav) {
+            setShowPromptNav(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for prompts:', error);
+      }
+    };
+    
+    checkForPrompts();
+    
+    // Check periodically for new prompts
+    const interval = setInterval(checkForPrompts, 5000);
+    return () => clearInterval(interval);
+  }, [activeSession?.id, hasManuallyToggledPromptNav]);
+  
   
   // Instead of subscribing to script output, we'll get it when needed
   const [scriptOutput, setScriptOutput] = useState<string[]>([]);
@@ -139,7 +176,9 @@ export function SessionView() {
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
   const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes' | 'terminal'>('output');
-  const [showPromptNav, setShowPromptNav] = useState(true);
+  const [showPromptNav, setShowPromptNav] = useState(false);
+  const [hasManuallyToggledPromptNav, setHasManuallyToggledPromptNav] = useState(false);
+  const [sessionHasPrompts, setSessionHasPrompts] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -750,7 +789,10 @@ export function SessionView() {
                 </svg>
               </button>
               <button
-                onClick={() => setShowPromptNav(!showPromptNav)}
+                onClick={() => {
+                  setShowPromptNav(!showPromptNav);
+                  setHasManuallyToggledPromptNav(true);
+                }}
                 className="p-1 text-gray-600 hover:bg-gray-200 rounded"
                 title={showPromptNav ? 'Hide prompt navigation' : 'Show prompt navigation'}
               >
