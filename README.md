@@ -4,6 +4,7 @@
 
 - Node.js 22.15.1
 - pnpm (`npm install -g pnpm`)
+- Git (for repository management)
 
 ## Build Steps
 
@@ -64,3 +65,17 @@ After building, packaged applications will be in the `dist-electron` directory:
 - macOS: `Crystal-1.0.0-arm64.dmg` and `Crystal-1.0.0-arm64-mac.zip`
 - Windows: `Crystal Setup 1.0.0.exe`
 - Linux: `Crystal-1.0.0.AppImage`
+
+## Features
+
+### Automatic Directory Creation
+- Crystal automatically creates the `~/.ccc` directory for configuration and database storage on first run
+- When creating a new project, Crystal will:
+  - Create the project directory if it doesn't exist
+  - Initialize a Git repository if the directory isn't already a Git repo
+  - This ensures all projects are properly set up for worktree management
+
+### Project Management
+- Projects represent Git repositories where Claude Code sessions will be created
+- Each session runs in its own Git worktree to enable parallel development
+- Multiple sessions can work on the same codebase without conflicts

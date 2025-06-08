@@ -3,6 +3,9 @@ import type { Request, Response } from 'express';
 import type { Project } from '../database/models';
 import type { DatabaseService } from '../database/database';
 import type { SessionManager } from '../services/sessionManager';
+import { existsSync, mkdirSync } from 'fs';
+import { execSync } from 'child_process';
+import { join } from 'path';
 
 export function createProjectsRouter(databaseService: DatabaseService, sessionManager: SessionManager): Router {
   const router = Router();
@@ -63,6 +66,31 @@ export function createProjectsRouter(databaseService: DatabaseService, sessionMa
       if (existingProject) {
         res.status(400).json({ error: 'Project with this path already exists' });
         return;
+      }
+
+      // Create directory if it doesn't exist
+      if (!existsSync(path)) {
+        try {
+          mkdirSync(path, { recursive: true });
+          console.log(`Created project directory: ${path}`);
+        } catch (error) {
+          console.error('Error creating project directory:', error);
+          res.status(500).json({ error: 'Failed to create project directory' });
+          return;
+        }
+      }
+
+      // Check if directory is a git repository
+      const gitDir = join(path, '.git');
+      if (!existsSync(gitDir)) {
+        try {
+          execSync('git init', { cwd: path });
+          console.log(`Initialized git repository in: ${path}`);
+        } catch (error) {
+          console.error('Error initializing git repository:', error);
+          res.status(500).json({ error: 'Failed to initialize git repository' });
+          return;
+        }
       }
 
       const project = databaseService.createProject(name, path, systemPrompt, runScript);

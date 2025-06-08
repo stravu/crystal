@@ -30,6 +30,12 @@ All core features have been successfully implemented with significant enhancemen
 - ✅ Automatic worktree cleanup when sessions are deleted
 - ✅ Proper error handling for worktree operations
 
+### Project Management
+- ✅ Automatic project directory creation if it doesn't exist
+- ✅ Automatic git repository initialization for new directories
+- ✅ Project-based session organization
+- ✅ Support for multiple projects with easy switching
+
 ### Advanced Terminal Interface
 - **Professional terminal**: ✅ XTerm.js terminal with full theme support
 - **Dual view system**: ✅ Switch between Terminal and JSON Messages views
@@ -98,6 +104,7 @@ All core features have been successfully implemented with significant enhancemen
 
 ### Data Persistence
 - **Database**: Better-SQLite3 with synchronous operations
+  - `projects` table: Project configurations and paths
   - `sessions` table: Core session metadata
   - `session_outputs` table: Terminal output history  
   - `conversation_messages` table: Conversation history for continuations
@@ -105,6 +112,9 @@ All core features have been successfully implemented with significant enhancemen
   - `prompt_markers` table: Prompt execution markers
 - **Migrations**: SQL migration system for schema evolution
 - **Electron Store**: Application configuration
+- **Automatic Initialization**: 
+  - `~/.ccc` directory created automatically on first run
+  - Database and config files initialized as needed
 
 ### Development Tools
 - **Package Manager**: pnpm with workspace configuration
@@ -170,6 +180,14 @@ All core features have been successfully implemented with significant enhancemen
 ### Configuration
 - `GET /api/config` - Get current application configuration
 - `POST /api/config` - Update configuration settings
+
+### Project Management
+- `GET /api/projects` - List all projects
+- `POST /api/projects` - Create new project (with automatic directory/git init)
+- `GET /api/projects/:id` - Get project details
+- `PUT /api/projects/:id` - Update project settings
+- `POST /api/projects/:id/activate` - Set active project
+- `DELETE /api/projects/:id` - Delete project
 
 ## Development Workflow
 

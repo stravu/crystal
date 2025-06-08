@@ -23,6 +23,9 @@ export class ConfigManager extends EventEmitter {
   }
 
   async initialize(): Promise<void> {
+    // Ensure the config directory exists
+    await fs.mkdir(this.configDir, { recursive: true });
+    
     try {
       const data = await fs.readFile(this.configPath, 'utf-8');
       this.config = JSON.parse(data);

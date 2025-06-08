@@ -1,12 +1,16 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import type { Project, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
 
 export class DatabaseService {
   private db: Database.Database;
 
   constructor(dbPath: string) {
+    // Ensure the directory exists before creating the database
+    const dir = dirname(dbPath);
+    mkdirSync(dir, { recursive: true });
+    
     this.db = new Database(dbPath);
   }
 
