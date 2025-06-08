@@ -13,6 +13,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [verbose, setVerbose] = useState(false);
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
+  const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications'>('general');
@@ -33,6 +34,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setVerbose(data.verbose || false);
       setOpenaiApiKey(data.openaiApiKey || '');
       setGlobalSystemPrompt(data.systemPromptAppend || '');
+      setClaudeExecutablePath(data.claudeExecutablePath || '');
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -49,7 +51,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ verbose, openaiApiKey, systemPromptAppend: globalSystemPrompt }),
+        body: JSON.stringify({ verbose, openaiApiKey, systemPromptAppend: globalSystemPrompt, claudeExecutablePath }),
       });
 
       if (!response.ok) {
@@ -157,6 +159,23 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             />
             <p className="text-xs text-gray-500 mt-1">
               This text will be automatically appended to every initial prompt sent to Claude Code across ALL projects. For project-specific prompts, use the project settings.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="claudeExecutablePath" className="block text-sm font-medium text-gray-700 mb-1">
+              Claude Executable Path (Optional)
+            </label>
+            <input
+              id="claudeExecutablePath"
+              type="text"
+              value={claudeExecutablePath}
+              onChange={(e) => setClaudeExecutablePath(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+              placeholder="/usr/local/bin/claude"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Full path to the claude executable. Leave empty to use the claude command from PATH. This is useful if Claude is installed in a non-standard location.
             </p>
           </div>
 

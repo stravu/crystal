@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import type { Logger } from '../utils/logger';
-import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../utils/claudeCodeTest';
+import { testClaudeCodeAvailability, testClaudeCodeInDirectory, getAugmentedPath } from '../utils/claudeCodeTest';
 import type { ConfigManager } from './configManager';
+import { getShellPath, findExecutableInPath } from '../utils/shellPath';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
@@ -50,9 +51,14 @@ export class ClaudeCodeManager extends EventEmitter {
       const availability = await testClaudeCodeAvailability();
       if (!availability.available) {
         this.logger?.error(`Claude Code not available: ${availability.error}`);
+        this.logger?.error(`Current PATH: ${process.env.PATH}`);
+        this.logger?.error(`Augmented PATH will be: ${getAugmentedPath()}`);
         throw new Error(`Claude Code CLI not available: ${availability.error}`);
       }
       this.logger?.verbose(`Claude found: ${availability.version || 'version unknown'}`);
+      if (availability.path) {
+        this.logger?.verbose(`Claude executable path: ${availability.path}`);
+      }
       
       // Test claude in the target directory
       const directoryTest = await testClaudeCodeInDirectory(worktreePath);
@@ -85,12 +91,29 @@ export class ClaudeCodeManager extends EventEmitter {
         throw new Error('node-pty not available');
       }
       
-      const ptyProcess = pty.spawn('claude', args, {
+      // Get the user's shell PATH to ensure we have access to all their tools
+      const shellPath = getShellPath();
+      const env = {
+        ...process.env,
+        PATH: shellPath
+      } as { [key: string]: string };
+      
+      // Use custom claude path if configured, otherwise find it in PATH
+      let claudeCommand = this.configManager?.getConfig()?.claudeExecutablePath;
+      if (!claudeCommand) {
+        const foundPath = findExecutableInPath('claude');
+        if (!foundPath) {
+          throw new Error('Claude Code CLI not found in PATH. Please ensure claude is installed and in your PATH.');
+        }
+        claudeCommand = foundPath;
+      }
+      
+      const ptyProcess = pty.spawn(claudeCommand, args, {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
         cwd: worktreePath,
-        env: process.env as { [key: string]: string }
+        env
       });
 
       const claudeProcess: ClaudeCodeProcess = {

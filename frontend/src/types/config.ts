@@ -4,4 +4,5 @@ export interface AppConfig {
   openaiApiKey?: string;
   systemPromptAppend?: string;
   runScript?: string[];
+  claudeExecutablePath?: string;
 }
