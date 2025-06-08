@@ -19,6 +19,7 @@ export function SessionView() {
   const [showPromptNav, setShowPromptNav] = useState(false);
   const [hasManuallyToggledPromptNav, setHasManuallyToggledPromptNav] = useState(false);
   const [sessionHasPrompts, setSessionHasPrompts] = useState(false);
+  const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes' | 'terminal'>('output');
   
   // Check for prompts and auto-expand panel if needed
   useEffect(() => {
@@ -186,7 +187,6 @@ export function SessionView() {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
-  const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes' | 'terminal'>('output');
   const [unreadActivity, setUnreadActivity] = useState<{
     output: boolean;
     messages: boolean;
