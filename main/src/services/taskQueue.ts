@@ -2,6 +2,7 @@ import Bull from 'bull';
 import { SimpleQueue } from './simpleTaskQueue';
 import type { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
+import { WorktreeNameGenerator } from './worktreeNameGenerator';
 import type { ClaudeCodeManager } from './claudeCodeManager';
 import type { GitDiffManager } from './gitDiffManager';
 import type { ExecutionTracker } from './executionTracker';
@@ -12,6 +13,7 @@ interface TaskQueueOptions {
   claudeCodeManager: ClaudeCodeManager;
   gitDiffManager: GitDiffManager;
   executionTracker: ExecutionTracker;
+  worktreeNameGenerator: WorktreeNameGenerator;
 }
 
 interface CreateSessionJob {
@@ -119,23 +121,21 @@ export class TaskQueue {
         
         // Generate a name if template is empty
         if (!worktreeName || worktreeName.trim() === '') {
-          console.log(`[TaskQueue] No worktree template provided, generating name...`);
-          // Generate a simple timestamp-based name as fallback
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-          worktreeName = `session-${timestamp}`;
+          console.log(`[TaskQueue] No worktree template provided, generating name from prompt...`);
+          // Use the AI-powered name generator or smart fallback
+          worktreeName = await this.options.worktreeNameGenerator.generateWorktreeName(prompt);
+          console.log(`[TaskQueue] Generated base name: ${worktreeName}`);
         }
         
-        // Add index suffix for multiple sessions
-        if (index !== undefined) {
-          worktreeName = `${worktreeName}-${index + 1}`;
-        }
+        // Ensure uniqueness among all sessions (including archived)
+        worktreeName = await this.ensureUniqueSessionName(worktreeName, index);
         
         console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
 
         const worktreePath = await worktreeManager.createWorktree(activeProject.path, worktreeName);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
         
-        const sessionName = `${prompt.substring(0, 50)}...`;
+        const sessionName = worktreeName;
         console.log(`[TaskQueue] Creating session in database`);
         
         const session = await sessionManager.createSession(
@@ -199,6 +199,45 @@ export class TaskQueue {
 
   async continueSession(sessionId: string, prompt: string): Promise<Bull.Job<ContinueSessionJob> | any> {
     return this.continueQueue.add({ sessionId, prompt });
+  }
+
+  private async ensureUniqueSessionName(baseName: string, index?: number): Promise<string> {
+    const { sessionManager } = this.options;
+    const db = (sessionManager as any).db;
+    
+    let candidateName = baseName;
+    
+    // Add index suffix if provided (for multiple sessions)
+    if (index !== undefined) {
+      candidateName = `${baseName}-${index + 1}`;
+    }
+    
+    // Check for existing sessions with this name (including archived)
+    let counter = 1;
+    let uniqueName = candidateName;
+    
+    while (true) {
+      // Check both active and archived sessions
+      const existingSession = db.db.prepare(`
+        SELECT id FROM sessions 
+        WHERE (name = ? OR worktree_name = ?)
+        LIMIT 1
+      `).get(uniqueName, uniqueName);
+      
+      if (!existingSession) {
+        break;
+      }
+      
+      // If we already have an index, increment after the index
+      if (index !== undefined) {
+        uniqueName = `${baseName}-${index + 1}-${counter}`;
+      } else {
+        uniqueName = `${baseName}-${counter}`;
+      }
+      counter++;
+    }
+    
+    return uniqueName;
   }
 
   async close() {

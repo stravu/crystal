@@ -5,6 +5,7 @@ import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
 import { ConfigManager } from './services/configManager';
 import { WorktreeManager } from './services/worktreeManager';
+import { WorktreeNameGenerator } from './services/worktreeNameGenerator';
 // Import ClaudeCodeManager dynamically to avoid node-pty issues
 import { GitDiffManager } from './services/gitDiffManager';
 import { ExecutionTracker } from './services/executionTracker';
@@ -92,13 +93,15 @@ async function initializeServices() {
   const claudeCodeManager = new ClaudeCodeManager(sessionManager);
   const gitDiffManager = new GitDiffManager();
   const executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
+  const worktreeNameGenerator = new WorktreeNameGenerator(configManager);
 
   taskQueue = new TaskQueue({
     sessionManager,
     worktreeManager,
     claudeCodeManager,
     gitDiffManager,
-    executionTracker
+    executionTracker,
+    worktreeNameGenerator
   });
 
   server = new Server({
