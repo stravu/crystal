@@ -3,36 +3,39 @@
   "version": "1.0.0",
   "description": "Electron main process for Claude Code Commander",
   "main": "dist/index.js",
+  "type": "commonjs",
   "scripts": {
     "dev": "tsc -w",
-    "build": "tsc && npm run copy:assets",
-    "copy:assets": "cp -r src/database/*.sql dist/database/ && cp -r src/database/migrations dist/database/",
+    "build": "rimraf dist && tsc && npm run copy:assets",
+    "copy:assets": "mkdirp dist/database/migrations && cp src/database/*.sql dist/database/ && cp src/database/migrations/*.sql dist/database/migrations/",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.17",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.12.0",
-    "better-sqlite3": "^11.10.0",
-    "bull": "^4.12.0",
+    "better-sqlite3": "^11.7.0",
+    "bull": "^4.16.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "electron-store": "^8.1.0",
+    "dotenv": "^16.4.7",
+    "electron-store": "^10.0.0",
     "express": "^4.21.2",
-    "openai": "^5.0.1",
+    "openai": "^5.1.1",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/better-sqlite3": "^7.6.12",
     "@types/bull": "^4.10.0",
     "@types/cors": "^2.8.18",
-    "@types/express": "^4.17.23",
-    "@types/node": "^20.17.12",
-    "@typescript-eslint/eslint-plugin": "^7.17.0",
-    "@typescript-eslint/parser": "^7.17.0",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.19.0",
+    "@typescript-eslint/parser": "^8.19.0",
     "electron": "^36.4.0",
     "electron-rebuild": "^3.2.9",
-    "eslint": "^9.14.0",
-    "typescript": "^5.5.4"
+    "eslint": "^9.17.0",
+    "mkdirp": "^3.0.1",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
   }
 }
