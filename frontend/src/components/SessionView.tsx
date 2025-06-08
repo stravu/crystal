@@ -179,6 +179,7 @@ export function SessionView() {
   const scriptTerminalInstance = useRef<Terminal | null>(null);
   const scriptFitAddon = useRef<FitAddon | null>(null);
   const [input, setInput] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
   const [viewMode, setViewMode] = useState<'output' | 'messages' | 'changes' | 'terminal'>('output');
   const [showPromptNav, setShowPromptNav] = useState(false);
@@ -573,6 +574,19 @@ export function SessionView() {
     });
   }, [activeSession?.id]);
   
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to auto to get the correct scrollHeight
+      textareaRef.current.style.height = 'auto';
+      // Set height to scrollHeight but constrain to min/max
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const minHeight = 42; // ~2 lines
+      const maxHeight = 200; // ~10 lines
+      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, minHeight), maxHeight)}px`;
+    }
+  }, [input]);
+  
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -953,10 +967,12 @@ export function SessionView() {
       <div className="border-t border-gray-300 p-4 bg-white flex-shrink-0">
         <div className="flex space-x-2">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              // Send on Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 if (activeSession.status === 'waiting') {
                   handleSendInput();
@@ -965,13 +981,13 @@ export function SessionView() {
                 }
               }
             }}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white resize-none min-h-[42px] max-h-[150px] overflow-y-auto"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white resize-none overflow-y-auto"
             placeholder={
               activeSession.status === 'waiting' 
-                ? "Enter your response..." 
-                : "Continue conversation with a new message..."
+                ? "Enter your response... (⌘↵ to send)" 
+                : "Continue conversation with a new message... (⌘↵ to send)"
             }
-            rows={2}
+            style={{ minHeight: '42px', maxHeight: '200px' }}
           />
           <button
             onClick={activeSession.status === 'waiting' ? handleSendInput : handleContinueConversation}
