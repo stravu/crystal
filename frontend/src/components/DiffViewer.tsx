@@ -1,8 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { parseDiff, Diff, Hunk } from 'react-diff-view';
 import type { DiffViewerProps } from '../types/diff';
 
 const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
+  const [viewType, setViewType] = useState<'unified' | 'split'>('unified');
+  
+  // Load saved preference from localStorage
+  useEffect(() => {
+    const savedViewType = localStorage.getItem('diffViewType');
+    if (savedViewType === 'split' || savedViewType === 'unified') {
+      setViewType(savedViewType);
+    }
+  }, []);
+  
+  // Save preference when it changes
+  const handleViewTypeChange = (type: 'unified' | 'split') => {
+    setViewType(type);
+    localStorage.setItem('diffViewType', type);
+  };
   if (!diff || diff.trim() === '') {
     return (
       <div className={`p-4 text-gray-500 text-center ${className}`}>
@@ -25,6 +40,38 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
 
     return (
       <div className={`diff-viewer ${className}`}>
+        {/* View toggle */}
+        <div className="flex justify-end mb-4">
+          <div className="inline-flex rounded-lg border border-gray-300 bg-white">
+            <button
+              onClick={() => handleViewTypeChange('unified')}
+              className={`px-3 py-1 text-sm font-medium rounded-l-lg transition-colors ${
+                viewType === 'unified'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              Unified
+            </button>
+            <button
+              onClick={() => handleViewTypeChange('split')}
+              className={`px-3 py-1 text-sm font-medium rounded-r-lg transition-colors ${
+                viewType === 'split'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Side-by-side
+            </button>
+          </div>
+        </div>
+        
         {files.map((file, index) => (
           <div key={`${file.oldPath}-${file.newPath}-${index}`} className="mb-6">
             {/* File header */}
@@ -59,7 +106,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
             {/* Diff content */}
             <div className="border border-t-0 border-gray-300 rounded-b-lg overflow-hidden">
               <Diff 
-                viewType="unified" 
+                viewType={viewType} 
                 diffType={file.type} 
                 hunks={file.hunks}
                 className="diff-content"
@@ -126,6 +173,29 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
 
           .diff-viewer .diff-gutter-delete {
             background-color: #ffdce0;
+          }
+          
+          /* Split view styles */
+          .diff-viewer .diff-split-table {
+            width: 100%;
+            table-layout: fixed;
+          }
+          
+          .diff-viewer .diff-split-cell {
+            width: 50%;
+            vertical-align: top;
+          }
+          
+          .diff-viewer .diff-split-gutter {
+            width: 40px;
+          }
+          
+          .diff-viewer .diff-code-cell {
+            overflow-x: auto;
+          }
+          
+          .diff-viewer .diff-line-content {
+            white-space: pre;
           }
 
           .diff-viewer .hunk-header {
