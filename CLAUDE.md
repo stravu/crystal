@@ -182,15 +182,42 @@ All core features have been successfully implemented with significant enhancemen
 
 ## Available Commands
 
-All commands are working and tested:
-- `npm run dev` - Start Electron app in development mode
-- `npm run build` - Build Electron app for production
-- `npm run build:main` - Build main process only
-- `npm run build:renderer` - Build renderer process only
-- `npm run build:electron` - Package Electron app for distribution
-- `npm run preview` - Preview Electron app
-- `npm run lint` - Run linting across all packages
-- `npm run typecheck` - Run TypeScript checking across all packages
+```bash
+# One-time setup (install, build, and rebuild native modules)
+pnpm run setup
+
+# Run as Electron app in development mode
+pnpm electron-dev
+# Or use the shorthand:
+pnpm run dev
+
+# Run frontend only (without Electron shell)
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Type checking
+pnpm typecheck
+
+# Linting
+pnpm lint
+```
+
+**Note:** You must run `pnpm run build:main` at least once before running `pnpm electron-dev` to compile the main process.
+
+### Building Packaged Electron App
+
+```bash
+# Build for current platform
+pnpm build
+
+# Build for specific platforms
+pnpm build:mac    # macOS (only works on macOS)
+pnpm build:win    # Windows
+pnpm build:linux  # Linux
+pnpm build:all    # All platforms at once
+```
 
 ## Project Structure
 

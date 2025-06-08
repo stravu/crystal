@@ -13,6 +13,8 @@ pnpm run setup
 
 # Run as Electron app in development mode
 pnpm electron-dev
+# Or use the shorthand:
+pnpm run dev
 
 # Run frontend only (without Electron shell)
 pnpm dev
