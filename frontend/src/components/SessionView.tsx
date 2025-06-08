@@ -20,6 +20,7 @@ export function SessionView() {
   const [scriptOutput, setScriptOutput] = useState<string[]>([]);
   const [formattedOutput, setFormattedOutput] = useState<string>('');
   const [currentSessionIdForOutput, setCurrentSessionIdForOutput] = useState<string | null>(null);
+  const [isPathCollapsed, setIsPathCollapsed] = useState(true);
   
   // Subscribe to script output changes manually
   useEffect(() => {
@@ -605,12 +606,32 @@ export function SessionView() {
         </div>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-gray-800 truncate">{activeSession.name}</h2>
-            <div className="flex items-center space-x-2 mt-1">
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-              <span className="text-sm text-gray-600 font-mono">{activeSession.worktreePath}</span>
+            <h2 className="font-bold text-xl text-gray-900 truncate">{activeSession.name}</h2>
+            <div className="flex items-center space-x-1 mt-1">
+              <button
+                onClick={() => setIsPathCollapsed(!isPathCollapsed)}
+                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors"
+                title={isPathCollapsed ? 'Show full path' : 'Hide full path'}
+              >
+                <svg 
+                  className={`w-3 h-3 transition-transform ${isPathCollapsed ? '' : 'rotate-90'}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </button>
+              {isPathCollapsed ? (
+                <span className="text-sm text-gray-600 font-mono">
+                  .../{activeSession.worktreePath.split('/').slice(-2).join('/')}
+                </span>
+              ) : (
+                <span className="text-sm text-gray-600 font-mono">{activeSession.worktreePath}</span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <StatusIndicator session={activeSession} size="medium" showText showProgress />
