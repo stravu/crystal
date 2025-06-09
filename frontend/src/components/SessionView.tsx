@@ -101,15 +101,29 @@ export function SessionView() {
     // Don't format output here - let it happen after loadOutputContent completes
   }, [activeSession?.id]); // Changed dependency to activeSession?.id to trigger on session change
   
+  // Track if this is a newly created session waiting for first output
+  const [isWaitingForFirstOutput, setIsWaitingForFirstOutput] = useState(false);
+  
+  // Track message and output counts for change detection
+  const messageCount = activeSession?.jsonMessages?.length || 0;
+  const outputCount = activeSession?.output?.length || 0;
+  
   // Separate effect for updating content when messages change (but not clearing)
   useEffect(() => {
     if (!activeSession) return;
     
     const sessionId = activeSession.id; // Capture the session ID
     
-    // Skip formatting if terminal was just cleared (output length is 0 after a session switch)
-    if (lastProcessedOutputLength.current === 0 && formattedOutput === '') {
-      // Let the loadOutputContent handle initial formatting
+    // Skip formatting only if we have no data to format
+    if (messageCount === 0 && outputCount === 0) {
+      return;
+    }
+    
+    // If we're waiting for first output and it arrives, trigger a reload
+    if (isWaitingForFirstOutput && (messageCount > 0 || outputCount > 0)) {
+      setIsWaitingForFirstOutput(false);
+      // Reload the output content now that we have data
+      loadOutputContent(sessionId);
       return;
     }
     
@@ -146,7 +160,7 @@ export function SessionView() {
     };
     
     formatOutput();
-  }, [activeSession?.jsonMessages, activeSession?.output]);
+  }, [activeSession?.id, messageCount, outputCount, isWaitingForFirstOutput]);
   
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
@@ -219,17 +233,21 @@ export function SessionView() {
     } catch (error) {
       console.error('Error fetching session output:', error);
       
-      if (retryCount < 2) {
-        // Retry after a short delay
+      if (retryCount < 3) {
+        // Retry after a short delay, with increasing delays for new sessions
+        const delay = activeSession?.status === 'initializing' ? 1500 : 1000;
         setTimeout(() => {
           // Check if still the active session before retrying
           const currentActiveSession = useSessionStore.getState().getActiveSession();
           if (currentActiveSession && currentActiveSession.id === sessionId) {
             loadOutputContent(sessionId, retryCount + 1);
           }
-        }, 1000);
+        }, delay);
       } else {
-        setLoadError(error instanceof Error ? error.message : 'Failed to load output content');
+        // Don't show error for new sessions, they might just be starting up
+        if (activeSession?.status !== 'initializing') {
+          setLoadError(error instanceof Error ? error.message : 'Failed to load output content');
+        }
       }
     } finally {
       setIsLoadingOutput(false);
@@ -286,8 +304,31 @@ export function SessionView() {
     lastProcessedOutputLength.current = 0;
     setFormattedOutput(''); // Reset formatted output
 
-    // Load output content with retry logic - pass session ID to avoid closure issues
-    loadOutputContent(activeSession.id);
+    // For newly created sessions (status: initializing), add a delay before loading output
+    // This gives Claude Code time to start producing output
+    if (activeSession.status === 'initializing') {
+      // Show a message while Claude Code is starting up
+      terminalInstance.current.writeln('\r\n🚀 Starting Claude Code session...\r\n');
+      
+      // Mark that we're waiting for first output
+      setIsWaitingForFirstOutput(true);
+      
+      // Try loading immediately first to get any initial prompt
+      loadOutputContent(activeSession.id);
+      
+      // Then also try again after a delay in case more output arrives
+      setTimeout(() => {
+        // Only reload if we're still on the same session
+        const currentActiveSession = useSessionStore.getState().getActiveSession();
+        if (currentActiveSession && currentActiveSession.id === activeSession.id) {
+          loadOutputContent(activeSession.id);
+        }
+      }, 2000);
+    } else {
+      // For existing sessions, load immediately
+      setIsWaitingForFirstOutput(false);
+      loadOutputContent(activeSession.id);
+    }
   }, [activeSession?.id]);
 
   useEffect(() => {

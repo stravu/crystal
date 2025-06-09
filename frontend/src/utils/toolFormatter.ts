@@ -11,8 +11,8 @@ function formatJsonForOutput(jsonMessage: any): string {
   // Handle result messages
   if (jsonMessage.type === 'result') {
     const status = jsonMessage.is_error ? '❌ Error' : '✅ Success';
-    const cost = jsonMessage.cost_usd ? ` ($${jsonMessage.cost_usd.toFixed(4)})` : '';
-    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[90m${status}${cost}\x1b[0m\r\n\r\n`;
+    // Removed cost display
+    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[90m${status}\x1b[0m\r\n\r\n`;
   }
   
   // Default formatting
@@ -258,8 +258,10 @@ export function formatJsonForOutputEnhanced(jsonMessage: any): string {
       
       if (textContent) {
         const time = new Date(timestamp).toLocaleTimeString();
-        return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[32m👤 User\x1b[0m\r\n` +
-               `\x1b[37m${textContent}\x1b[0m\r\n\r\n`;
+        // Make user prompts more prominent with bright green background and bold text
+        return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
+               `\x1b[1m\x1b[92m${textContent}\x1b[0m\r\n` +
+               `\x1b[90m${'─'.repeat(80)}\x1b[0m\r\n\r\n`;
       }
     }
   }

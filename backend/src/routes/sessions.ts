@@ -62,7 +62,7 @@ export function createSessionRouter(
       const transformedOutputs = outputs.map(output => {
         if (output.type === 'json') {
           // Generate output format from JSON using enhanced formatter
-          const outputText = formatJsonForOutputEnhanced(output.data, getGitRepoPath?.());
+          const outputText = formatJsonForOutputEnhanced(output.data);
           if (outputText) {
             // Return both the JSON and a generated output version
             return [
@@ -153,8 +153,9 @@ export function createSessionRouter(
         
         // Add the initial prompt to output so it's visible
         const timestamp = new Date().toLocaleTimeString();
-        const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[32m👤 Initial Prompt\x1b[0m\r\n` +
-                                     `\x1b[37m${prompt}\x1b[0m\r\n\r\n`;
+        const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
+                                     `\x1b[1m\x1b[92m${prompt}\x1b[0m\r\n` +
+                                     `\x1b[90m${'─'.repeat(80)}\x1b[0m\r\n\r\n`;
         await sessionManager.addSessionOutput(session.id, {
           type: 'stdout',
           data: initialPromptDisplay,
@@ -233,7 +234,10 @@ export function createSessionRouter(
       }
 
       // Store continuation message in session outputs for persistence and emit via WebSocket
-      const userInputDisplay = `\n--- New Message ---\n> ${message.trim()}\n`;
+      const timestamp = new Date().toLocaleTimeString();
+      const userInputDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
+                               `\x1b[1m\x1b[92m${message.trim()}\x1b[0m\r\n` +
+                               `\x1b[90m${'─'.repeat(80)}\x1b[0m\r\n\r\n`;
       await sessionManager.addSessionOutput(req.params.id, {
         type: 'stdout',
         data: userInputDisplay,

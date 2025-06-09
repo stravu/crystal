@@ -143,6 +143,9 @@ export class ClaudeCodeManager extends EventEmitter {
 
       this.processes.set(sessionId, claudeProcess);
       this.logger?.verbose(`Claude Code process created for session ${sessionId}`);
+      
+      // Emit spawned event to update session status
+      this.emit('spawned', { sessionId });
 
       let hasReceivedOutput = false;
       let lastOutput = '';
