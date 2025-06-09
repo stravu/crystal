@@ -48,6 +48,20 @@ export class WorktreeManager {
         // Ignore cleanup errors
       }
 
+      // Check if the repository has any commits
+      let hasCommits = false;
+      try {
+        await execAsync(`cd "${projectPath}" && git rev-parse HEAD`);
+        hasCommits = true;
+      } catch (error) {
+        // Repository has no commits yet, create initial commit
+        const addCmd = `cd "${projectPath}" && git add -A || true`;
+        const commitCmd = `cd "${projectPath}" && git commit -m "Initial commit" --allow-empty`;
+        await execAsync(addCmd);
+        await execAsync(commitCmd);
+        hasCommits = true;
+      }
+
       // Check if branch already exists
       console.log(`[WorktreeManager] Checking if branch ${branchName} exists...`);
       const checkBranchCmd = `cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`;
