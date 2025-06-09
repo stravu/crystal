@@ -1,81 +1,120 @@
-# Crystal - Build Instructions
+# Crystal - Multi-Session Claude Code Manager
 
-## Prerequisites
+Crystal is an Electron desktop application that lets you run multiple Claude Code instances simultaneously using git worktrees. Perfect for exploring different solutions to the same problem in parallel.
 
-- Node.js 22.15.1
-- pnpm (`npm install -g pnpm`)
-- Git (for repository management)
+![Crystal Logo](frontend/src/assets/crystal-logo.svg)
 
-## Build Steps
+## ✨ Key Features
+
+- **🚀 Parallel Sessions** - Run multiple Claude Code instances at once
+- **🌳 Git Worktree Isolation** - Each session gets its own branch
+- **💾 Session Persistence** - Resume conversations anytime
+- **🎯 Smart UI** - Professional terminal with real-time updates
+- **🔧 Git Integration** - Built-in rebase and squash operations
+- **📊 Change Tracking** - View diffs and track modifications
+- **🔔 Notifications** - Desktop alerts when sessions need input
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 22+ and pnpm
+- Claude Code CLI installed
+- Git repository (Crystal will initialize one if needed)
+
+### Installation
 
 ```bash
-# One-time setup (install, build, and rebuild native modules)
+# Clone the repository
+git clone https://github.com/yourusername/ccc.git
+cd ccc
+
+# One-time setup
 pnpm run setup
 
-# Run as Electron app in development mode
-pnpm electron-dev
-# Or use the shorthand:
+# Run in development
 pnpm run dev
+```
 
-# Run frontend only (without Electron shell)
-pnpm dev
+### Building for Production
 
-# Build for production
+```bash
+# Build for your current platform
 pnpm build
 
-# Type checking
-pnpm typecheck
-
-# Linting
-pnpm lint
+# Platform-specific builds
+pnpm build:mac    # macOS
+pnpm build:win    # Windows  
+pnpm build:linux  # Linux
 ```
 
-**Note:** You must run `pnpm run build:main` at least once before running `pnpm electron-dev` to compile the main process.
+## 📖 How to Use
 
-## Building Packaged Electron App
+### 1. Create a Session
+Click "Create Session" and enter:
+- **Prompt**: What you want Claude to do
+- **Worktree Name**: Branch name (optional)
+- **Count**: Number of parallel sessions
 
-### Build for Current Platform
+### 2. Manage Sessions
+- **🟢 Running**: Claude is working
+- **🟡 Waiting**: Needs your input
+- **⚪ Stopped**: Completed or paused
+- Click any session to view or continue it
+
+### 3. View Your Work
+- **Output**: Formatted terminal output
+- **Changes**: Git diffs of all modifications
+- **Terminal**: Run tests or build scripts
+- **Messages**: Raw JSON for debugging
+
+### 4. Git Operations
+- **Rebase from main**: Pull latest changes
+- **Squash and rebase**: Combine commits
+- Preview commands before executing
+
+## ⚙️ Configuration
+
+### Global Settings
+Access via the ⚙️ button:
+- Verbose logging
+- Anthropic API key
+- System prompts
+- Notifications
+
+### Project Settings
+Per-project configuration:
+- Custom prompts
+- Test/build scripts
+- Main branch name
+
+## 🎯 Tips & Tricks
+
+1. **Parallel Development**: Create multiple sessions with different prompts to explore various solutions
+2. **Quick Testing**: Use the Terminal tab to run tests after Claude makes changes
+3. **Change Review**: Always check the Changes tab before git operations
+4. **Session Names**: Use descriptive prompts for auto-generated session names
+5. **Keyboard Shortcut**: `Cmd/Ctrl + Enter` to send input
+
+## 🛠️ Development
+
+### Project Structure
+```
+ccc/
+├── frontend/     # React UI
+├── main/         # Electron main process
+├── shared/       # Shared types
+└── backend/      # Legacy (reference only)
+```
+
+### Commands
 ```bash
-pnpm build
+pnpm dev          # Run in development
+pnpm typecheck    # Type checking
+pnpm lint         # Linting
+pnpm build        # Build for production
 ```
 
-### Build for All Platforms
-```bash
-# Build for macOS
-pnpm build:mac
+## 📝 Documentation
 
-# Build for Windows
-pnpm build:win
-
-# Build for Linux
-pnpm build:linux
-
-# Build for all platforms at once
-pnpm build:all
-```
-
-**Note:** Cross-platform builds have limitations:
-- Windows apps can be built on any platform
-- macOS apps can only be built on macOS
-- Linux apps can be built on any platform
-
-## Build Output
-
-After building, packaged applications will be in the `dist-electron` directory:
-- macOS: `Crystal-1.0.0-arm64.dmg` and `Crystal-1.0.0-arm64-mac.zip`
-- Windows: `Crystal Setup 1.0.0.exe`
-- Linux: `Crystal-1.0.0.AppImage`
-
-## Features
-
-### Automatic Directory Creation
-- Crystal automatically creates the `~/.ccc` directory for configuration and database storage on first run
-- When creating a new project, Crystal will:
-  - Create the project directory if it doesn't exist
-  - Initialize a Git repository if the directory isn't already a Git repo
-  - This ensures all projects are properly set up for worktree management
-
-### Project Management
-- Projects represent Git repositories where Claude Code sessions will be created
-- Each session runs in its own Git worktree to enable parallel development
-- Multiple sessions can work on the same codebase without conflicts
+- **In-App Help**: Click the **?** button for comprehensive help
+- **Technical Docs**: See [CLAUDE.md](CLAUDE.md) for architecture details
