@@ -453,7 +453,9 @@ ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
     }
 
     // Get git commit history from the worktree
-    const commits = gitDiffManager.getCommitHistory(session.worktreePath);
+    const project = sessionManager.getProjectForSession(sessionId);
+    const mainBranch = project?.main_branch || 'main';
+    const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
     
     // Check for uncommitted changes
     const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
@@ -508,7 +510,9 @@ ipcMain.handle('sessions:get-execution-diff', async (_event, sessionId: string, 
     }
 
     // Get git commit history
-    const commits = gitDiffManager.getCommitHistory(session.worktreePath);
+    const project = sessionManager.getProjectForSession(sessionId);
+    const mainBranch = project?.main_branch || 'main';
+    const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
     const executionIndex = parseInt(executionId) - 1;
     
     if (executionIndex < 0 || executionIndex >= commits.length) {
@@ -782,7 +786,9 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
     }
 
     // Get git commit history
-    const commits = gitDiffManager.getCommitHistory(session.worktreePath);
+    const project = sessionManager.getProjectForSession(sessionId);
+    const mainBranch = project?.main_branch || 'main';
+    const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
     
     if (!commits.length) {
       return { 
@@ -965,9 +971,20 @@ ipcMain.handle('sessions:rebase-main-into-worktree', async (_event, sessionId: s
     await worktreeManager.rebaseMainIntoWorktree(session.worktreePath, mainBranch);
     
     return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to rebase main into worktree:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to rebase main into worktree' };
+    
+    // Pass detailed git error information to frontend
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to rebase main into worktree',
+      gitError: {
+        command: error.gitCommand,
+        output: error.gitOutput,
+        workingDirectory: error.workingDirectory,
+        originalError: error.originalError?.message
+      }
+    };
   }
 });
 
@@ -993,9 +1010,21 @@ ipcMain.handle('sessions:squash-and-rebase-to-main', async (_event, sessionId: s
     await worktreeManager.squashAndRebaseWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage);
     
     return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to squash and rebase worktree to main:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to squash and rebase worktree to main' };
+    
+    // Pass detailed git error information to frontend
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to squash and rebase worktree to main',
+      gitError: {
+        commands: error.gitCommands,
+        output: error.gitOutput,
+        workingDirectory: error.workingDirectory,
+        projectPath: error.projectPath,
+        originalError: error.originalError?.message
+      }
+    };
   }
 });
 

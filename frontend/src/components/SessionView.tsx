@@ -178,6 +178,16 @@ export function SessionView() {
   const [showCommitMessageDialog, setShowCommitMessageDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [dialogType, setDialogType] = useState<'rebase' | 'squash'>('rebase');
+  const [showGitErrorDialog, setShowGitErrorDialog] = useState(false);
+  const [gitErrorDetails, setGitErrorDetails] = useState<{
+    title: string;
+    message: string;
+    command?: string;
+    commands?: string[];
+    output: string;
+    workingDirectory?: string;
+    projectPath?: string;
+  } | null>(null);
   const lastProcessedOutputLength = useRef(0);
   const lastProcessedScriptOutputLength = useRef(0);
   
@@ -826,7 +836,21 @@ export function SessionView() {
       const response = await API.sessions.rebaseMainIntoWorktree(activeSession.id);
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to rebase main into worktree');
+        // Check if we have detailed git error information
+        if ((response as any).gitError) {
+          const gitError = (response as any).gitError;
+          setGitErrorDetails({
+            title: 'Rebase Failed',
+            message: response.error || 'Failed to rebase main into worktree',
+            command: gitError.command,
+            output: gitError.output || 'No output available',
+            workingDirectory: gitError.workingDirectory
+          });
+          setShowGitErrorDialog(true);
+        } else {
+          setMergeError(response.error || 'Failed to rebase main into worktree');
+        }
+        return;
       }
       
       setMergeError(null);
@@ -860,7 +884,22 @@ export function SessionView() {
       const response = await API.sessions.squashAndRebaseToMain(activeSession.id, message);
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to squash and rebase to main');
+        // Check if we have detailed git error information
+        if ((response as any).gitError) {
+          const gitError = (response as any).gitError;
+          setGitErrorDetails({
+            title: 'Squash and Rebase Failed',
+            message: response.error || 'Failed to squash and rebase to main',
+            commands: gitError.commands,
+            output: gitError.output || 'No output available',
+            workingDirectory: gitError.workingDirectory,
+            projectPath: gitError.projectPath
+          });
+          setShowGitErrorDialog(true);
+        } else {
+          setMergeError(response.error || 'Failed to squash and rebase to main');
+        }
+        return;
       }
       
       setMergeError(null);
@@ -1295,6 +1334,136 @@ export function SessionView() {
                 ) : (
                   <span>{dialogType === 'squash' ? 'Squash & Rebase' : 'Rebase'}</span>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Git Error Dialog */}
+      {showGitErrorDialog && gitErrorDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-red-50">
+              <div className="flex items-center space-x-3">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h2 className="text-lg font-semibold text-red-900">{gitErrorDetails.title}</h2>
+              </div>
+              <button
+                onClick={() => setShowGitErrorDialog(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-6">
+                {/* Error Message */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Error Message</h3>
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <p className="text-red-800 text-sm">{gitErrorDetails.message}</p>
+                  </div>
+                </div>
+
+                {/* Working Directory */}
+                {gitErrorDetails.workingDirectory && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Working Directory</h3>
+                    <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+                      <p className="text-gray-800 text-sm font-mono">{gitErrorDetails.workingDirectory}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Project Path */}
+                {gitErrorDetails.projectPath && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Project Path</h3>
+                    <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+                      <p className="text-gray-800 text-sm font-mono">{gitErrorDetails.projectPath}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Git Commands */}
+                {(gitErrorDetails.command || gitErrorDetails.commands) && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">
+                      {gitErrorDetails.commands ? 'Git Commands Executed' : 'Git Command'}
+                    </h3>
+                    <div className="space-y-2">
+                      {gitErrorDetails.command && (
+                        <div className="bg-gray-900 text-gray-100 rounded-md p-3 font-mono text-sm">
+                          {gitErrorDetails.command}
+                        </div>
+                      )}
+                      {gitErrorDetails.commands && gitErrorDetails.commands.map((cmd, idx) => (
+                        <div key={idx} className="bg-gray-900 text-gray-100 rounded-md p-3 font-mono text-sm">
+                          {cmd}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Git Output */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Git Output</h3>
+                  <div className="bg-gray-900 text-gray-100 rounded-md p-4 max-h-80 overflow-y-auto">
+                    <pre className="text-sm whitespace-pre-wrap font-mono">
+                      {gitErrorDetails.output || 'No output available'}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Helpful Information */}
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <div className="flex items-start space-x-2">
+                    <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-900 mb-1">Troubleshooting Tips</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• Check if you have uncommitted changes that need to be resolved</li>
+                        <li>• Verify that the main branch exists and is up to date</li>
+                        <li>• Look for merge conflicts in the git output above</li>
+                        <li>• Consider manually running the git commands in your terminal for more control</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  if (gitErrorDetails.output) {
+                    navigator.clipboard.writeText(gitErrorDetails.output);
+                  }
+                }}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy Output</span>
+              </button>
+              <button
+                onClick={() => setShowGitErrorDialog(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

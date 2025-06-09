@@ -217,38 +217,70 @@ export class WorktreeManager {
       await execAsync(`cd "${worktreePath}" && git rebase ${mainBranch}`);
       
       console.log(`[WorktreeManager] Successfully rebased ${mainBranch} into worktree`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[WorktreeManager] Failed to rebase ${mainBranch} into worktree:`, error);
-      throw new Error(`Failed to rebase ${mainBranch} into worktree: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Create detailed error with git command output
+      const gitError = new Error(`Failed to rebase ${mainBranch} into worktree`) as any;
+      gitError.gitCommand = `git rebase ${mainBranch}`;
+      gitError.gitOutput = error.stderr || error.stdout || error.message || '';
+      gitError.workingDirectory = worktreePath;
+      gitError.originalError = error;
+      
+      throw gitError;
     }
   }
 
   async squashAndRebaseWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string, commitMessage: string): Promise<void> {
+    const executedCommands: string[] = [];
+    
     try {
       console.log(`[WorktreeManager] Squashing and rebasing worktree to ${mainBranch}: ${worktreePath}`);
       
       // Get current branch name in worktree
-      const { stdout: currentBranch } = await execAsync(`cd "${worktreePath}" && git branch --show-current`);
+      let command = `git branch --show-current`;
+      executedCommands.push(`cd "${worktreePath}" && ${command}`);
+      const { stdout: currentBranch } = await execAsync(`cd "${worktreePath}" && ${command}`);
       const branchName = currentBranch.trim();
       
       // Get the base commit (where the worktree branch diverged from main)
-      const { stdout: baseCommit } = await execAsync(`cd "${worktreePath}" && git merge-base ${mainBranch} HEAD`);
+      command = `git merge-base ${mainBranch} HEAD`;
+      executedCommands.push(`cd "${worktreePath}" && ${command}`);
+      const { stdout: baseCommit } = await execAsync(`cd "${worktreePath}" && ${command}`);
       const base = baseCommit.trim();
       
       // Squash all commits since base into one
-      await execAsync(`cd "${worktreePath}" && git reset --soft ${base}`);
-      await execAsync(`cd "${worktreePath}" && git commit -m "${commitMessage.replace(/"/g, '\\"')}"`);
+      command = `git reset --soft ${base}`;
+      executedCommands.push(`cd "${worktreePath}" && ${command}`);
+      await execAsync(`cd "${worktreePath}" && ${command}`);
+      
+      command = `git commit -m "${commitMessage.replace(/"/g, '\\"')}"`;
+      executedCommands.push(`cd "${worktreePath}" && ${command}`);
+      await execAsync(`cd "${worktreePath}" && ${command}`);
       
       // Switch to main branch in the main repository
-      await execAsync(`cd "${projectPath}" && git checkout ${mainBranch}`);
+      command = `git checkout ${mainBranch}`;
+      executedCommands.push(`cd "${projectPath}" && ${command}`);
+      await execAsync(`cd "${projectPath}" && ${command}`);
       
       // Rebase the squashed commit onto main
-      await execAsync(`cd "${projectPath}" && git rebase ${branchName}`);
+      command = `git rebase ${branchName}`;
+      executedCommands.push(`cd "${projectPath}" && ${command}`);
+      await execAsync(`cd "${projectPath}" && ${command}`);
       
       console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[WorktreeManager] Failed to squash and rebase worktree to ${mainBranch}:`, error);
-      throw new Error(`Failed to squash and rebase worktree to ${mainBranch}: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Create detailed error with git command output
+      const gitError = new Error(`Failed to squash and rebase worktree to ${mainBranch}`) as any;
+      gitError.gitCommands = executedCommands;
+      gitError.gitOutput = error.stderr || error.stdout || error.message || '';
+      gitError.workingDirectory = worktreePath;
+      gitError.projectPath = projectPath;
+      gitError.originalError = error;
+      
+      throw gitError;
     }
   }
 

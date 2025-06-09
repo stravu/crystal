@@ -91,14 +91,15 @@ export class GitDiffManager {
   }
 
   /**
-   * Get git commit history for a worktree
+   * Get git commit history for a worktree (only commits unique to this branch)
    */
-  getCommitHistory(worktreePath: string, limit: number = 50): GitCommit[] {
+  getCommitHistory(worktreePath: string, limit: number = 50, mainBranch: string = 'main'): GitCommit[] {
     try {
-      // Get commit log with stats
+      // Get commit log with stats, excluding commits that are in main branch
+      // This shows only commits unique to the current branch
       const logFormat = '%H|%s|%ai|%an';
       const logOutput = execSync(
-        `git log --format="${logFormat}" --numstat -n ${limit}`,
+        `git log --format="${logFormat}" --numstat -n ${limit} HEAD --not ${mainBranch}`,
         { cwd: worktreePath, encoding: 'utf8' }
       );
 
