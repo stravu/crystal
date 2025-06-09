@@ -40,6 +40,19 @@ export class WorktreeManager {
     console.log(`[WorktreeManager] Worktree path: ${worktreePath}, branch: ${branchName}`);
 
     try {
+      // First check if this is a git repository
+      let isGitRepo = false;
+      try {
+        await execAsync(`cd "${projectPath}" && git rev-parse --is-inside-work-tree`);
+        isGitRepo = true;
+        console.log(`[WorktreeManager] Directory is a git repository`);
+      } catch (error) {
+        console.log(`[WorktreeManager] Directory is not a git repository, initializing...`);
+        // Initialize git repository
+        await execAsync(`cd "${projectPath}" && git init`);
+        console.log(`[WorktreeManager] Git repository initialized`);
+      }
+
       // Clean up any existing worktree directory first
       console.log(`[WorktreeManager] Cleaning up any existing worktree...`);
       try {
@@ -55,11 +68,13 @@ export class WorktreeManager {
         hasCommits = true;
       } catch (error) {
         // Repository has no commits yet, create initial commit
+        console.log(`[WorktreeManager] No commits found, creating initial commit...`);
         const addCmd = `cd "${projectPath}" && git add -A || true`;
         const commitCmd = `cd "${projectPath}" && git commit -m "Initial commit" --allow-empty`;
         await execAsync(addCmd);
         await execAsync(commitCmd);
         hasCommits = true;
+        console.log(`[WorktreeManager] Initial commit created`);
       }
 
       // Check if branch already exists

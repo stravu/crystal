@@ -6,6 +6,7 @@ import { SessionView } from './components/SessionView';
 import { PromptHistory } from './components/PromptHistory';
 import Help from './components/Help';
 import Welcome from './components/Welcome';
+import { MainProcessLogger } from './components/MainProcessLogger';
 
 type ViewMode = 'sessions' | 'prompts';
 
@@ -27,6 +28,7 @@ function App() {
 
   return (
     <div className="h-screen flex overflow-hidden">
+      <MainProcessLogger />
       {/* Draggable title bar area */}
       <div 
         className="fixed top-0 left-0 right-0 h-8 z-50" 

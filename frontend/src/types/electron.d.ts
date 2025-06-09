@@ -87,6 +87,7 @@ interface ElectronAPI {
     onSessionsLoaded: (callback: (sessions: any[]) => void) => () => void;
     onSessionOutput: (callback: (output: any) => void) => () => void;
     onScriptOutput: (callback: (output: any) => void) => () => void;
+    onMainLog: (callback: (level: string, message: string) => void) => () => void;
     removeAllListeners: (channel: string) => void;
   };
 }

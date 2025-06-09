@@ -69,6 +69,48 @@ async function createWindow() {
     console.log(`[Renderer] ${message} (${sourceId}:${line})`);
   });
 
+  // Override console methods to forward to renderer
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  const originalInfo = console.info;
+
+  console.log = (...args: any[]) => {
+    originalLog.apply(console, args);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-log', 'log', args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' '));
+    }
+  };
+
+  console.error = (...args: any[]) => {
+    originalError.apply(console, args);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-log', 'error', args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' '));
+    }
+  };
+
+  console.warn = (...args: any[]) => {
+    originalWarn.apply(console, args);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-log', 'warn', args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' '));
+    }
+  };
+
+  console.info = (...args: any[]) => {
+    originalInfo.apply(console, args);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-log', 'info', args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' '));
+    }
+  };
+
   // Log any renderer errors
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('Renderer process crashed:', details);
@@ -116,11 +158,15 @@ async function initializeServices() {
 }
 
 app.whenReady().then(async () => {
+  console.log('[Main] App is ready, initializing services...');
   await initializeServices();
+  console.log('[Main] Services initialized, creating window...');
   await createWindow();
+  console.log('[Main] Window created successfully');
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
+      console.log('[Main] Activating app, creating new window...');
       createWindow();
     }
   });
@@ -288,30 +334,40 @@ ipcMain.handle('sessions:get', async (_event, sessionId: string) => {
 });
 
 ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) => {
+  console.log('[IPC] sessions:create handler called with request:', request);
   try {
     const activeProject = sessionManager.getActiveProject();
+    console.log('[IPC] Active project:', activeProject);
     if (!activeProject) {
+      console.warn('[IPC] No active project found');
       return { success: false, error: 'No active project. Please select a project first.' };
     }
 
     if (!taskQueue) {
+      console.error('[IPC] Task queue not initialized');
       return { success: false, error: 'Task queue not initialized' };
     }
 
     const count = request.count || 1;
+    console.log(`[IPC] Creating ${count} session(s) with prompt: "${request.prompt}"`);
     
     if (count > 1) {
+      console.log('[IPC] Creating multiple sessions...');
       const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count);
+      console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
       return { success: true, data: { jobIds: jobs.map(job => job.id) } };
     } else {
+      console.log('[IPC] Creating single session...');
       const job = await taskQueue.createSession({
         prompt: request.prompt,
         worktreeTemplate: request.worktreeTemplate || ''
       });
+      console.log('[IPC] Created job with ID:', job.id);
       return { success: true, data: { jobId: job.id } };
     }
   } catch (error) {
-    console.error('Failed to create session:', error);
+    console.error('[IPC] Failed to create session:', error);
+    console.error('[IPC] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return { success: false, error: `Failed to create session: ${error}` };
   }
 });
@@ -650,12 +706,50 @@ ipcMain.handle('projects:get-active', async () => {
 
 ipcMain.handle('projects:create', async (_event, projectData: any) => {
   try {
+    console.log('[Main] Creating project:', projectData);
+    
+    // Import fs and exec utilities
+    const { mkdirSync, existsSync } = require('fs');
+    const { execSync: nodeExecSync } = require('child_process');
+    
+    // Create directory if it doesn't exist
+    if (!existsSync(projectData.path)) {
+      console.log('[Main] Creating directory:', projectData.path);
+      mkdirSync(projectData.path, { recursive: true });
+    }
+    
+    // Check if it's a git repository
+    let isGitRepo = false;
+    try {
+      nodeExecSync(`cd "${projectData.path}" && git rev-parse --is-inside-work-tree`, { encoding: 'utf-8' });
+      isGitRepo = true;
+      console.log('[Main] Directory is already a git repository');
+    } catch (error) {
+      console.log('[Main] Directory is not a git repository, initializing...');
+    }
+    
+    // Initialize git if needed
+    if (!isGitRepo) {
+      try {
+        nodeExecSync(`cd "${projectData.path}" && git init`, { encoding: 'utf-8' });
+        console.log('[Main] Git repository initialized successfully');
+        
+        // Create initial commit
+        nodeExecSync(`cd "${projectData.path}" && git commit -m "Initial commit" --allow-empty`, { encoding: 'utf-8' });
+        console.log('[Main] Created initial empty commit');
+      } catch (error) {
+        console.error('[Main] Failed to initialize git repository:', error);
+        // Continue anyway - let the user handle git setup manually if needed
+      }
+    }
+    
     // Detect the main branch if the path is a git repository
     let mainBranch: string | undefined;
     try {
       mainBranch = await worktreeManager.detectMainBranch(projectData.path);
+      console.log('[Main] Detected main branch:', mainBranch);
     } catch (error) {
-      console.log('Could not detect main branch, skipping:', error);
+      console.log('[Main] Could not detect main branch, skipping:', error);
       // Not a git repository or error detecting, that's okay
     }
 
@@ -666,9 +760,10 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
       projectData.runScript,
       mainBranch
     );
+    console.log('[Main] Project created successfully:', project);
     return { success: true, data: project };
   } catch (error) {
-    console.error('Failed to create project:', error);
+    console.error('[Main] Failed to create project:', error);
     return { success: false, error: 'Failed to create project' };
   }
 });

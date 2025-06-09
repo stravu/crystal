@@ -110,5 +110,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeAllListeners: (channel: string) => {
       ipcRenderer.removeAllListeners(channel);
     },
+    
+    // Main process logging
+    onMainLog: (callback: (level: string, message: string) => void) => {
+      ipcRenderer.on('main-log', (_event, level, message) => callback(level, message));
+      return () => ipcRenderer.removeAllListeners('main-log');
+    },
   },
 });
