@@ -18,7 +18,7 @@ export class ClaudeCodeManager extends EventEmitter {
     super();
   }
 
-  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[]): Promise<void> {
+  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false): Promise<void> {
     try {
       this.logger?.verbose(`Spawning Claude for session ${sessionId} in ${worktreePath}`);
       this.logger?.verbose(`Command: claude -p "${prompt}"`);
@@ -71,12 +71,16 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.verbose(`Claude works in target directory`);
       }
       
-      // Build the command arguments for conversation continuation
+      // Build the command arguments
       const args = ['--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'];
       
-      if (conversationHistory && conversationHistory.length > 0) {
-        // If we have conversation history, use it to continue the conversation
-        args.push('-p', conversationHistory.join('\n\n'));
+      if (isResume) {
+        // Use --resume flag to continue existing conversation
+        args.push('--resume');
+        // If a new prompt is provided, add it
+        if (prompt && prompt.trim()) {
+          args.push('-p', prompt);
+        }
       } else {
         // Initial prompt for new session
         let finalPrompt = prompt;
@@ -243,8 +247,14 @@ export class ClaudeCodeManager extends EventEmitter {
   }
 
   async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[]): Promise<void> {
-    const messages = conversationHistory.map(msg => msg.content);
-    return this.spawnClaudeCode(sessionId, worktreePath, prompt, messages);
+    // Kill any existing process for this session first
+    if (this.processes.has(sessionId)) {
+      this.killProcess(sessionId);
+    }
+    
+    // For continuing a session, we use the --resume flag
+    // The conversationHistory parameter is kept for compatibility but not used with --resume
+    return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true);
   }
 
   async stopSession(sessionId: string): Promise<void> {
