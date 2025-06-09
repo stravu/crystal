@@ -1,7 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { SessionManager } from './services/sessionManager';
 import { WorktreeManager } from './services/worktreeManager';
@@ -19,13 +17,6 @@ import { formatJsonForOutputEnhanced } from './utils/toolFormatter';
 dotenv.config();
 
 const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:4521',
-    methods: ['GET', 'POST']
-  }
-});
 
 const configManager = new ConfigManager(process.env.GIT_REPO_PATH);
 const logger = new Logger(configManager);
@@ -62,32 +53,32 @@ async function initialize() {
   });
   
   sessionManager.on('sessions-loaded', (sessions) => {
-    io.emit('sessions:loaded', sessions);
+    // Event removed - using IPC in Electron
   });
   
   sessionManager.on('session-created', (session) => {
-    io.emit('session:created', session);
+    // Event removed - using IPC in Electron
   });
 
   sessionManager.on('session-updated', (session) => {
-    io.emit('session:updated', session);
+    // Event removed - using IPC in Electron
   });
 
   sessionManager.on('session-deleted', (session) => {
-    io.emit('session:deleted', session);
+    // Event removed - using IPC in Electron
   });
 
   sessionManager.on('session-output', (output) => {
     const dataPreview = typeof output.data === 'string' 
       ? output.data.substring(0, 50) 
       : JSON.stringify(output.data).substring(0, 50);
-    console.log('Emitting session output to WebSocket:', output.sessionId, dataPreview);
-    io.emit('session:output', output);
+    console.log('Session output:', output.sessionId, dataPreview);
+    // Event removed - using IPC in Electron
   });
 
   sessionManager.on('script-output', (output) => {
-    console.log('Emitting script output to WebSocket:', output.sessionId, output.type);
-    io.emit('script:output', output);
+    console.log('Script output:', output.sessionId, output.type);
+    // Event removed - using IPC in Electron
   });
 
   sessionManager.on('conversation-continue', async ({ sessionId }) => {
@@ -209,22 +200,7 @@ async function initialize() {
   app.use('/api/config', createConfigRouter(configManager));
   app.use('/api/prompts', createPromptsRouter(sessionManager, logger));
 
-  // Set up WebSocket handling after sessionManager is ready
-  io.on('connection', async (socket) => {
-    console.log('Client connected:', socket.id);
-    
-    try {
-      const sessions = await sessionManager.getAllSessions();
-      socket.emit('sessions:initial', sessions);
-    } catch (error) {
-      console.error('Error fetching sessions for new client:', error);
-      socket.emit('sessions:initial', []);
-    }
-    
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
-    });
-  });
+  // WebSocket handling removed - using IPC in Electron
 }
 
 app.use(cors());
@@ -239,7 +215,7 @@ app.get('/health', (_req, res) => {
 const PORT = parseInt(process.env.PORT || '3521', 10);
 
 initialize().then(() => {
-  httpServer.listen(PORT, '127.0.0.1', () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`Server running on http://127.0.0.1:${PORT}`);
     console.log('Database and session manager initialized successfully');
   });
