@@ -272,6 +272,12 @@ export class SessionManager extends EventEmitter {
     // Store the user's message
     this.addConversationMessage(id, 'user', userMessage);
     
+    // Add a prompt marker for this continued conversation
+    // Get current output count to use as index
+    const outputs = this.db.getSessionOutputs(id);
+    this.db.addPromptMarker(id, userMessage, outputs.length);
+    console.log('[SessionManager] Added prompt marker for continued conversation');
+    
     // Emit event for the Claude Code manager to handle
     this.emit('conversation-continue', { sessionId: id, message: userMessage });
   }

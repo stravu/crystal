@@ -333,6 +333,11 @@ ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: s
     // Update session status to initializing
     sessionManager.updateSession(sessionId, { status: 'initializing' });
     
+    // Add the prompt to conversation history and prompt markers (if a prompt is provided)
+    if (continuePrompt) {
+      sessionManager.continueConversation(sessionId, continuePrompt);
+    }
+    
     // Continue the session with the existing conversation
     await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory);
     
