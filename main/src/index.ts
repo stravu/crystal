@@ -66,7 +66,18 @@ async function createWindow() {
 
   // Log any console messages from the renderer
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+    // Skip messages that are already prefixed to avoid circular logging
+    if (message.includes('[Main Process]') || message.includes('[Renderer]')) {
+      return;
+    }
+    // Also skip Electron security warnings and other system messages
+    if (message.includes('Electron Security Warning') || sourceId.includes('electron/js2c')) {
+      return;
+    }
+    // Only log errors and warnings from renderer, not all messages
+    if (level >= 2) { // 2 = warning, 3 = error
+      console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+    }
   });
 
   // Override console methods to forward to renderer
