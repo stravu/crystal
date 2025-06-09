@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (request: any): Promise<IPCResponse> => ipcRenderer.invoke('sessions:create', request),
     delete: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:delete', sessionId),
     sendInput: (sessionId: string, input: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:input', sessionId, input),
-    continue: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId),
+    continue: (sessionId: string, prompt?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt),
     getOutput: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-output', sessionId),
     getConversation: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-conversation', sessionId),
     markViewed: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:mark-viewed', sessionId),

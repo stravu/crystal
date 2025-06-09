@@ -316,9 +316,22 @@ ipcMain.handle('sessions:input', async (_event, sessionId: string, input: string
   }
 });
 
-ipcMain.handle('sessions:continue', async (_event, sessionId: string) => {
+ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string) => {
   try {
-    await claudeCodeManager.continueConversation(sessionId);
+    // Get session details
+    const session = sessionManager.getSession(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    
+    // Get conversation history
+    const conversationHistory = sessionManager.getConversationMessages(sessionId);
+    
+    // If no prompt provided, use empty string (for resuming)
+    const continuePrompt = prompt || '';
+    
+    // Continue the session with the existing conversation
+    await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory);
     return { success: true };
   } catch (error) {
     console.error('Failed to continue conversation:', error);

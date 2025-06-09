@@ -619,7 +619,7 @@ export function SessionView() {
     if (!input.trim()) return;
     
     try {
-      const response = await API.sessions.continue(activeSession.id);
+      const response = await API.sessions.continue(activeSession.id, input);
       
       if (!response.success) {
         throw new Error(response.error || 'Failed to continue conversation');
