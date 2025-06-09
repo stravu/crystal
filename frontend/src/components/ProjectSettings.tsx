@@ -16,6 +16,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
   const [path, setPath] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [runScript, setRunScript] = useState('');
+  const [mainBranch, setMainBranch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -26,6 +27,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       setPath(project.path);
       setSystemPrompt(project.system_prompt || '');
       setRunScript(project.run_script || '');
+      setMainBranch(project.main_branch || '');
       setError(null);
     }
   }, [isOpen, project]);
@@ -39,7 +41,8 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
         name,
         path,
         system_prompt: systemPrompt || null,
-        run_script: runScript || null
+        run_script: runScript || null,
+        main_branch: mainBranch || null
       });
 
       if (!response.success) {
@@ -143,6 +146,22 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
                     The local path to the git repository for this project
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Main Branch
+                  </label>
+                  <input
+                    type="text"
+                    value={mainBranch}
+                    onChange={(e) => setMainBranch(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
+                    placeholder="main"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    The main branch name for git operations (e.g., main, master, develop)
                   </p>
                 </div>
               </div>

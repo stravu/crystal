@@ -649,11 +649,21 @@ ipcMain.handle('projects:get-active', async () => {
 
 ipcMain.handle('projects:create', async (_event, projectData: any) => {
   try {
+    // Detect the main branch if the path is a git repository
+    let mainBranch: string | undefined;
+    try {
+      mainBranch = await worktreeManager.detectMainBranch(projectData.path);
+    } catch (error) {
+      console.log('Could not detect main branch, skipping:', error);
+      // Not a git repository or error detecting, that's okay
+    }
+
     const project = databaseService.createProject(
       projectData.name,
       projectData.path,
       projectData.systemPrompt,
-      projectData.runScript
+      projectData.runScript,
+      mainBranch
     );
     return { success: true, data: project };
   } catch (error) {
@@ -932,24 +942,119 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
   }
 });
 
-// Git merge operations (placeholders - would need implementation)
-ipcMain.handle('sessions:merge-main-to-worktree', async (_event, sessionId: string) => {
+// Git rebase operations
+ipcMain.handle('sessions:rebase-main-into-worktree', async (_event, sessionId: string) => {
   try {
-    // TODO: Implement git merge from main to worktree
-    return { success: false, error: 'Git merge not implemented yet' };
+    const session = await sessionManager.getSession(sessionId);
+    if (!session) {
+      return { success: false, error: 'Session not found' };
+    }
+
+    if (!session.worktreePath) {
+      return { success: false, error: 'Session has no worktree path' };
+    }
+
+    // Get the project to find the main branch
+    const project = sessionManager.getProjectForSession(sessionId);
+    if (!project) {
+      return { success: false, error: 'Project not found for session' };
+    }
+
+    const mainBranch = project.main_branch || 'main';
+    
+    await worktreeManager.rebaseMainIntoWorktree(session.worktreePath, mainBranch);
+    
+    return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
   } catch (error) {
-    console.error('Failed to merge main to worktree:', error);
-    return { success: false, error: 'Failed to merge main to worktree' };
+    console.error('Failed to rebase main into worktree:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to rebase main into worktree' };
   }
 });
 
-ipcMain.handle('sessions:merge-worktree-to-main', async (_event, sessionId: string) => {
+ipcMain.handle('sessions:squash-and-rebase-to-main', async (_event, sessionId: string, commitMessage: string) => {
   try {
-    // TODO: Implement git merge from worktree to main
-    return { success: false, error: 'Git merge not implemented yet' };
+    const session = await sessionManager.getSession(sessionId);
+    if (!session) {
+      return { success: false, error: 'Session not found' };
+    }
+
+    if (!session.worktreePath) {
+      return { success: false, error: 'Session has no worktree path' };
+    }
+
+    // Get the project to find the main branch and project path
+    const project = sessionManager.getProjectForSession(sessionId);
+    if (!project) {
+      return { success: false, error: 'Project not found for session' };
+    }
+
+    const mainBranch = project.main_branch || 'main';
+    
+    await worktreeManager.squashAndRebaseWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage);
+    
+    return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
   } catch (error) {
-    console.error('Failed to merge worktree to main:', error);
-    return { success: false, error: 'Failed to merge worktree to main' };
+    console.error('Failed to squash and rebase worktree to main:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to squash and rebase worktree to main' };
+  }
+});
+
+// Git operation helpers
+ipcMain.handle('sessions:has-changes-to-rebase', async (_event, sessionId: string) => {
+  try {
+    const session = await sessionManager.getSession(sessionId);
+    if (!session || !session.worktreePath) {
+      return { success: false, error: 'Session or worktree path not found' };
+    }
+
+    const project = sessionManager.getProjectForSession(sessionId);
+    if (!project) {
+      return { success: false, error: 'Project not found for session' };
+    }
+
+    const mainBranch = project.main_branch || 'main';
+    const hasChanges = await worktreeManager.hasChangesToRebase(session.worktreePath, mainBranch);
+    
+    return { success: true, data: hasChanges };
+  } catch (error) {
+    console.error('Failed to check for changes to rebase:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to check for changes to rebase' };
+  }
+});
+
+ipcMain.handle('sessions:get-git-commands', async (_event, sessionId: string) => {
+  try {
+    const session = await sessionManager.getSession(sessionId);
+    if (!session || !session.worktreePath) {
+      return { success: false, error: 'Session or worktree path not found' };
+    }
+
+    const project = sessionManager.getProjectForSession(sessionId);
+    if (!project) {
+      return { success: false, error: 'Project not found for session' };
+    }
+
+    const mainBranch = project.main_branch || 'main';
+    
+    // Get current branch name
+    const { execSync } = require('child_process');
+    const currentBranch = execSync(`cd "${session.worktreePath}" && git branch --show-current`, { encoding: 'utf8' }).trim();
+    
+    const rebaseCommands = worktreeManager.generateRebaseCommands(mainBranch);
+    const squashCommands = worktreeManager.generateSquashCommands(mainBranch, currentBranch);
+    
+    return { 
+      success: true, 
+      data: { 
+        rebaseCommands, 
+        squashCommands,
+        mainBranch,
+        currentBranch
+      } 
+    };
+  } catch (error) {
+    console.error('Failed to get git commands:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to get git commands' };
   }
 });
 

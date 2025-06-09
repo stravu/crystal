@@ -41,9 +41,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Prompt operations
     getPrompts: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-prompts', sessionId),
     
-    // Git merge operations
-    mergeMainToWorktree: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:merge-main-to-worktree', sessionId),
-    mergeWorktreeToMain: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:merge-worktree-to-main', sessionId),
+    // Git rebase operations
+    rebaseMainIntoWorktree: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:rebase-main-into-worktree', sessionId),
+    squashAndRebaseToMain: (sessionId: string, commitMessage: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:squash-and-rebase-to-main', sessionId, commitMessage),
+    
+    // Git operation helpers
+    hasChangesToRebase: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:has-changes-to-rebase', sessionId),
+    getGitCommands: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-git-commands', sessionId),
   },
 
   // Project management

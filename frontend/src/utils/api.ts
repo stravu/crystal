@@ -118,15 +118,26 @@ export class API {
       return window.electronAPI.sessions.getPrompts(sessionId);
     },
 
-    // Git merge operations
-    async mergeMainToWorktree(sessionId: string) {
+    // Git rebase operations
+    async rebaseMainIntoWorktree(sessionId: string) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.sessions.mergeMainToWorktree(sessionId);
+      return window.electronAPI.sessions.rebaseMainIntoWorktree(sessionId);
     },
 
-    async mergeWorktreeToMain(sessionId: string) {
+    async squashAndRebaseToMain(sessionId: string, commitMessage: string) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.sessions.mergeWorktreeToMain(sessionId);
+      return window.electronAPI.sessions.squashAndRebaseToMain(sessionId, commitMessage);
+    },
+
+    // Git operation helpers
+    async hasChangesToRebase(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.hasChangesToRebase(sessionId);
+    },
+
+    async getGitCommands(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getGitCommands(sessionId);
     },
   };
 

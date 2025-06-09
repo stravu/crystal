@@ -171,6 +171,13 @@ export function SessionView() {
   const [isMerging, setIsMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  
+  // Git operation state
+  const [gitCommands, setGitCommands] = useState<{rebaseCommands: string[], squashCommands: string[], mainBranch?: string, currentBranch?: string} | null>(null);
+  const [hasChangesToRebase, setHasChangesToRebase] = useState<boolean>(false);
+  const [showCommitMessageDialog, setShowCommitMessageDialog] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('');
+  const [dialogType, setDialogType] = useState<'rebase' | 'squash'>('rebase');
   const lastProcessedOutputLength = useRef(0);
   const lastProcessedScriptOutputLength = useRef(0);
   
@@ -556,6 +563,35 @@ export function SessionView() {
       terminal: false,
     });
   }, [activeSession?.id]);
+
+  // Load git commands and check for changes to rebase
+  useEffect(() => {
+    if (!activeSession) {
+      setGitCommands(null);
+      setHasChangesToRebase(false);
+      return;
+    }
+    
+    const loadGitData = async () => {
+      try {
+        // Load git commands for tooltips
+        const commandsResponse = await API.sessions.getGitCommands(activeSession.id);
+        if (commandsResponse.success) {
+          setGitCommands(commandsResponse.data);
+        }
+        
+        // Check if there are changes to rebase
+        const changesResponse = await API.sessions.hasChangesToRebase(activeSession.id);
+        if (changesResponse.success) {
+          setHasChangesToRebase(changesResponse.data);
+        }
+      } catch (error) {
+        console.error('Error loading git data:', error);
+      }
+    };
+    
+    loadGitData();
+  }, [activeSession?.id]);
   
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -782,48 +818,82 @@ export function SessionView() {
     }
   };
 
-  const handleMergeMainToWorktree = async () => {
+  const handleRebaseMainIntoWorktree = async () => {
     setIsMerging(true);
     setMergeError(null);
     
     try {
-      const response = await API.sessions.mergeMainToWorktree(activeSession.id);
+      const response = await API.sessions.rebaseMainIntoWorktree(activeSession.id);
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to merge main to worktree');
+        throw new Error(response.error || 'Failed to rebase main into worktree');
       }
       
-      // If successful, you might want to show a success message
-      // For now, we'll just clear any errors
       setMergeError(null);
+      // Refresh git data after successful rebase
+      const changesResponse = await API.sessions.hasChangesToRebase(activeSession.id);
+      if (changesResponse.success) {
+        setHasChangesToRebase(changesResponse.data);
+      }
     } catch (error) {
-      console.error('Error merging main to worktree:', error);
-      setMergeError(error instanceof Error ? error.message : 'Failed to merge main to worktree');
+      console.error('Error rebasing main into worktree:', error);
+      setMergeError(error instanceof Error ? error.message : 'Failed to rebase main into worktree');
     } finally {
       setIsMerging(false);
     }
   };
 
-  const handleMergeWorktreeToMain = async () => {
+  const handleSquashAndRebaseToMain = async () => {
+    // Show commit message dialog for squash operation
+    const defaultCommitMessage = await generateDefaultCommitMessage();
+    setCommitMessage(defaultCommitMessage);
+    setDialogType('squash');
+    setShowCommitMessageDialog(true);
+  };
+
+  const performSquashWithCommitMessage = async (message: string) => {
     setIsMerging(true);
     setMergeError(null);
+    setShowCommitMessageDialog(false);
     
     try {
-      const response = await API.sessions.mergeWorktreeToMain(activeSession.id);
+      const response = await API.sessions.squashAndRebaseToMain(activeSession.id, message);
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to merge worktree to main');
+        throw new Error(response.error || 'Failed to squash and rebase to main');
       }
       
-      // If successful, you might want to show a success message
-      // For now, we'll just clear any errors
       setMergeError(null);
+      // Refresh git data after successful squash
+      const changesResponse = await API.sessions.hasChangesToRebase(activeSession.id);
+      if (changesResponse.success) {
+        setHasChangesToRebase(changesResponse.data);
+      }
     } catch (error) {
-      console.error('Error merging worktree to main:', error);
-      setMergeError(error instanceof Error ? error.message : 'Failed to merge worktree to main');
+      console.error('Error squashing and rebasing to main:', error);
+      setMergeError(error instanceof Error ? error.message : 'Failed to squash and rebase to main');
     } finally {
       setIsMerging(false);
     }
+  };
+
+  const generateDefaultCommitMessage = async () => {
+    try {
+      const promptsResponse = await API.sessions.getPrompts(activeSession.id);
+      if (promptsResponse.success && promptsResponse.data?.length > 0) {
+        // Get all prompts and join them with empty lines
+        const prompts = promptsResponse.data.map((prompt: any) => prompt.prompt_text || prompt.content).filter(Boolean);
+        return prompts.join('\n\n');
+      }
+    } catch (error) {
+      console.error('Error generating default commit message:', error);
+    }
+    
+    // Fallback to a simple message with main branch name
+    const mainBranch = gitCommands?.mainBranch || 'main';
+    return dialogType === 'squash' 
+      ? `Squashed commits from ${gitCommands?.currentBranch || 'feature branch'}`
+      : `Rebase from ${mainBranch}`;
   };
   
   return (
@@ -866,10 +936,10 @@ export function SessionView() {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="group relative">
                   <button
-                    onClick={handleMergeMainToWorktree}
-                    disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
+                    onClick={handleRebaseMainIntoWorktree}
+                    disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || !hasChangesToRebase}
                     className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
-                      isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'
+                      isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || !hasChangesToRebase
                         ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
                         : 'bg-white border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'
                     }`}
@@ -877,19 +947,31 @@ export function SessionView() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
                     </svg>
-                    <span className="text-sm font-medium">{isMerging ? 'Merging...' : 'Pull'}</span>
+                    <span className="text-sm font-medium">{isMerging ? 'Rebasing...' : `Rebase from ${gitCommands?.mainBranch || 'main'}`}</span>
                   </button>
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                    <div className="font-semibold mb-1">Pull from Main</div>
-                    <div>Merge main branch into this worktree</div>
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                  {/* Enhanced Tooltip */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-md w-80">
+                    <div className="font-semibold mb-1">Rebase from {gitCommands?.mainBranch || 'main'}</div>
+                    {!hasChangesToRebase ? (
+                      <div className="text-gray-300">No changes to rebase</div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-gray-300">Command to run:</div>
+                        <div className="font-mono text-xs bg-gray-800 px-2 py-1 rounded whitespace-nowrap">
+                          git rebase {gitCommands?.mainBranch || 'main'}
+                        </div>
+                        <div className="text-xs text-gray-300 mt-1">
+                          Replays your commits on top of {gitCommands?.mainBranch || 'main'}
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
                   </div>
                 </div>
                 
                 <div className="group relative">
                   <button
-                    onClick={handleMergeWorktreeToMain}
+                    onClick={handleSquashAndRebaseToMain}
                     disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
                     className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
                       isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'
@@ -900,13 +982,35 @@ export function SessionView() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
                     </svg>
-                    <span className="text-sm font-medium">{isMerging ? 'Pushing...' : 'Push'}</span>
+                    <span className="text-sm font-medium">{isMerging ? 'Squashing...' : `Rebase to ${gitCommands?.mainBranch || 'main'}`}</span>
                   </button>
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                    <div className="font-semibold mb-1">Push to Main</div>
-                    <div>Rebase and fast-forward merge (no merge commits)</div>
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                  {/* Enhanced Tooltip */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-lg w-96">
+                    <div className="font-semibold mb-1">Rebase to {gitCommands?.mainBranch || 'main'}</div>
+                    <div className="space-y-1">
+                      <div className="text-gray-300">Commands to run:</div>
+                      <div className="space-y-1">
+                        <div className="font-mono text-xs bg-gray-800 px-2 py-1 rounded">
+                          git merge-base {gitCommands?.mainBranch || 'main'} HEAD
+                        </div>
+                        <div className="font-mono text-xs bg-gray-800 px-2 py-1 rounded">
+                          git reset --soft &lt;base-commit&gt;
+                        </div>
+                        <div className="font-mono text-xs bg-gray-800 px-2 py-1 rounded">
+                          git commit -m "Your message"
+                        </div>
+                        <div className="font-mono text-xs bg-gray-800 px-2 py-1 rounded">
+                          git checkout {gitCommands?.mainBranch || 'main'}
+                        </div>
+                        <div className="font-mono text-xs bg-gray-800 px-2 py-1 rounded">
+                          git rebase {gitCommands?.currentBranch || 'feature-branch'}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-300 mt-1">
+                        Squashes all commits into one, then rebases onto {gitCommands?.mainBranch || 'main'}
+                      </div>
+                    </div>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
                   </div>
                 </div>
               </div>
@@ -1105,6 +1209,97 @@ export function SessionView() {
           </p>
         )}
       </div>
+
+      {/* Commit Message Dialog */}
+      {showCommitMessageDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {dialogType === 'squash' 
+                  ? `Squash and Rebase to ${gitCommands?.mainBranch || 'Main'}`
+                  : `Rebase from ${gitCommands?.mainBranch || 'Main'}`
+                }
+              </h2>
+              <button
+                onClick={() => setShowCommitMessageDialog(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Commit Message
+                  </label>
+                  <textarea
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                    rows={8}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                    placeholder={dialogType === 'squash' 
+                      ? "Enter commit message for the squashed commit..."
+                      : "Enter commit message for the rebase..."
+                    }
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {dialogType === 'squash'
+                      ? `This message will be used for the single squashed commit combining all your changes.`
+                      : `This message will be used when rebasing changes from ${gitCommands?.mainBranch || 'main'}.`
+                    }
+                  </p>
+                </div>
+
+                {(dialogType === 'squash' ? gitCommands?.squashCommands : gitCommands?.rebaseCommands) && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Git commands to be executed:</h4>
+                    <div className="space-y-1">
+                      {(dialogType === 'squash' ? gitCommands.squashCommands : gitCommands.rebaseCommands)?.map((cmd, idx) => (
+                        <div key={idx} className="font-mono text-xs bg-gray-800 text-white px-3 py-2 rounded">
+                          {cmd}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowCommitMessageDialog(false)}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => performSquashWithCommitMessage(commitMessage)}
+                disabled={!commitMessage.trim() || isMerging}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+              >
+                {isMerging ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>{dialogType === 'squash' ? 'Squashing...' : 'Rebasing...'}</span>
+                  </>
+                ) : (
+                  <span>{dialogType === 'squash' ? 'Squash & Rebase' : 'Rebase'}</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

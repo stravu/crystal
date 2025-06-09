@@ -150,4 +150,121 @@ export class WorktreeManager {
       throw new Error(`Failed to list worktrees: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  async detectMainBranch(projectPath: string): Promise<string> {
+    try {
+      // Try to get the default branch from remote first
+      try {
+        const { stdout: remoteHead } = await execAsync(`cd "${projectPath}" && git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true`);
+        if (remoteHead.trim()) {
+          const mainBranch = remoteHead.trim().replace('refs/remotes/origin/', '');
+          console.log(`[WorktreeManager] Detected main branch from remote: ${mainBranch}`);
+          return mainBranch;
+        }
+      } catch {
+        // Remote HEAD not available, continue with other methods
+      }
+
+      // Try to get current branch
+      try {
+        const { stdout: currentBranch } = await execAsync(`cd "${projectPath}" && git branch --show-current 2>/dev/null || true`);
+        if (currentBranch.trim()) {
+          console.log(`[WorktreeManager] Using current branch as main: ${currentBranch.trim()}`);
+          return currentBranch.trim();
+        }
+      } catch {
+        // Current branch not available
+      }
+
+      // Try common main branch names
+      const commonNames = ['main', 'master', 'develop', 'dev'];
+      for (const branchName of commonNames) {
+        try {
+          await execAsync(`cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`);
+          console.log(`[WorktreeManager] Found common main branch: ${branchName}`);
+          return branchName;
+        } catch {
+          // Branch doesn't exist, try next
+        }
+      }
+
+      // Fallback to 'main' as default
+      console.log(`[WorktreeManager] No main branch detected, defaulting to 'main'`);
+      return 'main';
+    } catch (error) {
+      console.error(`[WorktreeManager] Error detecting main branch:`, error);
+      return 'main';
+    }
+  }
+
+  async hasChangesToRebase(worktreePath: string, mainBranch: string): Promise<boolean> {
+    try {
+      // Check if main branch has commits that the current branch doesn't have
+      const { stdout } = await execAsync(`cd "${worktreePath}" && git rev-list --count HEAD..${mainBranch} 2>/dev/null || echo "0"`);
+      const commitCount = parseInt(stdout.trim());
+      return commitCount > 0;
+    } catch (error) {
+      console.error(`[WorktreeManager] Error checking for changes to rebase:`, error);
+      return false;
+    }
+  }
+
+  async rebaseMainIntoWorktree(worktreePath: string, mainBranch: string): Promise<void> {
+    try {
+      console.log(`[WorktreeManager] Rebasing ${mainBranch} into worktree: ${worktreePath}`);
+      
+      // Rebase the current worktree branch onto main
+      await execAsync(`cd "${worktreePath}" && git rebase ${mainBranch}`);
+      
+      console.log(`[WorktreeManager] Successfully rebased ${mainBranch} into worktree`);
+    } catch (error) {
+      console.error(`[WorktreeManager] Failed to rebase ${mainBranch} into worktree:`, error);
+      throw new Error(`Failed to rebase ${mainBranch} into worktree: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async squashAndRebaseWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string, commitMessage: string): Promise<void> {
+    try {
+      console.log(`[WorktreeManager] Squashing and rebasing worktree to ${mainBranch}: ${worktreePath}`);
+      
+      // Get current branch name in worktree
+      const { stdout: currentBranch } = await execAsync(`cd "${worktreePath}" && git branch --show-current`);
+      const branchName = currentBranch.trim();
+      
+      // Get the base commit (where the worktree branch diverged from main)
+      const { stdout: baseCommit } = await execAsync(`cd "${worktreePath}" && git merge-base ${mainBranch} HEAD`);
+      const base = baseCommit.trim();
+      
+      // Squash all commits since base into one
+      await execAsync(`cd "${worktreePath}" && git reset --soft ${base}`);
+      await execAsync(`cd "${worktreePath}" && git commit -m "${commitMessage.replace(/"/g, '\\"')}"`);
+      
+      // Switch to main branch in the main repository
+      await execAsync(`cd "${projectPath}" && git checkout ${mainBranch}`);
+      
+      // Rebase the squashed commit onto main
+      await execAsync(`cd "${projectPath}" && git rebase ${branchName}`);
+      
+      console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
+    } catch (error) {
+      console.error(`[WorktreeManager] Failed to squash and rebase worktree to ${mainBranch}:`, error);
+      throw new Error(`Failed to squash and rebase worktree to ${mainBranch}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  generateRebaseCommands(mainBranch: string): string[] {
+    return [
+      `git rebase ${mainBranch}`
+    ];
+  }
+
+  generateSquashCommands(mainBranch: string, branchName: string): string[] {
+    return [
+      `git merge-base ${mainBranch} HEAD`,
+      `git reset --soft <base-commit>`,
+      `git commit -m "Squashed commit message"`,
+      `git checkout ${mainBranch}`,
+      `git rebase ${branchName}`
+    ];
+  }
 }

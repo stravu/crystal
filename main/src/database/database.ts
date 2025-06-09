@@ -193,14 +193,22 @@ export class DatabaseService {
         console.log('Skipping default project creation during initial setup');
       }
     }
+
+    // Add main_branch column to projects table if it doesn't exist
+    const projectsTableInfo = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasMainBranchColumn = projectsTableInfo.some((col: any) => col.name === 'main_branch');
+    
+    if (!hasMainBranchColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN main_branch TEXT").run();
+    }
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string): Project {
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string): Project {
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script)
-      VALUES (?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null);
+      INSERT INTO projects (name, path, system_prompt, run_script, main_branch)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, mainBranch || null);
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -244,6 +252,10 @@ export class DatabaseService {
     if (updates.run_script !== undefined) {
       fields.push('run_script = ?');
       values.push(updates.run_script);
+    }
+    if (updates.main_branch !== undefined) {
+      fields.push('main_branch = ?');
+      values.push(updates.main_branch);
     }
     if (updates.active !== undefined) {
       fields.push('active = ?');

@@ -4,6 +4,7 @@ export interface Project {
   path: string;
   system_prompt?: string;
   run_script?: string;
+  main_branch?: string;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -21,5 +22,6 @@ export interface UpdateProjectRequest {
   path?: string;
   system_prompt?: string;
   run_script?: string;
+  main_branch?: string;
   active?: boolean;
 }

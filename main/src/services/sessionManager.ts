@@ -42,6 +42,14 @@ export class SessionManager extends EventEmitter {
     return this.db.getProject(id);
   }
 
+  getProjectForSession(sessionId: string): Project | undefined {
+    const dbSession = this.getDbSession(sessionId);
+    if (dbSession?.project_id) {
+      return this.getProjectById(dbSession.project_id);
+    }
+    return undefined;
+  }
+
   initializeFromDatabase(): void {
     // Mark any previously running sessions as stopped
     const activeSessions = this.db.getActiveSessions();
