@@ -3,6 +3,7 @@ import { ChevronDown, Plus, Check, Settings } from 'lucide-react';
 import { API } from '../utils/api';
 import type { Project } from '../types/project';
 import ProjectSettings from './ProjectSettings';
+import { useErrorStore } from '../stores/errorStore';
 
 interface ProjectSelectorProps {
   onProjectChange?: (project: Project) => void;
@@ -16,6 +17,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
   const [newProject, setNewProject] = useState({ name: '', path: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
+  const { showError } = useErrorStore();
 
   useEffect(() => {
     fetchProjects();
@@ -68,15 +70,26 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
     try {
       const response = await API.projects.create(newProject);
 
-      if (response.success) {
-        setShowAddDialog(false);
-        setNewProject({ name: '', path: '' });
-        fetchProjects();
-      } else {
-        throw new Error(response.error || 'Failed to create project');
+      if (!response.success) {
+        showError({
+          title: 'Failed to Create Project',
+          error: response.error || 'An error occurred while creating the project.',
+          details: response.details,
+          command: response.command
+        });
+        return;
       }
-    } catch (error) {
+
+      setShowAddDialog(false);
+      setNewProject({ name: '', path: '' });
+      fetchProjects();
+    } catch (error: any) {
       console.error('Failed to create project:', error);
+      showError({
+        title: 'Failed to Create Project',
+        error: error.message || 'An error occurred while creating the project.',
+        details: error.stack || error.toString()
+      });
     }
   };
 

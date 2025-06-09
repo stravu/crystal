@@ -368,7 +368,38 @@ ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) 
   } catch (error) {
     console.error('[IPC] Failed to create session:', error);
     console.error('[IPC] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    return { success: false, error: `Failed to create session: ${error}` };
+    
+    // Extract detailed error information
+    let errorMessage = 'Failed to create session';
+    let errorDetails = '';
+    let command = '';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || error.toString();
+      
+      // Check if it's a git command error
+      const gitError = error as any;
+      if (gitError.gitCommand) {
+        command = gitError.gitCommand;
+      } else if (gitError.cmd) {
+        command = gitError.cmd;
+      }
+      
+      // Include git output if available
+      if (gitError.gitOutput) {
+        errorDetails = gitError.gitOutput;
+      } else if (gitError.stderr) {
+        errorDetails = gitError.stderr;
+      }
+    }
+    
+    return { 
+      success: false, 
+      error: errorMessage,
+      details: errorDetails,
+      command: command
+    };
   }
 });
 
@@ -764,7 +795,36 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
     return { success: true, data: project };
   } catch (error) {
     console.error('[Main] Failed to create project:', error);
-    return { success: false, error: 'Failed to create project' };
+    
+    // Extract detailed error information
+    let errorMessage = 'Failed to create project';
+    let errorDetails = '';
+    let command = '';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || error.toString();
+      
+      // Check if it's a command error
+      const cmdError = error as any;
+      if (cmdError.cmd) {
+        command = cmdError.cmd;
+      }
+      
+      // Include command output if available
+      if (cmdError.stderr) {
+        errorDetails = cmdError.stderr;
+      } else if (cmdError.stdout) {
+        errorDetails = cmdError.stdout;
+      }
+    }
+    
+    return { 
+      success: false, 
+      error: errorMessage,
+      details: errorDetails,
+      command: command
+    };
   }
 });
 

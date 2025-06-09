@@ -5,6 +5,8 @@ export interface IPCResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
+  details?: string;
+  command?: string;
 }
 
 // Check if we're running in Electron

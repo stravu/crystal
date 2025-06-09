@@ -7,6 +7,8 @@ import { PromptHistory } from './components/PromptHistory';
 import Help from './components/Help';
 import Welcome from './components/Welcome';
 import { MainProcessLogger } from './components/MainProcessLogger';
+import { ErrorDialog } from './components/ErrorDialog';
+import { useErrorStore } from './stores/errorStore';
 
 type ViewMode = 'sessions' | 'prompts';
 
@@ -14,6 +16,7 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const { currentError, clearError } = useErrorStore();
   
   useSocket();
   useNotifications();
@@ -38,6 +41,14 @@ function App() {
       {viewMode === 'sessions' ? <SessionView /> : <PromptHistory />}
       <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <Welcome isOpen={isWelcomeOpen} onClose={() => setIsWelcomeOpen(false)} />
+      <ErrorDialog 
+        isOpen={!!currentError}
+        onClose={clearError}
+        title={currentError?.title}
+        error={currentError?.error || ''}
+        details={currentError?.details}
+        command={currentError?.command}
+      />
     </div>
   );
 }

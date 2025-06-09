@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
+import { useErrorStore } from '../stores/errorStore';
 
 interface CreateSessionDialogProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
     count: 1
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showError } = useErrorStore();
   
   if (!isOpen) return null;
   
@@ -25,14 +27,24 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
       const response = await API.sessions.create(formData);
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to create session');
+        showError({
+          title: 'Failed to Create Session',
+          error: response.error || 'An error occurred while creating the session.',
+          details: response.details,
+          command: response.command
+        });
+        return;
       }
       
       onClose();
       setFormData({ prompt: '', worktreeTemplate: '', count: 1 });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating session:', error);
-      alert('Failed to create session');
+      showError({
+        title: 'Failed to Create Session',
+        error: error.message || 'An error occurred while creating the session.',
+        details: error.stack || error.toString()
+      });
     } finally {
       setIsSubmitting(false);
     }
