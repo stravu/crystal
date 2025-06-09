@@ -7,7 +7,8 @@ import type { ExecutionDiff, GitDiffResult } from '../types/diff';
 
 const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({ 
   sessionId, 
-  selectedExecutions: initialSelected 
+  selectedExecutions: initialSelected,
+  isGitOperationRunning = false 
 }) => {
   const [executions, setExecutions] = useState<ExecutionDiff[]>([]);
   const [selectedExecutions, setSelectedExecutions] = useState<number[]>(initialSelected);
@@ -57,8 +58,11 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
         if (selectedExecutions.length === executions.length) {
           // Get all diffs
           response = await API.sessions.getCombinedDiff(sessionId);
+        } else if (selectedExecutions.length === 1) {
+          // For single commit selection, pass it as a range with the same ID
+          response = await API.sessions.getCombinedDiff(sessionId, [selectedExecutions[0], selectedExecutions[0]]);
         } else {
-          // Get selected diffs
+          // Get selected diffs (range)
           response = await API.sessions.getCombinedDiff(sessionId, selectedExecutions);
         }
         
@@ -105,13 +109,24 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
         <h2 className="text-xl font-semibold text-gray-900">File Changes</h2>
-        {combinedDiff && (
-          <div className="flex items-center space-x-4 text-sm">
-            <span className="text-green-600">+{combinedDiff.stats.additions}</span>
-            <span className="text-red-600">-{combinedDiff.stats.deletions}</span>
-            <span className="text-gray-600">{combinedDiff.stats.filesChanged} {combinedDiff.stats.filesChanged === 1 ? 'file' : 'files'}</span>
-          </div>
-        )}
+        <div className="flex items-center space-x-4">
+          {isGitOperationRunning && (
+            <div className="flex items-center space-x-2 text-sm text-blue-600">
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Git operation in progress...</span>
+            </div>
+          )}
+          {combinedDiff && (
+            <div className="flex items-center space-x-4 text-sm">
+              <span className="text-green-600">+{combinedDiff.stats.additions}</span>
+              <span className="text-red-600">-{combinedDiff.stats.deletions}</span>
+              <span className="text-gray-600">{combinedDiff.stats.filesChanged} {combinedDiff.stats.filesChanged === 1 ? 'file' : 'files'}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
@@ -127,7 +142,18 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
 
         {/* Diff preview */}
         <div className="flex-1 overflow-auto bg-white min-w-0">
-          {loading && combinedDiff === null ? (
+          {isGitOperationRunning ? (
+            <div className="flex flex-col items-center justify-center h-full p-8">
+              <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <div className="text-gray-600 text-center">
+                <p className="font-medium">Git operation in progress</p>
+                <p className="text-sm text-gray-500 mt-1">Please wait while the operation completes...</p>
+              </div>
+            </div>
+          ) : loading && combinedDiff === null ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-gray-500">Loading diff...</div>
             </div>

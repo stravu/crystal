@@ -1073,11 +1073,30 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
         };
       }
       
-      // Get diff from first commit to HEAD (all changes)
+      // For a single commit, show the commit's own changes
+      if (commits.length === 1) {
+        const diff = gitDiffManager.getCommitDiff(session.worktreePath, commits[0].hash);
+        return { success: true, data: diff };
+      }
+      
+      // For multiple commits, get diff from parent of first commit to HEAD (all changes)
       const firstCommit = commits[commits.length - 1]; // Oldest commit
+      let fromCommitHash: string;
+      
+      try {
+        // Try to get the parent of the first commit
+        fromCommitHash = execSync(`git rev-parse ${firstCommit.hash}^`, {
+          cwd: session.worktreePath,
+          encoding: 'utf8'
+        }).trim();
+      } catch (error) {
+        // If there's no parent (initial commit), use git's empty tree hash
+        fromCommitHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+      }
+      
       const diff = await gitDiffManager.captureCommitDiff(
         session.worktreePath,
-        firstCommit.hash,
+        fromCommitHash,
         'HEAD'
       );
       return { success: true, data: diff };

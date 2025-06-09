@@ -43,4 +43,5 @@ export interface ExecutionListProps {
 export interface CombinedDiffViewProps {
   sessionId: string;
   selectedExecutions: number[];
+  isGitOperationRunning?: boolean;
 }
