@@ -15,7 +15,10 @@ export function PromptHistory() {
   const [prompts, setPrompts] = useState<PromptHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const createSession = useSessionStore((state) => state.createSession);
+  const setActiveSession = useSessionStore((state) => state.setActiveSession);
+  const sessions = useSessionStore((state) => state.sessions);
 
   useEffect(() => {
     fetchPromptHistory();
@@ -54,6 +57,38 @@ export function PromptHistory() {
       });
     } catch (error) {
       console.error('Error reusing prompt:', error);
+    }
+  };
+
+  const handlePromptClick = async (promptItem: PromptHistoryItem) => {
+    // Check if the session still exists
+    const sessionExists = sessions.some(s => s.id === promptItem.sessionId);
+    
+    if (sessionExists) {
+      // Set the selected prompt
+      setSelectedPromptId(promptItem.id);
+      
+      // Switch to the session
+      setActiveSession(promptItem.sessionId);
+      
+      // Get the prompt marker information
+      try {
+        const response = await API.prompts.getByPromptId(promptItem.id);
+        if (response.success && response.data) {
+          // Dispatch an event that SessionView can listen for
+          window.dispatchEvent(new CustomEvent('navigateToPrompt', {
+            detail: {
+              sessionId: promptItem.sessionId,
+              promptMarker: response.data
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error getting prompt details:', error);
+      }
+    } else {
+      // Session no longer exists, show a message or handle appropriately
+      console.warn('Session no longer exists:', promptItem.sessionId);
     }
   };
 
@@ -131,7 +166,12 @@ export function PromptHistory() {
             {filteredPrompts.map((promptItem) => (
               <div
                 key={promptItem.id}
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                className={`border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                  selectedPromptId === promptItem.id
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200'
+                }`}
+                onClick={() => handlePromptClick(promptItem)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">

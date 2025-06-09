@@ -182,6 +182,11 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.prompts.getAll();
     },
+    
+    async getByPromptId(promptId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.prompts.getByPromptId(promptId);
+    },
   };
 }
 

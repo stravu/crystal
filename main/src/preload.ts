@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Prompts
   prompts: {
     getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-all'),
+    getByPromptId: (promptId: string): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-by-id', promptId),
   },
 
   // Event listeners for real-time updates

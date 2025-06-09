@@ -64,6 +64,7 @@ interface ElectronAPI {
   // Prompts
   prompts: {
     getAll: () => Promise<IPCResponse>;
+    getByPromptId: (promptId: string) => Promise<IPCResponse>;
   };
 
   // Event listeners for real-time updates

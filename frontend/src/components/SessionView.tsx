@@ -591,6 +591,154 @@ export function SessionView() {
     previousStatusRef.current = currentStatus;
   }, [activeSession?.status, activeSession?.id]);
   
+  const handleNavigateToPrompt = (marker: any) => {
+    console.log('[SessionView] handleNavigateToPrompt called with marker:', marker);
+    
+    if (!terminalInstance.current) {
+      console.warn('[SessionView] Terminal instance not available');
+      return;
+    }
+    
+    // Ensure we're in output view
+    if (viewMode !== 'output') {
+      setViewMode('output');
+      // Give the terminal time to render before scrolling
+      setTimeout(() => {
+        navigateToPromptInTerminal(marker);
+      }, 200);
+    } else {
+      navigateToPromptInTerminal(marker);
+    }
+  };
+  
+  const navigateToPromptInTerminal = (marker: any) => {
+    if (!terminalInstance.current || !activeSession) return;
+    
+    // Search for the prompt text in the terminal buffer
+    const searchTerm = marker.prompt_text;
+    if (!searchTerm) {
+      console.warn('[SessionView] No prompt text to search for');
+      return;
+    }
+    
+    // Get the terminal buffer
+    const buffer = terminalInstance.current.buffer.active;
+    const totalLines = buffer.length;
+    
+    // Search from top to bottom for the prompt text
+    let foundLine = -1;
+    const searchTextStart = searchTerm.substring(0, 50).trim();
+    
+    for (let i = 0; i < totalLines; i++) {
+      const line = buffer.getLine(i);
+      if (line) {
+        const lineText = line.translateToString(true);
+        
+        // Check if this line contains a user prompt marker
+        if (lineText.includes('👤 User Input') || lineText.includes('👤 USER PROMPT')) {
+          // Now check the next few lines for the actual prompt text
+          for (let j = 1; j <= 5 && i + j < totalLines; j++) {
+            const promptLine = buffer.getLine(i + j);
+            if (promptLine) {
+              const promptLineText = promptLine.translateToString(true).trim();
+              if (promptLineText && promptLineText.includes(searchTextStart)) {
+                foundLine = i;
+                console.log('[SessionView] Found prompt marker at line:', i, 'Prompt at line:', i + j);
+                break;
+              }
+            }
+          }
+          if (foundLine >= 0) break;
+        }
+      }
+    }
+    
+    // If not found with markers, try direct search for the prompt text
+    if (foundLine < 0) {
+      for (let i = 0; i < totalLines; i++) {
+        const line = buffer.getLine(i);
+        if (line) {
+          const lineText = line.translateToString(true);
+          if (lineText.includes(searchTextStart)) {
+            // Check if this is likely a prompt by looking at previous lines
+            let isPrompt = false;
+            for (let j = Math.max(0, i - 3); j < i; j++) {
+              const prevLine = buffer.getLine(j);
+              if (prevLine) {
+                const prevLineText = prevLine.translateToString(true);
+                if (prevLineText.includes('👤 User Input') || prevLineText.includes('👤 USER PROMPT')) {
+                  isPrompt = true;
+                  foundLine = j; // Use the marker line, not the prompt line
+                  break;
+                }
+              }
+            }
+            if (isPrompt) {
+              console.log('[SessionView] Found prompt text at line:', i, 'Marker at:', foundLine);
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    if (foundLine >= 0) {
+      // Scroll to the found line, with a small offset to show context
+      const scrollToLine = Math.max(0, foundLine - 2);
+      console.log('[SessionView] Scrolling to line:', scrollToLine);
+      terminalInstance.current.scrollToLine(scrollToLine);
+      
+      // Highlight the prompt area briefly
+      setTimeout(() => {
+        if (terminalInstance.current) {
+          // Select from the marker line to a few lines below
+          const startLine = foundLine;
+          const endLine = Math.min(foundLine + 3, buffer.length - 1);
+          terminalInstance.current.select(0, startLine, 1000, endLine);
+          
+          // Clear selection after a delay
+          setTimeout(() => {
+            if (terminalInstance.current) {
+              terminalInstance.current.clearSelection();
+            }
+          }, 1000);
+        }
+      }, 100);
+    } else {
+      console.warn('[SessionView] Could not find prompt in terminal buffer:', searchTerm);
+      // Fallback to using output_line if available
+      if (marker.output_line !== undefined && marker.output_line !== null) {
+        terminalInstance.current.scrollToLine(marker.output_line);
+      }
+    }
+  };
+  
+  // Listen for navigate to prompt events from PromptHistory
+  useEffect(() => {
+    const handlePromptNavigation = (event: CustomEvent) => {
+      const { sessionId, promptMarker } = event.detail;
+      
+      // Only handle if this is the current session
+      if (activeSession?.id === sessionId && promptMarker && terminalInstance.current) {
+        // Switch to output view if not already there
+        if (viewMode !== 'output') {
+          setViewMode('output');
+        }
+        
+        // Navigate to the prompt after a short delay to ensure terminal is ready
+        setTimeout(() => {
+          handleNavigateToPrompt(promptMarker);
+        }, 100);
+      }
+    };
+    
+    window.addEventListener('navigateToPrompt', handlePromptNavigation as EventListener);
+    
+    return () => {
+      window.removeEventListener('navigateToPrompt', handlePromptNavigation as EventListener);
+    };
+  }, [activeSession?.id, viewMode, handleNavigateToPrompt]);
+  
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -638,13 +786,6 @@ export function SessionView() {
     }
   };
 
-  const handleNavigateToPrompt = (marker: any) => {
-    // For now, we'll just scroll to the approximate position
-    // In a real implementation, we'd calculate the actual line position
-    if (terminalInstance.current && marker.output_line) {
-      terminalInstance.current.scrollToLine(marker.output_line);
-    }
-  };
 
   const handleStopSession = async () => {
     try {
