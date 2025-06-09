@@ -591,6 +591,27 @@ export function SessionView() {
     }
   }, [input]);
   
+  // Watch for session status changes from 'stopped' to 'initializing' (indicating a continue)
+  const previousStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeSession) return;
+    
+    const previousStatus = previousStatusRef.current;
+    const currentStatus = activeSession.status;
+    
+    // If status changed from stopped/waiting to initializing, reload output
+    if (previousStatus && 
+        (previousStatus === 'stopped' || previousStatus === 'waiting') && 
+        currentStatus === 'initializing') {
+      // Reload output content when session restarts
+      setTimeout(() => {
+        loadOutputContent(activeSession.id);
+      }, 200);
+    }
+    
+    previousStatusRef.current = currentStatus;
+  }, [activeSession?.status, activeSession?.id]);
+  
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -626,6 +647,13 @@ export function SessionView() {
       }
       
       setInput('');
+      
+      // Force reload output content after a short delay to ensure the session has started
+      setTimeout(() => {
+        if (activeSession) {
+          loadOutputContent(activeSession.id);
+        }
+      }, 500);
     } catch (error) {
       console.error('Error continuing conversation:', error);
     }
