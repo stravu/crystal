@@ -42,10 +42,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   loadSessions: (sessions) => set({ sessions, isLoaded: true }),
   
-  addSession: (session) => set((state) => ({
-    sessions: [session, ...state.sessions],  // Add new sessions at the top
-    activeSessionId: session.id  // Automatically set as active
-  })),
+  addSession: (session) => set((state) => {
+    console.log(`[SessionStore] Adding new session ${session.id} and setting as active`);
+    return {
+      sessions: [session, ...state.sessions],  // Add new sessions at the top
+      activeSessionId: session.id  // Automatically set as active
+    };
+  }),
   
   updateSession: (updatedSession) => set((state) => ({
     sessions: state.sessions.map(session => 
@@ -68,15 +71,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  addSessionOutput: (output) => set((state) => ({
-    sessions: state.sessions.map(session => 
-      session.id === output.sessionId
-        ? output.type === 'json'
-          ? { ...session, jsonMessages: [...(session.jsonMessages || []), {...output.data, timestamp: output.timestamp}] }
-          : { ...session, output: [...session.output, output.data] }
-        : session
-    )
-  })),
+  addSessionOutput: (output) => set((state) => {
+    console.log(`[SessionStore] Adding output for session ${output.sessionId}, type: ${output.type}`);
+    return {
+      sessions: state.sessions.map(session => 
+        session.id === output.sessionId
+          ? output.type === 'json'
+            ? { ...session, jsonMessages: [...(session.jsonMessages || []), {...output.data, timestamp: output.timestamp}] }
+            : { ...session, output: [...session.output, output.data] }
+          : session
+      )
+    };
+  }),
   
   setSessionOutput: (sessionId, output) => set((state) => ({
     sessions: state.sessions.map(session => 

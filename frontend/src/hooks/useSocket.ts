@@ -18,7 +18,7 @@ export function useSocket() {
 
     // Listen for session events
     const unsubscribeSessionCreated = window.electronAPI.events.onSessionCreated((session: Session) => {
-      addSession({...session, jsonMessages: session.jsonMessages || []});
+      addSession({...session, output: session.output || [], jsonMessages: session.jsonMessages || []});
     });
     unsubscribeFunctions.push(unsubscribeSessionCreated);
 
@@ -42,6 +42,7 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionsLoaded);
 
     const unsubscribeSessionOutput = window.electronAPI.events.onSessionOutput((output: SessionOutput) => {
+      console.log(`[useSocket] Received session output for ${output.sessionId}, type: ${output.type}`);
       // Only add output to session store - the SessionView will handle filtering for display
       addSessionOutput(output);
     });

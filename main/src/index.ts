@@ -168,7 +168,7 @@ function setupEventListeners() {
   });
 
   // Listen to claudeCodeManager events
-  claudeCodeManager.on('output', (output: any) => {
+  claudeCodeManager.on('output', async (output: any) => {
     // Save output to database
     sessionManager.addSessionOutput(output.sessionId, {
       type: output.type,
@@ -178,6 +178,22 @@ function setupEventListeners() {
     
     // Broadcast to renderer
     if (mainWindow) {
+      // If it's a JSON message, also send a formatted stdout version
+      if (output.type === 'json') {
+        const { formatJsonForOutputEnhanced } = await import('./utils/toolFormatter');
+        const formattedOutput = formatJsonForOutputEnhanced(output.data);
+        if (formattedOutput) {
+          // Send the formatted version as stdout
+          mainWindow.webContents.send('session:output', {
+            sessionId: output.sessionId,
+            type: 'stdout',
+            data: formattedOutput,
+            timestamp: output.timestamp
+          });
+        }
+      }
+      
+      // Always send the original output (for Messages view)
       mainWindow.webContents.send('session:output', output);
     }
   });

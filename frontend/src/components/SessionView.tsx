@@ -145,6 +145,8 @@ export function SessionView() {
         formatted = currentActiveSession.output.join('');
       }
       
+      console.log(`[SessionView] Formatting output for session ${sessionId}, length: ${formatted.length}`);
+      
       // Only set the formatted output if we're still on the same session
       const finalActiveSession = useSessionStore.getState().getActiveSession();
       if (finalActiveSession && finalActiveSession.id === sessionId) {
@@ -412,12 +414,14 @@ export function SessionView() {
     // Otherwise, write only new formatted output
     if (lastProcessedOutputLength.current === 0) {
       // Write all content after terminal was cleared
+      console.log(`[SessionView] Writing all content to terminal, length: ${formattedOutput.length}`);
       terminalInstance.current.write(formattedOutput);
       lastProcessedOutputLength.current = formattedOutput.length;
       terminalInstance.current.scrollToBottom();
     } else if (formattedOutput.length > lastProcessedOutputLength.current) {
       // Write only new content
       const newOutput = formattedOutput.substring(lastProcessedOutputLength.current);
+      console.log(`[SessionView] Writing new content to terminal, length: ${newOutput.length}`);
       terminalInstance.current.write(newOutput);
       lastProcessedOutputLength.current = formattedOutput.length;
       terminalInstance.current.scrollToBottom();
