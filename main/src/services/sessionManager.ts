@@ -272,6 +272,17 @@ export class SessionManager extends EventEmitter {
     // Store the user's message
     this.addConversationMessage(id, 'user', userMessage);
     
+    // Add the continuation prompt to output so it's visible
+    const timestamp = new Date().toLocaleTimeString();
+    const userPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
+                             `\x1b[1m\x1b[92m${userMessage}\x1b[0m\r\n\r\n`;
+    this.addSessionOutput(id, {
+      type: 'stdout',
+      data: userPromptDisplay,
+      timestamp: new Date()
+    });
+    console.log('[SessionManager] Added continuation prompt to session output');
+    
     // Add a prompt marker for this continued conversation
     // Get current output count to use as index
     const outputs = this.db.getSessionOutputs(id);

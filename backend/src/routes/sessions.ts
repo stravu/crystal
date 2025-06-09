@@ -58,6 +58,8 @@ export function createSessionRouter(
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const outputs = await sessionManager.getSessionOutputs(req.params.id, limit);
       
+      logger?.verbose(`Retrieved ${outputs.length} outputs for session ${req.params.id}`);
+      
       // Transform JSON messages to output format on the fly
       const transformedOutputs = outputs.map(output => {
         if (output.type === 'json') {
@@ -154,8 +156,8 @@ export function createSessionRouter(
         // Add the initial prompt to output so it's visible
         const timestamp = new Date().toLocaleTimeString();
         const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
-                                     `\x1b[1m\x1b[92m${prompt}\x1b[0m\r\n` +
-                                     `\x1b[90m${'─'.repeat(80)}\x1b[0m\r\n\r\n`;
+                                     `\x1b[1m\x1b[92m${prompt}\x1b[0m\r\n\r\n`;
+        logger?.info(`Adding initial prompt to session output for session ${session.id}`);
         await sessionManager.addSessionOutput(session.id, {
           type: 'stdout',
           data: initialPromptDisplay,
@@ -236,8 +238,8 @@ export function createSessionRouter(
       // Store continuation message in session outputs for persistence and emit via WebSocket
       const timestamp = new Date().toLocaleTimeString();
       const userInputDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
-                               `\x1b[1m\x1b[92m${message.trim()}\x1b[0m\r\n` +
-                               `\x1b[90m${'─'.repeat(80)}\x1b[0m\r\n\r\n`;
+                               `\x1b[1m\x1b[92m${message.trim()}\x1b[0m\r\n\r\n`;
+      logger?.info(`Adding continuation prompt to session output for session ${req.params.id}`);
       await sessionManager.addSessionOutput(req.params.id, {
         type: 'stdout',
         data: userInputDisplay,

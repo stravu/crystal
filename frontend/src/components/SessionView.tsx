@@ -136,19 +136,13 @@ export function SessionView() {
         return;
       }
       
-      const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
+      // Since the backend now returns formatted stdout for JSON messages,
+      // we just need to concatenate all stdout outputs in order
       let formatted = '';
       
-      // Format JSON messages
-      if (currentActiveSession.jsonMessages) {
-        for (const msg of currentActiveSession.jsonMessages) {
-          formatted += formatJsonForOutputEnhanced(msg);
-        }
-      }
-      
-      // Add any non-JSON output
+      // Add all stdout output (which now includes formatted JSON messages)
       if (currentActiveSession.output && currentActiveSession.output.length > 0) {
-        formatted += currentActiveSession.output.join('');
+        formatted = currentActiveSession.output.join('');
       }
       
       // Only set the formatted output if we're still on the same session
@@ -207,27 +201,8 @@ export function SessionView() {
         useSessionStore.getState().addSessionOutput(output);
       });
       
-      // After loading all outputs, format them for display
-      const sessionAfterLoad = useSessionStore.getState().getActiveSession();
-      if (sessionAfterLoad && sessionAfterLoad.id === sessionId) {
-        const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
-        let formatted = '';
-        
-        // Format JSON messages
-        if (sessionAfterLoad.jsonMessages) {
-          for (const msg of sessionAfterLoad.jsonMessages) {
-            formatted += formatJsonForOutputEnhanced(msg);
-          }
-        }
-        
-        // Add any non-JSON output
-        if (sessionAfterLoad.output && sessionAfterLoad.output.length > 0) {
-          formatted += sessionAfterLoad.output.join('');
-        }
-        
-        setFormattedOutput(formatted);
-        setCurrentSessionIdForOutput(sessionId);
-      }
+      // After loading all outputs, we don't need to format here anymore
+      // The formatting will happen in the useEffect that watches for changes
       
       setLoadError(null);
     } catch (error) {

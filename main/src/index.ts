@@ -308,6 +308,14 @@ ipcMain.handle('sessions:delete', async (_event, sessionId: string) => {
 
 ipcMain.handle('sessions:input', async (_event, sessionId: string, input: string) => {
   try {
+    // Store user input in session outputs for persistence
+    const userInputDisplay = `> ${input.trim()}\n`;
+    await sessionManager.addSessionOutput(sessionId, {
+      type: 'stdout',
+      data: userInputDisplay,
+      timestamp: new Date()
+    });
+    
     claudeCodeManager.sendInput(sessionId, input);
     return { success: true };
   } catch (error) {
@@ -352,7 +360,30 @@ ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: s
 ipcMain.handle('sessions:get-output', async (_event, sessionId: string) => {
   try {
     const outputs = await sessionManager.getSessionOutputs(sessionId);
-    return { success: true, data: outputs };
+    
+    // Transform JSON messages to output format on the fly
+    const { formatJsonForOutputEnhanced } = await import('./utils/toolFormatter');
+    const transformedOutputs = outputs.map(output => {
+      if (output.type === 'json') {
+        // Generate output format from JSON using enhanced formatter
+        const outputText = formatJsonForOutputEnhanced(output.data);
+        if (outputText) {
+          // Return both the JSON and a generated output version
+          return [
+            output, // Keep the JSON message for Messages view
+            {
+              ...output,
+              type: 'stdout' as const,
+              data: outputText
+            }
+          ];
+        }
+        return [output]; // If no output format, just return JSON
+      }
+      return [output]; // Non-JSON outputs pass through
+    }).flat();
+    
+    return { success: true, data: transformedOutputs };
   } catch (error) {
     console.error('Failed to get session outputs:', error);
     return { success: false, error: 'Failed to get session outputs' };
