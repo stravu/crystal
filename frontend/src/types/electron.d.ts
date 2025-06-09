@@ -61,6 +61,7 @@ interface ElectronAPI {
     activate: (projectId: string) => Promise<IPCResponse>;
     update: (projectId: string, updates: any) => Promise<IPCResponse>;
     delete: (projectId: string) => Promise<IPCResponse>;
+    detectBranch: (path: string) => Promise<IPCResponse>;
   };
 
   // Configuration

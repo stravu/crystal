@@ -14,7 +14,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', path: '' });
+  const [newProject, setNewProject] = useState({ name: '', path: '', mainBranch: 'main' });
   const [showSettings, setShowSettings] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const { showError } = useErrorStore();
@@ -64,6 +64,19 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
     }
   };
 
+  const detectCurrentBranch = async (path: string) => {
+    if (!path) return;
+    
+    try {
+      const response = await API.projects.detectBranch(path);
+      if (response.success && response.data) {
+        setNewProject(prev => ({ ...prev, mainBranch: response.data }));
+      }
+    } catch (error) {
+      console.log('Could not detect branch, using default');
+    }
+  };
+
   const handleCreateProject = async () => {
     if (!newProject.name || !newProject.path) return;
 
@@ -81,7 +94,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
       }
 
       setShowAddDialog(false);
-      setNewProject({ name: '', path: '' });
+      setNewProject({ name: '', path: '', mainBranch: 'main' });
       fetchProjects();
     } catch (error: any) {
       console.error('Failed to create project:', error);
@@ -209,7 +222,10 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
                   <input
                     type="text"
                     value={newProject.path}
-                    onChange={(e) => setNewProject({ ...newProject, path: e.target.value })}
+                    onChange={(e) => {
+                      setNewProject({ ...newProject, path: e.target.value });
+                      detectCurrentBranch(e.target.value);
+                    }}
                     className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
                     placeholder="/path/to/repository"
                   />
@@ -222,6 +238,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
                       });
                       if (result.success && result.data) {
                         setNewProject({ ...newProject, path: result.data });
+                        detectCurrentBranch(result.data);
                       }
                     }}
                     className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -230,13 +247,29 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Main Branch
+                </label>
+                <input
+                  type="text"
+                  value={newProject.mainBranch}
+                  onChange={(e) => setNewProject({ ...newProject, mainBranch: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
+                  placeholder="main"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Branch name to use when creating new git repository
+                </p>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setShowAddDialog(false);
-                  setNewProject({ name: '', path: '' });
+                  setNewProject({ name: '', path: '', mainBranch: 'main' });
                 }}
                 className="px-4 py-2 text-gray-300 hover:text-gray-100 transition-colors"
               >

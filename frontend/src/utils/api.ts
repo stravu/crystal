@@ -174,6 +174,11 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.projects.delete(projectId);
     },
+
+    async detectBranch(path: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.projects.detectBranch(path);
+    },
   };
 
   // Configuration

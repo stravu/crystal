@@ -762,8 +762,15 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
     // Initialize git if needed
     if (!isGitRepo) {
       try {
+        // Use the specified main branch name if provided
+        const branchName = projectData.mainBranch || 'main';
+        
         nodeExecSync(`cd "${projectData.path}" && git init`, { encoding: 'utf-8' });
         console.log('[Main] Git repository initialized successfully');
+        
+        // Create and checkout the specified branch
+        nodeExecSync(`cd "${projectData.path}" && git checkout -b ${branchName}`, { encoding: 'utf-8' });
+        console.log(`[Main] Created and checked out branch: ${branchName}`);
         
         // Create initial commit
         nodeExecSync(`cd "${projectData.path}" && git commit -m "Initial commit" --allow-empty`, { encoding: 'utf-8' });
@@ -774,14 +781,16 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
       }
     }
     
-    // Detect the main branch if the path is a git repository
-    let mainBranch: string | undefined;
-    try {
-      mainBranch = await worktreeManager.detectMainBranch(projectData.path);
-      console.log('[Main] Detected main branch:', mainBranch);
-    } catch (error) {
-      console.log('[Main] Could not detect main branch, skipping:', error);
-      // Not a git repository or error detecting, that's okay
+    // Detect or use the provided main branch
+    let mainBranch: string | undefined = projectData.mainBranch;
+    if (!mainBranch && isGitRepo) {
+      try {
+        mainBranch = await worktreeManager.detectMainBranch(projectData.path);
+        console.log('[Main] Detected main branch:', mainBranch);
+      } catch (error) {
+        console.log('[Main] Could not detect main branch, skipping:', error);
+        // Not a git repository or error detecting, that's okay
+      }
     }
 
     const project = databaseService.createProject(
@@ -859,6 +868,16 @@ ipcMain.handle('projects:delete', async (_event, projectId: string) => {
   } catch (error) {
     console.error('Failed to delete project:', error);
     return { success: false, error: 'Failed to delete project' };
+  }
+});
+
+ipcMain.handle('projects:detect-branch', async (_event, path: string) => {
+  try {
+    const branch = await worktreeManager.detectMainBranch(path);
+    return { success: true, data: branch };
+  } catch (error) {
+    console.log('[Main] Could not detect branch:', error);
+    return { success: true, data: 'main' }; // Return default if detection fails
   }
 });
 
