@@ -181,6 +181,9 @@ importers:
       '@anthropic-ai/claude-code':
         specifier: ^1.0.17
         version: 1.0.17
+      '@anthropic-ai/sdk':
+        specifier: ^0.53.0
+        version: 0.53.0
       '@homebridge/node-pty-prebuilt-multiarch':
         specifier: ^0.12.0
         version: 0.12.0
@@ -196,9 +199,6 @@ importers:
       electron-store:
         specifier: ^10.0.0
         version: 10.0.1
-      openai:
-        specifier: ^5.1.1
-        version: 5.1.1
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12
@@ -252,6 +252,10 @@ packages:
   '@anthropic-ai/claude-code@1.0.17':
     resolution: {integrity: sha512-+MX/pKOKXG2HLSh7WJIgiILdumqRgcORUX0iSQmAfn+UEoHSYSuFWZWuWBpixaa8W4tiTCC06uN4pgzinCU6jw==}
     engines: {node: '>=18.0.0'}
+    hasBin: true
+
+  '@anthropic-ai/sdk@0.53.0':
+    resolution: {integrity: sha512-bl2frVo0cgHCXTzQEIHXPH329uQXC4YKBaLBkZmUc59tNiR3GgcGpBZU7mwfyv5tPuU/yT7tGHyoe5AnjN02QA==}
     hasBin: true
 
   '@babel/code-frame@7.27.1':
@@ -3594,6 +3598,8 @@ snapshots:
       '@img/sharp-linux-arm64': 0.33.5
       '@img/sharp-linux-x64': 0.33.5
       '@img/sharp-win32-x64': 0.33.5
+
+  '@anthropic-ai/sdk@0.53.0': {}
 
   '@babel/code-frame@7.27.1':
     dependencies:

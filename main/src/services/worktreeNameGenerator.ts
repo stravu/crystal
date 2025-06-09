@@ -1,38 +1,40 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { ConfigManager } from './configManager';
 import fs from 'fs/promises';
 import path from 'path';
 
 export class WorktreeNameGenerator {
-  private openai: OpenAI | null = null;
+  private anthropic: Anthropic | null = null;
   private configManager: ConfigManager;
 
   constructor(configManager: ConfigManager) {
     this.configManager = configManager;
-    this.initializeOpenAI();
+    this.initializeAnthropic();
   }
 
-  private initializeOpenAI(): void {
-    const apiKey = this.configManager.getOpenAIApiKey();
+  private initializeAnthropic(): void {
+    const apiKey = this.configManager.getAnthropicApiKey();
     if (apiKey) {
-      this.openai = new OpenAI({
+      this.anthropic = new Anthropic({
         apiKey: apiKey
       });
     }
   }
 
   async generateWorktreeName(prompt: string): Promise<string> {
-    if (!this.openai) {
+    if (!this.anthropic) {
       // Fallback to basic name generation if no API key
       return this.generateFallbackName(prompt);
     }
 
     try {
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4-1106-preview', // GPT-4 Turbo
+      const response = await this.anthropic.messages.create({
+        model: 'claude-3-haiku-20240307', // Using Haiku for fast, cost-effective naming
+        max_tokens: 50,
+        temperature: 0.3,
         messages: [
           {
-            role: 'system',
+            role: 'user',
             content: `You are a developer assistant that generates concise, descriptive git worktree names. 
             
 Rules:
@@ -47,26 +49,27 @@ Examples:
 - "Fix user authentication bug" → "fix-auth-bug"
 - "Add dark mode toggle" → "dark-mode-toggle"
 - "Refactor payment system" → "refactor-payments"
-- "Update API documentation" → "update-api-docs"`
-          },
-          {
-            role: 'user',
-            content: `Generate a worktree name for this coding task: "${prompt}"`
+- "Update API documentation" → "update-api-docs"
+
+Generate a worktree name for this coding task: "${prompt}"
+
+Respond with ONLY the worktree name, nothing else.`
           }
-        ],
-        max_tokens: 50,
-        temperature: 0.3
+        ]
       });
 
-      const generatedName = response.choices[0]?.message?.content?.trim();
-      if (generatedName) {
-        return this.sanitizeName(generatedName);
+      const content = response.content[0];
+      if (content.type === 'text' && content.text) {
+        const generatedName = content.text.trim();
+        if (generatedName) {
+          return this.sanitizeName(generatedName);
+        }
       }
     } catch (error) {
-      console.error('Error generating worktree name with OpenAI:', error);
+      console.error('Error generating worktree name with Anthropic:', error);
     }
 
-    // Fallback if OpenAI fails
+    // Fallback if Anthropic fails
     return this.generateFallbackName(prompt);
   }
 

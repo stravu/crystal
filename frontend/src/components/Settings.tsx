@@ -12,7 +12,7 @@ interface SettingsProps {
 export function Settings({ isOpen, onClose }: SettingsProps) {
   const [_config, setConfig] = useState<AppConfig | null>(null);
   const [verbose, setVerbose] = useState(false);
-  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [anthropicApiKey, setAnthropicApiKey] = useState('');
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,7 +33,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       const data = response.data;
       setConfig(data);
       setVerbose(data.verbose || false);
-      setOpenaiApiKey(data.openaiApiKey || '');
+      setAnthropicApiKey(data.anthropicApiKey || '');
       setGlobalSystemPrompt(data.systemPromptAppend || '');
       setClaudeExecutablePath(data.claudeExecutablePath || '');
     } catch (err) {
@@ -49,7 +49,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
     try {
       const response = await API.config.update({ 
         verbose, 
-        openaiApiKey, 
+        anthropicApiKey, 
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath 
       });
@@ -128,19 +128,19 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
           </div>
 
           <div>
-            <label htmlFor="openaiApiKey" className="block text-sm font-medium text-gray-700 mb-1">
-              OpenAI API Key (Optional)
+            <label htmlFor="anthropicApiKey" className="block text-sm font-medium text-gray-700 mb-1">
+              Anthropic API Key (Optional)
             </label>
             <input
-              id="openaiApiKey"
+              id="anthropicApiKey"
               type="password"
-              value={openaiApiKey}
-              onChange={(e) => setOpenaiApiKey(e.target.value)}
+              value={anthropicApiKey}
+              onChange={(e) => setAnthropicApiKey(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              placeholder="sk-..."
+              placeholder="sk-ant-..."
             />
             <p className="text-xs text-gray-500 mt-1">
-              Required for auto-generating worktree names with AI. If not provided, fallback names will be used.
+              Used for auto-generating session names with AI (NOT for Claude Code itself). If not provided, fallback names will be used.
             </p>
           </div>
 

@@ -16,7 +16,7 @@ export class ConfigManager extends EventEmitter {
     this.config = {
       gitRepoPath: defaultGitPath || os.homedir(),
       verbose: false,
-      openaiApiKey: undefined,
+      anthropicApiKey: undefined,
       systemPromptAppend: undefined,
       runScript: undefined
     };
@@ -60,8 +60,8 @@ export class ConfigManager extends EventEmitter {
     return path.join(this.configDir, 'sessions.db');
   }
 
-  getOpenAIApiKey(): string | undefined {
-    return this.config.openaiApiKey;
+  getAnthropicApiKey(): string | undefined {
+    return this.config.anthropicApiKey;
   }
 
   getSystemPromptAppend(): string | undefined {

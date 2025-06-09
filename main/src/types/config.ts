@@ -1,6 +1,6 @@
 export interface AppConfig {
   verbose?: boolean;
-  openaiApiKey?: string;
+  anthropicApiKey?: string;
   // Legacy fields for backward compatibility
   gitRepoPath?: string;
   systemPromptAppend?: string;
@@ -11,6 +11,6 @@ export interface AppConfig {
 
 export interface UpdateConfigRequest {
   verbose?: boolean;
-  openaiApiKey?: string;
+  anthropicApiKey?: string;
   claudeExecutablePath?: string;
 }
