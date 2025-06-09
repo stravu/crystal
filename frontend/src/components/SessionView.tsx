@@ -916,10 +916,6 @@ export function SessionView() {
                 <p className="text-sm text-red-700">{mergeError}</p>
               </div>
             )}
-            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200 max-h-40 overflow-y-auto">
-              <p className="text-sm text-gray-700 font-medium mb-1">Original Prompt:</p>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap break-words">{activeSession.prompt}</p>
-            </div>
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden flex-shrink-0">
@@ -1063,10 +1059,12 @@ export function SessionView() {
             <div ref={scriptTerminalRef} className="h-full" />
           </div>
         </div>
-        <PromptNavigation 
-          sessionId={activeSession.id} 
-          onNavigateToPrompt={handleNavigateToPrompt}
-        />
+        {viewMode === 'output' && (
+          <PromptNavigation 
+            sessionId={activeSession.id} 
+            onNavigateToPrompt={handleNavigateToPrompt}
+          />
+        )}
       </div>
       
       <div className="border-t border-gray-300 p-4 bg-white flex-shrink-0">
