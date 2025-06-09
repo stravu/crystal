@@ -1300,7 +1300,7 @@ export function SessionView() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Git commands to be executed:</h4>
                     <div className="space-y-1">
-                      {(dialogType === 'squash' ? gitCommands.squashCommands : gitCommands.rebaseCommands)?.map((cmd, idx) => (
+                      {(dialogType === 'squash' ? gitCommands?.squashCommands : gitCommands?.rebaseCommands)?.map((cmd, idx) => (
                         <div key={idx} className="font-mono text-xs bg-gray-800 text-white px-3 py-2 rounded">
                           {cmd}
                         </div>
