@@ -95,7 +95,7 @@ All core features have been successfully implemented with significant enhancemen
   - `conversation_messages`: Conversation history for continuations
   - `execution_diffs`: Git diff tracking per execution
   - `prompt_markers`: Navigation markers for prompts
-- **Automatic initialization**: `~/.ccc` directory created on first run
+- **Automatic initialization**: `~/.crystal` directory created on first run
 - **Migration system**: SQL migrations for schema evolution
 - **Electron Store**: Application configuration persistence
 
@@ -258,7 +258,7 @@ pnpm build:all    # All platforms at once
 ## Project Structure
 
 ```
-ccc/
+crystal/
 ├── frontend/         # React renderer process
 │   ├── src/
 │   │   ├── components/      # React components

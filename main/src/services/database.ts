@@ -3,5 +3,5 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 // Create and export a singleton instance
-const dbPath = join(homedir(), '.ccc', 'sessions.db');
+const dbPath = join(homedir(), '.crystal', 'sessions.db');
 export const databaseService = new DatabaseService(dbPath);
