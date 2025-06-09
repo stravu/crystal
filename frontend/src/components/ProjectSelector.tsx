@@ -192,13 +192,30 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   Repository Path
                 </label>
-                <input
-                  type="text"
-                  value={newProject.path}
-                  onChange={(e) => setNewProject({ ...newProject, path: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
-                  placeholder="/path/to/repository"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newProject.path}
+                    onChange={(e) => setNewProject({ ...newProject, path: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
+                    placeholder="/path/to/repository"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const result = await API.dialog.openDirectory({
+                        title: 'Select Repository Directory',
+                        buttonLabel: 'Select',
+                      });
+                      if (result.success && result.data) {
+                        setNewProject({ ...newProject, path: result.data });
+                      }
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    Browse
+                  </button>
+                </div>
               </div>
             </div>
 

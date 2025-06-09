@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as path from 'path';
 import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
@@ -512,6 +512,55 @@ ipcMain.handle('config:update', async (_event, updates: any) => {
   } catch (error) {
     console.error('Failed to update config:', error);
     return { success: false, error: 'Failed to update config' };
+  }
+});
+
+// Dialog handlers
+ipcMain.handle('dialog:open-file', async (_event, options?: Electron.OpenDialogOptions) => {
+  try {
+    if (!mainWindow) {
+      return { success: false, error: 'No main window available' };
+    }
+    
+    const defaultOptions: Electron.OpenDialogOptions = {
+      properties: ['openFile'],
+      ...options
+    };
+    
+    const result = await dialog.showOpenDialog(mainWindow, defaultOptions);
+    
+    if (result.canceled) {
+      return { success: true, data: null };
+    }
+    
+    return { success: true, data: result.filePaths[0] };
+  } catch (error) {
+    console.error('Failed to open file dialog:', error);
+    return { success: false, error: 'Failed to open file dialog' };
+  }
+});
+
+ipcMain.handle('dialog:open-directory', async (_event, options?: Electron.OpenDialogOptions) => {
+  try {
+    if (!mainWindow) {
+      return { success: false, error: 'No main window available' };
+    }
+    
+    const defaultOptions: Electron.OpenDialogOptions = {
+      properties: ['openDirectory'],
+      ...options
+    };
+    
+    const result = await dialog.showOpenDialog(mainWindow, defaultOptions);
+    
+    if (result.canceled) {
+      return { success: true, data: null };
+    }
+    
+    return { success: true, data: result.filePaths[0] };
+  } catch (error) {
+    console.error('Failed to open directory dialog:', error);
+    return { success: false, error: 'Failed to open directory dialog' };
   }
 });
 

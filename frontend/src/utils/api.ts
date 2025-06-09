@@ -188,6 +188,19 @@ export class API {
       return window.electronAPI.prompts.getByPromptId(promptId);
     },
   };
+
+  // Dialog
+  static dialog = {
+    async openFile(options?: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.dialog.openFile(options);
+    },
+
+    async openDirectory(options?: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.dialog.openDirectory(options);
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete

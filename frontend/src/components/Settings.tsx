@@ -165,14 +165,35 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             <label htmlFor="claudeExecutablePath" className="block text-sm font-medium text-gray-700 mb-1">
               Claude Executable Path (Optional)
             </label>
-            <input
-              id="claudeExecutablePath"
-              type="text"
-              value={claudeExecutablePath}
-              onChange={(e) => setClaudeExecutablePath(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              placeholder="/usr/local/bin/claude"
-            />
+            <div className="flex gap-2">
+              <input
+                id="claudeExecutablePath"
+                type="text"
+                value={claudeExecutablePath}
+                onChange={(e) => setClaudeExecutablePath(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                placeholder="/usr/local/bin/claude"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const result = await API.dialog.openFile({
+                    title: 'Select Claude Executable',
+                    buttonLabel: 'Select',
+                    properties: ['openFile'],
+                    filters: [
+                      { name: 'Executables', extensions: ['*'] }
+                    ]
+                  });
+                  if (result.success && result.data) {
+                    setClaudeExecutablePath(result.data);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Browse
+              </button>
+            </div>
             <p className="text-xs text-gray-500 mt-1">
               Full path to the claude executable. Leave empty to use the claude command from PATH. This is useful if Claude is installed in a non-standard location.
             </p>

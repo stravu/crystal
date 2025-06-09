@@ -68,6 +68,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getByPromptId: (promptId: string): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-by-id', promptId),
   },
 
+  // Dialog
+  dialog: {
+    openFile: (options?: any): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-file', options),
+    openDirectory: (options?: any): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-directory', options),
+  },
+
   // Event listeners for real-time updates
   events: {
     // Session events

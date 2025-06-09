@@ -67,6 +67,12 @@ interface ElectronAPI {
     getByPromptId: (promptId: string) => Promise<IPCResponse>;
   };
 
+  // Dialog
+  dialog: {
+    openFile: (options?: any) => Promise<IPCResponse<string | null>>;
+    openDirectory: (options?: any) => Promise<IPCResponse<string | null>>;
+  };
+
   // Event listeners for real-time updates
   events: {
     onSessionCreated: (callback: (session: any) => void) => () => void;
