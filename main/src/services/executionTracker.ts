@@ -3,6 +3,7 @@ import type { Logger } from '../utils/logger';
 import type { SessionManager } from './sessionManager';
 import { GitDiffManager, type GitDiffResult } from './gitDiffManager';
 import type { CreateExecutionDiffData } from '../database/models';
+import { execSync } from '../utils/commandExecutor';
 
 interface ExecutionContext {
   sessionId: string;
@@ -10,6 +11,7 @@ interface ExecutionContext {
   promptMarkerId?: number;
   beforeCommitHash: string;
   executionSequence: number;
+  prompt?: string;
 }
 
 export class ExecutionTracker extends EventEmitter {
@@ -26,7 +28,7 @@ export class ExecutionTracker extends EventEmitter {
   /**
    * Start tracking a new prompt execution
    */
-  async startExecution(sessionId: string, worktreePath: string, promptMarkerId?: number): Promise<void> {
+  async startExecution(sessionId: string, worktreePath: string, promptMarkerId?: number, prompt?: string): Promise<void> {
     try {
       this.logger?.verbose(`Starting execution tracking for session ${sessionId}`);
       
@@ -42,7 +44,8 @@ export class ExecutionTracker extends EventEmitter {
         worktreePath,
         promptMarkerId,
         beforeCommitHash,
-        executionSequence
+        executionSequence,
+        prompt
       };
       
       this.activeExecutions.set(sessionId, context);
@@ -67,18 +70,45 @@ export class ExecutionTracker extends EventEmitter {
 
       this.logger?.verbose(`Ending execution tracking for session ${sessionId}`);
       
-      // Get the current commit hash
+      // Auto-commit any uncommitted changes
+      try {
+        // Check if there are uncommitted changes
+        const statusOutput = execSync('git status --porcelain', { 
+          cwd: context.worktreePath, 
+          encoding: 'utf8' 
+        }).trim();
+        
+        if (statusOutput) {
+          this.logger?.verbose(`Found uncommitted changes, auto-committing...`);
+          
+          // Stage all changes
+          execSync('git add -A', { cwd: context.worktreePath });
+          
+          // Create commit message from prompt or use default
+          const commitMessage = context.prompt || `Claude Code execution ${context.executionSequence}`;
+          
+          // Commit with the prompt as the message
+          execSync(`git commit -m ${JSON.stringify(commitMessage)}`, { cwd: context.worktreePath });
+          
+          this.logger?.verbose(`Auto-committed changes with message: ${commitMessage}`);
+        }
+      } catch (commitError) {
+        this.logger?.error(`Failed to auto-commit changes:`, commitError instanceof Error ? commitError : undefined);
+        // Continue with diff capture even if commit fails
+      }
+      
+      // Get the current commit hash after auto-commit
       const afterCommitHash = this.gitDiffManager.getCurrentCommitHash(context.worktreePath);
       
       let executionDiff: GitDiffResult;
       
-      // If the commit hash hasn't changed, capture any uncommitted changes
+      // Always get the diff between the before and after commits
       if (afterCommitHash === context.beforeCommitHash) {
-        // No new commits, just capture working directory changes
+        // No changes at all
         executionDiff = await this.gitDiffManager.captureWorkingDirectoryDiff(context.worktreePath);
-        this.logger?.verbose(`No new commits, captured working directory changes`);
+        this.logger?.verbose(`No changes made during execution`);
       } else {
-        // There are new commits, get the diff between commits
+        // Get the diff between commits
         executionDiff = await this.gitDiffManager.captureCommitDiff(
           context.worktreePath, 
           context.beforeCommitHash, 

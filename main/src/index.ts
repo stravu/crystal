@@ -1,11 +1,12 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as path from 'path';
+import { execSync } from './utils/commandExecutor';
 import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
 import { ConfigManager } from './services/configManager';
 import { WorktreeManager } from './services/worktreeManager';
 import { WorktreeNameGenerator } from './services/worktreeNameGenerator';
-import { GitDiffManager } from './services/gitDiffManager';
+import { GitDiffManager, type GitDiffResult } from './services/gitDiffManager';
 import { ExecutionTracker } from './services/executionTracker';
 import { DatabaseService } from './database/database';
 import type { CreateSessionRequest } from './types/session';
@@ -205,7 +206,13 @@ function setupEventListeners() {
     try {
       const session = await sessionManager.getSession(sessionId);
       if (session && session.worktreePath) {
-        await executionTracker.startExecution(sessionId, session.worktreePath);
+        // Get the latest prompt from prompt markers or use the session prompt
+        const promptMarkers = sessionManager.getPromptMarkers(sessionId);
+        const latestPrompt = promptMarkers.length > 0 
+          ? promptMarkers[promptMarkers.length - 1].prompt_text 
+          : session.prompt;
+        
+        await executionTracker.startExecution(sessionId, session.worktreePath, undefined, latestPrompt);
       }
     } catch (error) {
       console.error(`Failed to start execution tracking for session ${sessionId}:`, error);
@@ -439,7 +446,53 @@ ipcMain.handle('sessions:stop', async (_event, sessionId: string) => {
 // Git and execution handlers
 ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
   try {
-    const executions = await executionTracker.getExecutionDiffs(sessionId);
+    // Get session to find worktree path
+    const session = await sessionManager.getSession(sessionId);
+    if (!session || !session.worktreePath) {
+      return { success: false, error: 'Session or worktree path not found' };
+    }
+
+    // Get git commit history from the worktree
+    const commits = gitDiffManager.getCommitHistory(session.worktreePath);
+    
+    // Check for uncommitted changes
+    const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
+    const hasUncommittedChanges = uncommittedDiff.stats.filesChanged > 0;
+    
+    // Transform commits to execution diff format for compatibility
+    const executions: any[] = commits.map((commit, index) => ({
+      id: index + 1,
+      session_id: sessionId,
+      prompt_text: commit.message,
+      execution_sequence: index + 1,
+      git_diff: null, // Will be loaded on demand
+      files_changed: [],
+      stats_additions: commit.stats.additions,
+      stats_deletions: commit.stats.deletions,
+      stats_files_changed: commit.stats.filesChanged,
+      before_commit_hash: `${commit.hash}~1`,
+      after_commit_hash: commit.hash,
+      timestamp: commit.date.toISOString()
+    }));
+    
+    // Add uncommitted changes as the first item if they exist
+    if (hasUncommittedChanges) {
+      executions.unshift({
+        id: 0, // Special ID for uncommitted changes
+        session_id: sessionId,
+        prompt_text: 'Uncommitted changes',
+        execution_sequence: 0,
+        git_diff: null,
+        files_changed: uncommittedDiff.changedFiles || [],
+        stats_additions: uncommittedDiff.stats.additions,
+        stats_deletions: uncommittedDiff.stats.deletions,
+        stats_files_changed: uncommittedDiff.stats.filesChanged,
+        before_commit_hash: commits.length > 0 ? commits[0].hash : 'HEAD',
+        after_commit_hash: 'UNCOMMITTED',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     return { success: true, data: executions };
   } catch (error) {
     console.error('Failed to get executions:', error);
@@ -454,8 +507,17 @@ ipcMain.handle('sessions:get-execution-diff', async (_event, sessionId: string, 
       return { success: false, error: 'Session or worktree path not found' };
     }
 
-    // For now, return the combined diff - we'll need to implement individual execution diff later
-    const diff = await executionTracker.getCombinedDiff(sessionId, [parseInt(executionId)]);
+    // Get git commit history
+    const commits = gitDiffManager.getCommitHistory(session.worktreePath);
+    const executionIndex = parseInt(executionId) - 1;
+    
+    if (executionIndex < 0 || executionIndex >= commits.length) {
+      return { success: false, error: 'Invalid execution ID' };
+    }
+
+    // Get diff for the specific commit
+    const commit = commits[executionIndex];
+    const diff = gitDiffManager.getCommitDiff(session.worktreePath, commit.hash);
     return { success: true, data: diff };
   } catch (error) {
     console.error('Failed to get execution diff:', error);
@@ -697,8 +759,107 @@ ipcMain.handle('sessions:get-prompts', async (_event, sessionId: string) => {
 
 ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, executionIds?: number[]) => {
   try {
-    const diff = await executionTracker.getCombinedDiff(sessionId, executionIds);
-    return { success: true, data: diff };
+    // Get session to find worktree path
+    const session = await sessionManager.getSession(sessionId);
+    if (!session || !session.worktreePath) {
+      return { success: false, error: 'Session or worktree path not found' };
+    }
+
+    // Handle uncommitted changes request
+    if (executionIds && executionIds.length === 1 && executionIds[0] === 0) {
+      const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
+      return { success: true, data: uncommittedDiff };
+    }
+
+    // Get git commit history
+    const commits = gitDiffManager.getCommitHistory(session.worktreePath);
+    
+    if (!commits.length) {
+      return { 
+        success: true, 
+        data: {
+          diff: '',
+          stats: { additions: 0, deletions: 0, filesChanged: 0 },
+          changedFiles: []
+        }
+      };
+    }
+
+    // If we have a range selection (2 IDs), use git diff between them
+    if (executionIds && executionIds.length === 2) {
+      const sortedIds = [...executionIds].sort((a, b) => a - b);
+      
+      // Handle range that includes uncommitted changes
+      if (sortedIds[0] === 0 || sortedIds[1] === 0) {
+        // If uncommitted is in the range, get diff from the other commit to working directory
+        const commitId = sortedIds[0] === 0 ? sortedIds[1] : sortedIds[0];
+        const commitIndex = commitId - 1;
+        
+        if (commitIndex >= 0 && commitIndex < commits.length) {
+          const fromCommit = commits[commitIndex];
+          // Get diff from commit to working directory (includes uncommitted changes)
+          const diff = execSync(
+            `git diff ${fromCommit.hash}`,
+            { cwd: session.worktreePath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
+          );
+          
+          const stats = gitDiffManager.parseDiffStats(
+            execSync(`git diff --stat ${fromCommit.hash}`, { cwd: session.worktreePath, encoding: 'utf8' })
+          );
+          
+          const changedFiles = execSync(
+            `git diff --name-only ${fromCommit.hash}`,
+            { cwd: session.worktreePath, encoding: 'utf8' }
+          ).trim().split('\n').filter(Boolean);
+          
+          return { 
+            success: true, 
+            data: {
+              diff,
+              stats,
+              changedFiles,
+              beforeHash: fromCommit.hash,
+              afterHash: 'UNCOMMITTED'
+            }
+          };
+        }
+      }
+      
+      // For regular commit ranges, we need to reverse the order because:
+      // - Commits are stored newest first (index 0 = newest)
+      // - User selects from older to newer visually
+      // - Git diff expects older..newer
+      const fromIndex = sortedIds[1] - 1; // Higher ID = older commit
+      const toIndex = sortedIds[0] - 1;   // Lower ID = newer commit
+      
+      if (fromIndex >= 0 && fromIndex < commits.length && toIndex >= 0 && toIndex < commits.length) {
+        const fromCommit = commits[fromIndex]; // Older commit
+        const toCommit = commits[toIndex];     // Newer commit
+        
+        // Use git diff older..newer for range
+        const diff = await gitDiffManager.captureCommitDiff(
+          session.worktreePath,
+          fromCommit.hash,
+          toCommit.hash
+        );
+        return { success: true, data: diff };
+      }
+    }
+
+    // Fallback: If specific execution IDs are provided, get those commits individually
+    let selectedCommits = commits;
+    if (executionIds && executionIds.length > 0) {
+      selectedCommits = commits.filter((_, index) => executionIds.includes(index + 1));
+    }
+
+    // Get diffs for selected commits
+    const diffs: GitDiffResult[] = selectedCommits.map(commit => 
+      gitDiffManager.getCommitDiff(session.worktreePath, commit.hash)
+    );
+
+    // Combine all diffs
+    const combinedDiff = gitDiffManager.combineDiffs(diffs);
+    return { success: true, data: combinedDiff };
   } catch (error) {
     console.error('Failed to get combined diff:', error);
     return { success: false, error: 'Failed to get combined diff' };

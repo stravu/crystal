@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ExecutionListProps } from '../types/diff';
 
 const ExecutionList: React.FC<ExecutionListProps> = ({
@@ -6,24 +6,37 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
   selectedExecutions,
   onSelectionChange
 }) => {
-  const handleToggleExecution = (executionId: number) => {
-    if (selectedExecutions.includes(executionId)) {
-      onSelectionChange(selectedExecutions.filter(id => id !== executionId));
+  const [rangeStart, setRangeStart] = useState<number | null>(null);
+
+  const handleCommitClick = (executionId: number, event: React.MouseEvent) => {
+    if (event.shiftKey && rangeStart !== null) {
+      // Range selection with shift-click
+      const start = Math.min(rangeStart, executionId);
+      const end = Math.max(rangeStart, executionId);
+      onSelectionChange([start, end]);
     } else {
-      onSelectionChange([...selectedExecutions, executionId]);
+      // Single selection
+      setRangeStart(executionId);
+      onSelectionChange([executionId]);
     }
   };
 
   const handleSelectAll = () => {
-    if (selectedExecutions.length === executions.length) {
-      onSelectionChange([]);
-    } else {
-      onSelectionChange(executions.map(exec => exec.id));
+    if (executions.length > 0) {
+      // Select from first to last commit (excluding uncommitted if present)
+      const firstId = executions[executions.length - 1].id;
+      const lastId = executions.find(e => e.id !== 0)?.id || firstId;
+      onSelectionChange([firstId, lastId]);
     }
   };
 
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
+  };
+
+  const truncateMessage = (message: string, maxLength: number = 50) => {
+    if (message.length <= maxLength) return message;
+    return message.substring(0, maxLength) + '...';
   };
 
   const getStatsDisplay = (exec: { stats_additions: number; stats_deletions: number; stats_files_changed: number }) => {
@@ -41,10 +54,20 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
     );
   };
 
+  const isInRange = (executionId: number): boolean => {
+    if (selectedExecutions.length === 0) return false;
+    if (selectedExecutions.length === 1) return selectedExecutions[0] === executionId;
+    if (selectedExecutions.length === 2) {
+      const [start, end] = selectedExecutions;
+      return executionId >= Math.min(start, end) && executionId <= Math.max(start, end);
+    }
+    return false;
+  };
+
   if (executions.length === 0) {
     return (
       <div className="p-4 text-gray-500 text-center">
-        No executions found for this session
+        No commits found for this session
       </div>
     );
   }
@@ -54,20 +77,26 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <h3 className="text-lg font-medium text-gray-900">
-          Prompt Executions ({executions.length})
+          Commits ({executions.filter(e => e.id !== 0).length})
         </h3>
         <button
           onClick={handleSelectAll}
           className="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
         >
-          {selectedExecutions.length === executions.length ? 'Deselect All' : 'Select All'}
+          Select All Commits
         </button>
+      </div>
+
+      {/* Instructions */}
+      <div className="px-4 py-2 bg-gray-100 text-xs text-gray-600 border-b">
+        Click to select a single commit, Shift+Click to select a range
       </div>
 
       {/* Execution list */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {executions.map((execution) => {
-          const isSelected = selectedExecutions.includes(execution.id);
+          const isSelected = isInRange(execution.id);
+          const isUncommitted = execution.id === 0;
           
           return (
             <div
@@ -75,21 +104,24 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
               className={`
                 flex items-center p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors
                 ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}
+                ${isUncommitted ? 'bg-yellow-50' : ''}
               `}
-              onClick={() => handleToggleExecution(execution.id)}
+              onClick={(e) => handleCommitClick(execution.id, e)}
             >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => handleToggleExecution(execution.id)}
-                className="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                onClick={(e) => e.stopPropagation()}
-              />
+              <div className="mr-3 w-4 h-4 flex items-center justify-center">
+                {isSelected && (
+                  <div className="w-3 h-3 bg-blue-600 rounded-full" />
+                )}
+              </div>
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-sm font-medium text-gray-900">
-                    Execution #{execution.execution_sequence}
+                    {isUncommitted ? (
+                      <span className="text-yellow-700">Uncommitted changes</span>
+                    ) : (
+                      <span>{truncateMessage(execution.prompt_text || `Commit ${execution.execution_sequence}`)}</span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-500">
                     {formatTimestamp(execution.timestamp)}
@@ -101,10 +133,9 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
                     {getStatsDisplay(execution)}
                   </div>
                   
-                  {execution.files_changed && execution.files_changed.length > 0 && (
-                    <div className="text-xs text-gray-500 truncate max-w-xs">
-                      Files: {execution.files_changed.slice(0, 3).join(', ')}
-                      {execution.files_changed.length > 3 && ` +${execution.files_changed.length - 3} more`}
+                  {execution.after_commit_hash && execution.after_commit_hash !== 'UNCOMMITTED' && (
+                    <div className="text-xs text-gray-500 font-mono">
+                      {execution.after_commit_hash.substring(0, 7)}
                     </div>
                   )}
                 </div>
@@ -118,7 +149,13 @@ const ExecutionList: React.FC<ExecutionListProps> = ({
       {selectedExecutions.length > 0 && (
         <div className="p-4 bg-blue-50 border-t border-blue-200">
           <div className="text-sm text-blue-800">
-            {selectedExecutions.length} execution{selectedExecutions.length !== 1 ? 's' : ''} selected
+            {selectedExecutions.length === 1 ? (
+              `1 commit selected`
+            ) : selectedExecutions.length === 2 ? (
+              `Range selected: ${Math.abs(selectedExecutions[1] - selectedExecutions[0]) + 1} commits`
+            ) : (
+              `${selectedExecutions.length} commits selected`
+            )}
           </div>
         </div>
       )}

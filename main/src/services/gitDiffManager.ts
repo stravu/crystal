@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execSync } from '../utils/commandExecutor';
 import type { Logger } from '../utils/logger';
 
 export interface GitDiffStats {
@@ -13,6 +13,14 @@ export interface GitDiffResult {
   changedFiles: string[];
   beforeHash?: string;
   afterHash?: string;
+}
+
+export interface GitCommit {
+  hash: string;
+  message: string;
+  date: Date;
+  author: string;
+  stats: GitDiffStats;
 }
 
 export class GitDiffManager {
@@ -83,6 +91,148 @@ export class GitDiffManager {
   }
 
   /**
+   * Get git commit history for a worktree
+   */
+  getCommitHistory(worktreePath: string, limit: number = 50): GitCommit[] {
+    try {
+      // Get commit log with stats
+      const logFormat = '%H|%s|%ai|%an';
+      const logOutput = execSync(
+        `git log --format="${logFormat}" --numstat -n ${limit}`,
+        { cwd: worktreePath, encoding: 'utf8' }
+      );
+
+      const commits: GitCommit[] = [];
+      const lines = logOutput.trim().split('\n');
+      
+      let currentCommit: GitCommit | null = null;
+      let statsLines: string[] = [];
+
+      for (const line of lines) {
+        if (line.includes('|')) {
+          // Process previous commit's stats if any
+          if (currentCommit && statsLines.length > 0) {
+            const stats = this.parseNumstatOutput(statsLines);
+            currentCommit.stats = stats;
+          }
+
+          // Start new commit
+          const [hash, message, date, author] = line.split('|');
+          currentCommit = {
+            hash,
+            message,
+            date: new Date(date),
+            author,
+            stats: { additions: 0, deletions: 0, filesChanged: 0 }
+          };
+          commits.push(currentCommit);
+          statsLines = [];
+        } else if (line.trim() && currentCommit) {
+          // Collect stat lines
+          statsLines.push(line);
+        }
+      }
+
+      // Process last commit's stats
+      if (currentCommit && statsLines.length > 0) {
+        const stats = this.parseNumstatOutput(statsLines);
+        currentCommit.stats = stats;
+      }
+
+      return commits;
+    } catch (error) {
+      this.logger?.error('Failed to get commit history', error instanceof Error ? error : undefined);
+      return [];
+    }
+  }
+
+  /**
+   * Parse numstat output to get diff statistics
+   */
+  private parseNumstatOutput(lines: string[]): GitDiffStats {
+    let additions = 0;
+    let deletions = 0;
+    let filesChanged = 0;
+
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 3) {
+        const added = parts[0] === '-' ? 0 : parseInt(parts[0], 10);
+        const deleted = parts[1] === '-' ? 0 : parseInt(parts[1], 10);
+        
+        if (!isNaN(added) && !isNaN(deleted)) {
+          additions += added;
+          deletions += deleted;
+          filesChanged++;
+        }
+      }
+    }
+
+    return { additions, deletions, filesChanged };
+  }
+
+  /**
+   * Get diff for a specific commit
+   */
+  getCommitDiff(worktreePath: string, commitHash: string): GitDiffResult {
+    try {
+      const diff = execSync(`git show --format= ${commitHash}`, {
+        cwd: worktreePath,
+        encoding: 'utf8',
+        maxBuffer: 10 * 1024 * 1024
+      });
+
+      const stats = this.getCommitStats(worktreePath, commitHash);
+      const changedFiles = this.getCommitChangedFiles(worktreePath, commitHash);
+
+      return {
+        diff,
+        stats,
+        changedFiles,
+        beforeHash: `${commitHash}~1`,
+        afterHash: commitHash
+      };
+    } catch (error) {
+      this.logger?.error(`Failed to get commit diff for ${commitHash}`, error instanceof Error ? error : undefined);
+      return {
+        diff: '',
+        stats: { additions: 0, deletions: 0, filesChanged: 0 },
+        changedFiles: []
+      };
+    }
+  }
+
+  /**
+   * Get stats for a specific commit
+   */
+  private getCommitStats(worktreePath: string, commitHash: string): GitDiffStats {
+    try {
+      const statsOutput = execSync(
+        `git show --stat --format= ${commitHash} | tail -1`,
+        { cwd: worktreePath, encoding: 'utf8' }
+      );
+      return this.parseDiffStats(statsOutput);
+    } catch {
+      return { additions: 0, deletions: 0, filesChanged: 0 };
+    }
+  }
+
+  /**
+   * Get changed files for a specific commit
+   */
+  private getCommitChangedFiles(worktreePath: string, commitHash: string): string[] {
+    try {
+      const output = execSync(
+        `git show --name-only --format= ${commitHash}`,
+        { cwd: worktreePath, encoding: 'utf8' }
+      );
+      return output.trim().split('\n').filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Combine multiple diffs into a single diff
    */
   combineDiffs(diffs: GitDiffResult[]): GitDiffResult {
@@ -145,7 +295,7 @@ export class GitDiffManager {
       const changedFiles = execSync(`git diff --name-only origin/${mainBranch}...HEAD`, {
         cwd: worktreePath,
         encoding: 'utf8'
-      }).trim().split('\n').filter(f => f.length > 0);
+      }).trim().split('\n').filter((f: string) => f.length > 0);
 
       // Get stats
       const statsOutput = execSync(`git diff --stat origin/${mainBranch}...HEAD`, {
@@ -200,7 +350,7 @@ export class GitDiffManager {
         cwd: worktreePath, 
         encoding: 'utf8' 
       });
-      return output.trim().split('\n').filter(f => f.length > 0);
+      return output.trim().split('\n').filter((f: string) => f.length > 0);
     } catch (error) {
       this.logger?.warn(`Could not get changed files in ${worktreePath}`);
       return [];
@@ -213,7 +363,7 @@ export class GitDiffManager {
         cwd: worktreePath, 
         encoding: 'utf8' 
       });
-      return output.trim().split('\n').filter(f => f.length > 0);
+      return output.trim().split('\n').filter((f: string) => f.length > 0);
     } catch (error) {
       this.logger?.warn(`Could not get changed files between commits in ${worktreePath}`);
       return [];
@@ -248,7 +398,7 @@ export class GitDiffManager {
     }
   }
 
-  private parseDiffStats(statsOutput: string): GitDiffStats {
+  parseDiffStats(statsOutput: string): GitDiffStats {
     const lines = statsOutput.trim().split('\n');
     const summaryLine = lines[lines.length - 1];
     

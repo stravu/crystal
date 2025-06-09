@@ -2,6 +2,7 @@ export interface ExecutionDiff {
   id: number;
   session_id: string;
   prompt_marker_id?: number;
+  prompt_text?: string;
   execution_sequence: number;
   git_diff?: string;
   files_changed?: string[];
