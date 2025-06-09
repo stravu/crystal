@@ -36,8 +36,10 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false
     },
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 10, y: 10 }
+    ...(process.platform === 'darwin' ? {
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: { x: 10, y: 10 }
+    } : {})
   });
 
   if (isDevelopment) {

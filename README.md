@@ -26,6 +26,19 @@ Crystal is an Electron desktop application that lets you run multiple Claude Cod
 - Git installed
 - Git repository (Crystal will initialize one if needed)
 
+### Linux-specific Requirements
+- Required build tools for native modules:
+  ```bash
+  # Ubuntu/Debian
+  sudo apt-get install build-essential python3
+  
+  # Fedora/RHEL
+  sudo dnf install gcc-c++ make python3
+  
+  # Arch
+  sudo pacman -S base-devel python
+  ```
+
 ### Installation
 
 ```bash
@@ -51,6 +64,10 @@ pnpm build:mac    # macOS
 pnpm build:win    # Windows  
 pnpm build:linux  # Linux
 ```
+
+### Installing Pre-built Releases
+
+See [INSTALL_INSTRUCTIONS.md](INSTALL_INSTRUCTIONS.md) for detailed installation instructions for macOS and Linux pre-built releases.
 
 ## 📖 How to Use
 
