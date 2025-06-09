@@ -687,23 +687,6 @@ export function SessionView() {
       const scrollToLine = Math.max(0, foundLine - 2);
       console.log('[SessionView] Scrolling to line:', scrollToLine);
       terminalInstance.current.scrollToLine(scrollToLine);
-      
-      // Highlight the prompt area briefly
-      setTimeout(() => {
-        if (terminalInstance.current) {
-          // Select from the marker line to a few lines below
-          const startLine = foundLine;
-          const endLine = Math.min(foundLine + 3, buffer.length - 1);
-          terminalInstance.current.select(0, startLine, 1000, endLine);
-          
-          // Clear selection after a delay
-          setTimeout(() => {
-            if (terminalInstance.current) {
-              terminalInstance.current.clearSelection();
-            }
-          }, 1000);
-        }
-      }, 100);
     } else {
       console.warn('[SessionView] Could not find prompt in terminal buffer:', searchTerm);
       // Fallback to using output_line if available
