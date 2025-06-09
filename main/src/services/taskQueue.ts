@@ -146,6 +146,10 @@ export class TaskQueue {
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
 
+        // Add the initial prompt marker
+        sessionManager.addInitialPromptMarker(session.id, prompt);
+        console.log(`[TaskQueue] Added initial prompt marker for session ${session.id}`);
+
         console.log(`[TaskQueue] Starting Claude Code for session ${session.id}`);
         await claudeCodeManager.startSession(session.id, session.worktreePath, prompt);
         console.log(`[TaskQueue] Claude Code started successfully for session ${session.id}`);

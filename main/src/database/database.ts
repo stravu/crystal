@@ -438,12 +438,20 @@ export class DatabaseService {
 
   // Prompt marker operations
   addPromptMarker(sessionId: string, promptText: string, outputIndex: number, outputLine?: number): number {
-    const result = this.db.prepare(`
-      INSERT INTO prompt_markers (session_id, prompt_text, output_index, output_line)
-      VALUES (?, ?, ?, ?)
-    `).run(sessionId, promptText, outputIndex, outputLine);
+    console.log('[Database] Adding prompt marker:', { sessionId, promptText, outputIndex, outputLine });
     
-    return result.lastInsertRowid as number;
+    try {
+      const result = this.db.prepare(`
+        INSERT INTO prompt_markers (session_id, prompt_text, output_index, output_line)
+        VALUES (?, ?, ?, ?)
+      `).run(sessionId, promptText, outputIndex, outputLine);
+      
+      console.log('[Database] Prompt marker added successfully, ID:', result.lastInsertRowid);
+      return result.lastInsertRowid as number;
+    } catch (error) {
+      console.error('[Database] Failed to add prompt marker:', error);
+      throw error;
+    }
   }
 
   getPromptMarkers(sessionId: string): PromptMarker[] {

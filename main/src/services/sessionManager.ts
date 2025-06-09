@@ -314,18 +314,22 @@ export class SessionManager extends EventEmitter {
     return this.db.getPromptMarkers(sessionId);
   }
 
-  getSessionPrompts(sessionId: string): Array<{ prompt: string; index: number; timestamp: string }> {
-    const markers = this.getPromptMarkers(sessionId);
-    return markers.map(marker => ({
-      prompt: marker.prompt_text,
-      index: marker.output_index,
-      timestamp: marker.timestamp
-    }));
+  getSessionPrompts(sessionId: string): PromptMarker[] {
+    return this.getPromptMarkers(sessionId);
   }
 
   addInitialPromptMarker(sessionId: string, prompt: string): void {
-    // Add the initial prompt as the first prompt marker (index 0)
-    this.db.addPromptMarker(sessionId, prompt, 0, 0);
+    console.log('[SessionManager] Adding initial prompt marker for session:', sessionId);
+    console.log('[SessionManager] Prompt text:', prompt);
+    
+    try {
+      // Add the initial prompt as the first prompt marker (index 0)
+      this.db.addPromptMarker(sessionId, prompt, 0, 0);
+      console.log('[SessionManager] Initial prompt marker added successfully');
+    } catch (error) {
+      console.error('[SessionManager] Failed to add initial prompt marker:', error);
+      throw error;
+    }
   }
 
   // Execution diff operations
