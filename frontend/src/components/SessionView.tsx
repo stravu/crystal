@@ -167,7 +167,6 @@ export function SessionView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState('');
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
-  const [showPromptNav, setShowPromptNav] = useState(true);
   const previousMessageCountRef = useRef(0);
   const [isMerging, setIsMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
@@ -867,31 +866,6 @@ export function SessionView() {
               )}
             </button>
             </div>
-            <div className="flex gap-1">
-              <button
-                onClick={() => activeSession && loadOutputContent(activeSession.id)}
-                disabled={isLoadingOutput || !activeSession}
-                className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-50"
-                title="Reload output content"
-              >
-                <svg className={`w-5 h-5 ${isLoadingOutput ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setShowPromptNav(!showPromptNav)}
-                className="p-1 text-gray-600 hover:bg-gray-200 rounded"
-                title={showPromptNav ? 'Hide prompt navigation' : 'Show prompt navigation'}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {showPromptNav ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                  )}
-                </svg>
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -965,12 +939,10 @@ export function SessionView() {
             <div ref={scriptTerminalRef} className="h-full" />
           </div>
         </div>
-        {showPromptNav && (
-          <PromptNavigation 
-            sessionId={activeSession.id} 
-            onNavigateToPrompt={handleNavigateToPrompt}
-          />
-        )}
+        <PromptNavigation 
+          sessionId={activeSession.id} 
+          onNavigateToPrompt={handleNavigateToPrompt}
+        />
       </div>
       
       <div className="border-t border-gray-300 p-4 bg-white flex-shrink-0">
