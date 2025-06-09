@@ -44,9 +44,6 @@ async function createWindow() {
     await mainWindow.loadURL('http://localhost:4521');
     mainWindow.webContents.openDevTools();
   } else {
-    // Open DevTools in production for debugging
-    mainWindow.webContents.openDevTools();
-    
     // Log the path we're trying to load
     const indexPath = path.join(__dirname, '../../frontend/dist/index.html');
     console.log('Loading index.html from:', indexPath);
