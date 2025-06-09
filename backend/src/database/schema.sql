@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   last_output TEXT,
   exit_code INTEGER,
-  pid INTEGER
+  pid INTEGER,
+  claude_session_id TEXT
 );
 
 -- Session outputs table to store terminal output history

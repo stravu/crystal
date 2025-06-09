@@ -24,6 +24,7 @@ export interface Session {
   archived?: boolean;
   last_viewed_at?: string;
   project_id?: number;
+  claude_session_id?: string;
 }
 
 export interface SessionOutput {
@@ -56,6 +57,7 @@ export interface UpdateSessionData {
   last_output?: string;
   exit_code?: number;
   pid?: number;
+  claude_session_id?: string;
 }
 
 export interface PromptMarker {

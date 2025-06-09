@@ -75,8 +75,19 @@ export class ClaudeCodeManager extends EventEmitter {
       const args = ['--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'];
       
       if (isResume) {
-        // Use --resume flag to continue existing conversation
-        args.push('--resume');
+        // Get Claude's session ID if available
+        const claudeSessionId = this.sessionManager.getClaudeSessionId(sessionId);
+        
+        if (claudeSessionId) {
+          // Use --resume flag with Claude's actual session ID
+          args.push('--resume', claudeSessionId);
+          console.log(`[ClaudeCodeManager] Resuming Claude session ${claudeSessionId} for Crystal session ${sessionId}`);
+        } else {
+          // Fall back to --resume without ID (will resume most recent)
+          args.push('--resume');
+          console.log(`[ClaudeCodeManager] No Claude session ID found for Crystal session ${sessionId}, resuming most recent session`);
+        }
+        
         // If a new prompt is provided, add it
         if (prompt && prompt.trim()) {
           args.push('-p', prompt);
@@ -94,6 +105,10 @@ export class ClaudeCodeManager extends EventEmitter {
       if (!pty) {
         throw new Error('node-pty not available');
       }
+      
+      // Log the full command being executed
+      const fullCommand = `claude ${args.join(' ')}`;
+      console.log(`[ClaudeCodeManager] Executing Claude Code command in worktree ${worktreePath}: ${fullCommand}`);
       
       // Get the user's shell PATH to ensure we have access to all their tools
       const shellPath = getShellPath();

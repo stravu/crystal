@@ -131,6 +131,15 @@ export class DatabaseService {
     if (!hasLastViewedAtColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at TEXT").run();
     }
+
+    // Check if claude_session_id column exists
+    const sessionTableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasClaudeSessionIdColumn = sessionTableInfo.some((col: any) => col.name === 'claude_session_id');
+    
+    if (!hasClaudeSessionIdColumn) {
+      // Add claude_session_id column to store Claude's actual session ID
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN claude_session_id TEXT").run();
+    }
   }
 
   // Session operations
@@ -178,6 +187,10 @@ export class DatabaseService {
     if (data.pid !== undefined) {
       updates.push('pid = ?');
       values.push(data.pid);
+    }
+    if (data.claude_session_id !== undefined) {
+      updates.push('claude_session_id = ?');
+      values.push(data.claude_session_id);
     }
 
     if (updates.length === 0) {

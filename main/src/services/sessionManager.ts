@@ -30,6 +30,13 @@ export class SessionManager extends EventEmitter {
   getDbSession(id: string): DbSession | undefined {
     return this.db.getSession(id);
   }
+  
+  getClaudeSessionId(id: string): string | undefined {
+    const dbSession = this.db.getSession(id);
+    const claudeSessionId = dbSession?.claude_session_id;
+    console.log(`[SessionManager] Getting Claude session ID for Crystal session ${id}: ${claudeSessionId || 'not found'}`);
+    return claudeSessionId;
+  }
 
   getProjectById(id: number): Project | undefined {
     return this.db.getProject(id);
@@ -163,6 +170,13 @@ export class SessionManager extends EventEmitter {
     // Store in database (stringify JSON objects)
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
     this.db.addSessionOutput(id, output.type, dataToStore);
+    
+    // Check if this is the initial system message with Claude's session ID
+    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'init' && output.data.session_id) {
+      // Store Claude's actual session ID
+      this.db.updateSession(id, { claude_session_id: output.data.session_id });
+      console.log(`[SessionManager] Captured Claude session ID: ${output.data.session_id} for Crystal session ${id}`);
+    }
     
     // Check if this is a user message in JSON format to track prompts
     if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {

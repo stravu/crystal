@@ -157,12 +157,13 @@ export class ExecutionTracker extends EventEmitter {
   async getCombinedDiff(sessionId: string, executionIds?: number[]): Promise<GitDiffResult> {
     const executions = await this.sessionManager.getExecutionDiffs(sessionId);
     
-    console.log(`[ExecutionTracker] getCombinedDiff for session ${sessionId}, found ${executions.length} executions`);
+    // Commented out verbose logging
+    // console.log(`[ExecutionTracker] getCombinedDiff for session ${sessionId}, found ${executions.length} executions`);
     
     let filteredExecutions = executions;
     if (executionIds && executionIds.length > 0) {
       filteredExecutions = executions.filter((exec: any) => executionIds.includes(exec.id));
-      console.log(`[ExecutionTracker] Filtered to ${filteredExecutions.length} executions`);
+      // console.log(`[ExecutionTracker] Filtered to ${filteredExecutions.length} executions`);
     }
     
     const diffs: GitDiffResult[] = filteredExecutions
@@ -179,26 +180,27 @@ export class ExecutionTracker extends EventEmitter {
         afterHash: exec.after_commit_hash
       }));
     
-    console.log(`[ExecutionTracker] Found ${diffs.length} diffs to combine`);
+    // console.log(`[ExecutionTracker] Found ${diffs.length} diffs to combine`);
     
     return this.gitDiffManager.combineDiffs(diffs);
   }
 
   async getExecutionDiffs(sessionId: string): Promise<any[]> {
     const diffs = await this.sessionManager.getExecutionDiffs(sessionId);
-    console.log(`[ExecutionTracker] getExecutionDiffs returned ${diffs.length} diffs for session ${sessionId}`);
-    if (diffs.length > 0) {
-      console.log(`[ExecutionTracker] First diff:`, {
-        id: diffs[0].id,
-        hasGitDiff: !!diffs[0].git_diff,
-        gitDiffLength: diffs[0].git_diff?.length || 0,
-        stats: {
-          additions: diffs[0].stats_additions,
-          deletions: diffs[0].stats_deletions,
-          filesChanged: diffs[0].stats_files_changed
-        }
-      });
-    }
+    // Commented out verbose logging
+    // console.log(`[ExecutionTracker] getExecutionDiffs returned ${diffs.length} diffs for session ${sessionId}`);
+    // if (diffs.length > 0) {
+    //   console.log(`[ExecutionTracker] First diff:`, {
+    //     id: diffs[0].id,
+    //     hasGitDiff: !!diffs[0].git_diff,
+    //     gitDiffLength: diffs[0].git_diff?.length || 0,
+    //     stats: {
+    //       additions: diffs[0].stats_additions,
+    //       deletions: diffs[0].stats_deletions,
+    //       filesChanged: diffs[0].stats_files_changed
+    //     }
+    //   });
+    // }
     return diffs;
   }
 }

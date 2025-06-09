@@ -84,6 +84,11 @@ export class SessionManager extends EventEmitter {
     const dbSession = await this.db.getSession(id);
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
+  
+  async getClaudeSessionId(id: string): Promise<string | undefined> {
+    const dbSession = await this.db.getSession(id);
+    return dbSession?.claude_session_id;
+  }
 
   async createSession(name: string, worktreePath: string, prompt: string, worktreeName: string): Promise<Session> {
     const sessionData: CreateSessionData = {
@@ -127,6 +132,13 @@ export class SessionManager extends EventEmitter {
     // Store in database (stringify JSON objects)
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
     await this.db.addSessionOutput(id, output.type, dataToStore);
+    
+    // Check if this is the initial system message with Claude's session ID
+    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'init' && output.data.session_id) {
+      // Store Claude's actual session ID
+      await this.db.updateSession(id, { claude_session_id: output.data.session_id });
+      console.log(`Captured Claude session ID: ${output.data.session_id} for session ${id}`);
+    }
     
     // Check if this is a user input prompt to track it
     if (output.type === 'stdout' && dataToStore.includes('> ')) {
