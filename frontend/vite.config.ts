@@ -12,5 +12,11 @@ export default defineConfig({
       }
     }
   },
-  base: './'
+  base: './',
+  build: {
+    // Ensure assets are copied and paths are relative
+    assetsDir: 'assets',
+    // Copy public files to dist
+    copyPublicDir: true
+  }
 });
