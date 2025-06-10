@@ -131,6 +131,8 @@ export class TaskQueue {
         worktreeName = await this.ensureUniqueSessionName(worktreeName, index);
         
         console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
+        console.log(`[TaskQueue] Active project build_script:`, activeProject.build_script);
+        console.log(`[TaskQueue] Active project run_script:`, activeProject.run_script);
 
         const worktreePath = await worktreeManager.createWorktree(activeProject.path, worktreeName, undefined, activeProject.build_script);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);

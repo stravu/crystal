@@ -276,7 +276,16 @@ export class DatabaseService {
   }
 
   getActiveProject(): Project | undefined {
-    return this.db.prepare('SELECT * FROM projects WHERE active = 1 LIMIT 1').get() as Project | undefined;
+    const project = this.db.prepare('SELECT * FROM projects WHERE active = 1 LIMIT 1').get() as Project | undefined;
+    if (project) {
+      console.log(`[Database] Retrieved active project:`, {
+        id: project.id,
+        name: project.name,
+        build_script: project.build_script,
+        run_script: project.run_script
+      });
+    }
+    return project;
   }
 
   getAllProjects(): Project[] {

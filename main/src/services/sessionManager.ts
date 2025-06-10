@@ -23,6 +23,14 @@ export class SessionManager extends EventEmitter {
   getActiveProject(): Project | null {
     if (!this.activeProject) {
       this.activeProject = this.db.getActiveProject() || null;
+      if (this.activeProject) {
+        console.log(`[SessionManager] Active project loaded from DB:`, {
+          id: this.activeProject.id,
+          name: this.activeProject.name,
+          build_script: this.activeProject.build_script,
+          run_script: this.activeProject.run_script
+        });
+      }
     }
     return this.activeProject;
   }

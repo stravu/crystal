@@ -267,7 +267,7 @@ export class ClaudeCodeManager extends EventEmitter {
         this.processes.delete(sessionId);
       });
 
-      this.emit('spawned', { sessionId });
+      // Note: 'spawned' event is already emitted earlier in the function
       this.logger?.info(`Claude spawned successfully for session ${sessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
