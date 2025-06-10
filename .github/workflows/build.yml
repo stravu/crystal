@@ -49,6 +49,8 @@ jobs:
 
     - name: Build application
       run: pnpm run ${{ matrix.build_cmd }}
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
