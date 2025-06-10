@@ -67,6 +67,12 @@
     "directories": {
       "output": "dist-electron"
     },
+    "extraResources": [
+      {
+        "from": "build/entitlements.mac.plist",
+        "to": "entitlements.mac.plist"
+      }
+    ],
     "files": [
       "main/dist/**/*",
       "frontend/dist/**/*",
@@ -81,8 +87,8 @@
       "icon": "main/assets/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "entitlements": "${env.PWD}/build/entitlements.mac.plist",
-      "entitlementsInherit": "${env.PWD}/build/entitlements.mac.plist",
+      "entitlements": "./entitlements.mac.plist",
+      "entitlementsInherit": "./entitlements.mac.plist",
       "notarize": {
         "teamId": "${APPLE_TEAM_ID}"
       }
