@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to Crystal! We welcome contributions from the community and are excited to work with you.
 
+Crystal is an open source project created by [Stravu](https://stravu.com/)
+
 ## Getting Started
 
 1. Fork the repository on GitHub

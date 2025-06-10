@@ -1,5 +1,7 @@
 # Crystal - Multi-Session Claude Code Manager
 
+Created by [Stravu](https://stravu.com/)
+
 ## Project Overview
 
 Crystal is a fully-implemented Electron desktop application for managing multiple Claude Code instances against a single directory using git worktrees. It provides a streamlined interface for running parallel Claude Code sessions with different approaches to the same problem.
@@ -326,6 +328,10 @@ crystal/
 
 ### Debug Mode
 Enable verbose logging in Settings to see detailed logs for troubleshooting.
+
+## Disclaimer
+
+Crystal is an independent project created by [Stravu](https://stravu.com/). Claude™ is a trademark of Anthropic, PBC. Crystal is not affiliated with, endorsed by, or sponsored by Anthropic. This tool is designed to work with Claude Code, which must be installed separately.
 
 ## important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

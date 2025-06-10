@@ -2,6 +2,8 @@
 
 This guide covers how to install Crystal from pre-built releases on macOS and Linux.
 
+Crystal is created by [Stravu](https://stravu.com/)
+
 ## Download
 
 Download the appropriate release for your platform from the releases page.
@@ -10,7 +12,7 @@ Download the appropriate release for your platform from the releases page.
 
 ### Option 1: Direct Installation (Recommended)
 
-1. **Download the `.dmg` file** (e.g., `Crystal-1.0.0-arm64.dmg` for Apple Silicon or `Crystal-1.0.0.dmg` for Intel)
+1. **Download the `.dmg` file** (e.g., `Crystal-0.1.0-arm64.dmg` for Apple Silicon or `Crystal-0.1.0.dmg` for Intel)
 
 2. **Install the application:**
    ```bash
@@ -101,7 +103,7 @@ Sometimes the "Open Anyway" button doesn't appear immediately:
 
 Crystal is distributed as an AppImage, which works on most Linux distributions without installation.
 
-1. **Download the AppImage file** (e.g., `Crystal-1.0.0-x86_64.AppImage` for Intel/AMD or `Crystal-1.0.0-arm64.AppImage` for ARM)
+1. **Download the AppImage file** (e.g., `Crystal-0.1.0-x86_64.AppImage` for Intel/AMD or `Crystal-0.1.0-arm64.AppImage` for ARM)
 
 2. **Make it executable:**
    ```bash
