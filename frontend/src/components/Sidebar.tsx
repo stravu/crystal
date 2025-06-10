@@ -100,7 +100,7 @@ export function Sidebar({ viewMode, onViewModeChange, onHelpClick }: SidebarProp
                 </svg>
               </button>
               {/* Status Legend Tooltip */}
-              <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+              <div className="absolute left-full ml-2 -top-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
                 <div className="p-3">
                   <h4 className="text-sm font-semibold text-white mb-2">Session Status Legend</h4>
                   <div className="space-y-2 text-xs">
@@ -126,8 +126,8 @@ export function Sidebar({ viewMode, onViewModeChange, onHelpClick }: SidebarProp
                     </div>
                   </div>
                 </div>
-                {/* Arrow pointing up */}
-                <div className="absolute -top-2 right-2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
+                {/* Arrow pointing left */}
+                <div className="absolute top-4 -left-2 w-0 h-0 border-t-4 border-b-4 border-r-4 border-t-transparent border-b-transparent border-r-gray-900"></div>
               </div>
             </div>
           </div>
