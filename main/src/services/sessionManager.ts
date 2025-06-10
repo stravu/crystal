@@ -4,6 +4,7 @@ import { spawn, ChildProcess, exec } from 'child_process';
 import type { Session, SessionUpdate, SessionOutput } from '../types/session';
 import type { DatabaseService } from '../database/database';
 import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, Project } from '../database/models';
+import { getShellPath } from '../utils/shellPath';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
@@ -422,11 +423,18 @@ export class SessionManager extends EventEmitter {
     // Join commands with && to run them sequentially
     const command = commands.join(' && ');
     
+    // Get enhanced shell PATH
+    const shellPath = getShellPath();
+    
     // Spawn the process with its own process group for easier termination
     this.runningScriptProcess = spawn('sh', ['-c', command], {
       cwd: workingDirectory,
       stdio: 'pipe',
-      detached: true // Create a new process group
+      detached: true, // Create a new process group
+      env: {
+        ...process.env,
+        PATH: shellPath
+      }
     });
 
     // Handle output

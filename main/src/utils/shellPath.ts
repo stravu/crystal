@@ -19,13 +19,20 @@ export function getShellPath(): string {
     
     // Execute the shell to get the PATH
     // Use -l for login shell to ensure all PATH modifications are loaded
-    const shellCommand = `${shell} -l -c 'echo $PATH'`;
+    // Use -i for interactive shell to load .bashrc/.zshrc
+    const shellCommand = `${shell} -l -i -c 'echo $PATH'`;
+    
+    console.log('Getting shell PATH using command:', shellCommand);
     
     // Execute the command to get the PATH
     const shellPath = execSync(shellCommand, {
       encoding: 'utf8',
-      timeout: 5000
+      timeout: 5000,
+      // Important: In packaged Electron apps, we need to ensure we're not inheriting a restricted PATH
+      env: { ...process.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' }
     }).trim();
+    
+    console.log('Shell PATH result:', shellPath);
     
     // Combine with current process PATH to ensure we don't lose anything
     const currentPath = process.env.PATH || '';
@@ -40,6 +47,20 @@ export function getShellPath(): string {
     } catch {
       // Ignore npm bin errors
     }
+    
+    // Try to get yarn global bin directory
+    try {
+      const yarnBin = execSync('yarn global bin', { encoding: 'utf8' }).trim();
+      if (yarnBin) additionalPaths.push(yarnBin);
+    } catch {
+      // Ignore yarn bin errors
+    }
+    
+    // Add common yarn paths
+    additionalPaths.push(
+      path.join(os.homedir(), '.yarn', 'bin'),
+      path.join(os.homedir(), '.config', 'yarn', 'global', 'node_modules', '.bin')
+    );
     
     // Check for nvm directories - look for all versions
     const nvmDir = path.join(os.homedir(), '.nvm/versions/node');
@@ -69,9 +90,59 @@ export function getShellPath(): string {
     return cachedPath;
   } catch (error) {
     console.error('Failed to get shell PATH:', error);
-    // Fallback to process PATH
+    
+    // Try alternative method: read shell config files directly
+    try {
+      const homeDir = os.homedir();
+      const shellConfigPaths = [
+        path.join(homeDir, '.zshrc'),
+        path.join(homeDir, '.bashrc'),
+        path.join(homeDir, '.bash_profile'),
+        path.join(homeDir, '.profile'),
+        path.join(homeDir, '.zprofile')
+      ];
+      
+      let extractedPaths: string[] = [];
+      
+      for (const configPath of shellConfigPaths) {
+        if (fs.existsSync(configPath)) {
+          const content = fs.readFileSync(configPath, 'utf8');
+          // Look for PATH exports
+          const pathMatches = content.match(/export\s+PATH=["']?([^"'\n]+)["']?/gm);
+          if (pathMatches) {
+            pathMatches.forEach(match => {
+              const pathValue = match.replace(/export\s+PATH=["']?/, '').replace(/["']?$/, '');
+              // Expand $PATH references
+              if (pathValue.includes('$PATH')) {
+                extractedPaths.push(pathValue.replace(/\$PATH/g, process.env.PATH || ''));
+              } else {
+                extractedPaths.push(pathValue);
+              }
+            });
+          }
+        }
+      }
+      
+      if (extractedPaths.length > 0) {
+        console.log('Found PATH in shell config files');
+        const combinedPaths = new Set(extractedPaths.join(':').split(':').filter(p => p));
+        cachedPath = Array.from(combinedPaths).join(':');
+        return cachedPath;
+      }
+    } catch (configError) {
+      console.error('Failed to read shell config files:', configError);
+    }
+    
+    // Final fallback to process PATH
     return process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin';
   }
+}
+
+/**
+ * Clear the cached PATH (useful for development/testing)
+ */
+export function clearShellPathCache(): void {
+  cachedPath = null;
 }
 
 /**

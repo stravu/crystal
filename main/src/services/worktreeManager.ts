@@ -2,8 +2,21 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
+import { getShellPath } from '../utils/shellPath';
 
 const execAsync = promisify(exec);
+
+// Wrapper for execAsync that includes enhanced PATH
+async function execWithShellPath(command: string, options?: { cwd?: string }): Promise<{ stdout: string; stderr: string }> {
+  const shellPath = getShellPath();
+  return execAsync(command, {
+    ...options,
+    env: {
+      ...process.env,
+      PATH: shellPath
+    }
+  });
+}
 
 export class WorktreeManager {
   private projectsCache: Map<string, { baseDir: string }> = new Map();
@@ -44,20 +57,20 @@ export class WorktreeManager {
       // First check if this is a git repository
       let isGitRepo = false;
       try {
-        await execAsync(`cd "${projectPath}" && git rev-parse --is-inside-work-tree`);
+        await execWithShellPath(`cd "${projectPath}" && git rev-parse --is-inside-work-tree`);
         isGitRepo = true;
         console.log(`[WorktreeManager] Directory is a git repository`);
       } catch (error) {
         console.log(`[WorktreeManager] Directory is not a git repository, initializing...`);
         // Initialize git repository
-        await execAsync(`cd "${projectPath}" && git init`);
+        await execWithShellPath(`cd "${projectPath}" && git init`);
         console.log(`[WorktreeManager] Git repository initialized`);
       }
 
       // Clean up any existing worktree directory first
       console.log(`[WorktreeManager] Cleaning up any existing worktree...`);
       try {
-        await execAsync(`cd "${projectPath}" && git worktree remove "${worktreePath}" --force 2>/dev/null || true`);
+        await execWithShellPath(`cd "${projectPath}" && git worktree remove "${worktreePath}" --force 2>/dev/null || true`);
       } catch {
         // Ignore cleanup errors
       }
@@ -65,15 +78,15 @@ export class WorktreeManager {
       // Check if the repository has any commits
       let hasCommits = false;
       try {
-        await execAsync(`cd "${projectPath}" && git rev-parse HEAD`);
+        await execWithShellPath(`cd "${projectPath}" && git rev-parse HEAD`);
         hasCommits = true;
       } catch (error) {
         // Repository has no commits yet, create initial commit
         console.log(`[WorktreeManager] No commits found, creating initial commit...`);
         const addCmd = `cd "${projectPath}" && git add -A || true`;
         const commitCmd = `cd "${projectPath}" && git commit -m "Initial commit" --allow-empty`;
-        await execAsync(addCmd);
-        await execAsync(commitCmd);
+        await execWithShellPath(addCmd);
+        await execWithShellPath(commitCmd);
         hasCommits = true;
         console.log(`[WorktreeManager] Initial commit created`);
       }
@@ -83,7 +96,7 @@ export class WorktreeManager {
       const checkBranchCmd = `cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`;
       let branchExists = false;
       try {
-        await execAsync(checkBranchCmd);
+        await execWithShellPath(checkBranchCmd);
         branchExists = true;
         console.log(`[WorktreeManager] Branch ${branchName} already exists`);
       } catch {
@@ -94,11 +107,11 @@ export class WorktreeManager {
       if (branchExists) {
         // Use existing branch
         console.log(`[WorktreeManager] Adding worktree with existing branch...`);
-        await execAsync(`cd "${projectPath}" && git worktree add "${worktreePath}" ${branchName}`);
+        await execWithShellPath(`cd "${projectPath}" && git worktree add "${worktreePath}" ${branchName}`);
       } else {
         // Create new branch from current HEAD and add worktree
         console.log(`[WorktreeManager] Creating new branch and adding worktree...`);
-        await execAsync(`cd "${projectPath}" && git worktree add -b ${branchName} "${worktreePath}"`);
+        await execWithShellPath(`cd "${projectPath}" && git worktree add -b ${branchName} "${worktreePath}"`);
       }
       
       console.log(`[WorktreeManager] Worktree created successfully at: ${worktreePath}`);
@@ -124,7 +137,7 @@ export class WorktreeManager {
                 timestamp: new Date()
               });
               
-              const { stdout, stderr } = await execAsync(`cd "${worktreePath}" && ${command}`);
+              const { stdout, stderr } = await execWithShellPath(`cd "${worktreePath}" && ${command}`);
               
               if (stdout) {
                 console.log(`[WorktreeManager] Output:`, stdout);
@@ -165,7 +178,7 @@ export class WorktreeManager {
     const worktreePath = join(baseDir, name);
     
     try {
-      await execAsync(`cd ${projectPath} && git worktree remove "${worktreePath}" --force`);
+      await execWithShellPath(`cd ${projectPath} && git worktree remove "${worktreePath}" --force`);
     } catch (error: any) {
       const errorMessage = error.stderr || error.stdout || error.message || String(error);
       
@@ -184,7 +197,7 @@ export class WorktreeManager {
 
   async listWorktrees(projectPath: string): Promise<Array<{ path: string; branch: string }>> {
     try {
-      const { stdout } = await execAsync(`cd ${projectPath} && git worktree list --porcelain`);
+      const { stdout } = await execWithShellPath(`cd ${projectPath} && git worktree list --porcelain`);
       
       const worktrees: Array<{ path: string; branch: string }> = [];
       const lines = stdout.split('\n');
@@ -222,7 +235,7 @@ export class WorktreeManager {
     try {
       // Try to get the default branch from remote first
       try {
-        const { stdout: remoteHead } = await execAsync(`cd "${projectPath}" && git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true`);
+        const { stdout: remoteHead } = await execWithShellPath(`cd "${projectPath}" && git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true`);
         if (remoteHead.trim()) {
           const mainBranch = remoteHead.trim().replace('refs/remotes/origin/', '');
           console.log(`[WorktreeManager] Detected main branch from remote: ${mainBranch}`);
@@ -234,7 +247,7 @@ export class WorktreeManager {
 
       // Try to get current branch
       try {
-        const { stdout: currentBranch } = await execAsync(`cd "${projectPath}" && git branch --show-current 2>/dev/null || true`);
+        const { stdout: currentBranch } = await execWithShellPath(`cd "${projectPath}" && git branch --show-current 2>/dev/null || true`);
         if (currentBranch.trim()) {
           console.log(`[WorktreeManager] Using current branch as main: ${currentBranch.trim()}`);
           return currentBranch.trim();
@@ -247,7 +260,7 @@ export class WorktreeManager {
       const commonNames = ['main', 'master', 'develop', 'dev'];
       for (const branchName of commonNames) {
         try {
-          await execAsync(`cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`);
+          await execWithShellPath(`cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`);
           console.log(`[WorktreeManager] Found common main branch: ${branchName}`);
           return branchName;
         } catch {
@@ -267,7 +280,7 @@ export class WorktreeManager {
   async hasChangesToRebase(worktreePath: string, mainBranch: string): Promise<boolean> {
     try {
       // Check if main branch has commits that the current branch doesn't have
-      const { stdout } = await execAsync(`cd "${worktreePath}" && git rev-list --count HEAD..${mainBranch} 2>/dev/null || echo "0"`);
+      const { stdout } = await execWithShellPath(`cd "${worktreePath}" && git rev-list --count HEAD..${mainBranch} 2>/dev/null || echo "0"`);
       const commitCount = parseInt(stdout.trim());
       return commitCount > 0;
     } catch (error) {
@@ -281,7 +294,7 @@ export class WorktreeManager {
       console.log(`[WorktreeManager] Rebasing ${mainBranch} into worktree: ${worktreePath}`);
       
       // Rebase the current worktree branch onto main
-      await execAsync(`cd "${worktreePath}" && git rebase ${mainBranch}`);
+      await execWithShellPath(`cd "${worktreePath}" && git rebase ${mainBranch}`);
       
       console.log(`[WorktreeManager] Successfully rebased ${mainBranch} into worktree`);
     } catch (error: any) {
@@ -307,33 +320,33 @@ export class WorktreeManager {
       // Get current branch name in worktree
       let command = `git branch --show-current`;
       executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      const { stdout: currentBranch } = await execAsync(`cd "${worktreePath}" && ${command}`);
+      const { stdout: currentBranch } = await execWithShellPath(`cd "${worktreePath}" && ${command}`);
       const branchName = currentBranch.trim();
       
       // Get the base commit (where the worktree branch diverged from main)
       command = `git merge-base ${mainBranch} HEAD`;
       executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      const { stdout: baseCommit } = await execAsync(`cd "${worktreePath}" && ${command}`);
+      const { stdout: baseCommit } = await execWithShellPath(`cd "${worktreePath}" && ${command}`);
       const base = baseCommit.trim();
       
       // Squash all commits since base into one
       command = `git reset --soft ${base}`;
       executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      await execAsync(`cd "${worktreePath}" && ${command}`);
+      await execWithShellPath(`cd "${worktreePath}" && ${command}`);
       
       command = `git commit -m "${commitMessage.replace(/"/g, '\\"')}"`;
       executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      await execAsync(`cd "${worktreePath}" && ${command}`);
+      await execWithShellPath(`cd "${worktreePath}" && ${command}`);
       
       // Switch to main branch in the main repository
       command = `git checkout ${mainBranch}`;
       executedCommands.push(`cd "${projectPath}" && ${command}`);
-      await execAsync(`cd "${projectPath}" && ${command}`);
+      await execWithShellPath(`cd "${projectPath}" && ${command}`);
       
       // Rebase the squashed commit onto main
       command = `git rebase ${branchName}`;
       executedCommands.push(`cd "${projectPath}" && ${command}`);
-      await execAsync(`cd "${projectPath}" && ${command}`);
+      await execWithShellPath(`cd "${projectPath}" && ${command}`);
       
       console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
     } catch (error: any) {

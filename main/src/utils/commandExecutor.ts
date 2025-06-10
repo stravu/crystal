@@ -1,4 +1,5 @@
 import { execSync as nodeExecSync, ExecSyncOptions, ExecSyncOptionsWithStringEncoding, ExecSyncOptionsWithBufferEncoding } from 'child_process';
+import { getShellPath } from './shellPath';
 
 class CommandExecutor {
   execSync(command: string, options: ExecSyncOptionsWithStringEncoding): string;
@@ -8,8 +9,21 @@ class CommandExecutor {
     const cwd = options?.cwd || process.cwd();
     console.log(`[CommandExecutor] Executing: ${command} in ${cwd}`);
 
+    // Get enhanced shell PATH
+    const shellPath = getShellPath();
+    
+    // Merge enhanced PATH into options
+    const enhancedOptions = {
+      ...options,
+      env: {
+        ...process.env,
+        ...options?.env,
+        PATH: shellPath
+      }
+    };
+
     try {
-      const result = nodeExecSync(command, options as any);
+      const result = nodeExecSync(command, enhancedOptions as any);
       
       // Log success with a preview of the result
       if (result) {
