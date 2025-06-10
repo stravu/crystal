@@ -4,6 +4,7 @@ import { SessionListItem } from './SessionListItem';
 import { CreateSessionButton } from './CreateSessionButton';
 import { Settings } from './Settings';
 import ProjectSelector from './ProjectSelector';
+import crystalLogo from '../assets/crystal-logo.svg';
 
 type ViewMode = 'sessions' | 'prompts';
 
@@ -22,7 +23,10 @@ export function Sidebar({ viewMode, onViewModeChange, onHelpClick }: SidebarProp
     <>
       <div className="w-64 bg-gray-800 text-white h-full flex flex-col pt-4">
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Crystal</h1>
+          <div className="flex items-center space-x-2">
+            <img src={crystalLogo} alt="Crystal" className="h-6 w-6" />
+            <h1 className="text-xl font-bold">Crystal</h1>
+          </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={onHelpClick}

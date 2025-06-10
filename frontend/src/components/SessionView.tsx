@@ -7,7 +7,6 @@ import { StatusIndicator } from './StatusIndicator';
 import { PromptNavigation } from './PromptNavigation';
 import CombinedDiffView from './CombinedDiffView';
 import { API } from '../utils/api';
-import crystalLogo from '../assets/crystal-logo.svg';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -978,9 +977,6 @@ export function SessionView() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="bg-gray-100 border-b border-gray-300 px-4 py-3 flex-shrink-0">
-        <div className="flex items-center justify-between gap-4 mb-2">
-          <img src={crystalLogo} alt="Crystal" className="h-8 w-8" />
-        </div>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-xl text-gray-900 truncate">{activeSession.name}</h2>
