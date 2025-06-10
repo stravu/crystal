@@ -50,7 +50,15 @@ jobs:
     - name: Build application
       run: pnpm run ${{ matrix.build_cmd }}
       env:
-        CSC_IDENTITY_AUTO_DISCOVERY: false
+        # macOS code signing (optional for CI builds)
+        CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
+        CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+        # macOS notarization (optional for CI builds)
+        APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_APP_PASSWORD || '' }}
+        APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
+        # Use ad-hoc signing if no certificates are provided
+        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE && 'true' || 'false' }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

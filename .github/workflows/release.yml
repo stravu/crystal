@@ -56,17 +56,17 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # macOS code signing
-        CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.CSC_LINK || '' }}
-        CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.CSC_KEY_PASSWORD || '' }}
+        CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
+        CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
         # macOS notarization
         APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
-        APPLE_ID_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID_PASSWORD || '' }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_APP_PASSWORD || '' }}
         APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         # Use ad-hoc signing if no certificates are provided
-        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && secrets.CSC_LINK && 'true' || 'false' }}
+        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE && 'true' || 'false' }}
 
     - name: Ad-hoc sign macOS app
-      if: matrix.os == 'macos-latest' && !secrets.CSC_LINK
+      if: matrix.os == 'macos-latest' && !secrets.APPLE_CERTIFICATE
       run: |
         # Find the built .app
         APP_PATH=$(find dist-electron -name "*.app" -type d | head -1)
