@@ -179,6 +179,10 @@ export class TaskQueue {
           timestamp: new Date()
         });
         console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
+        
+        // Now emit the session-created event after initial output has been added
+        sessionManager.emitSessionCreated(session);
+        console.log(`[TaskQueue] Emitted session-created event for session ${session.id}`);
 
         console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
         await claudeCodeManager.startSession(session.id, session.worktreePath, prompt, permissionMode);

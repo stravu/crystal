@@ -164,10 +164,16 @@ export class SessionManager extends EventEmitter {
     console.log(`[SessionManager] Converted session:`, session);
     
     this.activeSessions.set(session.id, session);
-    this.emit('session-created', session);
-    console.log(`[SessionManager] Session created event emitted`);
+    // Don't emit the event here - let the caller decide when to emit it
+    // this.emit('session-created', session);
+    console.log(`[SessionManager] Session created (event not emitted yet)`);
     
     return session;
+  }
+
+  emitSessionCreated(session: Session): void {
+    console.log(`[SessionManager] Emitting session-created event for session ${session.id}`);
+    this.emit('session-created', session);
   }
 
   updateSession(id: string, update: SessionUpdate): void {
