@@ -51,12 +51,6 @@ jobs:
     - name: Rebuild native modules
       run: pnpm run electron:rebuild
 
-    - name: Prepare entitlements (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        mkdir -p dist-electron/build
-        cp build/entitlements.mac.plist dist-electron/build/
-
     - name: Build and publish application
       run: pnpm run release:${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
       env:
