@@ -27,6 +27,23 @@ Crystal is an Electron desktop application that lets you run multiple Claude Cod
 - Git installed
 - Git repository (Crystal will initialize one if needed)
 
+### Installation
+
+#### Download Pre-built Binaries
+
+Download the latest release for your platform from the [Releases page](https://github.com/stravu/crystal/releases):
+
+- **macOS**: Download `Crystal-{version}.dmg`
+  - Open the DMG file and drag Crystal to your Applications folder
+  - On first launch, you may need to right-click and select "Open" due to macOS security settings
+
+- **Linux**: Download `Crystal-{version}.AppImage` **Linux Installable Has Not Been Tested**
+  - Make the file executable: `chmod +x Crystal-{version}.AppImage`
+  - Run the AppImage: `./Crystal-{version}.AppImage`
+  - Optional: Install [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) for desktop integration
+
+
+
 ### Linux-specific Requirements
 - Required build tools for native modules:
   ```bash
@@ -40,7 +57,9 @@ Crystal is an Electron desktop application that lets you run multiple Claude Cod
   sudo pacman -S base-devel python
   ```
 
-### Installation
+
+
+### Building from Source
 
 ```bash
 # Clone the repository
@@ -64,10 +83,6 @@ pnpm build
 pnpm build:mac    # macOS
 pnpm build:linux  # Linux (has not been tested)
 ```
-
-### Installing Pre-built Releases
-
-See [INSTALL_INSTRUCTIONS.md](INSTALL_INSTRUCTIONS.md) for detailed installation instructions for macOS and Linux pre-built releases.
 
 ## 📖 How to Use
 
