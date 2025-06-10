@@ -3,6 +3,7 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import type { Logger } from '../utils/logger';
 import type { DatabaseService } from '../database/database';
 import type { ProjectRunCommand } from '../database/models';
+import { getShellPath } from '../utils/shellPath';
 
 interface RunProcess {
   process: pty.IPty;
@@ -42,80 +43,113 @@ export class RunCommandManager extends EventEmitter {
         try {
           this.logger?.verbose(`Starting RUN command ${i + 1}/${runCommands.length}: ${command.display_name || command.command}`);
           
-          // Create environment with WORKTREE_PATH
-          const env = Object.assign({}, process.env, {
-            WORKTREE_PATH: worktreePath
-          });
+          // Split command by newlines to execute each line sequentially
+          const commandLines = command.command.split('\n').filter(line => line.trim());
           
-          
-          // For debugging, let's prepend the environment variable to the command
-          const commandWithEnv = `export WORKTREE_PATH="${worktreePath}" && ${command.command}`;
-          
-          // Spawn the shell process
-          const ptyProcess = pty.spawn('/bin/sh', ['-c', commandWithEnv], {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd: worktreePath,
-            env: process.env as any
-          });
-
-          const runProcess: RunProcess = {
-            process: ptyProcess,
-            command,
-            sessionId
-          };
-
-          // Store the process immediately so it can be stopped if needed
-          const currentProcesses = this.processes.get(sessionId) || [];
-          currentProcesses.push(runProcess);
-          this.processes.set(sessionId, currentProcesses);
-
-          // Wait for this command to complete before starting the next one
-          await new Promise<void>((resolve, reject) => {
-            let hasExited = false;
-
-            // Handle output from the run command
-            ptyProcess.onData((data: string) => {
-              this.emit('output', {
-                sessionId,
-                commandId: command.id,
-                displayName: command.display_name || command.command,
-                type: 'stdout',
-                data,
-                timestamp: new Date()
-              });
+          for (let j = 0; j < commandLines.length; j++) {
+            const commandLine = commandLines[j].trim();
+            if (!commandLine) continue;
+            
+            this.logger?.verbose(`Executing line ${j + 1}/${commandLines.length} of command ${i + 1}: ${commandLine}`);
+            
+            // Create environment with WORKTREE_PATH and enhanced PATH
+            const shellPath = getShellPath();
+            const env = {
+              ...process.env,
+              WORKTREE_PATH: worktreePath,
+              PATH: shellPath
+            } as { [key: string]: string };
+            
+            // Log environment details for debugging
+            if (j === 0) {
+              this.logger?.verbose(`Setting WORKTREE_PATH to: ${worktreePath}`);
+              this.logger?.verbose(`Enhanced PATH: ${shellPath}`);
+              this.logger?.verbose(`Env WORKTREE_PATH check: ${env.WORKTREE_PATH}`);
+            }
+            
+            // Properly escape the worktree path for shell
+            const escapedWorktreePath = worktreePath.replace(/'/g, "'\"'\"'");
+            
+            // Use the user's shell instead of /bin/sh
+            const userShell = process.env.SHELL || '/bin/bash';
+            
+            // Set WORKTREE_PATH and run command line
+            const commandWithEnv = `export WORKTREE_PATH='${escapedWorktreePath}' && ${commandLine}`;
+            
+            this.logger?.verbose(`Using shell: ${userShell}`);
+            this.logger?.verbose(`Full command: ${commandWithEnv}`);
+            
+            // Spawn the shell process with the enhanced environment
+            const ptyProcess = pty.spawn(userShell, ['-c', commandWithEnv], {
+              name: 'xterm-color',
+              cols: 80,
+              rows: 30,
+              cwd: worktreePath,
+              env: env
             });
 
-            ptyProcess.onExit(({ exitCode, signal }) => {
-              hasExited = true;
-              this.logger?.info(`Run command exited: ${command.display_name || command.command}, exitCode: ${exitCode}, signal: ${signal}`);
-              
-              this.emit('exit', {
-                sessionId,
-                commandId: command.id,
-                displayName: command.display_name || command.command,
-                exitCode,
-                signal
+            const runProcess: RunProcess = {
+              process: ptyProcess,
+              command,
+              sessionId
+            };
+
+            // Store the process immediately so it can be stopped if needed
+            const currentProcesses = this.processes.get(sessionId) || [];
+            currentProcesses.push(runProcess);
+            this.processes.set(sessionId, currentProcesses);
+
+            // Wait for this command line to complete before starting the next one
+            await new Promise<void>((resolve, reject) => {
+              let hasExited = false;
+
+              // Handle output from the run command
+              ptyProcess.onData((data: string) => {
+                this.emit('output', {
+                  sessionId,
+                  commandId: command.id,
+                  displayName: command.display_name || command.command,
+                  type: 'stdout',
+                  data,
+                  timestamp: new Date()
+                });
               });
 
-              // Remove from processes array
-              const sessionProcesses = this.processes.get(sessionId);
-              if (sessionProcesses) {
-                const index = sessionProcesses.indexOf(runProcess);
-                if (index > -1) {
-                  sessionProcesses.splice(index, 1);
+              ptyProcess.onExit(({ exitCode, signal }) => {
+                hasExited = true;
+                this.logger?.info(`Command line exited: ${commandLine}, exitCode: ${exitCode}, signal: ${signal}`);
+                
+                // Only emit exit event for the last line of a command
+                if (j === commandLines.length - 1) {
+                  this.emit('exit', {
+                    sessionId,
+                    commandId: command.id,
+                    displayName: command.display_name || command.command,
+                    exitCode,
+                    signal
+                  });
                 }
-              }
 
-              // Only continue to next command if this one succeeded
-              if (exitCode === 0) {
-                resolve();
-              } else {
-                reject(new Error(`Command failed with exit code ${exitCode}`));
-              }
+                // Remove from processes array
+                const sessionProcesses = this.processes.get(sessionId);
+                if (sessionProcesses) {
+                  const index = sessionProcesses.indexOf(runProcess);
+                  if (index > -1) {
+                    sessionProcesses.splice(index, 1);
+                  }
+                }
+
+                // Only continue to next command line if this one succeeded
+                if (exitCode === 0) {
+                  resolve();
+                } else {
+                  reject(new Error(`Command line failed with exit code ${exitCode}: ${commandLine}`));
+                }
+              });
             });
-          });
+
+            this.logger?.verbose(`Completed command line successfully: ${commandLine}`);
+          }
 
           this.logger?.info(`Completed run command successfully: ${command.display_name || command.command}`);
         } catch (error) {
