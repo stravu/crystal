@@ -208,10 +208,13 @@ export class GitDiffManager {
    */
   private getCommitStats(worktreePath: string, commitHash: string): GitDiffStats {
     try {
-      const statsOutput = execSync(
-        `git show --stat --format= ${commitHash} | tail -1`,
+      const fullOutput = execSync(
+        `git show --stat --format= ${commitHash}`,
         { cwd: worktreePath, encoding: 'utf8' }
       );
+      // Get the last line manually instead of using tail
+      const lines = fullOutput.trim().split('\n');
+      const statsOutput = lines[lines.length - 1];
       return this.parseDiffStats(statsOutput);
     } catch {
       return { additions: 0, deletions: 0, filesChanged: 0 };
@@ -280,11 +283,22 @@ export class GitDiffManager {
   async getCombinedDiff(worktreePath: string): Promise<GitDiffResult> {
     // Get diff against main branch
     try {
-      // Get the main branch name
-      const mainBranch = execSync('git symbolic-ref refs/remotes/origin/HEAD | sed "s@^refs/remotes/origin/@@"', {
-        cwd: worktreePath,
-        encoding: 'utf8'
-      }).trim() || 'main';
+      // Get the main branch name in a cross-platform way
+      let mainBranch = 'main';
+      try {
+        const fullRef = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
+          cwd: worktreePath,
+          encoding: 'utf8'
+        }).trim();
+        
+        // Remove the prefix manually instead of using sed
+        if (fullRef.startsWith('refs/remotes/origin/')) {
+          mainBranch = fullRef.substring('refs/remotes/origin/'.length);
+        }
+      } catch {
+        // If symbolic-ref fails, fallback to 'main'
+        mainBranch = 'main';
+      }
 
       // Get diff between current branch and main
       const diff = execSync(`git diff origin/${mainBranch}...HEAD`, {

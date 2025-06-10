@@ -67,20 +67,33 @@ export class RunCommandManager extends EventEmitter {
               this.logger?.verbose(`Env WORKTREE_PATH check: ${env.WORKTREE_PATH}`);
             }
             
-            // Properly escape the worktree path for shell
-            const escapedWorktreePath = worktreePath.replace(/'/g, "'\"'\"'");
+            // Determine shell and command format based on platform
+            const isWindows = process.platform === 'win32';
+            let shell: string;
+            let shellArgs: string[];
+            let commandWithEnv: string;
             
-            // Use the user's shell instead of /bin/sh
-            const userShell = process.env.SHELL || '/bin/bash';
+            if (isWindows) {
+              // Use cmd.exe on Windows
+              shell = process.env.COMSPEC || 'cmd.exe';
+              // Windows command format: set VAR=value && command
+              const escapedWorktreePath = worktreePath.replace(/"/g, '""');
+              commandWithEnv = `set WORKTREE_PATH="${escapedWorktreePath}" && ${commandLine}`;
+              shellArgs = ['/c', commandWithEnv];
+            } else {
+              // Unix/macOS
+              const escapedWorktreePath = worktreePath.replace(/'/g, "'\"'\"'");
+              const userShell = process.env.SHELL || '/bin/bash';
+              shell = userShell;
+              commandWithEnv = `export WORKTREE_PATH='${escapedWorktreePath}' && ${commandLine}`;
+              shellArgs = ['-c', commandWithEnv];
+            }
             
-            // Set WORKTREE_PATH and run command line
-            const commandWithEnv = `export WORKTREE_PATH='${escapedWorktreePath}' && ${commandLine}`;
-            
-            this.logger?.verbose(`Using shell: ${userShell}`);
+            this.logger?.verbose(`Using shell: ${shell}`);
             this.logger?.verbose(`Full command: ${commandWithEnv}`);
             
             // Spawn the shell process with the enhanced environment
-            const ptyProcess = pty.spawn(userShell, ['-c', commandWithEnv], {
+            const ptyProcess = pty.spawn(shell, shellArgs, {
               name: 'xterm-color',
               cols: 80,
               rows: 30,
@@ -187,9 +200,27 @@ export class RunCommandManager extends EventEmitter {
         // This is important when commands use & to run multiple processes
         const pid = runProcess.process.pid;
         if (pid) {
-          // On Unix-like systems, use negative PID to kill the process group
-          process.kill(-pid, 'SIGTERM');
-          this.logger?.verbose(`Killed process group for run command: ${runProcess.command.display_name || runProcess.command.command}`);
+          if (process.platform === 'win32') {
+            // On Windows, use taskkill to kill the process tree
+            try {
+              require('child_process').execSync(`taskkill /pid ${pid} /t /f`, { stdio: 'ignore' });
+              this.logger?.verbose(`Killed process tree for run command: ${runProcess.command.display_name || runProcess.command.command}`);
+            } catch {
+              // Fallback to regular kill if taskkill fails
+              runProcess.process.kill();
+              this.logger?.verbose(`Killed run command (fallback): ${runProcess.command.display_name || runProcess.command.command}`);
+            }
+          } else {
+            // On Unix-like systems, use negative PID to kill the process group
+            try {
+              process.kill(-pid, 'SIGTERM');
+              this.logger?.verbose(`Killed process group for run command: ${runProcess.command.display_name || runProcess.command.command}`);
+            } catch {
+              // Fallback to regular kill if process group kill fails
+              runProcess.process.kill();
+              this.logger?.verbose(`Killed run command (fallback): ${runProcess.command.display_name || runProcess.command.command}`);
+            }
+          }
         } else {
           // Fallback to regular kill if PID is not available
           runProcess.process.kill();

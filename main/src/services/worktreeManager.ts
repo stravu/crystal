@@ -57,20 +57,25 @@ export class WorktreeManager {
       // First check if this is a git repository
       let isGitRepo = false;
       try {
-        await execWithShellPath(`cd "${projectPath}" && git rev-parse --is-inside-work-tree`);
+        await execWithShellPath(`git rev-parse --is-inside-work-tree`, { cwd: projectPath });
         isGitRepo = true;
         console.log(`[WorktreeManager] Directory is a git repository`);
       } catch (error) {
         console.log(`[WorktreeManager] Directory is not a git repository, initializing...`);
         // Initialize git repository
-        await execWithShellPath(`cd "${projectPath}" && git init`);
+        await execWithShellPath(`git init`, { cwd: projectPath });
         console.log(`[WorktreeManager] Git repository initialized`);
       }
 
       // Clean up any existing worktree directory first
       console.log(`[WorktreeManager] Cleaning up any existing worktree...`);
       try {
-        await execWithShellPath(`cd "${projectPath}" && git worktree remove "${worktreePath}" --force 2>/dev/null || true`);
+        // Use cross-platform approach without shell redirection
+        try {
+          await execWithShellPath(`git worktree remove "${worktreePath}" --force`, { cwd: projectPath });
+        } catch {
+          // Ignore cleanup errors
+        }
       } catch {
         // Ignore cleanup errors
       }
@@ -78,25 +83,28 @@ export class WorktreeManager {
       // Check if the repository has any commits
       let hasCommits = false;
       try {
-        await execWithShellPath(`cd "${projectPath}" && git rev-parse HEAD`);
+        await execWithShellPath(`git rev-parse HEAD`, { cwd: projectPath });
         hasCommits = true;
       } catch (error) {
         // Repository has no commits yet, create initial commit
         console.log(`[WorktreeManager] No commits found, creating initial commit...`);
-        const addCmd = `cd "${projectPath}" && git add -A || true`;
-        const commitCmd = `cd "${projectPath}" && git commit -m "Initial commit" --allow-empty`;
-        await execWithShellPath(addCmd);
-        await execWithShellPath(commitCmd);
+        // Use cross-platform approach without shell operators
+        try {
+          await execWithShellPath(`git add -A`, { cwd: projectPath });
+        } catch {
+          // Ignore add errors (no files to add)
+        }
+        await execWithShellPath(`git commit -m "Initial commit" --allow-empty`, { cwd: projectPath });
         hasCommits = true;
         console.log(`[WorktreeManager] Initial commit created`);
       }
 
       // Check if branch already exists
       console.log(`[WorktreeManager] Checking if branch ${branchName} exists...`);
-      const checkBranchCmd = `cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`;
+      const checkBranchCmd = `git show-ref --verify --quiet refs/heads/${branchName}`;
       let branchExists = false;
       try {
-        await execWithShellPath(checkBranchCmd);
+        await execWithShellPath(checkBranchCmd, { cwd: projectPath });
         branchExists = true;
         console.log(`[WorktreeManager] Branch ${branchName} already exists`);
       } catch {
@@ -107,11 +115,11 @@ export class WorktreeManager {
       if (branchExists) {
         // Use existing branch
         console.log(`[WorktreeManager] Adding worktree with existing branch...`);
-        await execWithShellPath(`cd "${projectPath}" && git worktree add "${worktreePath}" ${branchName}`);
+        await execWithShellPath(`git worktree add "${worktreePath}" ${branchName}`, { cwd: projectPath });
       } else {
         // Create new branch from current HEAD and add worktree
         console.log(`[WorktreeManager] Creating new branch and adding worktree...`);
-        await execWithShellPath(`cd "${projectPath}" && git worktree add -b ${branchName} "${worktreePath}"`);
+        await execWithShellPath(`git worktree add -b ${branchName} "${worktreePath}"`, { cwd: projectPath });
       }
       
       console.log(`[WorktreeManager] Worktree created successfully at: ${worktreePath}`);
@@ -137,7 +145,7 @@ export class WorktreeManager {
                 timestamp: new Date()
               });
               
-              const { stdout, stderr } = await execWithShellPath(`cd "${worktreePath}" && ${command}`);
+              const { stdout, stderr } = await execWithShellPath(command, { cwd: worktreePath });
               
               if (stdout) {
                 console.log(`[WorktreeManager] Output:`, stdout);
@@ -178,7 +186,7 @@ export class WorktreeManager {
     const worktreePath = join(baseDir, name);
     
     try {
-      await execWithShellPath(`cd ${projectPath} && git worktree remove "${worktreePath}" --force`);
+      await execWithShellPath(`git worktree remove "${worktreePath}" --force`, { cwd: projectPath });
     } catch (error: any) {
       const errorMessage = error.stderr || error.stdout || error.message || String(error);
       
@@ -197,7 +205,7 @@ export class WorktreeManager {
 
   async listWorktrees(projectPath: string): Promise<Array<{ path: string; branch: string }>> {
     try {
-      const { stdout } = await execWithShellPath(`cd ${projectPath} && git worktree list --porcelain`);
+      const { stdout } = await execWithShellPath(`git worktree list --porcelain`, { cwd: projectPath });
       
       const worktrees: Array<{ path: string; branch: string }> = [];
       const lines = stdout.split('\n');
@@ -235,7 +243,15 @@ export class WorktreeManager {
     try {
       // Try to get the default branch from remote first
       try {
-        const { stdout: remoteHead } = await execWithShellPath(`cd "${projectPath}" && git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true`);
+        // Use cross-platform approach
+        let remoteHead = '';
+        try {
+          const result = await execWithShellPath(`git symbolic-ref refs/remotes/origin/HEAD`, { cwd: projectPath });
+          remoteHead = result.stdout;
+        } catch {
+          // Remote HEAD not available
+          remoteHead = '';
+        }
         if (remoteHead.trim()) {
           const mainBranch = remoteHead.trim().replace('refs/remotes/origin/', '');
           console.log(`[WorktreeManager] Detected main branch from remote: ${mainBranch}`);
@@ -247,7 +263,15 @@ export class WorktreeManager {
 
       // Try to get current branch
       try {
-        const { stdout: currentBranch } = await execWithShellPath(`cd "${projectPath}" && git branch --show-current 2>/dev/null || true`);
+        // Use cross-platform approach
+        let currentBranch = '';
+        try {
+          const result = await execWithShellPath(`git branch --show-current`, { cwd: projectPath });
+          currentBranch = result.stdout;
+        } catch {
+          // Current branch not available
+          currentBranch = '';
+        }
         if (currentBranch.trim()) {
           console.log(`[WorktreeManager] Using current branch as main: ${currentBranch.trim()}`);
           return currentBranch.trim();
@@ -260,7 +284,7 @@ export class WorktreeManager {
       const commonNames = ['main', 'master', 'develop', 'dev'];
       for (const branchName of commonNames) {
         try {
-          await execWithShellPath(`cd "${projectPath}" && git show-ref --verify --quiet refs/heads/${branchName}`);
+          await execWithShellPath(`git show-ref --verify --quiet refs/heads/${branchName}`, { cwd: projectPath });
           console.log(`[WorktreeManager] Found common main branch: ${branchName}`);
           return branchName;
         } catch {
@@ -280,7 +304,15 @@ export class WorktreeManager {
   async hasChangesToRebase(worktreePath: string, mainBranch: string): Promise<boolean> {
     try {
       // Check if main branch has commits that the current branch doesn't have
-      const { stdout } = await execWithShellPath(`cd "${worktreePath}" && git rev-list --count HEAD..${mainBranch} 2>/dev/null || echo "0"`);
+      // Use cross-platform approach
+      let stdout = '0';
+      try {
+        const result = await execWithShellPath(`git rev-list --count HEAD..${mainBranch}`, { cwd: worktreePath });
+        stdout = result.stdout;
+      } catch {
+        // Error checking, assume no changes
+        stdout = '0';
+      }
       const commitCount = parseInt(stdout.trim());
       return commitCount > 0;
     } catch (error) {
@@ -294,7 +326,7 @@ export class WorktreeManager {
       console.log(`[WorktreeManager] Rebasing ${mainBranch} into worktree: ${worktreePath}`);
       
       // Rebase the current worktree branch onto main
-      await execWithShellPath(`cd "${worktreePath}" && git rebase ${mainBranch}`);
+      await execWithShellPath(`git rebase ${mainBranch}`, { cwd: worktreePath });
       
       console.log(`[WorktreeManager] Successfully rebased ${mainBranch} into worktree`);
     } catch (error: any) {
@@ -319,34 +351,36 @@ export class WorktreeManager {
       
       // Get current branch name in worktree
       let command = `git branch --show-current`;
-      executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      const { stdout: currentBranch } = await execWithShellPath(`cd "${worktreePath}" && ${command}`);
+      executedCommands.push(`git branch --show-current (in ${worktreePath})`);
+      const { stdout: currentBranch } = await execWithShellPath(command, { cwd: worktreePath });
       const branchName = currentBranch.trim();
       
       // Get the base commit (where the worktree branch diverged from main)
       command = `git merge-base ${mainBranch} HEAD`;
-      executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      const { stdout: baseCommit } = await execWithShellPath(`cd "${worktreePath}" && ${command}`);
+      executedCommands.push(`git merge-base ${mainBranch} HEAD (in ${worktreePath})`);
+      const { stdout: baseCommit } = await execWithShellPath(command, { cwd: worktreePath });
       const base = baseCommit.trim();
       
       // Squash all commits since base into one
       command = `git reset --soft ${base}`;
-      executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      await execWithShellPath(`cd "${worktreePath}" && ${command}`);
+      executedCommands.push(`git reset --soft ${base} (in ${worktreePath})`);
+      await execWithShellPath(command, { cwd: worktreePath });
       
-      command = `git commit -m "${commitMessage.replace(/"/g, '\\"')}"`;
-      executedCommands.push(`cd "${worktreePath}" && ${command}`);
-      await execWithShellPath(`cd "${worktreePath}" && ${command}`);
+      // Properly escape commit message for cross-platform compatibility
+      const escapedMessage = commitMessage.replace(/"/g, '\\"');
+      command = `git commit -m "${escapedMessage}"`;
+      executedCommands.push(`git commit -m "..." (in ${worktreePath})`);
+      await execWithShellPath(command, { cwd: worktreePath });
       
       // Switch to main branch in the main repository
       command = `git checkout ${mainBranch}`;
-      executedCommands.push(`cd "${projectPath}" && ${command}`);
-      await execWithShellPath(`cd "${projectPath}" && ${command}`);
+      executedCommands.push(`git checkout ${mainBranch} (in ${projectPath})`);
+      await execWithShellPath(command, { cwd: projectPath });
       
       // Rebase the squashed commit onto main
       command = `git rebase ${branchName}`;
-      executedCommands.push(`cd "${projectPath}" && ${command}`);
-      await execWithShellPath(`cd "${projectPath}" && ${command}`);
+      executedCommands.push(`git rebase ${branchName} (in ${projectPath})`);
+      await execWithShellPath(command, { cwd: projectPath });
       
       console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
     } catch (error: any) {

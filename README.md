@@ -37,14 +37,21 @@ Download the latest release for your platform from the [Releases page](https://g
   - Open the DMG file and drag Crystal to your Applications folder
   - On first launch, you may need to right-click and select "Open" due to macOS security settings
 
-- **Linux**: Download `Crystal-{version}.AppImage` **Linux Installable Has Not Been Tested**
+- **Windows**: Download `Crystal Setup {version}.exe` **Crystal on Windows Has Not Been Tested**
+  - Run the installer and follow the setup wizard
+  - If you see a security warning, click "More info" → "Run anyway"
+  - Crystal will be installed to your Program Files and added to the Start Menu
+
+- **Linux**: Download `Crystal-{version}.AppImage` **Crystal on Linux Has Not Been Tested**
   - Make the file executable: `chmod +x Crystal-{version}.AppImage`
   - Run the AppImage: `./Crystal-{version}.AppImage`
   - Optional: Install [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) for desktop integration
 
 
 
-### Linux-specific Requirements
+### Platform-specific Requirements
+
+#### Linux
 - Required build tools for native modules:
   ```bash
   # Ubuntu/Debian
@@ -56,6 +63,10 @@ Download the latest release for your platform from the [Releases page](https://g
   # Arch
   sudo pacman -S base-devel python
   ```
+
+#### Windows
+- Git for Windows is recommended for optimal Git integration
+- Windows 10 or later
 
 
 
@@ -81,6 +92,7 @@ pnpm build
 
 # Platform-specific builds
 pnpm build:mac    # macOS
+pnpm build:win    # Windows
 pnpm build:linux  # Linux (has not been tested)
 ```
 
