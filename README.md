@@ -74,32 +74,32 @@ See [INSTALL_INSTRUCTIONS.md](INSTALL_INSTRUCTIONS.md) for detailed installation
 ### 1. Create a Project
 You must create a project before you can proceed. A project should point to a git repository. If there is no repo in the folder you select one will be created.
 
-### 1. Create a Session
+### 2. Create a Session
 Click "Create Session" and enter:
 - **Prompt**: What you want Claude to do
 - **Worktree Name**: Branch name (optional)
 - **Count**: Number of parallel sessions
 
-### 2. Manage Sessions
+### 3. Manage Sessions
 - **🟢 Running**: Claude is working
 - **🟡 Waiting**: Needs your input
 - **⚪ Stopped**: Completed or paused
 - Click any session to view or continue it
 
-### 3. View Your Work
+### 4. View Your Work
 - **Output**: Formatted terminal output
 - **Changes**: Git diffs of all modifications
 - **Terminal**: Run tests or build scripts
 - **Messages**: Raw JSON for debugging
 
-### 4. Run Scripts
+### 5. Run Scripts
 Configure project-specific scripts in the project settings:
 - **Run scripts**: Execute dev servers, test watchers, or any continuous processes
 - Scripts run in the Terminal tab while Claude is working
 - Each line runs sequentially - perfect for setup commands followed by servers
 - All scripts stop automatically when the session ends
 
-### 5. Git Operations
+### 6. Git Operations
 - **Rebase from main**: Pull latest changes
 - **Squash and rebase**: Combine commits
 - Preview commands before executing
