@@ -1,0 +1,117 @@
+name: Release Crystal
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            build_cmd: build:linux
+          - os: macos-latest
+            build_cmd: build:mac
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.15.1'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build main process
+      run: pnpm run build:main
+
+    - name: Rebuild native modules
+      run: pnpm run electron:rebuild
+
+    - name: Build and publish application
+      run: pnpm run release:${{ matrix.os == 'ubuntu-latest' && 'linux' || 'mac' }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # macOS code signing
+        CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.CSC_LINK || '' }}
+        CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.CSC_KEY_PASSWORD || '' }}
+        # macOS notarization
+        APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
+        APPLE_ID_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID_PASSWORD || '' }}
+        APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
+        # Use ad-hoc signing if no certificates are provided
+        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && secrets.CSC_LINK && 'true' || 'false' }}
+
+    - name: Ad-hoc sign macOS app
+      if: matrix.os == 'macos-latest' && !secrets.CSC_LINK
+      run: |
+        # Find the built .app
+        APP_PATH=$(find dist-electron -name "*.app" -type d | head -1)
+        if [ -n "$APP_PATH" ]; then
+          echo "Ad-hoc signing $APP_PATH"
+          codesign --force --deep --sign - "$APP_PATH"
+          echo "Removing quarantine attribute"
+          xattr -cr "$APP_PATH"
+        fi
+
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.tag
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get version from package.json
+      id: version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+        release_name: Crystal ${{ steps.version.outputs.version }}
+        body: |
+          ## Crystal ${{ steps.version.outputs.version }}
+
+          ### Installation
+
+          **macOS**: Download the `.dmg` file and drag Crystal to your Applications folder.
+          
+          **Linux**: Download the `.AppImage` file, make it executable with `chmod +x`, and run it.
+
+          ### What's New
+          - See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details
+
+          ### Requirements
+          - Claude Code must be installed separately
+          - Node.js 22+ (for development)
+          - Git
+        draft: true
+        prerelease: false

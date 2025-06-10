@@ -26,6 +26,8 @@
     "build:win": "pnpm run build:frontend && pnpm run build:main && electron-builder --win --publish never",
     "build:linux": "pnpm run build:frontend && pnpm run build:main && electron-builder --linux --publish never",
     "build:all": "pnpm run build:frontend && pnpm run build:main && electron-builder -mwl",
+    "release:mac": "pnpm run build:frontend && pnpm run build:main && electron-builder --mac --publish always",
+    "release:linux": "pnpm run build:frontend && pnpm run build:main && electron-builder --linux --publish always",
     "preview": "pnpm run --filter frontend preview",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
@@ -73,7 +75,14 @@
     "buildDependenciesFromSource": false,
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "main/assets/icon.icns"
+      "icon": "main/assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": {
+        "teamId": "${APPLE_TEAM_ID}"
+      }
     },
     "win": {
       "target": "nsis",
@@ -86,6 +95,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "stravu",
+      "repo": "crystal"
     }
   },
   "packageManager": "pnpm@10.11.1+sha512.e519b9f7639869dc8d5c3c5dfef73b3f091094b0a006d7317353c72b124e80e1afd429732e28705ad6bfa1ee879c1fce46c128ccebd3192101f43dd67c667912"
