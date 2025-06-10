@@ -9,28 +9,55 @@ exports.default = async function(context) {
     return;
   }
 
-  console.log('Removing problematic JARs that contain unsigned native libraries...');
+  console.log('AfterSign: Starting JAR cleanup process...');
+  console.log('AfterSign: appOutDir =', appOutDir);
+  console.log('AfterSign: productName =', packager.appInfo.productName);
   
   const appPath = path.join(appOutDir, `${packager.appInfo.productName}.app`);
-  const claudeCodePath = path.join(appPath, 'Contents/Resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-code');
+  console.log('AfterSign: appPath =', appPath);
   
-  if (!fs.existsSync(claudeCodePath)) {
-    console.log('Claude Code path not found, skipping JAR removal');
-    return;
-  }
-
-  // Remove the problematic jansi JAR that contains unsigned native libraries
-  const problematicJars = [
-    'vendor/claude-code-jetbrains-plugin/lib/jansi-2.4.1.jar'
+  // Try multiple possible paths for the claude-code module
+  const possiblePaths = [
+    path.join(appPath, 'Contents/Resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-code'),
+    path.join(appPath, 'Contents/Resources/app/node_modules/@anthropic-ai/claude-code'),
+    path.join(appPath, 'Contents/Resources/node_modules/@anthropic-ai/claude-code')
   ];
-
-  for (const jarPath of problematicJars) {
-    const fullPath = path.join(claudeCodePath, jarPath);
-    if (fs.existsSync(fullPath)) {
-      console.log(`Removing problematic JAR: ${fullPath}`);
-      fs.unlinkSync(fullPath);
+  
+  let claudeCodePath = null;
+  for (const testPath of possiblePaths) {
+    console.log('AfterSign: Checking path:', testPath);
+    if (fs.existsSync(testPath)) {
+      claudeCodePath = testPath;
+      console.log('AfterSign: Found Claude Code at:', claudeCodePath);
+      break;
     }
   }
   
-  console.log('Problematic JAR removal complete');
+  if (!claudeCodePath) {
+    console.log('AfterSign: Claude Code path not found in any of the expected locations');
+    return;
+  }
+
+  // Remove ALL JAR files from the vendor directory since they may contain unsigned native code
+  const vendorPath = path.join(claudeCodePath, 'vendor');
+  if (fs.existsSync(vendorPath)) {
+    console.log('AfterSign: Removing all JAR files from vendor directory...');
+    
+    function removeJarsRecursively(dir) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          removeJarsRecursively(fullPath);
+        } else if (entry.name.endsWith('.jar')) {
+          console.log('AfterSign: Removing JAR:', fullPath);
+          fs.unlinkSync(fullPath);
+        }
+      }
+    }
+    
+    removeJarsRecursively(vendorPath);
+  }
+  
+  console.log('AfterSign: JAR cleanup complete');
 };
