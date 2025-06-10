@@ -452,6 +452,15 @@ export class SessionManager extends EventEmitter {
     });
   }
 
+  addScriptOutput(sessionId: string, data: string): void {
+    // Emit script output event that will be handled by the frontend
+    this.emit('script-output', { 
+      sessionId, 
+      type: 'stdout', 
+      data 
+    });
+  }
+
   stopRunningScript(): void {
     if (this.runningScriptProcess && this.currentRunningSessionId) {
       const sessionId = this.currentRunningSessionId;

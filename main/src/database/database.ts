@@ -226,7 +226,7 @@ export class DatabaseService {
       this.db.prepare("CREATE INDEX idx_project_run_commands_project_id ON project_run_commands(project_id)").run();
       
       // Migrate existing run_script data to the new table
-      const projectsWithRunScripts = this.db.prepare("SELECT id, run_script FROM projects WHERE run_script IS NOT NULL").all();
+      const projectsWithRunScripts = this.db.prepare("SELECT id, run_script FROM projects WHERE run_script IS NOT NULL").all() as Array<{id: number; run_script: string}>;
       for (const project of projectsWithRunScripts) {
         if (project.run_script) {
           this.db.prepare(`
