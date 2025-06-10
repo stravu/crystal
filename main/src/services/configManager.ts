@@ -18,7 +18,8 @@ export class ConfigManager extends EventEmitter {
       verbose: false,
       anthropicApiKey: undefined,
       systemPromptAppend: undefined,
-      runScript: undefined
+      runScript: undefined,
+      defaultPermissionMode: 'ignore'
     };
   }
 

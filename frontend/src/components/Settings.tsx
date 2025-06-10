@@ -38,6 +38,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setAnthropicApiKey(data.anthropicApiKey || '');
       setGlobalSystemPrompt(data.systemPromptAppend || '');
       setClaudeExecutablePath(data.claudeExecutablePath || '');
+      setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -180,7 +181,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 />
                 <div className="flex items-center gap-2">
                   <ShieldOff className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm">Skip Permissions (Default)</span>
+                  <span className="text-sm text-gray-900">Skip Permissions</span>
+                  <span className="text-xs text-gray-500">(faster, less secure)</span>
                 </div>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -194,12 +196,13 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 />
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-green-600" />
-                  <span className="text-sm">Approve Actions</span>
+                  <span className="text-sm text-gray-900">Manual Approval</span>
+                  <span className="text-xs text-gray-500">(safer, interactive)</span>
                 </div>
               </label>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Sets the default permission mode for new sessions. Individual sessions can override this setting.
+            <p className="text-xs text-gray-500 mt-2">
+              When enabled, Claude will ask for permission before performing potentially dangerous actions. This sets the default for new sessions.
             </p>
           </div>
 

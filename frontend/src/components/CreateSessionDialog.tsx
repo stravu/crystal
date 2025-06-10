@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
@@ -18,6 +18,22 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showError } = useErrorStore();
+  
+  useEffect(() => {
+    if (isOpen) {
+      // Fetch the default permission mode when dialog opens
+      API.config.get().then(response => {
+        if (response.success && response.data?.defaultPermissionMode) {
+          setFormData(prev => ({
+            ...prev,
+            permissionMode: response.data.defaultPermissionMode
+          }));
+        }
+      }).catch(err => {
+        console.error('Failed to fetch default permission mode:', err);
+      });
+    }
+  }, [isOpen]);
   
   if (!isOpen) return null;
   
@@ -39,7 +55,12 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
       }
       
       onClose();
-      setFormData({ prompt: '', worktreeTemplate: '', count: 1, permissionMode: 'ignore' });
+      // Reset form but fetch the default permission mode again
+      const configResponse = await API.config.get();
+      const defaultPermissionMode = configResponse.success && configResponse.data?.defaultPermissionMode 
+        ? configResponse.data.defaultPermissionMode 
+        : 'ignore';
+      setFormData({ prompt: '', worktreeTemplate: '', count: 1, permissionMode: defaultPermissionMode });
     } catch (error: any) {
       console.error('Error creating session:', error);
       showError({
