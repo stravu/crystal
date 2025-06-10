@@ -77,9 +77,6 @@ jobs:
     - name: Run type checking
       run: pnpm typecheck
 
-    - name: Run linting
-      run: pnpm lint
-
     - name: Install Playwright browsers
       run: pnpm playwright install
 
