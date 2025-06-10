@@ -978,7 +978,7 @@ export function SessionView() {
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="bg-gray-100 border-b border-gray-300 px-4 py-3 flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 relative">
             <h2 className="font-bold text-xl text-gray-900 truncate">{activeSession.name}</h2>
             <div className="flex items-center space-x-1 mt-1">
               <button
@@ -1008,7 +1008,7 @@ export function SessionView() {
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <StatusIndicator session={activeSession} size="medium" showText showProgress />
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 relative z-20">
                 <div className="group relative">
                   <button
                     onClick={handleRebaseMainIntoWorktree}
@@ -1025,7 +1025,7 @@ export function SessionView() {
                     <span className="text-sm font-medium">{isMerging ? 'Rebasing...' : `Rebase from ${gitCommands?.mainBranch || 'main'}`}</span>
                   </button>
                   {/* Enhanced Tooltip */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-md w-80">
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 max-w-md w-80">
                     <div className="font-semibold mb-1">Rebase from {gitCommands?.mainBranch || 'main'}</div>
                     {!hasChangesToRebase ? (
                       <div className="text-gray-300">No changes to rebase</div>
@@ -1060,7 +1060,7 @@ export function SessionView() {
                     <span className="text-sm font-medium">{isMerging ? 'Squashing...' : `Rebase to ${gitCommands?.mainBranch || 'main'}`}</span>
                   </button>
                   {/* Enhanced Tooltip */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-lg w-96">
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 max-w-lg w-96">
                     <div className="font-semibold mb-1">Rebase to {gitCommands?.mainBranch || 'main'}</div>
                     <div className="space-y-1">
                       <div className="text-gray-300">Commands to run:</div>
@@ -1096,14 +1096,14 @@ export function SessionView() {
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 relative z-50 mt-6">
             <div className="flex bg-white rounded-lg border border-gray-300 overflow-hidden flex-shrink-0">
             <button
               onClick={() => {
                 setViewMode('output');
                 setUnreadActivity(prev => ({ ...prev, output: false }));
               }}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 relative ${
+              className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block ${
                 viewMode === 'output' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -1119,7 +1119,7 @@ export function SessionView() {
                 setViewMode('messages');
                 setUnreadActivity(prev => ({ ...prev, messages: false }));
               }}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 relative ${
+              className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block ${
                 viewMode === 'messages' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -1135,7 +1135,7 @@ export function SessionView() {
                 setViewMode('changes');
                 setUnreadActivity(prev => ({ ...prev, changes: false }));
               }}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 relative ${
+              className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block ${
                 viewMode === 'changes' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
@@ -1151,7 +1151,7 @@ export function SessionView() {
                 setViewMode('terminal');
                 setUnreadActivity(prev => ({ ...prev, terminal: false }));
               }}
-              className={`px-3 py-1 text-sm whitespace-nowrap flex-shrink-0 inline-flex items-center relative ${
+              className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 inline-flex items-center relative ${
                 viewMode === 'terminal' 
                   ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
