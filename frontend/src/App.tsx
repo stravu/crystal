@@ -29,18 +29,38 @@ function App() {
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [currentPermissionRequest, setCurrentPermissionRequest] = useState<PermissionRequest | null>(null);
   const { currentError, clearError } = useErrorStore();
-  const { sessions } = useSessionStore();
+  const { sessions, isLoaded } = useSessionStore();
   
   useSocket();
   useNotifications();
 
   useEffect(() => {
-    // Check if we should show welcome screen
-    const hideWelcome = localStorage.getItem('crystal-hide-welcome');
-    if (!hideWelcome) {
-      setIsWelcomeOpen(true);
-    }
+    // Only show welcome screen on first launch when no data exists
+    const checkInitialState = async () => {
+      const hideWelcome = localStorage.getItem('crystal-hide-welcome');
+      if (!hideWelcome && isLoaded) {
+        // Check if there are any projects
+        try {
+          const projectsResponse = await API.projects.getAll();
+          const hasProjects = projectsResponse.success && projectsResponse.data && projectsResponse.data.length > 0;
+          const hasSessions = sessions.length > 0;
+          
+          // Only show welcome if no projects and no sessions exist
+          if (!hasProjects && !hasSessions) {
+            setIsWelcomeOpen(true);
+          }
+        } catch (error) {
+          console.error('Error checking initial state:', error);
+        }
+      }
+    };
     
+    if (isLoaded) {
+      checkInitialState();
+    }
+  }, [isLoaded, sessions.length]);
+  
+  useEffect(() => {
     // Set up permission request listener
     const handlePermissionRequest = (request: PermissionRequest) => {
       console.log('[App] Received permission request:', request);

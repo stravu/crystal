@@ -16,6 +16,7 @@ Crystal is an Electron desktop application that lets you run multiple Claude Cod
 - **🔧 Git Integration** - Built-in rebase and squash operations
 - **📊 Change Tracking** - View diffs and track modifications
 - **🔔 Notifications** - Desktop alerts when sessions need input
+- **🏗️ Build & Run Scripts** - Test changes instantly without leaving Crystal
 
 ## 🚀 Quick Start
 
@@ -90,7 +91,13 @@ Click "Create Session" and enter:
 - **Terminal**: Run tests or build scripts
 - **Messages**: Raw JSON for debugging
 
-### 4. Git Operations
+### 4. Build and Run Scripts
+Configure project-specific scripts to quickly test your changes:
+- **Build scripts**: Automatically compile and check for errors
+- **Run scripts**: Execute your application or tests
+- Useful for verifying Claude's changes work correctly without switching contexts
+
+### 5. Git Operations
 - **Rebase from main**: Pull latest changes
 - **Squash and rebase**: Combine commits
 - Preview commands before executing
