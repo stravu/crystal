@@ -10,23 +10,35 @@ export class WorktreeNameGenerator {
   constructor(configManager: ConfigManager) {
     this.configManager = configManager;
     this.initializeAnthropic();
+    
+    // Listen for config updates to reinitialize Anthropic client if API key changes
+    this.configManager.on('config-updated', () => {
+      console.log('[WorktreeNameGenerator] Config updated, reinitializing Anthropic client...');
+      this.initializeAnthropic();
+    });
   }
 
   private initializeAnthropic(): void {
     const apiKey = this.configManager.getAnthropicApiKey();
     if (apiKey) {
+      console.log('[WorktreeNameGenerator] Initializing Anthropic client with API key');
       this.anthropic = new Anthropic({
         apiKey: apiKey
       });
+    } else {
+      console.log('[WorktreeNameGenerator] No API key found, AI name generation disabled');
+      this.anthropic = null;
     }
   }
 
   async generateWorktreeName(prompt: string): Promise<string> {
     if (!this.anthropic) {
+      console.log('[WorktreeNameGenerator] No Anthropic client available, using fallback name generation');
       // Fallback to basic name generation if no API key
       return this.generateFallbackName(prompt);
     }
 
+    console.log('[WorktreeNameGenerator] Attempting AI-powered name generation for prompt:', prompt.substring(0, 50) + '...');
     try {
       const response = await this.anthropic.messages.create({
         model: 'claude-3-haiku-20240307', // Using Haiku for fast, cost-effective naming
@@ -62,7 +74,9 @@ Respond with ONLY the worktree name, nothing else.`
       if (content.type === 'text' && content.text) {
         const generatedName = content.text.trim();
         if (generatedName) {
-          return this.sanitizeName(generatedName);
+          const sanitized = this.sanitizeName(generatedName);
+          console.log('[WorktreeNameGenerator] AI generated name:', sanitized);
+          return sanitized;
         }
       }
     } catch (error) {
