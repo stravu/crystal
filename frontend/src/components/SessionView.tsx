@@ -1232,11 +1232,13 @@ export function SessionView() {
             <JsonMessageView messages={activeSession.jsonMessages || []} />
           </div>
           <div className={`h-full ${viewMode === 'changes' ? 'block' : 'hidden'}`}>
-            <CombinedDiffView 
-              sessionId={activeSession.id} 
-              selectedExecutions={[]} 
-              isGitOperationRunning={isMerging}
-            />
+            {viewMode === 'changes' && (
+              <CombinedDiffView 
+                sessionId={activeSession.id} 
+                selectedExecutions={[]} 
+                isGitOperationRunning={isMerging}
+              />
+            )}
           </div>
           <div className={`h-full ${viewMode === 'terminal' ? 'block' : 'hidden'} bg-gray-900`}>
             <div ref={scriptTerminalRef} className="h-full" />

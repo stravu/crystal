@@ -18,28 +18,33 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
 
   // Load executions for the session
   useEffect(() => {
-    const loadExecutions = async () => {
-      try {
-        setLoading(true);
-        const response = await API.sessions.getExecutions(sessionId);
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to load executions');
+    // Add a small delay to debounce rapid updates
+    const timeoutId = setTimeout(() => {
+      const loadExecutions = async () => {
+        try {
+          setLoading(true);
+          const response = await API.sessions.getExecutions(sessionId);
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to load executions');
+          }
+          const data = response.data;
+          setExecutions(data);
+          
+          // If no initial selection, select all executions
+          if (initialSelected.length === 0) {
+            setSelectedExecutions(data.map((exec: ExecutionDiff) => exec.id));
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load executions');
+        } finally {
+          setLoading(false);
         }
-        const data = response.data;
-        setExecutions(data);
-        
-        // If no initial selection, select all executions
-        if (initialSelected.length === 0) {
-          setSelectedExecutions(data.map((exec: ExecutionDiff) => exec.id));
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load executions');
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
-    loadExecutions();
+      loadExecutions();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [sessionId, initialSelected]);
 
   // Load combined diff when selection changes
