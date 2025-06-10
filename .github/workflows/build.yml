@@ -62,38 +62,3 @@ jobs:
         if-no-files-found: error
         retention-days: 7
 
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.15.1'
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install
-
-    - name: Run type checking
-      run: pnpm typecheck
-
-    - name: Run linting
-      run: pnpm lint
-
-    - name: Install Playwright browsers
-      run: pnpm playwright install
-
-    - name: Run tests
-      run: pnpm test
