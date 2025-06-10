@@ -51,7 +51,7 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.crystal.claudecodecommander",
+    "appId": "com.stravu.crystal",
     "productName": "Crystal",
     "directories": {
       "output": "dist-electron"
