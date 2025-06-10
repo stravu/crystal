@@ -83,8 +83,8 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "binaries": [
-        "!**/node_modules/@anthropic-ai/claude-code/vendor/**/*.jar"
+      "signIgnore": [
+        "node_modules/@anthropic-ai/claude-code/vendor/**/*.jar"
       ],
       "notarize": {
         "teamId": "${APPLE_TEAM_ID}"
