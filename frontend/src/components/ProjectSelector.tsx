@@ -93,9 +93,18 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
         return;
       }
 
+      // Get the created project from the response
+      const createdProject = response.data;
+      
       setShowAddDialog(false);
       setNewProject({ name: '', path: '', mainBranch: 'main' });
-      fetchProjects();
+      
+      // Auto-open the newly created project
+      if (createdProject) {
+        await handleSelectProject(createdProject);
+      } else {
+        fetchProjects();
+      }
     } catch (error: any) {
       console.error('Failed to create project:', error);
       showError({
