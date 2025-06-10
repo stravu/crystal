@@ -104,6 +104,8 @@ export function SessionView() {
   
   // Track if this is a newly created session waiting for first output
   const [isWaitingForFirstOutput, setIsWaitingForFirstOutput] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
   
   // Track message and output counts for change detection
   const messageCount = activeSession?.jsonMessages?.length || 0;
@@ -564,6 +566,31 @@ export function SessionView() {
     
     previousMessageCountRef.current = currentMessageCount;
   }, [activeSession?.jsonMessages?.length, viewMode]);
+
+  // Track elapsed time when session is running
+  useEffect(() => {
+    if (!activeSession) return;
+    
+    if (activeSession.status === 'running' || activeSession.status === 'initializing') {
+      // Start the timer
+      if (!startTime) {
+        setStartTime(Date.now());
+      }
+      
+      // Update elapsed time every second
+      const interval = setInterval(() => {
+        if (startTime) {
+          setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+        }
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Reset timer when session stops
+      setStartTime(null);
+      setElapsedTime(0);
+    }
+  }, [activeSession?.status, startTime]);
   
   // Reset unread badges when session changes
   useEffect(() => {
@@ -935,6 +962,18 @@ export function SessionView() {
       ? `Squashed commits from ${gitCommands?.currentBranch || 'feature branch'}`
       : `Rebase from ${mainBranch}`;
   };
+
+  const formatElapsedTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+  };
   
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -1176,8 +1215,8 @@ export function SessionView() {
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-400 to-transparent w-1/3 animate-slide-progress"></div>
                     </div>
                   </div>
-                  <div className="text-xs text-gray-400">
-                    {activeSession.status === 'initializing' ? '⚡' : '🧠'}
+                  <div className="text-xs text-gray-400 font-mono">
+                    {activeSession.status === 'initializing' ? '⚡' : formatElapsedTime(elapsedTime)}
                   </div>
                   <button
                     onClick={handleStopSession}
