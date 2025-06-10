@@ -190,6 +190,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   </p>
                 </div>
 
+                {/* Build Script - Hidden for now
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Build Script
@@ -206,6 +207,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     One command per line. These run in the worktree directory before Claude starts.
                   </p>
                 </div>
+                */}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -228,8 +230,6 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     <span className="font-mono text-gray-600">• npx concurrently "npm:server" "npm:client"</span>
                     <br />
                     <span className="font-mono text-gray-600">• npm run dev (if your package.json uses concurrently)</span>
-                    <br />
-                    <span className="text-gray-600">The WORKTREE_PATH environment variable is available in all commands.</span>
                   </p>
                 </div>
               </div>
