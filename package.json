@@ -71,7 +71,8 @@
       "main/dist/**/*",
       "frontend/dist/**/*",
       "package.json",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "build/**/*"
     ],
     "npmRebuild": true,
     "buildDependenciesFromSource": false,

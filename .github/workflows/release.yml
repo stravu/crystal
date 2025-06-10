@@ -62,8 +62,8 @@ jobs:
         APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
         APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_APP_PASSWORD || '' }}
         APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
-        # Use ad-hoc signing if no certificates are provided
-        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE && 'true' || 'false' }}
+        # Only enable signing when certificates are available
+        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'true' || 'false' }}
 
     - name: Ad-hoc sign macOS app
       if: matrix.os == 'macos-latest' && !secrets.APPLE_CERTIFICATE
