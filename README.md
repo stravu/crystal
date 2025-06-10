@@ -13,7 +13,6 @@ Crystal is an Electron desktop application that lets you run multiple Claude Cod
 - **🚀 Parallel Sessions** - Run multiple Claude Code instances at once
 - **🌳 Git Worktree Isolation** - Each session gets its own branch
 - **💾 Session Persistence** - Resume conversations anytime
-- **🎯 Smart UI** - Professional terminal with real-time updates
 - **🔧 Git Integration** - Built-in rebase and squash operations
 - **📊 Change Tracking** - View diffs and track modifications
 - **🔔 Notifications** - Desktop alerts when sessions need input
@@ -43,14 +42,14 @@ Crystal is an Electron desktop application that lets you run multiple Claude Cod
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ccc.git
-cd ccc
+git clone https://github.com/stravu/crystal.git
+cd crystal
 
 # One-time setup
 pnpm run setup
 
 # Run in development
-pnpm run dev
+pnpm run electron-dev
 ```
 
 ### Building for Production
@@ -61,8 +60,7 @@ pnpm build
 
 # Platform-specific builds
 pnpm build:mac    # macOS
-pnpm build:win    # Windows  
-pnpm build:linux  # Linux
+pnpm build:linux  # Linux (has not been tested)
 ```
 
 ### Installing Pre-built Releases
