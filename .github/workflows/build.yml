@@ -1,0 +1,91 @@
+name: Build Crystal
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            build_cmd: build:linux
+          - os: macos-latest
+            build_cmd: build:mac
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.11.1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.15.1'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build main process
+      run: pnpm run build:main
+
+    - name: Rebuild native modules
+      run: pnpm run electron:rebuild
+
+    - name: Build application
+      run: pnpm run ${{ matrix.build_cmd }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: crystal-${{ matrix.os }}
+        path: |
+          dist-electron/*.dmg
+          dist-electron/*.AppImage
+        if-no-files-found: error
+        retention-days: 7
+
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.11.1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.15.1'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Run type checking
+      run: pnpm typecheck
+
+    - name: Run linting
+      run: pnpm lint
+
+    - name: Install Playwright browsers
+      run: pnpm playwright install
+
+    - name: Run tests
+      run: pnpm test
