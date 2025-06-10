@@ -16,7 +16,7 @@ export function getAugmentedPath(): string {
   const pathSeparator = platform === 'win32' ? ';' : ':';
   
   // Start with existing PATH
-  let paths = (process.env.PATH || '').split(pathSeparator);
+  const paths = (process.env.PATH || '').split(pathSeparator);
   
   // Add common installation paths based on platform
   const additionalPaths: string[] = [];

@@ -37,7 +37,9 @@ export function getShellPath(): string {
     try {
       const npmBin = execSync('npm bin -g', { encoding: 'utf8' }).trim();
       if (npmBin) additionalPaths.push(npmBin);
-    } catch {}
+    } catch {
+      // Ignore npm bin errors
+    }
     
     // Check for nvm directories - look for all versions
     const nvmDir = path.join(os.homedir(), '.nvm/versions/node');
@@ -50,7 +52,9 @@ export function getShellPath(): string {
             additionalPaths.push(binPath);
           }
         });
-      } catch {}
+      } catch {
+        // Ignore nvm directory read errors
+      }
     }
     
     const combinedPaths = new Set([
