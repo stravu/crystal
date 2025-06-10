@@ -124,15 +124,20 @@ export class ClaudeCodeManager extends EventEmitter {
         // Get Claude's session ID if available
         const claudeSessionId = this.sessionManager.getClaudeSessionId(sessionId);
         
-        if (claudeSessionId) {
-          // Use --resume flag with Claude's actual session ID
-          args.push('--resume', claudeSessionId);
-          console.log(`[ClaudeCodeManager] Resuming Claude session ${claudeSessionId} for Crystal session ${sessionId}`);
-        } else {
-          // Fall back to --resume without ID (will resume most recent)
-          args.push('--resume');
-          console.log(`[ClaudeCodeManager] No Claude session ID found for Crystal session ${sessionId}, resuming most recent session`);
-        }
+        // Use --continue flag (automatically continues from latest session in folder)
+        args.push('--continue');
+        console.log(`[ClaudeCodeManager] Continuing latest Claude session in ${worktreePath} for Crystal session ${sessionId}`);
+        
+        // Commented out --resume logic for future reference
+        // if (claudeSessionId) {
+        //   // Use --resume flag with Claude's actual session ID
+        //   args.push('--resume', claudeSessionId);
+        //   console.log(`[ClaudeCodeManager] Resuming Claude session ${claudeSessionId} for Crystal session ${sessionId}`);
+        // } else {
+        //   // Fall back to --resume without ID (will resume most recent)
+        //   args.push('--resume');
+        //   console.log(`[ClaudeCodeManager] No Claude session ID found for Crystal session ${sessionId}, resuming most recent session`);
+        // }
         
         // If a new prompt is provided, add it
         if (prompt && prompt.trim()) {
@@ -348,8 +353,8 @@ export class ClaudeCodeManager extends EventEmitter {
     const dbSession = this.sessionManager.getDbSession(sessionId);
     const permissionMode = dbSession?.permission_mode;
     
-    // For continuing a session, we use the --resume flag
-    // The conversationHistory parameter is kept for compatibility but not used with --resume
+    // For continuing a session, we use the --continue flag
+    // The conversationHistory parameter is kept for compatibility but not used with --continue
     return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true, permissionMode);
   }
 

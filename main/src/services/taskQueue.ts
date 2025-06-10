@@ -169,6 +169,10 @@ export class TaskQueue {
         sessionManager.addInitialPromptMarker(session.id, prompt);
         console.log(`[TaskQueue] Added initial prompt marker for session ${session.id}`);
 
+        // Add the initial prompt to conversation messages for continuation support
+        sessionManager.addConversationMessage(session.id, 'user', prompt);
+        console.log(`[TaskQueue] Added initial prompt to conversation messages for session ${session.id}`);
+
         // Add the initial prompt to output so it's visible
         const timestamp = new Date().toLocaleTimeString();
         const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +

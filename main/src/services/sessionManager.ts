@@ -227,6 +227,30 @@ export class SessionManager extends EventEmitter {
         // Get current output count to use as index
         const outputs = this.db.getSessionOutputs(id);
         this.db.addPromptMarker(id, promptText, outputs.length - 1);
+        // Also add to conversation messages for continuation support
+        this.db.addConversationMessage(id, 'user', promptText);
+      }
+    }
+    
+    // Check if this is an assistant message to track for conversation history
+    if (output.type === 'json' && output.data.type === 'assistant' && output.data.message?.content) {
+      // Extract text content from assistant messages
+      const content = output.data.message.content;
+      let assistantText = '';
+      
+      if (Array.isArray(content)) {
+        // Concatenate all text content from the array
+        assistantText = content
+          .filter((item: any) => item.type === 'text')
+          .map((item: any) => item.text)
+          .join('\n');
+      } else if (typeof content === 'string') {
+        assistantText = content;
+      }
+      
+      if (assistantText) {
+        // Add to conversation messages for continuation support
+        this.db.addConversationMessage(id, 'assistant', assistantText);
       }
     }
     
