@@ -81,8 +81,8 @@
       "icon": "main/assets/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "entitlements": "${env.PWD}/build/entitlements.mac.plist",
+      "entitlementsInherit": "${env.PWD}/build/entitlements.mac.plist",
       "notarize": {
         "teamId": "${APPLE_TEAM_ID}"
       }
