@@ -865,6 +865,20 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
       mainBranch,
       projectData.buildScript
     );
+    
+    // If run_script was provided, also create run commands
+    if (projectData.runScript && project) {
+      const commands = projectData.runScript.split('\n').filter((cmd: string) => cmd.trim());
+      commands.forEach((command: string, index: number) => {
+        databaseService.createRunCommand(
+          project.id,
+          command.trim(),
+          `Command ${index + 1}`,
+          index
+        );
+      });
+    }
+    
     console.log('[Main] Project created successfully:', project);
     return { success: true, data: project };
   } catch (error) {
@@ -918,7 +932,30 @@ ipcMain.handle('projects:activate', async (_event, projectId: string) => {
 
 ipcMain.handle('projects:update', async (_event, projectId: string, updates: any) => {
   try {
+    // Update the project
     const project = databaseService.updateProject(parseInt(projectId), updates);
+    
+    // If run_script was updated, also update the run commands table
+    if (updates.run_script !== undefined) {
+      const projectIdNum = parseInt(projectId);
+      
+      // Delete existing run commands
+      databaseService.deleteProjectRunCommands(projectIdNum);
+      
+      // Add new run commands from the multiline script
+      if (updates.run_script) {
+        const commands = updates.run_script.split('\n').filter((cmd: string) => cmd.trim());
+        commands.forEach((command: string, index: number) => {
+          databaseService.createRunCommand(
+            projectIdNum,
+            command.trim(),
+            `Command ${index + 1}`,
+            index
+          );
+        });
+      }
+    }
+    
     return { success: true, data: project };
   } catch (error) {
     console.error('Failed to update project:', error);

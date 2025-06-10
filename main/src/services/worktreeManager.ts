@@ -104,13 +104,25 @@ export class WorktreeManager {
       
       // Run build script if provided
       if (buildScript) {
-        console.log(`[WorktreeManager] Running build script: ${buildScript}`);
+        console.log(`[WorktreeManager] Running build script...`);
         try {
-          const { stdout, stderr } = await execAsync(`cd "${worktreePath}" && ${buildScript}`);
-          console.log(`[WorktreeManager] Build script output:`, stdout);
-          if (stderr) {
-            console.log(`[WorktreeManager] Build script stderr:`, stderr);
+          // Split build script into individual commands and run them sequentially
+          const commands = buildScript.split('\n').filter(cmd => cmd.trim());
+          
+          for (const command of commands) {
+            if (command.trim()) {
+              console.log(`[WorktreeManager] Executing: ${command}`);
+              const { stdout, stderr } = await execAsync(`cd "${worktreePath}" && ${command}`);
+              
+              if (stdout) {
+                console.log(`[WorktreeManager] Output:`, stdout);
+              }
+              if (stderr) {
+                console.log(`[WorktreeManager] Warning:`, stderr);
+              }
+            }
           }
+          
           console.log(`[WorktreeManager] Build script completed successfully`);
         } catch (error: any) {
           console.error(`[WorktreeManager] Build script failed:`, error);

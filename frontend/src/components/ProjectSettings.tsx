@@ -194,15 +194,16 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Build Script
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     value={buildScript}
                     onChange={(e) => setBuildScript(e.target.value)}
+                    rows={3}
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500 font-mono text-sm"
-                    placeholder="npm install"
+                    placeholder="npm install&#10;npm run build"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Command to run when creating a new worktree (e.g., npm install, yarn install)
+                    Commands to run once when creating a new worktree (e.g., install dependencies, build assets).
+                    One command per line. These run in the worktree directory before Claude starts.
                   </p>
                 </div>
 
@@ -215,10 +216,12 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     onChange={(e) => setRunScript(e.target.value)}
                     rows={4}
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500 font-mono text-sm"
-                    placeholder="npm run dev&#10;npm test"
+                    placeholder="npm run dev&#10;npm test --watch"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Commands to run when the session starts (one per line)
+                    Commands to run continuously while Claude is working (e.g., dev server, test watcher).
+                    One command per line. All commands run in parallel and are automatically stopped when the session ends.
+                    Output appears in the Terminal tab.
                   </p>
                 </div>
               </div>
