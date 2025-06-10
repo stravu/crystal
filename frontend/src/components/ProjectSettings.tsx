@@ -16,6 +16,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
   const [path, setPath] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [runScript, setRunScript] = useState('');
+  const [buildScript, setBuildScript] = useState('');
   const [mainBranch, setMainBranch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       setPath(project.path);
       setSystemPrompt(project.system_prompt || '');
       setRunScript(project.run_script || '');
+      setBuildScript(project.build_script || '');
       setMainBranch(project.main_branch || '');
       setError(null);
     }
@@ -42,6 +44,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
         path,
         system_prompt: systemPrompt || null,
         run_script: runScript || null,
+        build_script: buildScript || null,
         main_branch: mainBranch || null
       });
 
@@ -189,7 +192,23 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Run Script Commands
+                    Build Script
+                  </label>
+                  <input
+                    type="text"
+                    value={buildScript}
+                    onChange={(e) => setBuildScript(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    placeholder="npm install"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Command to run when creating a new worktree (e.g., npm install, yarn install)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Run Commands
                   </label>
                   <textarea
                     value={runScript}
@@ -199,7 +218,7 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     placeholder="npm run dev&#10;npm test"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Commands to run in this project (one per line)
+                    Commands to run when the session starts (one per line)
                   </p>
                 </div>
               </div>

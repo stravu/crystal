@@ -4,10 +4,20 @@ export interface Project {
   path: string;
   system_prompt?: string;
   run_script?: string;
+  build_script?: string;
   main_branch?: string;
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProjectRunCommand {
+  id: number;
+  project_id: number;
+  command: string;
+  display_name?: string;
+  order_index: number;
+  created_at: string;
 }
 
 export interface CreateProjectRequest {
@@ -15,6 +25,8 @@ export interface CreateProjectRequest {
   path: string;
   systemPrompt?: string;
   runScript?: string;
+  buildScript?: string;
+  mainBranch?: string;
 }
 
 export interface UpdateProjectRequest {
@@ -22,6 +34,7 @@ export interface UpdateProjectRequest {
   path?: string;
   system_prompt?: string;
   run_script?: string;
+  build_script?: string;
   main_branch?: string;
   active?: boolean;
 }

@@ -9,6 +9,7 @@ import { WorktreeNameGenerator } from './services/worktreeNameGenerator';
 import { GitDiffManager, type GitDiffResult } from './services/gitDiffManager';
 import { ExecutionTracker } from './services/executionTracker';
 import { DatabaseService } from './database/database';
+import { RunCommandManager } from './services/runCommandManager';
 import type { CreateSessionRequest } from './types/session';
 
 let mainWindow: BrowserWindow | null = null;
@@ -23,6 +24,7 @@ let gitDiffManager: GitDiffManager;
 let executionTracker: ExecutionTracker;
 let worktreeNameGenerator: WorktreeNameGenerator;
 let databaseService: DatabaseService;
+let runCommandManager: RunCommandManager;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 
@@ -156,6 +158,7 @@ async function initializeServices() {
   gitDiffManager = new GitDiffManager();
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
+  runCommandManager = new RunCommandManager(databaseService);
 
   taskQueue = new TaskQueue({
     sessionManager,
@@ -269,6 +272,16 @@ function setupEventListeners() {
           : session.prompt;
         
         await executionTracker.startExecution(sessionId, session.worktreePath, undefined, latestPrompt);
+        
+        // Start run commands for the project
+        const dbSession = sessionManager.getDbSession(sessionId);
+        if (dbSession?.project_id) {
+          try {
+            await runCommandManager.startRunCommands(sessionId, dbSession.project_id, session.worktreePath);
+          } catch (error) {
+            console.error(`Failed to start run commands for session ${sessionId}:`, error);
+          }
+        }
       }
     } catch (error) {
       console.error(`Failed to start execution tracking for session ${sessionId}:`, error);
@@ -279,6 +292,13 @@ function setupEventListeners() {
     console.log(`Session ${sessionId} exited with code ${exitCode}, signal ${signal}`);
     await sessionManager.setSessionExitCode(sessionId, exitCode);
     await sessionManager.updateSession(sessionId, { status: 'stopped' });
+    
+    // Stop run commands
+    try {
+      runCommandManager.stopRunCommands(sessionId);
+    } catch (error) {
+      console.error(`Failed to stop run commands for session ${sessionId}:`, error);
+    }
     
     // End execution tracking
     try {
@@ -293,6 +313,13 @@ function setupEventListeners() {
   claudeCodeManager.on('error', async ({ sessionId, error }: { sessionId: string; error: string }) => {
     console.log(`Session ${sessionId} encountered an error: ${error}`);
     await sessionManager.updateSession(sessionId, { status: 'error', error });
+    
+    // Stop run commands on error
+    try {
+      runCommandManager.stopRunCommands(sessionId);
+    } catch (stopError) {
+      console.error(`Failed to stop run commands for session ${sessionId}:`, stopError);
+    }
     
     // Cancel execution tracking on error
     try {
@@ -309,6 +336,30 @@ function setupEventListeners() {
     // Broadcast script output to renderer
     if (mainWindow) {
       mainWindow.webContents.send('script:output', output);
+    }
+  });
+
+  // Listen to run command manager events
+  runCommandManager.on('output', (output) => {
+    // Store run command output with the session's script output
+    if (output.sessionId && output.data) {
+      sessionManager.addScriptOutput(output.sessionId, output.data);
+    }
+  });
+
+  runCommandManager.on('error', (error) => {
+    console.error(`Run command error for session ${error.sessionId}:`, error.error);
+    // Add error to script output
+    if (error.sessionId) {
+      sessionManager.addScriptOutput(error.sessionId, `\n[Error] ${error.displayName}: ${error.error}\n`);
+    }
+  });
+
+  runCommandManager.on('exit', (info) => {
+    console.log(`Run command exited: ${info.displayName}, exitCode: ${info.exitCode}`);
+    // Add exit info to script output
+    if (info.sessionId && info.exitCode !== 0) {
+      sessionManager.addScriptOutput(info.sessionId, `\n[Exit] ${info.displayName} exited with code ${info.exitCode}\n`);
     }
   });
 }
@@ -811,7 +862,8 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
       projectData.path,
       projectData.systemPrompt,
       projectData.runScript,
-      mainBranch
+      mainBranch,
+      projectData.buildScript
     );
     console.log('[Main] Project created successfully:', project);
     return { success: true, data: project };

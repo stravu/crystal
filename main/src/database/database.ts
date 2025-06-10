@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import type { Project, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
+import type { Project, ProjectRunCommand, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
 
 export class DatabaseService {
   private db: Database.Database;
@@ -201,14 +201,49 @@ export class DatabaseService {
     if (!hasMainBranchColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN main_branch TEXT").run();
     }
+
+    // Add build_script column to projects table if it doesn't exist
+    const hasBuildScriptColumn = projectsTableInfo.some((col: any) => col.name === 'build_script');
+    
+    if (!hasBuildScriptColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN build_script TEXT").run();
+    }
+
+    // Create project_run_commands table if it doesn't exist
+    const runCommandsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_run_commands'").all();
+    if (runCommandsTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE project_run_commands (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          command TEXT NOT NULL,
+          display_name TEXT,
+          order_index INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_project_run_commands_project_id ON project_run_commands(project_id)").run();
+      
+      // Migrate existing run_script data to the new table
+      const projectsWithRunScripts = this.db.prepare("SELECT id, run_script FROM projects WHERE run_script IS NOT NULL").all();
+      for (const project of projectsWithRunScripts) {
+        if (project.run_script) {
+          this.db.prepare(`
+            INSERT INTO project_run_commands (project_id, command, display_name, order_index)
+            VALUES (?, ?, 'Default Run Command', 0)
+          `).run(project.id, project.run_script);
+        }
+      }
+    }
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string): Project {
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string, buildScript?: string): Project {
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, main_branch)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, mainBranch || null);
+      INSERT INTO projects (name, path, system_prompt, run_script, main_branch, build_script)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, mainBranch || null, buildScript || null);
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -253,6 +288,10 @@ export class DatabaseService {
       fields.push('run_script = ?');
       values.push(updates.run_script);
     }
+    if (updates.build_script !== undefined) {
+      fields.push('build_script = ?');
+      values.push(updates.build_script);
+    }
     if (updates.main_branch !== undefined) {
       fields.push('main_branch = ?');
       values.push(updates.main_branch);
@@ -290,6 +329,70 @@ export class DatabaseService {
 
   deleteProject(id: number): boolean {
     const result = this.db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  // Project run commands operations
+  createRunCommand(projectId: number, command: string, displayName?: string, orderIndex?: number): ProjectRunCommand {
+    const result = this.db.prepare(`
+      INSERT INTO project_run_commands (project_id, command, display_name, order_index)
+      VALUES (?, ?, ?, ?)
+    `).run(projectId, command, displayName || null, orderIndex || 0);
+    
+    const runCommand = this.getRunCommand(result.lastInsertRowid as number);
+    if (!runCommand) {
+      throw new Error('Failed to create run command');
+    }
+    return runCommand;
+  }
+
+  getRunCommand(id: number): ProjectRunCommand | undefined {
+    return this.db.prepare('SELECT * FROM project_run_commands WHERE id = ?').get(id) as ProjectRunCommand | undefined;
+  }
+
+  getProjectRunCommands(projectId: number): ProjectRunCommand[] {
+    return this.db.prepare('SELECT * FROM project_run_commands WHERE project_id = ? ORDER BY order_index ASC, id ASC').all(projectId) as ProjectRunCommand[];
+  }
+
+  updateRunCommand(id: number, updates: { command?: string; display_name?: string; order_index?: number }): ProjectRunCommand | undefined {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.command !== undefined) {
+      fields.push('command = ?');
+      values.push(updates.command);
+    }
+    if (updates.display_name !== undefined) {
+      fields.push('display_name = ?');
+      values.push(updates.display_name);
+    }
+    if (updates.order_index !== undefined) {
+      fields.push('order_index = ?');
+      values.push(updates.order_index);
+    }
+
+    if (fields.length === 0) {
+      return this.getRunCommand(id);
+    }
+
+    values.push(id);
+
+    this.db.prepare(`
+      UPDATE project_run_commands 
+      SET ${fields.join(', ')} 
+      WHERE id = ?
+    `).run(...values);
+    
+    return this.getRunCommand(id);
+  }
+
+  deleteRunCommand(id: number): boolean {
+    const result = this.db.prepare('DELETE FROM project_run_commands WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  deleteProjectRunCommands(projectId: number): boolean {
+    const result = this.db.prepare('DELETE FROM project_run_commands WHERE project_id = ?').run(projectId);
     return result.changes > 0;
   }
 

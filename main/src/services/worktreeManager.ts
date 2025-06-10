@@ -30,7 +30,7 @@ export class WorktreeManager {
     }
   }
 
-  async createWorktree(projectPath: string, name: string, branch?: string): Promise<string> {
+  async createWorktree(projectPath: string, name: string, branch?: string, buildScript?: string): Promise<string> {
     console.log(`[WorktreeManager] Creating worktree: ${name} in project: ${projectPath}`);
     
     const { baseDir } = this.getProjectPaths(projectPath);
@@ -101,6 +101,24 @@ export class WorktreeManager {
       }
       
       console.log(`[WorktreeManager] Worktree created successfully at: ${worktreePath}`);
+      
+      // Run build script if provided
+      if (buildScript) {
+        console.log(`[WorktreeManager] Running build script: ${buildScript}`);
+        try {
+          const { stdout, stderr } = await execAsync(`cd "${worktreePath}" && ${buildScript}`);
+          console.log(`[WorktreeManager] Build script output:`, stdout);
+          if (stderr) {
+            console.log(`[WorktreeManager] Build script stderr:`, stderr);
+          }
+          console.log(`[WorktreeManager] Build script completed successfully`);
+        } catch (error: any) {
+          console.error(`[WorktreeManager] Build script failed:`, error);
+          // Don't throw - we still want to create the session even if build fails
+          console.warn(`[WorktreeManager] Continuing despite build script failure`);
+        }
+      }
+      
       return worktreePath;
     } catch (error) {
       console.error(`[WorktreeManager] Failed to create worktree:`, error);

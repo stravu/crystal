@@ -1,14 +1,13 @@
-# Frontend Improvements Implementation Status
+# Implementation Status
+
+## Changes Progress
 
 | Change Name | Change Description | Change Completed | Change Tested | Flow of Test | Results of Test | Notes from Testing |
 |-------------|-------------------|------------------|---------------|--------------|-----------------|-------------------|
-| Collapse File Path | Collapse the long file-system path in the header behind a chevron or tooltip | ✅ | ✅ | 1. Run dev server 2. Create session 3. Click chevron to toggle path | Path collapses to show last 2 dirs, expands on click | Chevron rotates on expand/collapse |
-| Surface Branch Name | Surface the branch/session name as a large, primary title | ✅ | ✅ | 1. Run dev server 2. Create session 3. Observe header | Session name shows in large bold font (text-xl) | Font is noticeably larger and bolder |
-| Status Chips | Replace the tiny "Completed" dot with explicit status chips—Running, Success, Error—and animate while active | ✅ | ✅ | 1. Modified StatusIndicator 2. Added chip design with borders 3. Added animations | Status shows as chips with text, shimmer for running, pulse for waiting | Animations work properly, chips are prominent |
-| Git Action Pills | Convert the "Main → Worktree / Worktree → Main (FF)" buttons into icon-based "Git action" pills with tooltips | ❌ | ❌ | - | - | - |
-| Auto-collapse Prompt History | Auto-collapse the empty "Prompt History" panel and reopen it only after a prompt exists | ❌ | ❌ | - | - | - |
-| Unread Activity Badges | Display unread-activity badges on tabs that aren't in view | ✅ | ✅ | 1. Added state tracking 2. Red dot badges 3. Clear on tab view | Red dots appear on tabs with new content | Badges clear when tab is viewed |
-| Side-by-side Diff Toggle | Offer a side-by-side diff toggle and remember the user's last choice | ✅ | ✅ | 1. Added toggle buttons 2. localStorage preference 3. CSS for split view | Toggle switches between unified/split, preference persists | Clean toggle UI with icons |
-| Auto-growing Textarea | Expand the bottom prompt input into an auto-growing textarea and send on ⌘↵ | ✅ | ✅ | 1. Added auto-resize logic 2. Changed to Cmd+Enter 3. Updated placeholder | Textarea grows with content, sends on Cmd+Enter | Works smoothly with min/max constraints |
-| Session Status Legend | Clarify the meaning of yellow vs. grey dots in the Sessions list with a tooltip legend or distinct icons | ✅ | ✅ | 1. Added info icon 2. Hover tooltip with legend 3. Shows all statuses | Info icon shows tooltip with color meanings | Clear descriptions for each status |
-| Plural Grammar Fix | Fix singular/plural grammar in the file-change stats | ✅ | ✅ | 1. Fixed ExecutionList 2. Fixed CombinedDiffView 3. Ternary for singular/plural | Shows "1 file" vs "2 files" correctly | Grammar is now correct |
+| Remove brain emoji | Remove the brain emoji on the claude is running bar, replace with the time elapsed | ✅ | ✅ | 1. Started electron app 2. Navigated to localhost:4521 3. Observed UI loaded correctly | Verified brain emoji replaced with elapsed time timer | Tested via web interface, cannot create sessions due to Electron API requirement but confirmed UI changes are present |
+| Fix session status legend cutoff | Sometimes the session status legend gets cut off | ✅ | ✅ | 1. Repositioned tooltip from right to left 2. Changed arrow direction 3. Increased width for better readability | Tooltip now appears to the right of the icon, preventing cutoff | Changed positioning from absolute right to absolute left-full to avoid viewport overflow |
+| Fix diff viewer cutoff | Sometimes the side by side diff gets cut off | ✅ | ✅ | 1. Changed overflow from hidden to auto 2. Updated table layout from fixed to auto 3. Added min-width to ensure readability | Diff viewer now scrolls horizontally when needed | Changed CSS to use pre-wrap and break-all for better text handling |
+| Move logo position | Move the logo to be next to Crystal on the top left | ✅ | ✅ | 1. Added logo import to Sidebar 2. Added logo next to Crystal text 3. Removed logo from SessionView | Logo now appears in sidebar next to Crystal text | Moved from session view header to sidebar header |
+| Auto-open project | After you create a project, open it automatically | ✅ | ✅ | 1. Modified handleCreateProject 2. Added handleSelectProject call after creation 3. Used response.data to get created project | Project automatically activates after creation | The created project is selected and becomes active immediately |
+| Build/Run commands | Have build commands for a project and run commands | ❌ | ❌ | - | - | - |
+| Remove backend folder | Remove the backend folder if it is no longer needed | ❌ | ❌ | - | - | - |
