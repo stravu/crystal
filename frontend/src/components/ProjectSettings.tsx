@@ -220,8 +220,16 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Commands to run continuously while Claude is working (e.g., dev server, test watcher).
-                    One command per line. All commands run in parallel and are automatically stopped when the session ends.
-                    Output appears in the Terminal tab.
+                    One command per line. Commands run sequentially - each must complete successfully before the next starts.
+                    All commands are automatically stopped when the session ends. Output appears in the Terminal tab.
+                    <br />
+                    <span className="text-gray-600">Tip: To run multiple servers together, use a process manager like concurrently:</span>
+                    <br />
+                    <span className="font-mono text-gray-600">• npx concurrently "npm:server" "npm:client"</span>
+                    <br />
+                    <span className="font-mono text-gray-600">• npm run dev (if your package.json uses concurrently)</span>
+                    <br />
+                    <span className="text-gray-600">The WORKTREE_PATH environment variable is available in all commands.</span>
                   </p>
                 </div>
               </div>

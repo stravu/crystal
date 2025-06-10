@@ -112,7 +112,6 @@ export class TaskQueue {
 
       try {
         const activeProject = sessionManager.getActiveProject();
-        console.log(`[TaskQueue] Active project:`, activeProject);
         
         if (!activeProject) {
           throw new Error('No active project selected');

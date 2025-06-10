@@ -25,25 +25,39 @@ export class RunCommandManager extends EventEmitter {
       // Get all run commands for the project
       const runCommands = this.databaseService.getProjectRunCommands(projectId);
       
+      
       if (runCommands.length === 0) {
-        this.logger?.info(`No run commands configured for project ${projectId}`);
+        this.logger?.info(`No RUN commands configured for project ${projectId}`);
         return;
       }
 
-      this.logger?.info(`Starting ${runCommands.length} run commands for session ${sessionId}`);
+      this.logger?.info(`Starting ${runCommands.length} RUN commands sequentially for session ${sessionId}`);
       
       const processes: RunProcess[] = [];
 
-      for (const command of runCommands) {
+      // Execute commands sequentially
+      for (let i = 0; i < runCommands.length; i++) {
+        const command = runCommands[i];
+        
         try {
-          this.logger?.verbose(`Starting run command: ${command.display_name || command.command}`);
+          this.logger?.verbose(`Starting RUN command ${i + 1}/${runCommands.length}: ${command.display_name || command.command}`);
           
-          const ptyProcess = pty.spawn('/bin/sh', ['-c', command.command], {
+          // Create environment with WORKTREE_PATH
+          const env = Object.assign({}, process.env, {
+            WORKTREE_PATH: worktreePath
+          });
+          
+          
+          // For debugging, let's prepend the environment variable to the command
+          const commandWithEnv = `export WORKTREE_PATH="${worktreePath}" && ${command.command}`;
+          
+          // Spawn the shell process
+          const ptyProcess = pty.spawn('/bin/sh', ['-c', commandWithEnv], {
             name: 'xterm-color',
             cols: 80,
             rows: 30,
             cwd: worktreePath,
-            env: process.env as { [key: string]: string }
+            env: process.env as any
           });
 
           const runProcess: RunProcess = {
@@ -52,55 +66,73 @@ export class RunCommandManager extends EventEmitter {
             sessionId
           };
 
-          processes.push(runProcess);
+          // Store the process immediately so it can be stopped if needed
+          const currentProcesses = this.processes.get(sessionId) || [];
+          currentProcesses.push(runProcess);
+          this.processes.set(sessionId, currentProcesses);
 
-          // Handle output from the run command
-          ptyProcess.onData((data: string) => {
-            this.emit('output', {
-              sessionId,
-              commandId: command.id,
-              displayName: command.display_name || command.command,
-              type: 'stdout',
-              data,
-              timestamp: new Date()
-            });
-          });
+          // Wait for this command to complete before starting the next one
+          await new Promise<void>((resolve, reject) => {
+            let hasExited = false;
 
-          ptyProcess.onExit(({ exitCode, signal }) => {
-            this.logger?.info(`Run command exited: ${command.display_name || command.command}, exitCode: ${exitCode}, signal: ${signal}`);
-            
-            this.emit('exit', {
-              sessionId,
-              commandId: command.id,
-              displayName: command.display_name || command.command,
-              exitCode,
-              signal
+            // Handle output from the run command
+            ptyProcess.onData((data: string) => {
+              this.emit('output', {
+                sessionId,
+                commandId: command.id,
+                displayName: command.display_name || command.command,
+                type: 'stdout',
+                data,
+                timestamp: new Date()
+              });
             });
 
-            // Remove from processes array
-            const sessionProcesses = this.processes.get(sessionId);
-            if (sessionProcesses) {
-              const index = sessionProcesses.indexOf(runProcess);
-              if (index > -1) {
-                sessionProcesses.splice(index, 1);
+            ptyProcess.onExit(({ exitCode, signal }) => {
+              hasExited = true;
+              this.logger?.info(`Run command exited: ${command.display_name || command.command}, exitCode: ${exitCode}, signal: ${signal}`);
+              
+              this.emit('exit', {
+                sessionId,
+                commandId: command.id,
+                displayName: command.display_name || command.command,
+                exitCode,
+                signal
+              });
+
+              // Remove from processes array
+              const sessionProcesses = this.processes.get(sessionId);
+              if (sessionProcesses) {
+                const index = sessionProcesses.indexOf(runProcess);
+                if (index > -1) {
+                  sessionProcesses.splice(index, 1);
+                }
               }
-            }
+
+              // Only continue to next command if this one succeeded
+              if (exitCode === 0) {
+                resolve();
+              } else {
+                reject(new Error(`Command failed with exit code ${exitCode}`));
+              }
+            });
           });
 
-          this.logger?.info(`Started run command successfully: ${command.display_name || command.command}`);
+          this.logger?.info(`Completed run command successfully: ${command.display_name || command.command}`);
         } catch (error) {
-          this.logger?.error(`Failed to start run command: ${command.display_name || command.command}`, error as Error);
+          this.logger?.error(`Failed to run command: ${command.display_name || command.command}`, error as Error);
           this.emit('error', {
             sessionId,
             commandId: command.id,
             displayName: command.display_name || command.command,
             error: error instanceof Error ? error.message : String(error)
           });
+          
+          // Stop execution of subsequent commands if one fails
+          break;
         }
       }
 
-      this.processes.set(sessionId, processes);
-      this.logger?.info(`All run commands started for session ${sessionId}`);
+      this.logger?.info(`Finished running commands for session ${sessionId}`);
     } catch (error) {
       this.logger?.error(`Failed to start run commands for session ${sessionId}`, error as Error);
       throw error;
@@ -117,10 +149,26 @@ export class RunCommandManager extends EventEmitter {
 
     for (const runProcess of processes) {
       try {
-        runProcess.process.kill();
-        this.logger?.verbose(`Killed run command: ${runProcess.command.display_name || runProcess.command.command}`);
+        // Kill the entire process group to ensure all child processes are terminated
+        // This is important when commands use & to run multiple processes
+        const pid = runProcess.process.pid;
+        if (pid) {
+          // On Unix-like systems, use negative PID to kill the process group
+          process.kill(-pid, 'SIGTERM');
+          this.logger?.verbose(`Killed process group for run command: ${runProcess.command.display_name || runProcess.command.command}`);
+        } else {
+          // Fallback to regular kill if PID is not available
+          runProcess.process.kill();
+          this.logger?.verbose(`Killed run command: ${runProcess.command.display_name || runProcess.command.command}`);
+        }
       } catch (error) {
-        this.logger?.error(`Failed to kill run command: ${runProcess.command.display_name || runProcess.command.command}`, error as Error);
+        // If process group kill fails, try regular kill
+        try {
+          runProcess.process.kill();
+          this.logger?.verbose(`Killed run command (fallback): ${runProcess.command.display_name || runProcess.command.command}`);
+        } catch (fallbackError) {
+          this.logger?.error(`Failed to kill run command: ${runProcess.command.display_name || runProcess.command.command}`, error as Error);
+        }
       }
     }
 
