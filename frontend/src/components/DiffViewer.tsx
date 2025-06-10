@@ -104,7 +104,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
             </div>
 
             {/* Diff content */}
-            <div className="border border-t-0 border-gray-300 rounded-b-lg overflow-x-auto">
+            <div className="border border-t-0 border-gray-300 rounded-b-lg overflow-x-hidden">
               <Diff 
                 viewType={viewType} 
                 diffType={file.type} 
@@ -133,7 +133,8 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
 
           .diff-viewer .diff-line {
             padding: 2px 8px;
-            white-space: pre;
+            white-space: pre-wrap;
+            word-break: break-all;
             border: none;
           }
 
