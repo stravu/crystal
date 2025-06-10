@@ -76,8 +76,8 @@
     ],
     "npmRebuild": true,
     "buildDependenciesFromSource": false,
-    "afterSign": "build/afterSign.js",
     "mac": {
+      "afterSign": "build/afterSign.js",
       "category": "public.app-category.developer-tools",
       "icon": "main/assets/icon.icns",
       "hardenedRuntime": true,
