@@ -288,15 +288,8 @@ function setupEventListeners() {
         
         await executionTracker.startExecution(sessionId, session.worktreePath, undefined, latestPrompt);
         
-        // Start run commands for the project
-        const dbSession = sessionManager.getDbSession(sessionId);
-        if (dbSession?.project_id) {
-          try {
-            await runCommandManager.startRunCommands(sessionId, dbSession.project_id, session.worktreePath);
-          } catch (error) {
-            console.error(`Failed to start run commands for session ${sessionId}:`, error);
-          }
-        }
+        // NOTE: Run commands are NOT started automatically when Claude spawns
+        // They should only run when the user clicks the play button
       }
     } catch (error) {
       console.error(`Failed to start execution tracking for session ${sessionId}:`, error);

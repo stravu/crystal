@@ -131,11 +131,16 @@ export class TaskQueue {
         worktreeName = await this.ensureUniqueSessionName(worktreeName, index);
         
         console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
-        console.log(`[TaskQueue] Active project build_script:`, activeProject.build_script);
-        console.log(`[TaskQueue] Active project run_script:`, activeProject.run_script);
+        console.log(`[TaskQueue] Active project:`, JSON.stringify({
+          id: activeProject.id,
+          name: activeProject.name,
+          build_script: activeProject.build_script,
+          run_script: activeProject.run_script
+        }, null, 2));
 
-        const worktreePath = await worktreeManager.createWorktree(activeProject.path, worktreeName, undefined, activeProject.build_script);
+        const { worktreePath, buildOutput } = await worktreeManager.createWorktree(activeProject.path, worktreeName, undefined, activeProject.build_script);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
+        console.log(`[TaskQueue] Build output items:`, buildOutput.length);
         
         const sessionName = worktreeName;
         console.log(`[TaskQueue] Creating session in database`);
@@ -148,6 +153,17 @@ export class TaskQueue {
           permissionMode
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
+        
+        // Store build output as script output for the session
+        if (buildOutput.length > 0) {
+          console.log(`[TaskQueue] Storing build output for session ${session.id}`);
+          // Add a header to indicate this is build output
+          sessionManager.addScriptOutput(session.id, '\x1b[1m\x1b[32m=== Build Script Output ===\x1b[0m\n');
+          for (const output of buildOutput) {
+            sessionManager.addScriptOutput(session.id, output.data);
+          }
+          sessionManager.addScriptOutput(session.id, '\x1b[1m\x1b[32m=== Build Script Complete ===\x1b[0m\n\n');
+        }
 
         // Add the initial prompt marker
         sessionManager.addInitialPromptMarker(session.id, prompt);

@@ -132,7 +132,11 @@ export class SessionManager extends EventEmitter {
   }
 
   createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore'): Session {
-    console.log(`[SessionManager] Creating session: ${name}`);
+    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode);
+  }
+
+  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore'): Session {
+    console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
     const activeProject = this.getActiveProject();
     console.log(`[SessionManager] Active project:`, activeProject);
@@ -142,7 +146,7 @@ export class SessionManager extends EventEmitter {
     }
 
     const sessionData: CreateSessionData = {
-      id: randomUUID(),
+      id,
       name,
       initial_prompt: prompt,
       worktree_name: worktreeName,
