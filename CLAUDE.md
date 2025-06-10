@@ -278,7 +278,6 @@ crystal/
 │   │   ├── routes/          # API routes
 │   │   └── types/           # TypeScript types
 │   └── dist/               # Compiled output
-├── backend/          # Legacy backend (for reference)
 ├── shared/          # Shared TypeScript types
 ├── dist-electron/   # Packaged Electron app
 ├── package.json     # Root workspace configuration
