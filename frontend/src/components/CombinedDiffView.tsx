@@ -141,7 +141,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = ({
         </div>
 
         {/* Diff preview */}
-        <div className="flex-1 overflow-auto bg-white min-w-0">
+        <div className="flex-1 overflow-x-auto overflow-y-auto bg-white min-w-0">
           {isGitOperationRunning ? (
             <div className="flex flex-col items-center justify-center h-full p-8">
               <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

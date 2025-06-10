@@ -104,7 +104,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
             </div>
 
             {/* Diff content */}
-            <div className="border border-t-0 border-gray-300 rounded-b-lg overflow-hidden">
+            <div className="border border-t-0 border-gray-300 rounded-b-lg overflow-x-auto">
               <Diff 
                 viewType={viewType} 
                 diffType={file.type} 
@@ -178,12 +178,14 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
           /* Split view styles */
           .diff-viewer .diff-split-table {
             width: 100%;
-            table-layout: fixed;
+            table-layout: auto;
+            min-width: 800px;
           }
           
           .diff-viewer .diff-split-cell {
             width: 50%;
             vertical-align: top;
+            min-width: 400px;
           }
           
           .diff-viewer .diff-split-gutter {
@@ -191,11 +193,13 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, className = '' }) => {
           }
           
           .diff-viewer .diff-code-cell {
-            overflow-x: auto;
+            overflow-x: visible;
+            word-break: break-all;
           }
           
           .diff-viewer .diff-line-content {
-            white-space: pre;
+            white-space: pre-wrap;
+            word-break: break-all;
           }
 
           .diff-viewer .hunk-header {
