@@ -58,13 +58,8 @@ function connectToMainProcess() {
 async function requestPermission(toolName: string, input: any): Promise<any> {
   return new Promise((resolve, reject) => {
     const requestId = `${Date.now()}-${Math.random()}`;
-    const timeout = setTimeout(() => {
-      pendingRequests.delete(requestId);
-      reject(new Error('Permission request timeout'));
-    }, 60000); // 1 minute timeout
     
     pendingRequests.set(requestId, (response) => {
-      clearTimeout(timeout);
       resolve(response);
     });
     
@@ -77,7 +72,6 @@ async function requestPermission(toolName: string, input: any): Promise<any> {
         input
       }));
     } else {
-      clearTimeout(timeout);
       pendingRequests.delete(requestId);
       reject(new Error('IPC client not connected'));
     }

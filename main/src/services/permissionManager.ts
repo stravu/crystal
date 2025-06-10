@@ -69,16 +69,9 @@ export class PermissionManager extends EventEmitter {
       console.error('[PermissionManager] No main window available to send permission request!');
     }
 
-    // Wait for response with timeout
+    // Wait for response indefinitely (no timeout)
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(request.id);
-        this.removeAllListeners(`response:${request.id}`);
-        reject(new Error('Permission request timeout'));
-      }, 300000); // 5 minute timeout
-
       this.once(`response:${request.id}`, (response: PermissionResponse) => {
-        clearTimeout(timeout);
         resolve(response);
       });
     });
