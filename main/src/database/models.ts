@@ -9,6 +9,7 @@ export interface Project {
   active: boolean;
   created_at: string;
   updated_at: string;
+  default_permission_mode?: 'approve' | 'ignore';
 }
 
 export interface ProjectRunCommand {
@@ -36,6 +37,7 @@ export interface Session {
   last_viewed_at?: string;
   project_id?: number;
   claude_session_id?: string;
+  permission_mode?: 'approve' | 'ignore';
 }
 
 export interface SessionOutput {
@@ -61,6 +63,7 @@ export interface CreateSessionData {
   worktree_name: string;
   worktree_path: string;
   project_id: number;
+  permission_mode?: 'approve' | 'ignore';
 }
 
 export interface UpdateSessionData {

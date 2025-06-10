@@ -5,4 +5,5 @@ export interface AppConfig {
   systemPromptAppend?: string;
   runScript?: string[];
   claudeExecutablePath?: string;
+  defaultPermissionMode?: 'approve' | 'ignore';
 }

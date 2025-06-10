@@ -21,7 +21,7 @@ export function Sidebar({ viewMode, onViewModeChange, onHelpClick }: SidebarProp
 
   return (
     <>
-      <div className="w-64 bg-gray-800 text-white h-full flex flex-col pt-4">
+      <div data-testid="sidebar" className="w-64 bg-gray-800 text-white h-full flex flex-col pt-4">
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <img src={crystalLogo} alt="Crystal" className="h-6 w-6" />
@@ -39,6 +39,7 @@ export function Sidebar({ viewMode, onViewModeChange, onHelpClick }: SidebarProp
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
+              data-testid="settings-button"
               className="text-gray-400 hover:text-white transition-colors"
               title="Settings"
             >

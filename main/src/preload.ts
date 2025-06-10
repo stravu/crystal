@@ -79,6 +79,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openDirectory: (options?: any): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-directory', options),
   },
 
+  // Permissions
+  permissions: {
+    respond: (requestId: string, response: any): Promise<IPCResponse> => ipcRenderer.invoke('permission:respond', requestId, response),
+    getPending: (): Promise<IPCResponse> => ipcRenderer.invoke('permission:getPending'),
+  },
+
   // Event listeners for real-time updates
   events: {
     // Session events
@@ -117,5 +123,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('main-log', (_event, level, message) => callback(level, message));
       return () => ipcRenderer.removeAllListeners('main-log');
     },
+  },
+});
+
+// Expose electron event listeners for permission requests
+contextBridge.exposeInMainWorld('electron', {
+  on: (channel: string, callback: (...args: any[]) => void) => {
+    const validChannels = ['permission:request'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+    }
+  },
+  off: (channel: string, callback: (...args: any[]) => void) => {
+    const validChannels = ['permission:request'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, callback);
+    }
   },
 });

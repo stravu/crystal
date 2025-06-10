@@ -1,9 +1,13 @@
 import { EventEmitter } from 'events';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import type { Logger } from '../utils/logger';
 import { testClaudeCodeAvailability, testClaudeCodeInDirectory, getAugmentedPath } from '../utils/claudeCodeTest';
 import type { ConfigManager } from './configManager';
 import { getShellPath, findExecutableInPath } from '../utils/shellPath';
+import { PermissionManager } from './permissionManager';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
@@ -14,11 +18,16 @@ interface ClaudeCodeProcess {
 export class ClaudeCodeManager extends EventEmitter {
   private processes: Map<string, ClaudeCodeProcess> = new Map();
 
-  constructor(private sessionManager: any, private logger?: Logger, private configManager?: ConfigManager) {
+  constructor(
+    private sessionManager: any, 
+    private logger?: Logger, 
+    private configManager?: ConfigManager,
+    private permissionIpcPath?: string
+  ) {
     super();
   }
 
-  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false): Promise<void> {
+  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false, permissionMode?: 'approve' | 'ignore'): Promise<void> {
     try {
       this.logger?.verbose(`Spawning Claude for session ${sessionId} in ${worktreePath}`);
       this.logger?.verbose(`Command: claude -p "${prompt}"`);
@@ -72,7 +81,44 @@ export class ClaudeCodeManager extends EventEmitter {
       }
       
       // Build the command arguments
-      const args = ['--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'];
+      const args = ['--verbose', '--output-format', 'stream-json'];
+      
+      // Determine permission mode
+      const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
+      const effectiveMode = permissionMode || defaultMode;
+      
+      if (effectiveMode === 'ignore') {
+        args.push('--dangerously-skip-permissions');
+      } else if (effectiveMode === 'approve' && this.permissionIpcPath) {
+        // Create MCP config for permission approval
+        const mcpBridgePath = path.join(__dirname, 'mcpPermissionBridge.js');
+        const mcpConfigPath = path.join(os.tmpdir(), `crystal-mcp-${sessionId}.json`);
+        
+        const mcpConfig = {
+          "mcpServers": {
+            "crystal-permissions": {
+              "command": "node",
+              "args": [mcpBridgePath, sessionId, this.permissionIpcPath]
+            }
+          }
+        };
+        
+        fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
+        
+        // Add MCP flags
+        args.push('--mcp-config', mcpConfigPath);
+        args.push('--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission');
+        args.push('--allowedTools', 'mcp__crystal-permissions__approve_permission');
+        
+        // Store config path for cleanup
+        (global as any)[`mcp_config_${sessionId}`] = mcpConfigPath;
+      } else {
+        // Fallback to skip permissions if IPC path not available
+        args.push('--dangerously-skip-permissions');
+        if (effectiveMode === 'approve') {
+          this.logger?.warn(`Permission approval mode requested but IPC server not available. Using skip permissions mode.`);
+        }
+      }
       
       if (isResume) {
         // Get Claude's session ID if available
@@ -187,7 +233,7 @@ export class ClaudeCodeManager extends EventEmitter {
         }
       });
 
-      ptyProcess.onExit(({ exitCode, signal }) => {
+      ptyProcess.onExit(async ({ exitCode, signal }) => {
         if (exitCode !== 0) {
           this.logger?.error(`Claude process failed for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
           if (!hasReceivedOutput) {
@@ -197,6 +243,20 @@ export class ClaudeCodeManager extends EventEmitter {
           }
         } else {
           this.logger?.info(`Claude process exited normally for session ${sessionId}`);
+        }
+        
+        // Clear any pending permission requests
+        PermissionManager.getInstance().clearPendingRequests(sessionId);
+        
+        // Clean up MCP config file if it exists
+        const mcpConfigPath = (global as any)[`mcp_config_${sessionId}`];
+        if (mcpConfigPath && fs.existsSync(mcpConfigPath)) {
+          try {
+            fs.unlinkSync(mcpConfigPath);
+            delete (global as any)[`mcp_config_${sessionId}`];
+          } catch (error) {
+            this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
+          }
         }
         
         this.emit('exit', {
@@ -230,10 +290,24 @@ export class ClaudeCodeManager extends EventEmitter {
     claudeProcess.process.write(input);
   }
 
-  killProcess(sessionId: string): void {
+  async killProcess(sessionId: string): Promise<void> {
     const claudeProcess = this.processes.get(sessionId);
     if (!claudeProcess) {
       return;
+    }
+
+    // Clear any pending permission requests
+    PermissionManager.getInstance().clearPendingRequests(sessionId);
+    
+    // Clean up MCP config file if it exists
+    const mcpConfigPath = (global as any)[`mcp_config_${sessionId}`];
+    if (mcpConfigPath && fs.existsSync(mcpConfigPath)) {
+      try {
+        fs.unlinkSync(mcpConfigPath);
+        delete (global as any)[`mcp_config_${sessionId}`];
+      } catch (error) {
+        this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
+      }
     }
 
     claudeProcess.process.kill();
@@ -250,7 +324,7 @@ export class ClaudeCodeManager extends EventEmitter {
 
   async restartSessionWithHistory(sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: string[]): Promise<void> {
     // Kill existing process if it exists
-    this.killProcess(sessionId);
+    await this.killProcess(sessionId);
     
     // Restart with conversation history
     await this.spawnClaudeCode(sessionId, worktreePath, initialPrompt, conversationHistory);
@@ -260,22 +334,26 @@ export class ClaudeCodeManager extends EventEmitter {
     return this.processes.has(sessionId);
   }
 
-  async startSession(sessionId: string, worktreePath: string, prompt: string): Promise<void> {
-    return this.spawnClaudeCode(sessionId, worktreePath, prompt);
+  async startSession(sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore'): Promise<void> {
+    return this.spawnClaudeCode(sessionId, worktreePath, prompt, undefined, false, permissionMode);
   }
 
   async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[]): Promise<void> {
     // Kill any existing process for this session first
     if (this.processes.has(sessionId)) {
-      this.killProcess(sessionId);
+      await this.killProcess(sessionId);
     }
+    
+    // Get the session's permission mode from database
+    const dbSession = this.sessionManager.getDbSession(sessionId);
+    const permissionMode = dbSession?.permission_mode;
     
     // For continuing a session, we use the --resume flag
     // The conversationHistory parameter is kept for compatibility but not used with --resume
-    return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true);
+    return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true, permissionMode);
   }
 
   async stopSession(sessionId: string): Promise<void> {
-    this.killProcess(sessionId);
+    await this.killProcess(sessionId);
   }
 }

@@ -82,6 +82,12 @@ interface ElectronAPI {
     openDirectory: (options?: any) => Promise<IPCResponse<string | null>>;
   };
 
+  // Permissions
+  permissions: {
+    respond: (requestId: string, response: any) => Promise<IPCResponse>;
+    getPending: () => Promise<IPCResponse>;
+  };
+
   // Event listeners for real-time updates
   events: {
     onSessionCreated: (callback: (session: any) => void) => () => void;
@@ -95,9 +101,16 @@ interface ElectronAPI {
   };
 }
 
+// Additional electron interface for IPC event listeners
+interface ElectronInterface {
+  on: (channel: string, callback: (...args: any[]) => void) => void;
+  off: (channel: string, callback: (...args: any[]) => void) => void;
+}
+
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    electron?: ElectronInterface;
   }
 }
 

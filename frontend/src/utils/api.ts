@@ -219,6 +219,19 @@ export class API {
       return window.electronAPI.dialog.openDirectory(options);
     },
   };
+
+  // Permissions
+  static permissions = {
+    async respond(requestId: string, response: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.permissions.respond(requestId, response);
+    },
+
+    async getPending() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.permissions.getPending();
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete

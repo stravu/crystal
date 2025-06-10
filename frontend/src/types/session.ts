@@ -13,12 +13,14 @@ export interface Session {
   isRunning?: boolean;
   lastViewedAt?: string;
   projectId?: number;
+  permissionMode?: 'approve' | 'ignore';
 }
 
 export interface CreateSessionRequest {
   prompt: string;
   worktreeTemplate?: string;
   count?: number;
+  permissionMode?: 'approve' | 'ignore';
 }
 
 export interface SessionOutput {

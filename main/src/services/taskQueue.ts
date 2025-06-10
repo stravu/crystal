@@ -20,6 +20,7 @@ interface CreateSessionJob {
   prompt: string;
   worktreeTemplate: string;
   index?: number;
+  permissionMode?: 'approve' | 'ignore';
 }
 
 interface ContinueSessionJob {
@@ -104,10 +105,10 @@ export class TaskQueue {
 
   private setupProcessors() {
     this.sessionQueue.process(5, async (job) => {
-      const { prompt, worktreeTemplate, index } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
-      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index });
+      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode });
 
       try {
         const activeProject = sessionManager.getActiveProject();
@@ -142,7 +143,8 @@ export class TaskQueue {
           sessionName,
           worktreePath,
           prompt,
-          worktreeName
+          worktreeName,
+          permissionMode
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
 
@@ -161,8 +163,8 @@ export class TaskQueue {
         });
         console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
 
-        console.log(`[TaskQueue] Starting Claude Code for session ${session.id}`);
-        await claudeCodeManager.startSession(session.id, session.worktreePath, prompt);
+        console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
+        await claudeCodeManager.startSession(session.id, session.worktreePath, prompt, permissionMode);
         console.log(`[TaskQueue] Claude Code started successfully for session ${session.id}`);
 
         return { sessionId: session.id };
@@ -200,10 +202,10 @@ export class TaskQueue {
     return job;
   }
 
-  async createMultipleSessions(prompt: string, worktreeTemplate: string, count: number): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
+  async createMultipleSessions(prompt: string, worktreeTemplate: string, count: number, permissionMode?: 'approve' | 'ignore'): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
     const jobs = [];
     for (let i = 0; i < count; i++) {
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate, index: i }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate, index: i, permissionMode }));
     }
     return Promise.all(jobs);
   }

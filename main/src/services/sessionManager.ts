@@ -77,7 +77,8 @@ export class SessionManager extends EventEmitter {
       jsonMessages: [], // Will be loaded separately by frontend when needed
       error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined,
       isRunning: false,
-      lastViewedAt: dbSession.last_viewed_at
+      lastViewedAt: dbSession.last_viewed_at,
+      permissionMode: dbSession.permission_mode
     };
   }
 
@@ -122,7 +123,7 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string): Session {
+  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore'): Session {
     console.log(`[SessionManager] Creating session: ${name}`);
     
     const activeProject = this.getActiveProject();
@@ -138,7 +139,8 @@ export class SessionManager extends EventEmitter {
       initial_prompt: prompt,
       worktree_name: worktreeName,
       worktree_path: worktreePath,
-      project_id: activeProject.id
+      project_id: activeProject.id,
+      permission_mode: permissionMode
     };
     console.log(`[SessionManager] Session data:`, sessionData);
 

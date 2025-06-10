@@ -141,6 +141,14 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN claude_session_id TEXT").run();
     }
 
+    // Check if permission_mode column exists
+    const hasPermissionModeColumn = sessionTableInfo.some((col: any) => col.name === 'permission_mode');
+    
+    if (!hasPermissionModeColumn) {
+      // Add permission_mode column to sessions table
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN permission_mode TEXT DEFAULT 'ignore' CHECK(permission_mode IN ('approve', 'ignore'))").run();
+    }
+
     // Add project support migration
     const projectsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'").all();
     if (projectsTable.length === 0) {
@@ -209,6 +217,13 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE projects ADD COLUMN build_script TEXT").run();
     }
 
+    // Add default_permission_mode column to projects table if it doesn't exist
+    const hasDefaultPermissionModeColumn = projectsTableInfo.some((col: any) => col.name === 'default_permission_mode');
+    
+    if (!hasDefaultPermissionModeColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN default_permission_mode TEXT DEFAULT 'ignore' CHECK(default_permission_mode IN ('approve', 'ignore'))").run();
+    }
+
     // Create project_run_commands table if it doesn't exist
     const runCommandsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_run_commands'").all();
     if (runCommandsTable.length === 0) {
@@ -239,11 +254,11 @@ export class DatabaseService {
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string, buildScript?: string): Project {
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore'): Project {
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, main_branch, build_script)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, mainBranch || null, buildScript || null);
+      INSERT INTO projects (name, path, system_prompt, run_script, main_branch, build_script, default_permission_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, mainBranch || null, buildScript || null, defaultPermissionMode || 'ignore');
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -295,6 +310,10 @@ export class DatabaseService {
     if (updates.main_branch !== undefined) {
       fields.push('main_branch = ?');
       values.push(updates.main_branch);
+    }
+    if (updates.default_permission_mode !== undefined) {
+      fields.push('default_permission_mode = ?');
+      values.push(updates.default_permission_mode);
     }
     if (updates.active !== undefined) {
       fields.push('active = ?');
@@ -399,9 +418,9 @@ export class DatabaseService {
   // Session operations
   createSession(data: CreateSessionData): Session {
     this.db.prepare(`
-      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id);
+      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, permission_mode)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.permission_mode || 'ignore');
     
     const session = this.getSession(data.id);
     if (!session) {

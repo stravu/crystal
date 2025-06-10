@@ -31,12 +31,16 @@
     "typecheck": "pnpm run -r typecheck",
     "postinstall": "electron-builder install-app-deps",
     "electron:rebuild": "cd main && electron-rebuild -f -w better-sqlite3",
-    "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild"
+    "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.17",
     "@anthropic-ai/sdk": "^0.53.0",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.12.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "better-sqlite3": "^11.7.0",
     "bull": "^4.16.3",
     "dotenv": "^16.4.7",
@@ -44,10 +48,12 @@
     "openai": "^5.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "concurrently": "^9.1.0",
     "electron": "^36.4.0",
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
+    "playwright": "^1.52.0",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
     "wait-on": "^8.0.1"

@@ -3,6 +3,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { useNotifications } from '../hooks/useNotifications';
 import { API } from '../utils/api';
 import type { AppConfig } from '../types/config';
+import { Shield, ShieldOff } from 'lucide-react';
 
 interface SettingsProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
+  const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications'>('general');
@@ -51,7 +53,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         verbose, 
         anthropicApiKey, 
         systemPromptAppend: globalSystemPrompt, 
-        claudeExecutablePath 
+        claudeExecutablePath,
+        defaultPermissionMode 
       });
 
       if (!response.success) {
@@ -158,6 +161,45 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             />
             <p className="text-xs text-gray-500 mt-1">
               This text will be automatically appended to every initial prompt sent to Claude Code across ALL projects. For project-specific prompts, use the project settings.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Default Permission Mode
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="defaultPermissionMode"
+                  value="ignore"
+                  checked={defaultPermissionMode === 'ignore'}
+                  onChange={(e) => setDefaultPermissionMode(e.target.value as 'ignore' | 'approve')}
+                  className="text-blue-600"
+                />
+                <div className="flex items-center gap-2">
+                  <ShieldOff className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm">Skip Permissions (Default)</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="defaultPermissionMode"
+                  value="approve"
+                  checked={defaultPermissionMode === 'approve'}
+                  onChange={(e) => setDefaultPermissionMode(e.target.value as 'ignore' | 'approve')}
+                  className="text-blue-600"
+                />
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-green-600" />
+                  <span className="text-sm">Approve Actions</span>
+                </div>
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Sets the default permission mode for new sessions. Individual sessions can override this setting.
             </p>
           </div>
 

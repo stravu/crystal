@@ -10,6 +10,8 @@ import { GitDiffManager, type GitDiffResult } from './services/gitDiffManager';
 import { ExecutionTracker } from './services/executionTracker';
 import { DatabaseService } from './database/database';
 import { RunCommandManager } from './services/runCommandManager';
+import { PermissionIpcServer } from './services/permissionIpcServer';
+import { PermissionManager } from './services/permissionManager';
 import type { CreateSessionRequest } from './types/session';
 
 let mainWindow: BrowserWindow | null = null;
@@ -25,6 +27,7 @@ let executionTracker: ExecutionTracker;
 let worktreeNameGenerator: WorktreeNameGenerator;
 let databaseService: DatabaseService;
 let runCommandManager: RunCommandManager;
+let permissionIpcServer: PermissionIpcServer;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 
@@ -144,6 +147,10 @@ async function initializeServices() {
   sessionManager = new SessionManager(databaseService);
   sessionManager.initializeFromDatabase();
   
+  // Start permission IPC server
+  permissionIpcServer = new PermissionIpcServer();
+  await permissionIpcServer.start();
+  
   // Create worktree manager without a specific path
   worktreeManager = new WorktreeManager();
   
@@ -154,7 +161,7 @@ async function initializeServices() {
   }
   
   const { ClaudeCodeManager } = await import('./services/claudeCodeManager');
-  claudeCodeManager = new ClaudeCodeManager(sessionManager);
+  claudeCodeManager = new ClaudeCodeManager(sessionManager, undefined, configManager, permissionIpcServer.getSocketPath());
   gitDiffManager = new GitDiffManager();
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
@@ -195,8 +202,16 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', async () => {
+  // Close task queue
   if (taskQueue) {
     await taskQueue.close();
+  }
+  
+  // Stop permission IPC server
+  if (permissionIpcServer) {
+    console.log('[Main] Stopping permission IPC server...');
+    await permissionIpcServer.stop();
+    console.log('[Main] Permission IPC server stopped');
   }
 });
 
@@ -417,14 +432,15 @@ ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) 
     
     if (count > 1) {
       console.log('[IPC] Creating multiple sessions...');
-      const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count);
+      const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode);
       console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
       return { success: true, data: { jobIds: jobs.map(job => job.id) } };
     } else {
       console.log('[IPC] Creating single session...');
       const job = await taskQueue.createSession({
         prompt: request.prompt,
-        worktreeTemplate: request.worktreeTemplate || ''
+        worktreeTemplate: request.worktreeTemplate || '',
+        permissionMode: request.permissionMode
       });
       console.log('[IPC] Created job with ID:', job.id);
       return { success: true, data: { jobId: job.id } };
@@ -1399,3 +1415,8 @@ ipcMain.handle('prompts:get-by-id', async (_event, promptId: string) => {
     return { success: false, error: 'Failed to get prompt by id' };
   }
 });
+
+// Export getter function for mainWindow
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow;
+}

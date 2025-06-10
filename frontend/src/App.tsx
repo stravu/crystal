@@ -8,15 +8,28 @@ import Help from './components/Help';
 import Welcome from './components/Welcome';
 import { MainProcessLogger } from './components/MainProcessLogger';
 import { ErrorDialog } from './components/ErrorDialog';
+import { PermissionDialog } from './components/PermissionDialog';
 import { useErrorStore } from './stores/errorStore';
+import { useSessionStore } from './stores/sessionStore';
+import { API } from './utils/api';
 
 type ViewMode = 'sessions' | 'prompts';
+
+interface PermissionRequest {
+  id: string;
+  sessionId: string;
+  toolName: string;
+  input: any;
+  timestamp: number;
+}
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [currentPermissionRequest, setCurrentPermissionRequest] = useState<PermissionRequest | null>(null);
   const { currentError, clearError } = useErrorStore();
+  const { sessions } = useSessionStore();
   
   useSocket();
   useNotifications();
@@ -27,7 +40,32 @@ function App() {
     if (!hideWelcome) {
       setIsWelcomeOpen(true);
     }
+    
+    // Set up permission request listener
+    const handlePermissionRequest = (request: PermissionRequest) => {
+      console.log('[App] Received permission request:', request);
+      setCurrentPermissionRequest(request);
+    };
+    
+    window.electron?.on('permission:request', handlePermissionRequest);
+    
+    return () => {
+      window.electron?.off('permission:request', handlePermissionRequest);
+    };
   }, []);
+  
+  const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: any, message?: string) => {
+    try {
+      await API.permissions.respond(requestId, {
+        behavior,
+        updatedInput,
+        message
+      });
+      setCurrentPermissionRequest(null);
+    } catch (error) {
+      console.error('Failed to respond to permission request:', error);
+    }
+  };
 
   return (
     <div className="h-screen flex overflow-hidden">
@@ -48,6 +86,11 @@ function App() {
         error={currentError?.error || ''}
         details={currentError?.details}
         command={currentError?.command}
+      />
+      <PermissionDialog
+        request={currentPermissionRequest}
+        onRespond={handlePermissionResponse}
+        session={currentPermissionRequest ? sessions.find(s => s.id === currentPermissionRequest.sessionId) : undefined}
       />
     </div>
   );
