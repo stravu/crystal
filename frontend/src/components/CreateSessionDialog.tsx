@@ -124,7 +124,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
                 />
                 <div className="flex items-center gap-2">
                   <ShieldOff className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm">Skip Permissions</span>
+                  <span className="text-sm text-gray-900">Skip Permissions</span>
                   <span className="text-xs text-gray-500">(faster, less secure)</span>
                 </div>
               </label>
@@ -139,7 +139,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
                 />
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-green-600" />
-                  <span className="text-sm">Approve Actions</span>
+                  <span className="text-sm text-gray-900">Manual Approval</span>
                   <span className="text-xs text-gray-500">(safer, interactive)</span>
                 </div>
               </label>
