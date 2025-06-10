@@ -72,10 +72,16 @@
       "frontend/dist/**/*",
       "package.json",
       "node_modules/**/*",
+      "!node_modules/@anthropic-ai/claude-code/vendor/**/*.jar",
       "build/**/*"
     ],
     "npmRebuild": true,
     "buildDependenciesFromSource": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/**/*.node",
+      "!node_modules/@anthropic-ai/claude-code/vendor/**"
+    ],
     "afterSign": "build/afterSign.js",
     "mac": {
       "category": "public.app-category.developer-tools",
