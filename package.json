@@ -76,6 +76,7 @@
     ],
     "npmRebuild": true,
     "buildDependenciesFromSource": false,
+    "afterSign": "build/afterSign.js",
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "main/assets/icon.icns",
@@ -84,7 +85,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "signIgnore": [
-        "node_modules/@anthropic-ai/claude-code/vendor/.*\\.jar$"
+        "node_modules/@anthropic-ai/claude-code/vendor/**/*.jar"
       ],
       "notarize": true
     },
