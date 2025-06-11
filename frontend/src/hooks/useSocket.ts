@@ -47,7 +47,7 @@ export function useSocket() {
 
     const unsubscribeSessionOutput = window.electronAPI.events.onSessionOutput((output: SessionOutput) => {
       console.log(`[useSocket] Received session output for ${output.sessionId}, type: ${output.type}`);
-      // Only add output to session store - the SessionView will handle filtering for display
+      // Add output to session store for real-time updates
       addSessionOutput(output);
     });
     unsubscribeFunctions.push(unsubscribeSessionOutput);

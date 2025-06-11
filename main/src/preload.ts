@@ -127,6 +127,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('session:output', (_event, output) => callback(output));
       return () => ipcRenderer.removeAllListeners('session:output');
     },
+    onSessionOutputAvailable: (callback: (info: any) => void) => {
+      ipcRenderer.on('session:output-available', (_event, info) => callback(info));
+      return () => ipcRenderer.removeAllListeners('session:output-available');
+    },
     onScriptOutput: (callback: (output: any) => void) => {
       ipcRenderer.on('script:output', (_event, output) => callback(output));
       return () => ipcRenderer.removeAllListeners('script:output');

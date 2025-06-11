@@ -8,7 +8,6 @@ import { PromptNavigation } from './PromptNavigation';
 import CombinedDiffView from './CombinedDiffView';
 import { StravuFileSearch } from './StravuFileSearch';
 import { API } from '../utils/api';
-import type { SessionOutput } from '../types/session';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -36,6 +35,7 @@ export function SessionView() {
   const [formattedOutput, setFormattedOutput] = useState<string>('');
   const [currentSessionIdForOutput, setCurrentSessionIdForOutput] = useState<string | null>(null);
   const [isPathCollapsed, setIsPathCollapsed] = useState(true);
+  const loadingRef = useRef(false);
   
   // Subscribe to script output changes manually
   useEffect(() => {
@@ -75,7 +75,6 @@ export function SessionView() {
     }
     
     if (!activeSession) {
-      setFormattedOutput('');
       // Clear terminal immediately
       if (terminalInstance.current) {
         terminalInstance.current.clear();
@@ -85,8 +84,7 @@ export function SessionView() {
     
     const sessionId = activeSession.id; // Capture the session ID
     
-    // Immediately clear terminal and output when session changes
-    setFormattedOutput('');
+    // Clear terminal but don't clear formatted output yet - let it update naturally
     setCurrentSessionIdForOutput(sessionId); // Track which session this output belongs to
     if (terminalInstance.current) {
       terminalInstance.current.clear();
@@ -105,8 +103,6 @@ export function SessionView() {
       setIsWaitingForFirstOutput(true);
       setStartTime(Date.now());
     }
-    
-    // Don't format output here - let it happen after loadOutputContent completes
   }, [activeSession?.id]); // Changed dependency to activeSession?.id to trigger on session change
   
   // Track if this is a newly created session waiting for first output
@@ -141,32 +137,34 @@ export function SessionView() {
       // Get the current session fresh from the store to avoid stale closure
       const currentActiveSession = useSessionStore.getState().getActiveSession();
       
+      console.log(`[formatOutput] Called for session ${sessionId}, active session: ${currentActiveSession?.id}`);
+      
       // Only format if we're still on the same session that triggered this effect
       if (!currentActiveSession || currentActiveSession.id !== sessionId) {
+        console.log(`[formatOutput] Session mismatch, skipping`);
         return;
       }
       
-      // Since the backend now returns formatted stdout for JSON messages,
-      // we just need to concatenate all stdout outputs in order
+      // Just concatenate stdout outputs - JSON messages are already formatted
       let formatted = '';
       
-      // Add all stdout output (which now includes formatted JSON messages)
       if (currentActiveSession.output && currentActiveSession.output.length > 0) {
         formatted = currentActiveSession.output.join('');
       }
       
-      console.log(`[SessionView] Formatting output for session ${sessionId}, length: ${formatted.length}`);
+      console.log(`[formatOutput] Formatting output for session ${sessionId}, output array length: ${currentActiveSession.output?.length}, formatted length: ${formatted.length}`);
       
       // Only set the formatted output if we're still on the same session
       const finalActiveSession = useSessionStore.getState().getActiveSession();
       if (finalActiveSession && finalActiveSession.id === sessionId) {
         setFormattedOutput(formatted);
         setCurrentSessionIdForOutput(sessionId);
+        console.log(`[formatOutput] Set formatted output, length: ${formatted.length}`);
       }
     };
     
     formatOutput();
-  }, [activeSession?.id, messageCount, outputCount, isWaitingForFirstOutput]);
+  }, [activeSession?.id, messageCount, outputCount, isWaitingForFirstOutput, activeSession?.status]);
   
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
@@ -253,32 +251,23 @@ export function SessionView() {
   };
   
   const loadOutputContent = async (sessionId: string, retryCount = 0) => {
-    if (!terminalInstance.current) return;
+    console.log(`[loadOutputContent] Called for session ${sessionId}`);
+    if (!terminalInstance.current) {
+      console.log(`[loadOutputContent] No terminal instance, returning`);
+      return;
+    }
     
+    // Prevent concurrent loads
+    if (loadingRef.current) {
+      console.log(`[loadOutputContent] Already loading, skipping`);
+      return;
+    }
+    
+    loadingRef.current = true;
     setIsLoadingOutput(true);
     setLoadError(null);
     
     try {
-      // Store any outputs that arrive while we're loading
-      const outputBuffer: SessionOutput[] = [];
-      const bufferUnsubscribe = useSessionStore.subscribe((state, prevState) => {
-        const currentSession = state.sessions.find(s => s.id === sessionId);
-        const prevSession = prevState.sessions.find(s => s.id === sessionId);
-        
-        if (currentSession && prevSession) {
-          const newOutputs = currentSession.output.slice(prevSession.output.length);
-          outputBuffer.push(...newOutputs.map((data) => ({
-            sessionId,
-            type: 'stdout' as const,
-            data,
-            timestamp: new Date().toISOString()
-          })));
-        }
-      });
-      
-      // Clear any existing output for this session to prevent stale data
-      useSessionStore.getState().clearSessionOutput(sessionId);
-      
       const response = await API.sessions.getOutput(sessionId);
       if (!response.success) {
         throw new Error(response.error || 'Failed to load output');
@@ -289,25 +278,32 @@ export function SessionView() {
       // Check if we're still on the same session before adding outputs
       const currentActiveSession = useSessionStore.getState().getActiveSession();
       if (!currentActiveSession || currentActiveSession.id !== sessionId) {
-        bufferUnsubscribe();
+        console.log(`[loadOutputContent] Session changed, aborting`);
         return;
       }
       
-      // Store outputs for this session
-      outputs.forEach((output: any) => {
-        useSessionStore.getState().addSessionOutput(output);
-      });
+      console.log(`[loadOutputContent] Database returned ${outputs.length} outputs`);
       
-      // Add any buffered outputs that arrived while loading
-      outputBuffer.forEach((output) => {
-        useSessionStore.getState().addSessionOutput(output);
-      });
+      // Small delay to ensure UI is ready
+      await new Promise(resolve => setTimeout(resolve, 50));
       
-      // Clean up the buffer subscription
-      bufferUnsubscribe();
+      // Double-check we're still on the same session
+      const stillActiveSession = useSessionStore.getState().getActiveSession();
+      if (!stillActiveSession || stillActiveSession.id !== sessionId) {
+        console.log(`[loadOutputContent] Session changed during delay, aborting`);
+        return;
+      }
       
-      // After loading all outputs, we don't need to format here anymore
-      // The formatting will happen in the useEffect that watches for changes
+      console.log(`[loadOutputContent] Setting ${outputs.length} outputs from database`);
+      
+      // Use setSessionOutputs for atomic update
+      useSessionStore.getState().setSessionOutputs(sessionId, outputs);
+      
+      // Get the updated session to verify data was added
+      const updatedSession = useSessionStore.getState().getActiveSession();
+      if (updatedSession) {
+        console.log(`[loadOutputContent] After setting - output count: ${updatedSession.output?.length}, json count: ${updatedSession.jsonMessages?.length}`);
+      }
       
       setLoadError(null);
     } catch (error) {
@@ -330,6 +326,7 @@ export function SessionView() {
         }
       }
     } finally {
+      loadingRef.current = false;
       setIsLoadingOutput(false);
     }
   };
@@ -383,27 +380,32 @@ export function SessionView() {
     terminalInstance.current.reset();
     lastProcessedOutputLength.current = 0;
     
-    setFormattedOutput(''); // Reset formatted output
+    // Don't reset formatted output here - let the formatting effect handle it
 
-    // For newly created sessions (status: initializing), add a delay before loading output
-    // This gives Claude Code time to start producing output
-    if (activeSession.status === 'initializing') {
-      // Show a message while Claude Code is starting up
-      terminalInstance.current.writeln('\r\n🚀 Starting Claude Code session...\r\n');
-      
-      // Mark that we're waiting for first output
-      setIsWaitingForFirstOutput(true);
-      
-      // Load output after a longer delay for new sessions
-      setTimeout(() => {
-        loadOutputContent(activeSession.id);
-      }, 500);
-    } else {
-      // For existing sessions, load output after a short delay
-      setTimeout(() => {
-        loadOutputContent(activeSession.id);
-      }, 50);
-    }
+    // Use requestAnimationFrame to ensure terminal is ready
+    requestAnimationFrame(() => {
+      // For newly created sessions (status: initializing), add a delay before loading output
+      // This gives Claude Code time to start producing output
+      if (activeSession.status === 'initializing') {
+        // Show a message while Claude Code is starting up
+        if (terminalInstance.current) {
+          terminalInstance.current.writeln('\r\n🚀 Starting Claude Code session...\r\n');
+        }
+        
+        // Mark that we're waiting for first output
+        setIsWaitingForFirstOutput(true);
+        
+        // Load output after a longer delay for new sessions
+        setTimeout(() => {
+          loadOutputContent(activeSession.id);
+        }, 500);
+      } else {
+        // For existing sessions, load output after terminal is ready
+        setTimeout(() => {
+          loadOutputContent(activeSession.id);
+        }, 100);
+      }
+    });
     
   }, [activeSession?.id]);
 
@@ -495,17 +497,29 @@ export function SessionView() {
   }, [viewMode, activeSession?.id]);
 
   useEffect(() => {
-    if (!terminalInstance.current) return;
+    console.log(`[Terminal Write Effect] Called, formatted output length: ${formattedOutput.length}, session: ${currentSessionIdForOutput}`);
+    
+    if (!terminalInstance.current) {
+      console.log(`[Terminal Write Effect] No terminal instance`);
+      return;
+    }
 
     // Get the current active session directly from the store to ensure freshness
     const currentActiveSession = useSessionStore.getState().getActiveSession();
-    if (!currentActiveSession) return;
+    if (!currentActiveSession) {
+      console.log(`[Terminal Write Effect] No active session`);
+      return;
+    }
 
     // If we have no formatted output, don't write anything
-    if (!formattedOutput) return;
+    if (!formattedOutput) {
+      console.log(`[Terminal Write Effect] No formatted output`);
+      return;
+    }
 
     // Critical check: Only write if the formatted output belongs to the current session
     if (currentSessionIdForOutput !== currentActiveSession.id) {
+      console.log(`[Terminal Write Effect] Session mismatch: ${currentSessionIdForOutput} !== ${currentActiveSession.id}`);
       return;
     }
 
@@ -682,6 +696,20 @@ export function SessionView() {
       setElapsedTime(0);
     }
   }, [activeSession?.status, activeSession?.runStartedAt]);
+  
+  // Remove polling - we're using real-time updates now
+  // useEffect(() => {
+  //   if (!activeSession || (activeSession.status !== 'running' && activeSession.status !== 'waiting')) {
+  //     return;
+  //   }
+  //   
+  //   // Reload output content every 500ms during active sessions
+  //   const interval = setInterval(() => {
+  //     loadOutputContent(activeSession.id, 0, true);
+  //   }, 500);
+  //   
+  //   return () => clearInterval(interval);
+  // }, [activeSession?.id, activeSession?.status]);
   
   // Reset unread badges when session changes
   useEffect(() => {

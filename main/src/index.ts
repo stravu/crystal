@@ -401,21 +401,21 @@ function setupEventListeners() {
 
   // Listen to claudeCodeManager events
   claudeCodeManager.on('output', async (output: any) => {
-    // Save output to database
+    // Save raw output to database (including JSON)
     sessionManager.addSessionOutput(output.sessionId, {
       type: output.type,
       data: output.data,
       timestamp: output.timestamp
     });
 
-    // Broadcast to renderer
+    // Send real-time updates to renderer
     if (mainWindow) {
-      // If it's a JSON message, also send a formatted stdout version
       if (output.type === 'json') {
+        // For JSON, send both formatted output and raw JSON
         const { formatJsonForOutputEnhanced } = await import('./utils/toolFormatter');
         const formattedOutput = formatJsonForOutputEnhanced(output.data);
         if (formattedOutput) {
-          // Send the formatted version as stdout
+          // Send formatted as stdout for Output view
           mainWindow.webContents.send('session:output', {
             sessionId: output.sessionId,
             type: 'stdout',
@@ -423,10 +423,12 @@ function setupEventListeners() {
             timestamp: output.timestamp
           });
         }
+        // Also send raw JSON for Messages view
+        mainWindow.webContents.send('session:output', output);
+      } else {
+        // Send non-JSON outputs as-is
+        mainWindow.webContents.send('session:output', output);
       }
-
-      // Always send the original output (for Messages view)
-      mainWindow.webContents.send('session:output', output);
     }
   });
 
@@ -884,27 +886,25 @@ ipcMain.handle('sessions:get-output', async (_event, sessionId: string) => {
   try {
     const outputs = await sessionManager.getSessionOutputs(sessionId);
 
-    // Transform JSON messages to output format on the fly
+    // Transform JSON messages to formatted stdout on the fly
     const { formatJsonForOutputEnhanced } = await import('./utils/toolFormatter');
     const transformedOutputs = outputs.map(output => {
       if (output.type === 'json') {
-        // Generate output format from JSON using enhanced formatter
+        // Generate formatted output from JSON
         const outputText = formatJsonForOutputEnhanced(output.data);
         if (outputText) {
-          // Return both the JSON and a generated output version
-          return [
-            output, // Keep the JSON message for Messages view
-            {
-              ...output,
-              type: 'stdout' as const,
-              data: outputText
-            }
-          ];
+          // Return as stdout for the Output view
+          return {
+            ...output,
+            type: 'stdout' as const,
+            data: outputText
+          };
         }
-        return [output]; // If no output format, just return JSON
+        // If no output format can be generated, skip this JSON message
+        return null;
       }
-      return [output]; // Non-JSON outputs pass through
-    }).flat();
+      return output; // Non-JSON outputs pass through
+    }).filter(Boolean); // Remove any null entries
 
     return { success: true, data: transformedOutputs };
   } catch (error) {

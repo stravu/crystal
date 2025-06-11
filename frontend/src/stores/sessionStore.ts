@@ -22,6 +22,7 @@ interface SessionStore {
   setActiveSession: (sessionId: string | null) => void;
   addSessionOutput: (output: SessionOutput) => void;
   setSessionOutput: (sessionId: string, output: string) => void;
+  setSessionOutputs: (sessionId: string, outputs: SessionOutput[]) => void;
   clearSessionOutput: (sessionId: string) => void;
   addScriptOutput: (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => void;
   clearScriptOutput: (sessionId: string) => void;
@@ -53,7 +54,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   updateSession: (updatedSession) => set((state) => ({
     sessions: state.sessions.map(session => 
       session.id === updatedSession.id 
-        ? { ...updatedSession, output: session.output } // Preserve existing output
+        ? { ...updatedSession, output: session.output, jsonMessages: session.jsonMessages } // Preserve existing output and messages
         : session
     )
   })),
@@ -82,12 +83,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const session = sessions[sessionIndex];
     
     if (output.type === 'json') {
-      // Use more efficient array update for JSON messages
+      // Update jsonMessages array
       const newJsonMessages = session.jsonMessages || [];
       newJsonMessages.push({...output.data, timestamp: output.timestamp});
       sessions[sessionIndex] = { ...session, jsonMessages: newJsonMessages };
     } else {
-      // Use more efficient array update for regular output
+      // Add stdout/stderr to output array
       const newOutput = [...session.output];
       newOutput.push(output.data);
       sessions[sessionIndex] = { ...session, output: newOutput };
@@ -102,6 +103,27 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         ? { ...session, output: [output] }
         : session
     )
+  })),
+  
+  setSessionOutputs: (sessionId, outputs) => set((state) => ({
+    sessions: state.sessions.map(session => {
+      if (session.id === sessionId) {
+        // Separate outputs and JSON messages
+        const stdOutputs: string[] = [];
+        const jsonMessages: any[] = [];
+        
+        outputs.forEach(output => {
+          if (output.type === 'json') {
+            jsonMessages.push({ ...output.data, timestamp: output.timestamp });
+          } else if (output.type === 'stdout' || output.type === 'stderr') {
+            stdOutputs.push(output.data);
+          }
+        });
+        
+        return { ...session, output: stdOutputs, jsonMessages };
+      }
+      return session;
+    })
   })),
   
   clearSessionOutput: (sessionId) => set((state) => ({
