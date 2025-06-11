@@ -12,6 +12,7 @@ import { DatabaseService } from './database/database';
 import { RunCommandManager } from './services/runCommandManager';
 import { PermissionIpcServer } from './services/permissionIpcServer';
 import { PermissionManager } from './services/permissionManager';
+import { Logger } from './utils/logger';
 import type { CreateSessionRequest } from './types/session';
 
 let mainWindow: BrowserWindow | null = null;
@@ -19,6 +20,7 @@ let taskQueue: TaskQueue | null = null;
 
 // Service instances
 let configManager: ConfigManager;
+let logger: Logger;
 let sessionManager: SessionManager;
 let worktreeManager: WorktreeManager;
 let claudeCodeManager: any;
@@ -28,6 +30,12 @@ let worktreeNameGenerator: WorktreeNameGenerator;
 let databaseService: DatabaseService;
 let runCommandManager: RunCommandManager;
 let permissionIpcServer: PermissionIpcServer;
+
+// Store original console methods before overriding
+let originalLog: typeof console.log;
+let originalError: typeof console.error;
+let originalWarn: typeof console.warn;
+let originalInfo: typeof console.info;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 
@@ -87,45 +95,77 @@ async function createWindow() {
     }
   });
 
-  // Override console methods to forward to renderer
-  const originalLog = console.log;
-  const originalError = console.error;
-  const originalWarn = console.warn;
-  const originalInfo = console.info;
-
+  // Override console methods to forward to renderer and logger
   console.log = (...args: any[]) => {
-    originalLog.apply(console, args);
+    // Format the message
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    // Write to logger if available
+    if (logger) {
+      logger.info(message);
+    } else {
+      originalLog.apply(console, args);
+    }
+    
+    // Forward to renderer
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('main-log', 'log', args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' '));
+      mainWindow.webContents.send('main-log', 'log', message);
     }
   };
 
   console.error = (...args: any[]) => {
-    originalError.apply(console, args);
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    // Extract Error object if present
+    const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
+    
+    if (logger) {
+      logger.error(message, errorObj);
+    } else {
+      originalError.apply(console, args);
+    }
+    
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('main-log', 'error', args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' '));
+      mainWindow.webContents.send('main-log', 'error', message);
     }
   };
 
   console.warn = (...args: any[]) => {
-    originalWarn.apply(console, args);
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    // Extract Error object if present for warnings too
+    const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
+    
+    if (logger) {
+      logger.warn(message, errorObj);
+    } else {
+      originalWarn.apply(console, args);
+    }
+    
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('main-log', 'warn', args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' '));
+      mainWindow.webContents.send('main-log', 'warn', message);
     }
   };
 
   console.info = (...args: any[]) => {
-    originalInfo.apply(console, args);
+    const message = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+    ).join(' ');
+    
+    if (logger) {
+      logger.info(message);
+    } else {
+      originalInfo.apply(console, args);
+    }
+    
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('main-log', 'info', args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' '));
+      mainWindow.webContents.send('main-log', 'info', message);
     }
   };
 
@@ -136,8 +176,18 @@ async function createWindow() {
 }
 
 async function initializeServices() {
+  // Store original console methods before any overrides
+  originalLog = console.log;
+  originalError = console.error;
+  originalWarn = console.warn;
+  originalInfo = console.info;
+  
   configManager = new ConfigManager();
   await configManager.initialize();
+  
+  // Initialize logger early so it can capture all logs
+  logger = new Logger(configManager);
+  console.log('[Main] Logger initialized with file logging to ~/.crystal/logs');
   
   // Use the same database path as the original backend
   const dbPath = configManager.getDatabasePath();
@@ -212,6 +262,11 @@ app.on('before-quit', async () => {
     console.log('[Main] Stopping permission IPC server...');
     await permissionIpcServer.stop();
     console.log('[Main] Permission IPC server stopped');
+  }
+  
+  // Close logger to ensure all logs are flushed
+  if (logger) {
+    logger.close();
   }
 });
 
