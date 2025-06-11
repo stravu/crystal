@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
 
+  // System utilities
+  openExternal: (url: string): Promise<IPCResponse> => ipcRenderer.invoke('openExternal', url),
+
   // Version checking
   checkForUpdates: (): Promise<IPCResponse> => ipcRenderer.invoke('version:check-for-updates'),
   getVersionInfo: (): Promise<IPCResponse> => ipcRenderer.invoke('version:get-info'),

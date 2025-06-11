@@ -248,6 +248,11 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             </p>
           </div>
 
+          {/* Stravu Integration Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Stravu Integration</h3>
+            <StravuConnection />
+          </div>
           <div>
             <label className="flex items-center space-x-2">
               <input

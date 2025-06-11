@@ -13,6 +13,9 @@ interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
 
+  // System utilities
+  openExternal: (url: string) => Promise<void>;
+
   // Version checking
   checkForUpdates: () => Promise<IPCResponse>;
   getVersionInfo: () => Promise<IPCResponse>;

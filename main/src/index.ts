@@ -12,6 +12,8 @@ import { DatabaseService } from './database/database';
 import { RunCommandManager } from './services/runCommandManager';
 import { PermissionIpcServer } from './services/permissionIpcServer';
 import { PermissionManager } from './services/permissionManager';
+import { StravuAuthManager } from './services/stravuAuthManager';
+import { StravuNotebookService } from './services/stravuNotebookService';
 import { VersionChecker, type VersionInfo } from './services/versionChecker';
 import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
