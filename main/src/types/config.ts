@@ -9,6 +9,9 @@ export interface AppConfig {
   claudeExecutablePath?: string;
   // Permission mode for all sessions
   defaultPermissionMode?: 'approve' | 'ignore';
+  // Stravu MCP integration
+  stravuApiKey?: string;
+  stravuServerUrl?: string;
 }
 
 export interface UpdateConfigRequest {
@@ -17,4 +20,6 @@ export interface UpdateConfigRequest {
   claudeExecutablePath?: string;
   systemPromptAppend?: string;
   defaultPermissionMode?: 'approve' | 'ignore';
+  stravuApiKey?: string;
+  stravuServerUrl?: string;
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NotificationSettings } from './NotificationSettings';
+import { StravuConnection } from './StravuConnection';
 import { useNotifications } from '../hooks/useNotifications';
 import { API } from '../utils/api';
 import type { AppConfig } from '../types/config';
@@ -55,7 +56,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         anthropicApiKey, 
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath,
-        defaultPermissionMode 
+        defaultPermissionMode
       });
 
       if (!response.success) {
@@ -244,6 +245,11 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             </p>
           </div>
 
+          {/* Stravu Integration Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Stravu Integration</h3>
+            <StravuConnection />
+          </div>
 
           {error && (
             <div className="text-red-600 text-sm">{error}</div>

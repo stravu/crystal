@@ -13,6 +13,9 @@ interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
 
+  // System utilities
+  openExternal: (url: string) => Promise<void>;
+
   // Session management
   sessions: {
     getAll: () => Promise<IPCResponse>;
@@ -89,6 +92,17 @@ interface ElectronAPI {
     getPending: () => Promise<IPCResponse>;
   };
 
+  // Stravu MCP integration with OAuth
+  stravu: {
+    getConnectionStatus: () => Promise<IPCResponse>;
+    initiateAuth: () => Promise<IPCResponse>;
+    checkAuthStatus: (sessionId: string) => Promise<IPCResponse>;
+    disconnect: () => Promise<IPCResponse>;
+    getNotebooks: () => Promise<IPCResponse>;
+    getNotebook: (notebookId: string) => Promise<IPCResponse>;
+    searchNotebooks: (query: string, limit?: number) => Promise<IPCResponse>;
+  };
+
   // Event listeners for real-time updates
   events: {
     onSessionCreated: (callback: (session: any) => void) => () => void;
@@ -104,6 +118,7 @@ interface ElectronAPI {
 
 // Additional electron interface for IPC event listeners
 interface ElectronInterface {
+  openExternal: (url: string) => Promise<void>;
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }

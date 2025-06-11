@@ -9,6 +9,7 @@ import Welcome from './components/Welcome';
 import { MainProcessLogger } from './components/MainProcessLogger';
 import { ErrorDialog } from './components/ErrorDialog';
 import { PermissionDialog } from './components/PermissionDialog';
+import { StravuStatusIndicator } from './components/StravuStatusIndicator';
 import { useErrorStore } from './stores/errorStore';
 import { useSessionStore } from './stores/sessionStore';
 import { API } from './utils/api';
@@ -92,9 +93,14 @@ function App() {
       <MainProcessLogger />
       {/* Draggable title bar area */}
       <div 
-        className="fixed top-0 left-0 right-0 h-8 z-50" 
+        className="fixed top-0 left-0 right-0 h-8 z-50 flex items-center justify-end pr-4" 
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      />
+      >
+        {/* Stravu status indicator in top-right */}
+        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <StravuStatusIndicator />
+        </div>
+      </div>
       <Sidebar viewMode={viewMode} onViewModeChange={setViewMode} onHelpClick={() => setIsHelpOpen(true)} />
       {viewMode === 'sessions' ? <SessionView /> : <PromptHistory />}
       <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />

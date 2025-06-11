@@ -6,6 +6,7 @@ import { JsonMessageView } from './JsonMessageView';
 import { StatusIndicator } from './StatusIndicator';
 import { PromptNavigation } from './PromptNavigation';
 import CombinedDiffView from './CombinedDiffView';
+import { StravuFileSearch } from './StravuFileSearch';
 import { API } from '../utils/api';
 import type { SessionOutput } from '../types/session';
 import '@xterm/xterm/css/xterm.css';
@@ -197,6 +198,7 @@ export function SessionView() {
     workingDirectory?: string;
     projectPath?: string;
   } | null>(null);
+  const [showStravuSearch, setShowStravuSearch] = useState(false);
   const lastProcessedOutputLength = useRef(0);
   const lastProcessedScriptOutputLength = useRef(0);
   
@@ -321,7 +323,7 @@ export function SessionView() {
       terminalInstance.current.open(terminalRef.current);
       // Delay initial fit to ensure container is properly sized
       setTimeout(() => {
-        if (fitAddon.current) {
+        if (fitAddon.current && terminalRef.current && terminalRef.current.offsetWidth > 0) {
           fitAddon.current.fit();
         }
       }, 100);
@@ -414,7 +416,7 @@ export function SessionView() {
       scriptTerminalInstance.current.open(scriptTerminalRef.current);
       // Delay initial fit to ensure container is properly sized
       setTimeout(() => {
-        if (scriptFitAddon.current) {
+        if (scriptFitAddon.current && scriptTerminalRef.current && scriptTerminalRef.current.offsetWidth > 0) {
           scriptFitAddon.current.fit();
         }
       }, 100);
@@ -991,6 +993,14 @@ export function SessionView() {
       : `Rebase from ${mainBranch}`;
   };
 
+  const handleStravuFileSelect = (file: any, content: string) => {
+    // Format the content as a markdown code block with file reference
+    const formattedContent = `\n\n## File: ${file.name}\n\`\`\`${file.type}\n${content}\n\`\`\`\n\n`;
+    
+    // Append to current input
+    setInput(prevInput => prevInput + formattedContent);
+  };
+
   const formatElapsedTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -1283,29 +1293,40 @@ export function SessionView() {
       
       <div className="border-t border-gray-300 p-4 bg-white flex-shrink-0">
         <div className="flex space-x-2">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              // Send on Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                if (activeSession.status === 'waiting') {
-                  handleSendInput();
-                } else {
-                  handleContinueConversation();
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Send on Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  if (activeSession.status === 'waiting') {
+                    handleSendInput();
+                  } else {
+                    handleContinueConversation();
+                  }
                 }
+              }}
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white resize-none overflow-y-auto"
+              placeholder={
+                activeSession.status === 'waiting' 
+                  ? "Enter your response... (⌘↵ to send)" 
+                  : "Continue conversation with a new message... (⌘↵ to send)"
               }
-            }}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white resize-none overflow-y-auto"
-            placeholder={
-              activeSession.status === 'waiting' 
-                ? "Enter your response... (⌘↵ to send)" 
-                : "Continue conversation with a new message... (⌘↵ to send)"
-            }
-            style={{ minHeight: '42px', maxHeight: '200px' }}
-          />
+              style={{ minHeight: '42px', maxHeight: '200px' }}
+            />
+            <button
+              onClick={() => setShowStravuSearch(true)}
+              className="absolute right-2 top-2 p-1 text-gray-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors"
+              title="Search Stravu files"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </button>
+          </div>
           <button
             onClick={activeSession.status === 'waiting' ? handleSendInput : handleContinueConversation}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -1540,6 +1561,13 @@ export function SessionView() {
           </div>
         </div>
       )}
+
+      {/* Stravu File Search Dialog */}
+      <StravuFileSearch
+        isOpen={showStravuSearch}
+        onClose={() => setShowStravuSearch(false)}
+        onFileSelect={handleStravuFileSelect}
+      />
     </div>
   );
 }

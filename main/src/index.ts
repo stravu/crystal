@@ -12,6 +12,8 @@ import { DatabaseService } from './database/database';
 import { RunCommandManager } from './services/runCommandManager';
 import { PermissionIpcServer } from './services/permissionIpcServer';
 import { PermissionManager } from './services/permissionManager';
+import { StravuAuthManager } from './services/stravuAuthManager';
+import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
 import type { CreateSessionRequest } from './types/session';
 
@@ -30,6 +32,8 @@ let worktreeNameGenerator: WorktreeNameGenerator;
 let databaseService: DatabaseService;
 let runCommandManager: RunCommandManager;
 let permissionIpcServer: PermissionIpcServer | null;
+let stravuAuthManager: StravuAuthManager;
+let stravuNotebookService: StravuNotebookService;
 
 // Store original console methods before overriding
 let originalLog: typeof console.log;
@@ -38,6 +42,12 @@ let originalWarn: typeof console.warn;
 let originalInfo: typeof console.info;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
+
+// Install Devtron in development
+if (isDevelopment) {
+  // Devtron can be installed manually in DevTools console with: require('devtron').install()
+  console.log('[Main] Development mode - Devtron can be installed in DevTools console');
+}
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -58,11 +68,30 @@ async function createWindow() {
   if (isDevelopment) {
     await mainWindow.loadURL('http://localhost:4521');
     mainWindow.webContents.openDevTools();
+    
+    // Enable IPC debugging in development
+    console.log('[Main] 🔍 IPC debugging enabled - check DevTools console for IPC call logs');
+    
+    // Log all IPC calls in main process
+    const originalHandle = ipcMain.handle;
+    ipcMain.handle = function(channel: string, listener: any) {
+      const wrappedListener = async (event: any, ...args: any[]) => {
+        if (channel.startsWith('stravu:')) {
+          console.log(`[IPC] 📞 ${channel}`, args.length > 0 ? args : '(no args)');
+        }
+        const result = await listener(event, ...args);
+        if (channel.startsWith('stravu:')) {
+          console.log(`[IPC] 📤 ${channel} response:`, result);
+        }
+        return result;
+      };
+      return originalHandle.call(this, channel, wrappedListener);
+    };
   } else {
     // Log the path we're trying to load
     const indexPath = path.join(__dirname, '../../frontend/dist/index.html');
     console.log('Loading index.html from:', indexPath);
-    
+
     try {
       await mainWindow.loadFile(indexPath);
     } catch (error) {
@@ -98,17 +127,17 @@ async function createWindow() {
   // Override console methods to forward to renderer and logger
   console.log = (...args: any[]) => {
     // Format the message
-    const message = args.map(arg => 
+    const message = args.map(arg =>
       typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
     ).join(' ');
-    
+
     // Write to logger if available
     if (logger) {
       logger.info(message);
     } else {
       originalLog.apply(console, args);
     }
-    
+
     // Forward to renderer
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('main-log', 'log', message);
@@ -130,16 +159,16 @@ async function createWindow() {
       }
       return String(arg);
     }).join(' ');
-    
+
     // Extract Error object if present
     const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
-    
+
     if (logger) {
       logger.error(message, errorObj);
     } else {
       originalError.apply(console, args);
     }
-    
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('main-log', 'error', message);
     }
@@ -160,16 +189,16 @@ async function createWindow() {
       }
       return String(arg);
     }).join(' ');
-    
+
     // Extract Error object if present for warnings too
     const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
-    
+
     if (logger) {
       logger.warn(message, errorObj);
     } else {
       originalWarn.apply(console, args);
     }
-    
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('main-log', 'warn', message);
     }
@@ -190,13 +219,13 @@ async function createWindow() {
       }
       return String(arg);
     }).join(' ');
-    
+
     if (logger) {
       logger.info(message);
     } else {
       originalInfo.apply(console, args);
     }
-    
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('main-log', 'info', message);
     }
@@ -214,27 +243,27 @@ async function initializeServices() {
   originalError = console.error;
   originalWarn = console.warn;
   originalInfo = console.info;
-  
+
   configManager = new ConfigManager();
   await configManager.initialize();
-  
+
   // Initialize logger early so it can capture all logs
   logger = new Logger(configManager);
   console.log('[Main] Logger initialized with file logging to ~/.crystal/logs');
-  
+
   // Use the same database path as the original backend
   const dbPath = configManager.getDatabasePath();
   databaseService = new DatabaseService(dbPath);
   databaseService.initialize();
-  
+
   sessionManager = new SessionManager(databaseService);
   sessionManager.initializeFromDatabase();
-  
+
   // Start permission IPC server
   console.log('[Main] Initializing Permission IPC server...');
   permissionIpcServer = new PermissionIpcServer();
   console.log('[Main] Starting Permission IPC server...');
-  
+
   let permissionIpcPath: string | null = null;
   try {
     await permissionIpcServer.start();
@@ -246,22 +275,24 @@ async function initializeServices() {
     console.error('[Main] Permission-based MCP will be disabled');
     permissionIpcServer = null;
   }
-  
+
   // Create worktree manager without a specific path
   worktreeManager = new WorktreeManager();
-  
+
   // Initialize the active project's worktree directory if one exists
   const activeProject = sessionManager.getActiveProject();
   if (activeProject) {
     await worktreeManager.initializeProject(activeProject.path);
   }
-  
+
   const { ClaudeCodeManager } = await import('./services/claudeCodeManager');
   claudeCodeManager = new ClaudeCodeManager(sessionManager, logger, configManager, permissionIpcPath);
   gitDiffManager = new GitDiffManager();
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
   runCommandManager = new RunCommandManager(databaseService);
+  stravuAuthManager = new StravuAuthManager(logger);
+  stravuNotebookService = new StravuNotebookService(stravuAuthManager, logger);
 
   taskQueue = new TaskQueue({
     sessionManager,
@@ -302,14 +333,14 @@ app.on('before-quit', async () => {
   if (taskQueue) {
     await taskQueue.close();
   }
-  
+
   // Stop permission IPC server
   if (permissionIpcServer) {
     console.log('[Main] Stopping permission IPC server...');
     await permissionIpcServer.stop();
     console.log('[Main] Permission IPC server stopped');
   }
-  
+
   // Close logger to ensure all logs are flushed
   if (logger) {
     logger.close();
@@ -351,7 +382,7 @@ function setupEventListeners() {
       data: output.data,
       timestamp: output.timestamp
     });
-    
+
     // Broadcast to renderer
     if (mainWindow) {
       // If it's a JSON message, also send a formatted stdout version
@@ -368,7 +399,7 @@ function setupEventListeners() {
           });
         }
       }
-      
+
       // Always send the original output (for Messages view)
       mainWindow.webContents.send('session:output', output);
     }
@@ -376,19 +407,19 @@ function setupEventListeners() {
 
   claudeCodeManager.on('spawned', async ({ sessionId }: { sessionId: string }) => {
     await sessionManager.updateSession(sessionId, { status: 'running' });
-    
+
     // Start execution tracking
     try {
       const session = await sessionManager.getSession(sessionId);
       if (session && session.worktreePath) {
         // Get the latest prompt from prompt markers or use the session prompt
         const promptMarkers = sessionManager.getPromptMarkers(sessionId);
-        const latestPrompt = promptMarkers.length > 0 
-          ? promptMarkers[promptMarkers.length - 1].prompt_text 
+        const latestPrompt = promptMarkers.length > 0
+          ? promptMarkers[promptMarkers.length - 1].prompt_text
           : session.prompt;
-        
+
         await executionTracker.startExecution(sessionId, session.worktreePath, undefined, latestPrompt);
-        
+
         // NOTE: Run commands are NOT started automatically when Claude spawns
         // They should only run when the user clicks the play button
       }
@@ -401,14 +432,14 @@ function setupEventListeners() {
     console.log(`Session ${sessionId} exited with code ${exitCode}, signal ${signal}`);
     await sessionManager.setSessionExitCode(sessionId, exitCode);
     await sessionManager.updateSession(sessionId, { status: 'stopped' });
-    
+
     // Stop run commands
     try {
       runCommandManager.stopRunCommands(sessionId);
     } catch (error) {
       console.error(`Failed to stop run commands for session ${sessionId}:`, error);
     }
-    
+
     // End execution tracking
     try {
       if (executionTracker.isTracking(sessionId)) {
@@ -422,14 +453,14 @@ function setupEventListeners() {
   claudeCodeManager.on('error', async ({ sessionId, error }: { sessionId: string; error: string }) => {
     console.log(`Session ${sessionId} encountered an error: ${error}`);
     await sessionManager.updateSession(sessionId, { status: 'error', error });
-    
+
     // Stop run commands on error
     try {
       runCommandManager.stopRunCommands(sessionId);
     } catch (stopError) {
       console.error(`Failed to stop run commands for session ${sessionId}:`, stopError);
     }
-    
+
     // Cancel execution tracking on error
     try {
       if (executionTracker.isTracking(sessionId)) {
@@ -523,7 +554,7 @@ ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) 
 
     const count = request.count || 1;
     console.log(`[IPC] Creating ${count} session(s) with prompt: "${request.prompt}"`);
-    
+
     if (count > 1) {
       console.log('[IPC] Creating multiple sessions...');
       const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode);
@@ -542,16 +573,16 @@ ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) 
   } catch (error) {
     console.error('[IPC] Failed to create session:', error);
     console.error('[IPC] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
+
     // Extract detailed error information
     let errorMessage = 'Failed to create session';
     let errorDetails = '';
     let command = '';
-    
+
     if (error instanceof Error) {
       errorMessage = error.message;
       errorDetails = error.stack || error.toString();
-      
+
       // Check if it's a git command error
       const gitError = error as any;
       if (gitError.gitCommand) {
@@ -559,7 +590,7 @@ ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) 
       } else if (gitError.cmd) {
         command = gitError.cmd;
       }
-      
+
       // Include git output if available
       if (gitError.gitOutput) {
         errorDetails = gitError.gitOutput;
@@ -567,9 +598,9 @@ ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) 
         errorDetails = gitError.stderr;
       }
     }
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: errorMessage,
       details: errorDetails,
       command: command
@@ -596,7 +627,7 @@ ipcMain.handle('sessions:input', async (_event, sessionId: string, input: string
       data: userInputDisplay,
       timestamp: new Date()
     });
-    
+
     claudeCodeManager.sendInput(sessionId, input);
     return { success: true };
   } catch (error) {
@@ -612,24 +643,24 @@ ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: s
     if (!session) {
       throw new Error('Session not found');
     }
-    
+
     // Get conversation history
     const conversationHistory = sessionManager.getConversationMessages(sessionId);
-    
+
     // If no prompt provided, use empty string (for resuming)
     const continuePrompt = prompt || '';
-    
+
     // Update session status to initializing
     sessionManager.updateSession(sessionId, { status: 'initializing' });
-    
+
     // Add the prompt to conversation history and prompt markers (if a prompt is provided)
     if (continuePrompt) {
       sessionManager.continueConversation(sessionId, continuePrompt);
     }
-    
+
     // Continue the session with the existing conversation
     await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory);
-    
+
     // The session manager will update status based on Claude output
     return { success: true };
   } catch (error) {
@@ -641,7 +672,7 @@ ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: s
 ipcMain.handle('sessions:get-output', async (_event, sessionId: string) => {
   try {
     const outputs = await sessionManager.getSessionOutputs(sessionId);
-    
+
     // Transform JSON messages to output format on the fly
     const { formatJsonForOutputEnhanced } = await import('./utils/toolFormatter');
     const transformedOutputs = outputs.map(output => {
@@ -663,7 +694,7 @@ ipcMain.handle('sessions:get-output', async (_event, sessionId: string) => {
       }
       return [output]; // Non-JSON outputs pass through
     }).flat();
-    
+
     return { success: true, data: transformedOutputs };
   } catch (error) {
     console.error('Failed to get session outputs:', error);
@@ -724,11 +755,11 @@ ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
     const project = sessionManager.getProjectForSession(sessionId);
     const mainBranch = project?.main_branch || 'main';
     const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
-    
+
     // Check for uncommitted changes
     const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
     const hasUncommittedChanges = uncommittedDiff.stats.filesChanged > 0;
-    
+
     // Transform commits to execution diff format for compatibility
     const executions: any[] = commits.map((commit, index) => ({
       id: index + 1,
@@ -744,7 +775,7 @@ ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
       after_commit_hash: commit.hash,
       timestamp: commit.date.toISOString()
     }));
-    
+
     // Add uncommitted changes as the first item if they exist
     if (hasUncommittedChanges) {
       executions.unshift({
@@ -782,7 +813,7 @@ ipcMain.handle('sessions:get-execution-diff', async (_event, sessionId: string, 
     const mainBranch = project?.main_branch || 'main';
     const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
     const executionIndex = parseInt(executionId) - 1;
-    
+
     if (executionIndex < 0 || executionIndex >= commits.length) {
       return { success: false, error: 'Invalid execution ID' };
     }
@@ -855,18 +886,18 @@ ipcMain.handle('dialog:open-file', async (_event, options?: Electron.OpenDialogO
     if (!mainWindow) {
       return { success: false, error: 'No main window available' };
     }
-    
+
     const defaultOptions: Electron.OpenDialogOptions = {
       properties: ['openFile'],
       ...options
     };
-    
+
     const result = await dialog.showOpenDialog(mainWindow, defaultOptions);
-    
+
     if (result.canceled) {
       return { success: true, data: null };
     }
-    
+
     return { success: true, data: result.filePaths[0] };
   } catch (error) {
     console.error('Failed to open file dialog:', error);
@@ -879,18 +910,18 @@ ipcMain.handle('dialog:open-directory', async (_event, options?: Electron.OpenDi
     if (!mainWindow) {
       return { success: false, error: 'No main window available' };
     }
-    
+
     const defaultOptions: Electron.OpenDialogOptions = {
       properties: ['openDirectory'],
       ...options
     };
-    
+
     const result = await dialog.showOpenDialog(mainWindow, defaultOptions);
-    
+
     if (result.canceled) {
       return { success: true, data: null };
     }
-    
+
     return { success: true, data: result.filePaths[0] };
   } catch (error) {
     console.error('Failed to open directory dialog:', error);
@@ -922,17 +953,17 @@ ipcMain.handle('projects:get-active', async () => {
 ipcMain.handle('projects:create', async (_event, projectData: any) => {
   try {
     console.log('[Main] Creating project:', projectData);
-    
+
     // Import fs and exec utilities
     const { mkdirSync, existsSync } = require('fs');
     const { execSync: nodeExecSync } = require('child_process');
-    
+
     // Create directory if it doesn't exist
     if (!existsSync(projectData.path)) {
       console.log('[Main] Creating directory:', projectData.path);
       mkdirSync(projectData.path, { recursive: true });
     }
-    
+
     // Check if it's a git repository
     let isGitRepo = false;
     try {
@@ -942,20 +973,20 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
     } catch (error) {
       console.log('[Main] Directory is not a git repository, initializing...');
     }
-    
+
     // Initialize git if needed
     if (!isGitRepo) {
       try {
         // Use the specified main branch name if provided
         const branchName = projectData.mainBranch || 'main';
-        
+
         nodeExecSync(`cd "${projectData.path}" && git init`, { encoding: 'utf-8' });
         console.log('[Main] Git repository initialized successfully');
-        
+
         // Create and checkout the specified branch
         nodeExecSync(`cd "${projectData.path}" && git checkout -b ${branchName}`, { encoding: 'utf-8' });
         console.log(`[Main] Created and checked out branch: ${branchName}`);
-        
+
         // Create initial commit
         nodeExecSync(`cd "${projectData.path}" && git commit -m "Initial commit" --allow-empty`, { encoding: 'utf-8' });
         console.log('[Main] Created initial empty commit');
@@ -964,7 +995,7 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
         // Continue anyway - let the user handle git setup manually if needed
       }
     }
-    
+
     // Detect or use the provided main branch
     let mainBranch: string | undefined = projectData.mainBranch;
     if (!mainBranch && isGitRepo) {
@@ -985,7 +1016,7 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
       mainBranch,
       projectData.buildScript
     );
-    
+
     // If run_script was provided, also create run commands
     if (projectData.runScript && project) {
       const commands = projectData.runScript.split('\n').filter((cmd: string) => cmd.trim());
@@ -998,27 +1029,27 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
         );
       });
     }
-    
+
     console.log('[Main] Project created successfully:', project);
     return { success: true, data: project };
   } catch (error) {
     console.error('[Main] Failed to create project:', error);
-    
+
     // Extract detailed error information
     let errorMessage = 'Failed to create project';
     let errorDetails = '';
     let command = '';
-    
+
     if (error instanceof Error) {
       errorMessage = error.message;
       errorDetails = error.stack || error.toString();
-      
+
       // Check if it's a command error
       const cmdError = error as any;
       if (cmdError.cmd) {
         command = cmdError.cmd;
       }
-      
+
       // Include command output if available
       if (cmdError.stderr) {
         errorDetails = cmdError.stderr;
@@ -1026,9 +1057,9 @@ ipcMain.handle('projects:create', async (_event, projectData: any) => {
         errorDetails = cmdError.stdout;
       }
     }
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: errorMessage,
       details: errorDetails,
       command: command
@@ -1054,14 +1085,14 @@ ipcMain.handle('projects:update', async (_event, projectId: string, updates: any
   try {
     // Update the project
     const project = databaseService.updateProject(parseInt(projectId), updates);
-    
+
     // If run_script was updated, also update the run commands table
     if (updates.run_script !== undefined) {
       const projectIdNum = parseInt(projectId);
-      
+
       // Delete existing run commands
       databaseService.deleteProjectRunCommands(projectIdNum);
-      
+
       // Add new run commands from the multiline script
       if (updates.run_script) {
         const commands = updates.run_script.split('\n').filter((cmd: string) => cmd.trim());
@@ -1075,7 +1106,7 @@ ipcMain.handle('projects:update', async (_event, projectId: string, updates: any
         });
       }
     }
-    
+
     return { success: true, data: project };
   } catch (error) {
     console.error('Failed to update project:', error);
@@ -1182,10 +1213,10 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
     const project = sessionManager.getProjectForSession(sessionId);
     const mainBranch = project?.main_branch || 'main';
     const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
-    
+
     if (!commits.length) {
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: {
           diff: '',
           stats: { additions: 0, deletions: 0, filesChanged: 0 },
@@ -1197,13 +1228,13 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
     // If we have a range selection (2 IDs), use git diff between them
     if (executionIds && executionIds.length === 2) {
       const sortedIds = [...executionIds].sort((a, b) => a - b);
-      
+
       // Handle range that includes uncommitted changes
       if (sortedIds[0] === 0 || sortedIds[1] === 0) {
         // If uncommitted is in the range, get diff from the other commit to working directory
         const commitId = sortedIds[0] === 0 ? sortedIds[1] : sortedIds[0];
         const commitIndex = commitId - 1;
-        
+
         if (commitIndex >= 0 && commitIndex < commits.length) {
           const fromCommit = commits[commitIndex];
           // Get diff from commit to working directory (includes uncommitted changes)
@@ -1211,18 +1242,18 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
             `git diff ${fromCommit.hash}`,
             { cwd: session.worktreePath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
           );
-          
+
           const stats = gitDiffManager.parseDiffStats(
             execSync(`git diff --stat ${fromCommit.hash}`, { cwd: session.worktreePath, encoding: 'utf8' })
           );
-          
+
           const changedFiles = execSync(
             `git diff --name-only ${fromCommit.hash}`,
             { cwd: session.worktreePath, encoding: 'utf8' }
           ).trim().split('\n').filter(Boolean);
-          
-          return { 
-            success: true, 
+
+          return {
+            success: true,
             data: {
               diff,
               stats,
@@ -1233,22 +1264,22 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
           };
         }
       }
-      
+
       // For regular commit ranges, we want to show all changes introduced by the selected commits
       // - Commits are stored newest first (index 0 = newest)
       // - User selects from older to newer visually
       // - We need to go back one commit before the older selection to show all changes
       const newerIndex = sortedIds[0] - 1;   // Lower ID = newer commit
       const olderIndex = sortedIds[1] - 1;   // Higher ID = older commit
-      
+
       if (newerIndex >= 0 && newerIndex < commits.length && olderIndex >= 0 && olderIndex < commits.length) {
         const newerCommit = commits[newerIndex]; // Newer commit
         const olderCommit = commits[olderIndex]; // Older commit
-        
+
         // To show all changes introduced by the selected commits, we diff from
         // the parent of the older commit to the newer commit
         let fromCommitHash: string;
-        
+
         try {
           // Try to get the parent of the older commit
           const parentHash = execSync(`git rev-parse ${olderCommit.hash}^`, {
@@ -1260,7 +1291,7 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
           // If there's no parent (initial commit), use git's empty tree hash
           fromCommitHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
         }
-        
+
         // Use git diff to show all changes from before the range to the newest selected commit
         const diff = await gitDiffManager.captureCommitDiff(
           session.worktreePath,
@@ -1274,8 +1305,8 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
     // If no specific execution IDs are provided, get diff from first to last commit
     if (!executionIds || executionIds.length === 0) {
       if (commits.length === 0) {
-        return { 
-          success: true, 
+        return {
+          success: true,
           data: {
             diff: '',
             stats: { additions: 0, deletions: 0, filesChanged: 0 },
@@ -1283,17 +1314,17 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
           }
         };
       }
-      
+
       // For a single commit, show the commit's own changes
       if (commits.length === 1) {
         const diff = gitDiffManager.getCommitDiff(session.worktreePath, commits[0].hash);
         return { success: true, data: diff };
       }
-      
+
       // For multiple commits, get diff from parent of first commit to HEAD (all changes)
       const firstCommit = commits[commits.length - 1]; // Oldest commit
       let fromCommitHash: string;
-      
+
       try {
         // Try to get the parent of the first commit
         fromCommitHash = execSync(`git rev-parse ${firstCommit.hash}^`, {
@@ -1304,7 +1335,7 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
         // If there's no parent (initial commit), use git's empty tree hash
         fromCommitHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
       }
-      
+
       const diff = await gitDiffManager.captureCommitDiff(
         session.worktreePath,
         fromCommitHash,
@@ -1318,14 +1349,14 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
       const sortedIds = [...executionIds].sort((a, b) => a - b);
       const firstId = sortedIds[sortedIds.length - 1]; // Highest ID = oldest commit
       const lastId = sortedIds[0]; // Lowest ID = newest commit
-      
+
       const fromIndex = firstId - 1;
       const toIndex = lastId - 1;
-      
+
       if (fromIndex >= 0 && fromIndex < commits.length && toIndex >= 0 && toIndex < commits.length) {
         const fromCommit = commits[fromIndex]; // Oldest selected
         const toCommit = commits[toIndex]; // Newest selected
-        
+
         const diff = await gitDiffManager.captureCommitDiff(
           session.worktreePath,
           fromCommit.hash,
@@ -1346,8 +1377,8 @@ ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, e
     }
 
     // Fallback to empty diff
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         diff: '',
         stats: { additions: 0, deletions: 0, filesChanged: 0 },
@@ -1379,16 +1410,16 @@ ipcMain.handle('sessions:rebase-main-into-worktree', async (_event, sessionId: s
     }
 
     const mainBranch = project.main_branch || 'main';
-    
+
     await worktreeManager.rebaseMainIntoWorktree(session.worktreePath, mainBranch);
-    
+
     return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
   } catch (error: any) {
     console.error('Failed to rebase main into worktree:', error);
-    
+
     // Pass detailed git error information to frontend
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to rebase main into worktree',
       gitError: {
         command: error.gitCommand,
@@ -1418,16 +1449,16 @@ ipcMain.handle('sessions:squash-and-rebase-to-main', async (_event, sessionId: s
     }
 
     const mainBranch = project.main_branch || 'main';
-    
+
     await worktreeManager.squashAndRebaseWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage);
-    
+
     return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
   } catch (error: any) {
     console.error('Failed to squash and rebase worktree to main:', error);
-    
+
     // Pass detailed git error information to frontend
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to squash and rebase worktree to main',
       gitError: {
         commands: error.gitCommands,
@@ -1455,7 +1486,7 @@ ipcMain.handle('sessions:has-changes-to-rebase', async (_event, sessionId: strin
 
     const mainBranch = project.main_branch || 'main';
     const hasChanges = await worktreeManager.hasChangesToRebase(session.worktreePath, mainBranch);
-    
+
     return { success: true, data: hasChanges };
   } catch (error) {
     console.error('Failed to check for changes to rebase:', error);
@@ -1476,22 +1507,22 @@ ipcMain.handle('sessions:get-git-commands', async (_event, sessionId: string) =>
     }
 
     const mainBranch = project.main_branch || 'main';
-    
+
     // Get current branch name
     const { execSync } = require('child_process');
     const currentBranch = execSync(`cd "${session.worktreePath}" && git branch --show-current`, { encoding: 'utf8' }).trim();
-    
+
     const rebaseCommands = worktreeManager.generateRebaseCommands(mainBranch);
     const squashCommands = worktreeManager.generateSquashCommands(mainBranch, currentBranch);
-    
-    return { 
-      success: true, 
-      data: { 
-        rebaseCommands, 
+
+    return {
+      success: true,
+      data: {
+        rebaseCommands,
         squashCommands,
         mainBranch,
         currentBranch
-      } 
+      }
     };
   } catch (error) {
     console.error('Failed to get git commands:', error);
@@ -1517,6 +1548,128 @@ ipcMain.handle('prompts:get-by-id', async (_event, promptId: string) => {
   } catch (error) {
     console.error('Failed to get prompt by id:', error);
     return { success: false, error: 'Failed to get prompt by id' };
+  }
+});
+
+// System utilities
+ipcMain.handle('openExternal', async (_event, url: string) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open external URL:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to open URL' };
+  }
+});
+
+// Stravu OAuth integration handlers
+ipcMain.handle('stravu:get-connection-status', async () => {
+  try {
+    const connectionState = stravuAuthManager.getConnectionState();
+    return { success: true, data: connectionState };
+  } catch (error) {
+    console.error('Failed to get Stravu connection status:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to get connection status' };
+  }
+});
+
+ipcMain.handle('stravu:initiate-auth', async () => {
+  try {
+    const result = await stravuAuthManager.authenticate();
+    return {
+      success: true,
+      data: {
+        authUrl: stravuAuthManager.getCurrentSession()?.authUrl,
+        sessionId: stravuAuthManager.getCurrentSession()?.sessionId
+      }
+    };
+  } catch (error) {
+    console.error('Failed to initiate Stravu authentication:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to initiate authentication' };
+  }
+});
+
+ipcMain.handle('stravu:check-auth-status', async (_event, sessionId: string) => {
+  try {
+    const result = await stravuAuthManager.pollForCompletion(sessionId);
+
+    if (result.status === 'pending') {
+      return { success: true, data: { status: 'pending' } };
+    } else {
+      return {
+        success: true,
+        data: {
+          status: 'completed',
+          memberInfo: {
+            memberId: result.memberId || '',
+            orgSlug: result.orgSlug || '',
+            scopes: result.scopes || []
+          }
+        }
+      };
+    }
+  } catch (error) {
+    console.error('Failed to check Stravu auth status:', error);
+    return {
+      success: true,
+      data: {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Authentication failed'
+      }
+    };
+  }
+});
+
+ipcMain.handle('stravu:disconnect', async () => {
+  try {
+    await stravuAuthManager.disconnect();
+    stravuNotebookService.clearCache();
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to disconnect from Stravu:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to disconnect' };
+  }
+});
+
+ipcMain.handle('stravu:get-notebooks', async () => {
+  try {
+    if (!stravuAuthManager.isConnected()) {
+      return { success: false, error: 'Not connected to Stravu' };
+    }
+
+    const notebooks = await stravuNotebookService.getNotebooks();
+    return { success: true, data: notebooks };
+  } catch (error) {
+    console.error('Failed to get Stravu notebooks:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to get notebooks' };
+  }
+});
+
+ipcMain.handle('stravu:get-notebook', async (_event, notebookId: string) => {
+  try {
+    if (!stravuAuthManager.isConnected()) {
+      return { success: false, error: 'Not connected to Stravu' };
+    }
+
+    const notebook = await stravuNotebookService.getNotebookContent(notebookId);
+    return { success: true, data: notebook };
+  } catch (error) {
+    console.error('Failed to get Stravu notebook:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to get notebook' };
+  }
+});
+
+ipcMain.handle('stravu:search-notebooks', async (_event, query: string, limit?: number) => {
+  try {
+    if (!stravuAuthManager.isConnected()) {
+      return { success: false, error: 'Not connected to Stravu' };
+    }
+
+    const results = await stravuNotebookService.searchNotebooks(query, limit);
+    return { success: true, data: results };
+  } catch (error) {
+    console.error('Failed to search Stravu notebooks:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to search notebooks' };
   }
 });
 

@@ -19,7 +19,9 @@ export class ConfigManager extends EventEmitter {
       anthropicApiKey: undefined,
       systemPromptAppend: undefined,
       runScript: undefined,
-      defaultPermissionMode: 'ignore'
+      defaultPermissionMode: 'ignore',
+      stravuApiKey: undefined,
+      stravuServerUrl: 'https://api.stravu.com'
     };
   }
 
@@ -74,5 +76,13 @@ export class ConfigManager extends EventEmitter {
 
   getRunScript(): string[] | undefined {
     return this.config.runScript;
+  }
+
+  getStravuApiKey(): string | undefined {
+    return this.config.stravuApiKey;
+  }
+
+  getStravuServerUrl(): string {
+    return this.config.stravuServerUrl || 'https://api.stravu.com';
   }
 }

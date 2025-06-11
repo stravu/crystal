@@ -6,4 +6,6 @@ export interface AppConfig {
   runScript?: string[];
   claudeExecutablePath?: string;
   defaultPermissionMode?: 'approve' | 'ignore';
+  stravuApiKey?: string;
+  stravuServerUrl?: string;
 }

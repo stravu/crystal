@@ -64,3 +64,7 @@ body {
 .animate-typing-dot {
   animation: typing-dots 1.5s ease-in-out infinite;
 }
+
+.xterm .xterm-screen {
+  margin: 6px;
+}

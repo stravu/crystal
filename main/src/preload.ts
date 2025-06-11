@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
 
+  // System utilities
+  openExternal: (url: string): Promise<IPCResponse> => ipcRenderer.invoke('openExternal', url),
+
   // Session management
   sessions: {
     getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-all'),
@@ -86,6 +89,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getPending: (): Promise<IPCResponse> => ipcRenderer.invoke('permission:getPending'),
   },
 
+  // Stravu OAuth integration
+  stravu: {
+    getConnectionStatus: (): Promise<IPCResponse> => ipcRenderer.invoke('stravu:get-connection-status'),
+    initiateAuth: (): Promise<IPCResponse> => ipcRenderer.invoke('stravu:initiate-auth'),
+    checkAuthStatus: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('stravu:check-auth-status', sessionId),
+    disconnect: (): Promise<IPCResponse> => ipcRenderer.invoke('stravu:disconnect'),
+    getNotebooks: (): Promise<IPCResponse> => ipcRenderer.invoke('stravu:get-notebooks'),
+    getNotebook: (notebookId: string): Promise<IPCResponse> => ipcRenderer.invoke('stravu:get-notebook', notebookId),
+    searchNotebooks: (query: string, limit?: number): Promise<IPCResponse> => ipcRenderer.invoke('stravu:search-notebooks', query, limit),
+  },
+
   // Event listeners for real-time updates
   events: {
     // Session events
@@ -127,8 +141,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 });
 
-// Expose electron event listeners for permission requests
+// Expose electron event listeners and utilities for permission requests
 contextBridge.exposeInMainWorld('electron', {
+  openExternal: (url: string) => ipcRenderer.invoke('openExternal', url),
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = ['permission:request'];
     if (validChannels.includes(channel)) {
