@@ -73,15 +73,27 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   addSessionOutput: (output) => set((state) => {
     console.log(`[SessionStore] Adding output for session ${output.sessionId}, type: ${output.type}`);
-    return {
-      sessions: state.sessions.map(session => 
-        session.id === output.sessionId
-          ? output.type === 'json'
-            ? { ...session, jsonMessages: [...(session.jsonMessages || []), {...output.data, timestamp: output.timestamp}] }
-            : { ...session, output: [...session.output, output.data] }
-          : session
-      )
-    };
+    
+    // Find the target session index for more efficient updates
+    const sessionIndex = state.sessions.findIndex(s => s.id === output.sessionId);
+    if (sessionIndex === -1) return state;
+    
+    const sessions = [...state.sessions];
+    const session = sessions[sessionIndex];
+    
+    if (output.type === 'json') {
+      // Use more efficient array update for JSON messages
+      const newJsonMessages = session.jsonMessages || [];
+      newJsonMessages.push({...output.data, timestamp: output.timestamp});
+      sessions[sessionIndex] = { ...session, jsonMessages: newJsonMessages };
+    } else {
+      // Use more efficient array update for regular output
+      const newOutput = [...session.output];
+      newOutput.push(output.data);
+      sessions[sessionIndex] = { ...session, output: newOutput };
+    }
+    
+    return { sessions };
   }),
   
   setSessionOutput: (sessionId, output) => set((state) => ({

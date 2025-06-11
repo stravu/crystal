@@ -77,24 +77,30 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
 
     fetchPrompts();
     
-    // Refresh prompts every 5 seconds while session is active
-    const interval = setInterval(fetchPrompts, 5000);
-    return () => clearInterval(interval);
-  }, [sessionId]);
+    // Only refresh prompts when session status changes, not on a timer
+    // This reduces unnecessary API calls from every 5 seconds to only when needed
+  }, [sessionId, activeSession?.status]);
 
-  // Update timer for ongoing prompts
+  // Use requestAnimationFrame for smooth UI updates instead of setInterval
   useEffect(() => {
     if (!activeSession || (activeSession.status !== 'running' && activeSession.status !== 'waiting')) {
       return;
     }
 
-    // Force re-render every second to update ongoing duration
-    const timer = setInterval(() => {
-      // Force component re-render by updating a dummy state
-      setPrompts(prev => [...prev]);
-    }, 1000);
+    let animationId: number;
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 5000; // Update every 5 seconds instead of every second
 
-    return () => clearInterval(timer);
+    const updateOngoingDuration = (timestamp: number) => {
+      if (timestamp - lastUpdate >= UPDATE_INTERVAL) {
+        setPrompts(prev => [...prev]); // Force re-render for duration updates
+        lastUpdate = timestamp;
+      }
+      animationId = requestAnimationFrame(updateOngoingDuration);
+    };
+
+    animationId = requestAnimationFrame(updateOngoingDuration);
+    return () => cancelAnimationFrame(animationId);
   }, [activeSession?.status]);
 
   const handlePromptClick = (marker: PromptMarker) => {

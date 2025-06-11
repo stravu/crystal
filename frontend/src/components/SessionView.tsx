@@ -547,10 +547,15 @@ export function SessionView() {
     let resizeObserver: ResizeObserver | null = null;
     
     if (terminalRef.current) {
+      // Debounce resize events to prevent excessive calls
+      let resizeTimer: NodeJS.Timeout;
       resizeObserver = new ResizeObserver(() => {
-        if (fitAddon.current && terminalInstance.current && viewMode === 'output') {
-          fitAddon.current.fit();
-        }
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (fitAddon.current && terminalInstance.current && viewMode === 'output') {
+            fitAddon.current.fit();
+          }
+        }, 100);
       });
       resizeObserver.observe(terminalRef.current);
     }
@@ -560,17 +565,22 @@ export function SessionView() {
         resizeObserver.disconnect();
       }
     };
-  }, [viewMode]);
+  }, [terminalRef.current, viewMode]); // Only recreate when refs change, not viewMode
 
   // Use ResizeObserver for script terminal
   useEffect(() => {
     let resizeObserver: ResizeObserver | null = null;
     
     if (scriptTerminalRef.current) {
+      // Debounce resize events to prevent excessive calls
+      let resizeTimer: NodeJS.Timeout;
       resizeObserver = new ResizeObserver(() => {
-        if (scriptFitAddon.current && scriptTerminalInstance.current && viewMode === 'terminal') {
-          scriptFitAddon.current.fit();
-        }
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (scriptFitAddon.current && scriptTerminalInstance.current && viewMode === 'terminal') {
+            scriptFitAddon.current.fit();
+          }
+        }, 100);
       });
       resizeObserver.observe(scriptTerminalRef.current);
     }
@@ -580,7 +590,7 @@ export function SessionView() {
         resizeObserver.disconnect();
       }
     };
-  }, [viewMode]);
+  }, [scriptTerminalRef.current, viewMode]); // Only recreate when refs change, not viewMode
   
   // Track changes in messages and mark as unread if not viewing
   useEffect(() => {
@@ -610,10 +620,10 @@ export function SessionView() {
         setStartTime(sessionStartTime);
       }
       
-      // Update elapsed time every second
+      // Update elapsed time every 5 seconds instead of every second to reduce CPU usage
       const interval = setInterval(() => {
         setElapsedTime(Math.floor((Date.now() - sessionStartTime) / 1000));
-      }, 1000);
+      }, 5000);
       
       return () => clearInterval(interval);
     } else {
