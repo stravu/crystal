@@ -600,6 +600,16 @@ ipcMain.handle('sessions:stop', async (_event, sessionId: string) => {
   }
 });
 
+ipcMain.handle('sessions:generate-name', async (_event, prompt: string) => {
+  try {
+    const name = await worktreeNameGenerator.generateWorktreeName(prompt);
+    return { success: true, data: name };
+  } catch (error) {
+    console.error('Failed to generate session name:', error);
+    return { success: false, error: 'Failed to generate session name' };
+  }
+});
+
 // Git and execution handlers
 ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
   try {

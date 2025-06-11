@@ -51,6 +51,7 @@ interface ElectronAPI {
     squashAndRebaseToMain: (sessionId: string, commitMessage: string) => Promise<IPCResponse>;
     hasChangesToRebase: (sessionId: string) => Promise<IPCResponse>;
     getGitCommands: (sessionId: string) => Promise<IPCResponse>;
+    generateName: (prompt: string) => Promise<IPCResponse>;
   };
 
   // Project management

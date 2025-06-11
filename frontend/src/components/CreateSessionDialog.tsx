@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
-import { Shield, ShieldOff } from 'lucide-react';
+import { Shield, ShieldOff, Sparkles } from 'lucide-react';
 
 interface CreateSessionDialogProps {
   isOpen: boolean;
@@ -17,28 +17,78 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
     permissionMode: 'ignore'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [worktreeError, setWorktreeError] = useState<string | null>(null);
+  const [isGeneratingName, setIsGeneratingName] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
   const { showError } = useErrorStore();
   
   useEffect(() => {
     if (isOpen) {
-      // Fetch the default permission mode when dialog opens
+      // Fetch the default permission mode and check for API key when dialog opens
       API.config.get().then(response => {
-        if (response.success && response.data?.defaultPermissionMode) {
-          setFormData(prev => ({
-            ...prev,
-            permissionMode: response.data.defaultPermissionMode
-          }));
+        if (response.success) {
+          if (response.data?.defaultPermissionMode) {
+            setFormData(prev => ({
+              ...prev,
+              permissionMode: response.data.defaultPermissionMode
+            }));
+          }
+          // Check if API key exists
+          setHasApiKey(!!response.data?.anthropicApiKey);
         }
       }).catch(err => {
-        console.error('Failed to fetch default permission mode:', err);
+        console.error('Failed to fetch config:', err);
       });
     }
   }, [isOpen]);
   
   if (!isOpen) return null;
   
+  const validateWorktreeName = (name: string): string | null => {
+    if (!name) return null; // Empty is allowed
+    
+    // Check for spaces
+    if (name.includes(' ')) {
+      return 'Session name cannot contain spaces';
+    }
+    
+    // Check for invalid git characters
+    const invalidChars = /[~^:?*\[\]\\]/;
+    if (invalidChars.test(name)) {
+      return 'Session name contains invalid characters (~^:?*[]\\)';
+    }
+    
+    // Check if it starts or ends with dot
+    if (name.startsWith('.') || name.endsWith('.')) {
+      return 'Session name cannot start or end with a dot';
+    }
+    
+    // Check if it starts or ends with slash
+    if (name.startsWith('/') || name.endsWith('/')) {
+      return 'Session name cannot start or end with a slash';
+    }
+    
+    // Check for consecutive dots
+    if (name.includes('..')) {
+      return 'Session name cannot contain consecutive dots';
+    }
+    
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate worktree name
+    const validationError = validateWorktreeName(formData.worktreeTemplate || '');
+    if (validationError) {
+      showError({
+        title: 'Invalid Session Name',
+        error: validationError
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
@@ -60,7 +110,8 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
       const defaultPermissionMode = configResponse.success && configResponse.data?.defaultPermissionMode 
         ? configResponse.data.defaultPermissionMode 
         : 'ignore';
-      setFormData({ prompt: '', worktreeTemplate: '', count: 1, permissionMode: defaultPermissionMode });
+      setFormData({ prompt: '', worktreeTemplate: '', count: 1, permissionMode: defaultPermissionMode as 'ignore' | 'approve' });
+      setWorktreeError(null);
     } catch (error: any) {
       console.error('Error creating session:', error);
       showError({
@@ -96,18 +147,67 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
           
           <div>
             <label htmlFor="worktreeTemplate" className="block text-sm font-medium text-gray-700 mb-1">
-              Worktree Name Template (Optional)
+              Session Name (Optional)
             </label>
-            <input
-              id="worktreeTemplate"
-              type="text"
-              value={formData.worktreeTemplate}
-              onChange={(e) => setFormData({ ...formData, worktreeTemplate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              placeholder="Leave empty for auto-generated name"
-            />
+            <div className="flex gap-2">
+              <input
+                id="worktreeTemplate"
+                type="text"
+                value={formData.worktreeTemplate}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({ ...formData, worktreeTemplate: value });
+                  // Real-time validation
+                  const error = validateWorktreeName(value);
+                  setWorktreeError(error);
+                }}
+                className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 bg-white ${
+                  worktreeError 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                placeholder="Leave empty for AI-generated name"
+                disabled={isGeneratingName}
+              />
+              {hasApiKey && formData.prompt.trim() && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsGeneratingName(true);
+                    try {
+                      const response = await API.sessions.generateName(formData.prompt);
+                      if (response.success && response.data) {
+                        setFormData({ ...formData, worktreeTemplate: response.data });
+                        setWorktreeError(null);
+                      } else {
+                        showError({
+                          title: 'Failed to Generate Name',
+                          error: response.error || 'Could not generate session name'
+                        });
+                      }
+                    } catch (error) {
+                      showError({
+                        title: 'Failed to Generate Name',
+                        error: 'An error occurred while generating the name'
+                      });
+                    } finally {
+                      setIsGeneratingName(false);
+                    }
+                  }}
+                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  disabled={isGeneratingName || !formData.prompt.trim()}
+                  title="Generate name from prompt"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {isGeneratingName ? 'Generating...' : 'Generate'}
+                </button>
+              )}
+            </div>
+            {worktreeError && (
+              <p className="text-xs text-red-600 mt-1">{worktreeError}</p>
+            )}
             <p className="text-xs text-gray-500 mt-1">
-              Names are auto-generated using AI based on your prompt. You can override by entering a custom name.
+              {!worktreeError && 'The name that will be used to label your session and create your worktree folder.'}
             </p>
           </div>
           
@@ -173,7 +273,10 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                setWorktreeError(null);
+                onClose();
+              }}
               className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
               disabled={isSubmitting}
             >
@@ -182,7 +285,7 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!worktreeError}
             >
               {isSubmitting ? 'Creating...' : 'Create'}
             </button>
