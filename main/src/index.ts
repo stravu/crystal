@@ -311,7 +311,7 @@ async function initializeServices() {
   // Set up IPC event listeners for real-time updates
   setupEventListeners();
 
-  // Start periodic version checking
+  // Start periodic version checking (only if enabled in settings)
   versionChecker.startPeriodicCheck();
 }
 
@@ -321,6 +321,12 @@ app.whenReady().then(async () => {
   console.log('[Main] Services initialized, creating window...');
   await createWindow();
   console.log('[Main] Window created successfully');
+
+  // Check for updates after window is created
+  setTimeout(async () => {
+    console.log('[Main] Performing startup version check...');
+    await versionChecker.checkOnStartup();
+  }, 1000); // Small delay to ensure window is fully ready
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -522,7 +528,24 @@ function setupEventListeners() {
   // Listen for version update events
   process.on('version-update-available', (versionInfo: VersionInfo) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      // Send to renderer for notification
       mainWindow.webContents.send('version:update-available', versionInfo);
+
+      // Show native dialog popup
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Available',
+        message: `Crystal v${versionInfo.latest} is now available!`,
+        detail: `You're currently running v${versionInfo.current}. Would you like to view the release notes and download the update?`,
+        buttons: ['View Release', 'Remind Me Later'],
+        defaultId: 0,
+        cancelId: 1
+      }).then((result) => {
+        if (result.response === 0 && versionInfo.releaseUrl) {
+          // Open release page in default browser
+          shell.openExternal(versionInfo.releaseUrl);
+        }
+      });
     }
   });
 }

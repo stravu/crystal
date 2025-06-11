@@ -81,20 +81,33 @@ export class VersionChecker {
     }
   }
 
+  public async checkOnStartup(): Promise<void> {
+    this.logger.info(`[Version Checker] Performing startup version check`);
+    
+    try {
+      const versionInfo = await this.checkForUpdates();
+      
+      if (versionInfo.hasUpdate) {
+        this.logger.info(`[Version Checker] Update available on startup: ${versionInfo.latest}`);
+        // Emit event for UI notification
+        (process as any).emit('version-update-available', versionInfo);
+      }
+    } catch (error) {
+      this.logger.error(`[Version Checker] Startup check failed:`, error as Error);
+    }
+  }
+
   public startPeriodicCheck(): void {
     // Check if auto-updates are enabled in config
     const config = this.configManager.getConfig();
     if (config.autoCheckUpdates === false) {
-      this.logger.info(`[Version Checker] Auto-update checking is disabled`);
+      this.logger.info(`[Version Checker] Auto-update checking is disabled, skipping periodic checks`);
       return;
     }
 
     this.logger.info(`[Version Checker] Starting periodic version checks (every 24 hours)`);
     
-    // Check immediately on startup
-    this.performCheck();
-    
-    // Set up periodic checks
+    // Set up periodic checks (don't check immediately since we do that on startup)
     this.checkTimeout = setInterval(() => {
       this.performCheck();
     }, this.checkIntervalMs);
