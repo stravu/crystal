@@ -217,24 +217,15 @@ export function CreateSessionDialog({ isOpen, onClose }: CreateSessionDialogProp
             </label>
             <input
               id="count"
-              type="text"
+              type="number"
+              min="1"
+              max="10"
               value={formData.count}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Allow only numbers
-                if (!/^\d*$/.test(value)) return;
-                
-                const num = parseInt(value) || 0;
-                // Limit to 10
-                if (num > 10) return;
-                
-                setFormData({ ...formData, count: num || 1 });
-              }}
+              onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-              placeholder="1"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Creates multiple sessions with numbered suffixes (max 10)
+              Creates multiple sessions with numbered suffixes
             </p>
           </div>
           
