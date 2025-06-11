@@ -16,7 +16,7 @@ export class PermissionIpcServer {
     let socketDir: string;
     try {
       const homeDir = os.homedir();
-      socketDir = path.join(homeDir, '.crystal-mcp', 'sockets');
+      socketDir = path.join(homeDir, '.crystal', 'sockets');
       
       // Ensure the directory exists
       if (!fs.existsSync(socketDir)) {
@@ -37,11 +37,8 @@ export class PermissionIpcServer {
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log(`[Permission IPC] Starting server with socket path: ${this.socketPath}`);
-      
       // Clean up any existing socket file
       if (fs.existsSync(this.socketPath)) {
-        console.log('[Permission IPC] Removing existing socket file');
         fs.unlinkSync(this.socketPath);
       }
 
@@ -49,7 +46,6 @@ export class PermissionIpcServer {
         const clientId = `${Date.now()}-${Math.random()}`;
         this.clients.set(clientId, client);
         
-        console.log('[Permission IPC] Client connected:', clientId);
 
         client.on('data', async (data) => {
           try {
@@ -58,11 +54,6 @@ export class PermissionIpcServer {
             if (message.type === 'permission-request') {
               const { requestId, sessionId, toolName, input } = message;
               
-              console.log('[Permission IPC] Received permission request:', {
-                requestId,
-                sessionId,
-                toolName
-              });
               
               try {
                 // Request permission from the frontend
@@ -101,7 +92,6 @@ export class PermissionIpcServer {
 
         client.on('close', () => {
           this.clients.delete(clientId);
-          console.log('[Permission IPC] Client disconnected:', clientId);
         });
       });
 
@@ -111,16 +101,6 @@ export class PermissionIpcServer {
       });
 
       this.server.listen(this.socketPath, () => {
-        console.log('[Permission IPC] Server listening on:', this.socketPath);
-        
-        // Verify socket file exists
-        if (fs.existsSync(this.socketPath)) {
-          console.log('[Permission IPC] Socket file created successfully');
-          const stats = fs.statSync(this.socketPath);
-          console.log('[Permission IPC] Socket file mode:', stats.mode.toString(8));
-        } else {
-          console.error('[Permission IPC] WARNING: Socket file not found after server started');
-        }
         
         resolve();
       });

@@ -17,39 +17,10 @@ import os from 'os';
 const sessionId = process.argv[2];
 const ipcPath = process.argv[3];
 
-// Write debug logs to a file for debugging
-const logDir = path.join(os.homedir(), '.crystal-mcp');
-const logFile = path.join(logDir, `bridge-${sessionId}.log`);
-
-// Ensure log directory exists
-try {
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
-} catch (e) {
-  // Ignore errors creating log directory
-}
-
-const log = (message: string) => {
-  const timestamp = new Date().toISOString();
-  const logMessage = `${timestamp} ${message}\n`;
-  try {
-    fs.appendFileSync(logFile, logMessage);
-  } catch (e) {
-    // Ignore file write errors
-  }
-  console.error(`[MCP Bridge] ${message}`);
-};
-
-log(`Starting with args: ${process.argv.join(' ')}`);
-log(`Session ID: ${sessionId}`);
-log(`IPC Path: ${ipcPath}`);
-log(`Process PID: ${process.pid}`);
-log(`Node version: ${process.version}`);
 
 if (!sessionId || !ipcPath) {
-  log('ERROR: Missing required arguments');
-  log('Usage: node mcpPermissionBridge.js <sessionId> <ipcPath>');
+  console.error('[MCP Bridge] ERROR: Missing required arguments');
+  console.error('[MCP Bridge] Usage: node mcpPermissionBridge.js <sessionId> <ipcPath>');
   process.exit(1);
 }
 
@@ -58,17 +29,15 @@ let ipcClient: net.Socket | null = null;
 let pendingRequests = new Map<string, (response: any) => void>();
 
 function connectToMainProcess() {
-  log(`Attempting to connect to IPC socket: ${ipcPath}`);
   ipcClient = net.createConnection(ipcPath);
   
   ipcClient.on('connect', () => {
-    log(`Connected to main process for session ${sessionId}`);
+    // Connected successfully
   });
   
   ipcClient.on('data', (data) => {
     try {
       const message = JSON.parse(data.toString());
-      log(`Received IPC message: ${JSON.stringify(message)}`);
       if (message.type === 'permission-response' && message.requestId) {
         const resolver = pendingRequests.get(message.requestId);
         if (resolver) {
@@ -77,16 +46,15 @@ function connectToMainProcess() {
         }
       }
     } catch (error) {
-      log(`Error parsing IPC message: ${error}`);
+      console.error(`[MCP Bridge] Error parsing IPC message: ${error}`);
     }
   });
   
   ipcClient.on('error', (error) => {
-    log(`IPC error: ${error}`);
+    console.error(`[MCP Bridge] IPC error: ${error}`);
   });
   
   ipcClient.on('close', () => {
-    log('IPC connection closed');
     process.exit(0);
   });
 }
@@ -115,13 +83,10 @@ async function requestPermission(toolName: string, input: any): Promise<any> {
 }
 
 async function main() {
-  log('Starting main function');
-  
   // Connect to main process first
   connectToMainProcess();
   
   // Wait a bit for connection to establish
-  log('Waiting for IPC connection to establish...');
   await new Promise(resolve => setTimeout(resolve, 100));
   
   const server = new Server({
@@ -137,7 +102,6 @@ async function main() {
 
   // Register tool handlers
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    log('Received ListTools request');
     const tools = [{
       name: 'approve_permission',
       description: 'Request permission to use a tool',
@@ -156,7 +120,6 @@ async function main() {
         required: ['tool_name', 'input']
       }
     }];
-    log(`Returning ${tools.length} tools`);
     return { tools };
   });
 
@@ -165,9 +128,7 @@ async function main() {
       const { tool_name, input } = request.params.arguments as { tool_name: string; input: any };
       
       try {
-        log(`Requesting permission for tool: ${tool_name}`);
         const response = await requestPermission(tool_name, input);
-        log(`Permission response: ${JSON.stringify(response)}`);
         
         // Return the expected format for permission prompt tool
         // The response should have behavior and optionally updatedInput
@@ -184,7 +145,7 @@ async function main() {
           }]
         };
       } catch (error) {
-        log(`Permission request error: ${error}`);
+        console.error(`[MCP Bridge] Permission request error: ${error}`);
         return {
           content: [{
             type: 'text',
@@ -201,15 +162,11 @@ async function main() {
   });
 
   // Connect and run
-  log('Connecting server to transport...');
   await server.connect(transport);
-  log(`MCP permission server started successfully for session ${sessionId}`);
-  log('Ready to handle permission requests');
 }
 
 // Handle shutdown gracefully
 process.on('SIGTERM', () => {
-  log('Received SIGTERM signal');
   if (ipcClient) {
     ipcClient.end();
   }
@@ -217,7 +174,6 @@ process.on('SIGTERM', () => {
 });
 
 process.on('SIGINT', () => {
-  log('Received SIGINT signal');
   if (ipcClient) {
     ipcClient.end();
   }
@@ -226,19 +182,18 @@ process.on('SIGINT', () => {
 
 // Handle unhandled rejections
 process.on('unhandledRejection', (reason, promise) => {
-  log(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+  console.error(`[MCP Bridge] Unhandled Rejection at: ${promise}, reason: ${reason}`);
 });
 
 process.on('uncaughtException', (error) => {
-  log(`Uncaught Exception: ${error}`);
-  log(`Stack trace: ${error.stack}`);
+  console.error(`[MCP Bridge] Uncaught Exception: ${error}`);
+  console.error(`[MCP Bridge] Stack trace: ${error.stack}`);
   process.exit(1);
 });
 
 // Start the server
-log('Process started, calling main()');
 main().catch((error) => {
-  log(`Failed to start: ${error}`);
-  log(`Stack trace: ${error.stack}`);
+  console.error(`[MCP Bridge] Failed to start: ${error}`);
+  console.error(`[MCP Bridge] Stack trace: ${error.stack}`);
   process.exit(1);
 });

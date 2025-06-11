@@ -137,35 +137,32 @@ export class ClaudeCodeManager extends EventEmitter {
         let tempDir: string;
         try {
           const homeDir = os.homedir();
-          tempDir = path.join(homeDir, '.crystal-mcp');
+          tempDir = path.join(homeDir, '.crystal');
           
           // Ensure the directory exists
           if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
-            this.logger?.info(`[MCP] Created MCP temp directory: ${tempDir}`);
+            this.logger?.verbose(`[MCP] Created MCP temp directory: ${tempDir}`);
           }
           
           // Test write access
           const testFile = path.join(tempDir, '.test');
           fs.writeFileSync(testFile, 'test');
           fs.unlinkSync(testFile);
-          this.logger?.info(`[MCP] Verified write access to: ${tempDir}`);
         } catch (error) {
           this.logger?.error(`[MCP] Failed to create/access home directory, falling back to system temp: ${error}`);
           tempDir = os.tmpdir();
         }
         
-        this.logger?.info(`[MCP] Using temp directory: ${tempDir}`);
         
         // Handle ASAR packaging - copy the script to temp directory since it can't be executed from ASAR
         if (mcpBridgePath.includes('.asar')) {
-          this.logger?.info(`[MCP] Detected ASAR packaging, extracting script to temp directory`);
+          this.logger?.verbose(`[MCP] Detected ASAR packaging, extracting script`);
           
           // Read the script from ASAR
           let scriptContent: string;
           try {
             scriptContent = fs.readFileSync(mcpBridgePath, 'utf8');
-            this.logger?.info(`[MCP] Successfully read script from ASAR (${scriptContent.length} bytes)`);
           } catch (error) {
             this.logger?.error(`[MCP] Failed to read script from ASAR: ${error}`);
             throw new Error(`Failed to read MCP bridge script from ASAR: ${error}`);
@@ -182,11 +179,7 @@ export class ClaudeCodeManager extends EventEmitter {
             
             // Verify the file was created and is readable
             const stats = fs.statSync(tempScriptPath);
-            this.logger?.info(`[MCP] Script extracted successfully:`);
-            this.logger?.info(`[MCP]   Path: ${tempScriptPath}`);
-            this.logger?.info(`[MCP]   Size: ${stats.size} bytes`);
-            this.logger?.info(`[MCP]   Mode: ${stats.mode.toString(8)}`);
-            this.logger?.info(`[MCP]   Readable: ${fs.accessSync(tempScriptPath, fs.constants.R_OK) === undefined}`);
+            this.logger?.verbose(`[MCP] Script extracted to: ${tempScriptPath}`);
             
             mcpBridgePath = tempScriptPath;
           } catch (error) {
@@ -209,7 +202,6 @@ export class ClaudeCodeManager extends EventEmitter {
           const nodeInPath = await findExecutableInPath('node');
           if (nodeInPath) {
             nodePath = nodeInPath;
-            this.logger?.info(`[MCP] Found node in PATH: ${nodePath}`);
           } else {
             // When running from .dmg, try common node locations
             const commonNodePaths = [
@@ -223,7 +215,6 @@ export class ClaudeCodeManager extends EventEmitter {
             for (const tryPath of commonNodePaths) {
               if (fs.existsSync(tryPath)) {
                 nodePath = tryPath;
-                this.logger?.info(`[MCP] Found node at common location: ${nodePath}`);
                 break;
               }
             }
@@ -231,7 +222,6 @@ export class ClaudeCodeManager extends EventEmitter {
             // If still not found and we're in packaged app, use Electron's node
             if (nodePath === 'node' && app.isPackaged) {
               nodePath = process.execPath;
-              this.logger?.info(`[MCP] Using Electron's built-in Node.js: ${nodePath}`);
             }
           }
         } catch (e) {
@@ -239,21 +229,16 @@ export class ClaudeCodeManager extends EventEmitter {
           // Use Electron's node as fallback for packaged apps
           if (app.isPackaged) {
             nodePath = process.execPath;
-            this.logger?.info(`[MCP] Fallback to Electron's built-in Node.js: ${nodePath}`);
           }
         }
         
-        this.logger?.info(`[MCP] Final node path selected: ${nodePath}`);
         
         // Test if the selected node path actually works
         try {
-          const testResult = execSync(`"${nodePath}" --version`, { encoding: 'utf8' });
-          this.logger?.info(`[MCP] Node version test successful: ${testResult.trim()}`);
+          execSync(`"${nodePath}" --version`, { encoding: 'utf8' });
         } catch (e) {
           this.logger?.error(`[MCP] Node executable test failed: ${e}`);
           if (app.isPackaged) {
-            // Last resort: try to use the MCP bridge directly with Electron
-            this.logger?.warn(`[MCP] Will attempt to use Electron's process.fork instead`);
           }
         }
         
@@ -262,9 +247,6 @@ export class ClaudeCodeManager extends EventEmitter {
         let mcpArgs: string[] = [mcpBridgePath, sessionId, this.permissionIpcPath];
         
         if (nodePath === process.execPath && app.isPackaged) {
-          // For Electron in packaged app, we need to use different approach
-          // Try to spawn a separate node process or use a different method
-          this.logger?.warn(`[MCP] Using Electron executable, attempting alternate approach`);
           
           // First, let's try to find any available node
           const alternateNodes = ['/usr/local/bin/node', '/opt/homebrew/bin/node', '/usr/bin/node'];
@@ -275,14 +257,11 @@ export class ClaudeCodeManager extends EventEmitter {
               mcpCommand = altNode;
               mcpArgs = [mcpBridgePath, sessionId, this.permissionIpcPath];
               foundAlternate = true;
-              this.logger?.info(`[MCP] Found alternate node at: ${altNode}`);
               break;
             }
           }
           
           if (!foundAlternate) {
-            // If no alternate node found, we'll try with Electron but might fail
-            this.logger?.warn(`[MCP] No alternate node found, using Electron with --require flag`);
             mcpCommand = nodePath;
             // Use Electron's --require flag to load the script
             mcpArgs = ['--require', mcpBridgePath, '--', sessionId, this.permissionIpcPath];
@@ -302,10 +281,7 @@ export class ClaudeCodeManager extends EventEmitter {
           }
         };
         
-        this.logger?.info(`[MCP] Creating MCP config at: ${mcpConfigPath}`);
-        this.logger?.info(`[MCP] MCP bridge path: ${mcpBridgePath}`);
-        this.logger?.info(`[MCP] IPC socket path: ${this.permissionIpcPath}`);
-        this.logger?.info(`[MCP] Session ID: ${sessionId}`);
+        this.logger?.verbose(`[MCP] Creating MCP config at: ${mcpConfigPath}`);
         
         try {
           fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
@@ -313,9 +289,6 @@ export class ClaudeCodeManager extends EventEmitter {
           // Verify the config file was created
           if (fs.existsSync(mcpConfigPath)) {
             const configStats = fs.statSync(mcpConfigPath);
-            this.logger?.info(`[MCP] MCP config file created successfully:`);
-            this.logger?.info(`[MCP]   Size: ${configStats.size} bytes`);
-            this.logger?.info(`[MCP]   Mode: ${configStats.mode.toString(8)}`);
             
             // Make config file readable by all (might help with permission issues)
             fs.chmodSync(mcpConfigPath, 0o644);
@@ -327,12 +300,10 @@ export class ClaudeCodeManager extends EventEmitter {
           throw new Error(`Failed to create MCP config: ${error}`);
         }
         
-        this.logger?.info(`[MCP] MCP config content: ${JSON.stringify(mcpConfig, null, 2)}`);
         
         // Additional debugging: Test if the MCP bridge script can be executed
         try {
           const testCmd = `"${nodePath}" "${mcpBridgePath}" --version`;
-          this.logger?.info(`[MCP] Testing MCP bridge script: ${testCmd}`);
           // Note: This will fail because the script expects different args, but it tests if node can execute it
           execSync(testCmd, { encoding: 'utf8', timeout: 2000 });
         } catch (testError: any) {
@@ -340,8 +311,6 @@ export class ClaudeCodeManager extends EventEmitter {
           if (testError.code === 'EACCES' || testError.message.includes('EACCES')) {
             this.logger?.error(`[MCP] Permission denied executing MCP bridge script`);
             throw new Error('MCP bridge script is not executable');
-          } else {
-            this.logger?.info(`[MCP] MCP bridge script is executable (test failed as expected)`);
           }
         }
         
@@ -350,8 +319,6 @@ export class ClaudeCodeManager extends EventEmitter {
         args.push('--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission');
         args.push('--allowedTools', 'mcp__crystal-permissions__approve_permission');
         
-        this.logger?.info(`[MCP] Added MCP flags to Claude command`);
-        this.logger?.info(`[MCP] Full args: ${JSON.stringify(args)}`);
         
         // Store config path and temp script path for cleanup
         (global as any)[`mcp_config_${sessionId}`] = mcpConfigPath;
@@ -360,14 +327,12 @@ export class ClaudeCodeManager extends EventEmitter {
         }
         
         // Add a small delay to ensure file is fully written and accessible
-        this.logger?.info(`[MCP] Waiting 100ms to ensure files are accessible...`);
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Final check that config file still exists
         if (!fs.existsSync(mcpConfigPath)) {
           throw new Error(`MCP config file disappeared after creation: ${mcpConfigPath}`);
         }
-        this.logger?.info(`[MCP] Final check: MCP config file still exists`);
       } else {
         // Fallback to skip permissions if IPC path not available
         args.push('--dangerously-skip-permissions');
@@ -428,8 +393,6 @@ export class ClaudeCodeManager extends EventEmitter {
         ...(this.configManager?.getConfig()?.verbose ? { MCP_DEBUG: '1' } : {})
       } as { [key: string]: string };
       
-      this.logger?.info(`[MCP] Environment PATH: ${env.PATH}`);
-      this.logger?.info(`[MCP] MCP_SOCKET_PATH: ${env.MCP_SOCKET_PATH}`);
       
       // Use custom claude path if configured, otherwise find it in PATH
       let claudeCommand = this.configManager?.getConfig()?.claudeExecutablePath;
@@ -473,28 +436,6 @@ export class ClaudeCodeManager extends EventEmitter {
         claudeCommand = foundPath;
       }
       
-      // Log the full command and environment to a debug file (if MCP is enabled)
-      if (effectiveMode === 'approve' && this.permissionIpcPath) {
-        const debugFile = path.join(os.homedir(), '.crystal-mcp', `claude-command-${sessionId}.log`);
-        const debugInfo = {
-          timestamp: new Date().toISOString(),
-          command: claudeCommand,
-          args: args,
-          cwd: worktreePath,
-          env: {
-            PATH: env.PATH,
-            MCP_SOCKET_PATH: env.MCP_SOCKET_PATH,
-            MCP_DEBUG: env.MCP_DEBUG
-          },
-          fullCommand: `${claudeCommand} ${args.join(' ')}`
-        };
-        try {
-          fs.writeFileSync(debugFile, JSON.stringify(debugInfo, null, 2));
-          this.logger?.info(`[MCP] Debug info written to: ${debugFile}`);
-        } catch (e) {
-          this.logger?.warn(`[MCP] Could not write debug file: ${e}`);
-        }
-      }
       
       let ptyProcess: pty.IPty;
       try {
@@ -669,7 +610,7 @@ export class ClaudeCodeManager extends EventEmitter {
             try {
               if (fs.existsSync(mcpConfigPath)) {
                 fs.unlinkSync(mcpConfigPath);
-                this.logger?.info(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
+                this.logger?.verbose(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
               }
               delete (global as any)[`mcp_config_${sessionId}`];
             } catch (error) {
@@ -685,7 +626,7 @@ export class ClaudeCodeManager extends EventEmitter {
             try {
               if (fs.existsSync(mcpScriptPath)) {
                 fs.unlinkSync(mcpScriptPath);
-                this.logger?.info(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
+                this.logger?.verbose(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
               }
               delete (global as any)[`mcp_script_${sessionId}`];
             } catch (error) {
@@ -742,7 +683,7 @@ export class ClaudeCodeManager extends EventEmitter {
         try {
           if (fs.existsSync(mcpConfigPath)) {
             fs.unlinkSync(mcpConfigPath);
-            this.logger?.info(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
+            this.logger?.verbose(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
           }
           delete (global as any)[`mcp_config_${sessionId}`];
         } catch (error) {
@@ -758,7 +699,7 @@ export class ClaudeCodeManager extends EventEmitter {
         try {
           if (fs.existsSync(mcpScriptPath)) {
             fs.unlinkSync(mcpScriptPath);
-            this.logger?.info(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
+            this.logger?.verbose(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
           }
           delete (global as any)[`mcp_script_${sessionId}`];
         } catch (error) {
