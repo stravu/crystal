@@ -68,10 +68,10 @@ async function createWindow() {
   if (isDevelopment) {
     await mainWindow.loadURL('http://localhost:4521');
     mainWindow.webContents.openDevTools();
-    
+
     // Enable IPC debugging in development
     console.log('[Main] 🔍 IPC debugging enabled - check DevTools console for IPC call logs');
-    
+
     // Log all IPC calls in main process
     const originalHandle = ipcMain.handle;
     ipcMain.handle = function(channel: string, listener: any) {
@@ -406,7 +406,10 @@ function setupEventListeners() {
   });
 
   claudeCodeManager.on('spawned', async ({ sessionId }: { sessionId: string }) => {
-    await sessionManager.updateSession(sessionId, { status: 'running' });
+    await sessionManager.updateSession(sessionId, {
+      status: 'running',
+      run_started_at: new Date().toISOString()
+    });
 
     // Start execution tracking
     try {
@@ -650,8 +653,11 @@ ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: s
     // If no prompt provided, use empty string (for resuming)
     const continuePrompt = prompt || '';
 
-    // Update session status to initializing
-    sessionManager.updateSession(sessionId, { status: 'initializing' });
+    // Update session status to initializing and clear run_started_at
+    sessionManager.updateSession(sessionId, {
+      status: 'initializing',
+      run_started_at: null // Clear previous run time
+    });
 
     // Add the prompt to conversation history and prompt markers (if a prompt is provided)
     if (continuePrompt) {

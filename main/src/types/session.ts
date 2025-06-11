@@ -13,6 +13,7 @@ export interface Session {
   isRunning?: boolean;
   lastViewedAt?: string;
   permissionMode?: 'approve' | 'ignore';
+  runStartedAt?: string;
 }
 
 export interface CreateSessionRequest {

@@ -38,6 +38,7 @@ export interface Session {
   project_id?: number;
   claude_session_id?: string;
   permission_mode?: 'approve' | 'ignore';
+  run_started_at?: string;
 }
 
 export interface SessionOutput {
@@ -72,6 +73,7 @@ export interface UpdateSessionData {
   exit_code?: number;
   pid?: number;
   claude_session_id?: string;
+  run_started_at?: string;
 }
 
 export interface PromptMarker {

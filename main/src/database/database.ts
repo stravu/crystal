@@ -477,6 +477,10 @@ export class DatabaseService {
       updates.push('claude_session_id = ?');
       values.push(data.claude_session_id);
     }
+    if (data.run_started_at !== undefined) {
+      updates.push('run_started_at = ?');
+      values.push(data.run_started_at);
+    }
 
     if (updates.length === 0) {
       return this.getSession(id);

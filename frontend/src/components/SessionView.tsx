@@ -602,16 +602,17 @@ export function SessionView() {
     if (!activeSession) return;
     
     if (activeSession.status === 'running' || activeSession.status === 'initializing') {
+      // Use the actual run start time if available, otherwise use current time
+      const sessionStartTime = activeSession.runStartedAt ? new Date(activeSession.runStartedAt).getTime() : Date.now();
+      
       // Start the timer
-      if (!startTime) {
-        setStartTime(Date.now());
+      if (!startTime || startTime !== sessionStartTime) {
+        setStartTime(sessionStartTime);
       }
       
       // Update elapsed time every second
       const interval = setInterval(() => {
-        if (startTime) {
-          setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
-        }
+        setElapsedTime(Math.floor((Date.now() - sessionStartTime) / 1000));
       }, 1000);
       
       return () => clearInterval(interval);
@@ -620,7 +621,7 @@ export function SessionView() {
       setStartTime(null);
       setElapsedTime(0);
     }
-  }, [activeSession?.status, startTime]);
+  }, [activeSession?.status, activeSession?.runStartedAt]);
   
   // Reset unread badges when session changes
   useEffect(() => {

@@ -87,7 +87,8 @@ export class SessionManager extends EventEmitter {
       error: dbSession.exit_code && dbSession.exit_code !== 0 ? `Exit code: ${dbSession.exit_code}` : undefined,
       isRunning: false,
       lastViewedAt: dbSession.last_viewed_at,
-      permissionMode: dbSession.permission_mode
+      permissionMode: dbSession.permission_mode,
+      runStartedAt: dbSession.run_started_at
     };
   }
 

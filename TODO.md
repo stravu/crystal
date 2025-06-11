@@ -1,3 +1,3 @@
-1. When creating a new project, check (after doing git init if that hasn't been done) if there is a .gitignore and if that .gitignore covers the worktree folder. Give a popup asking if they would like to add it, and if so add it and commit.
-2. Each time I make a new project it shows the getting started again. Kind of unexpected behavior to me. 
-3. Make running with --dangerously-ignore-permissions an option. Build out a UX for approving changes.
+1. The box to put number of sessions should be text, not one of those ones where you have to click the up and down buttons to pick a number. Limit it to 10.
+2. The time at the claude running bar is incorrect, make sure it is based on the actual timestamp of when you started the current claude run.
+3. Show how long each prompt took on the right hand prompt bar on the session pane

@@ -14,6 +14,7 @@ export interface Session {
   lastViewedAt?: string;
   projectId?: number;
   permissionMode?: 'approve' | 'ignore';
+  runStartedAt?: string;
 }
 
 export interface CreateSessionRequest {
