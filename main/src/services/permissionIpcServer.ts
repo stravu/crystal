@@ -2,6 +2,7 @@ import net from 'net';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { app } from 'electron';
 import { PermissionManager } from './permissionManager';
 
 export class PermissionIpcServer {
@@ -10,14 +11,37 @@ export class PermissionIpcServer {
   private socketPath: string;
 
   constructor() {
-    // Use a unique socket path
-    this.socketPath = path.join(os.tmpdir(), `crystal-permissions-${process.pid}.sock`);
+    // Use a directory without spaces for better compatibility
+    // DMG apps can write to user's home directory
+    let socketDir: string;
+    try {
+      const homeDir = os.homedir();
+      socketDir = path.join(homeDir, '.crystal-mcp', 'sockets');
+      
+      // Ensure the directory exists
+      if (!fs.existsSync(socketDir)) {
+        fs.mkdirSync(socketDir, { recursive: true });
+      }
+      
+      // Test write access
+      const testFile = path.join(socketDir, '.test');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+    } catch (error) {
+      console.error('[Permission IPC] Failed to create socket directory, falling back to system temp:', error);
+      socketDir = os.tmpdir();
+    }
+    
+    this.socketPath = path.join(socketDir, `crystal-permissions-${process.pid}.sock`);
   }
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
+      console.log(`[Permission IPC] Starting server with socket path: ${this.socketPath}`);
+      
       // Clean up any existing socket file
       if (fs.existsSync(this.socketPath)) {
+        console.log('[Permission IPC] Removing existing socket file');
         fs.unlinkSync(this.socketPath);
       }
 
@@ -88,6 +112,16 @@ export class PermissionIpcServer {
 
       this.server.listen(this.socketPath, () => {
         console.log('[Permission IPC] Server listening on:', this.socketPath);
+        
+        // Verify socket file exists
+        if (fs.existsSync(this.socketPath)) {
+          console.log('[Permission IPC] Socket file created successfully');
+          const stats = fs.statSync(this.socketPath);
+          console.log('[Permission IPC] Socket file mode:', stats.mode.toString(8));
+        } else {
+          console.error('[Permission IPC] WARNING: Socket file not found after server started');
+        }
+        
         resolve();
       });
     });

@@ -202,6 +202,9 @@ importers:
       '@homebridge/node-pty-prebuilt-multiarch':
         specifier: ^0.12.0
         version: 0.12.0
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.12.1
       better-sqlite3:
         specifier: ^11.7.0
         version: 11.10.0

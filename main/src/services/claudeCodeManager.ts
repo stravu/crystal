@@ -3,11 +3,13 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { app } from 'electron';
 import type { Logger } from '../utils/logger';
 import { testClaudeCodeAvailability, testClaudeCodeInDirectory, getAugmentedPath } from '../utils/claudeCodeTest';
 import type { ConfigManager } from './configManager';
 import { getShellPath, findExecutableInPath } from '../utils/shellPath';
 import { PermissionManager } from './permissionManager';
+import { execSync } from 'child_process';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
@@ -22,7 +24,7 @@ export class ClaudeCodeManager extends EventEmitter {
     private sessionManager: any, 
     private logger?: Logger, 
     private configManager?: ConfigManager,
-    private permissionIpcPath?: string
+    private permissionIpcPath?: string | null
   ) {
     super();
   }
@@ -125,27 +127,247 @@ export class ClaudeCodeManager extends EventEmitter {
         args.push('--dangerously-skip-permissions');
       } else if (effectiveMode === 'approve' && this.permissionIpcPath) {
         // Create MCP config for permission approval
-        const mcpBridgePath = path.join(__dirname, 'mcpPermissionBridge.js');
-        const mcpConfigPath = path.join(os.tmpdir(), `crystal-mcp-${sessionId}.json`);
+        // Use standalone script in packaged apps
+        let mcpBridgePath = app.isPackaged
+          ? path.join(__dirname, 'mcpPermissionBridgeStandalone.js')
+          : path.join(__dirname, 'mcpPermissionBridge.js');
+        
+        // Use a directory without spaces for better compatibility
+        // DMG apps can write to user's home directory
+        let tempDir: string;
+        try {
+          const homeDir = os.homedir();
+          tempDir = path.join(homeDir, '.crystal-mcp');
+          
+          // Ensure the directory exists
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+            this.logger?.info(`[MCP] Created MCP temp directory: ${tempDir}`);
+          }
+          
+          // Test write access
+          const testFile = path.join(tempDir, '.test');
+          fs.writeFileSync(testFile, 'test');
+          fs.unlinkSync(testFile);
+          this.logger?.info(`[MCP] Verified write access to: ${tempDir}`);
+        } catch (error) {
+          this.logger?.error(`[MCP] Failed to create/access home directory, falling back to system temp: ${error}`);
+          tempDir = os.tmpdir();
+        }
+        
+        this.logger?.info(`[MCP] Using temp directory: ${tempDir}`);
+        
+        // Handle ASAR packaging - copy the script to temp directory since it can't be executed from ASAR
+        if (mcpBridgePath.includes('.asar')) {
+          this.logger?.info(`[MCP] Detected ASAR packaging, extracting script to temp directory`);
+          
+          // Read the script from ASAR
+          let scriptContent: string;
+          try {
+            scriptContent = fs.readFileSync(mcpBridgePath, 'utf8');
+            this.logger?.info(`[MCP] Successfully read script from ASAR (${scriptContent.length} bytes)`);
+          } catch (error) {
+            this.logger?.error(`[MCP] Failed to read script from ASAR: ${error}`);
+            throw new Error(`Failed to read MCP bridge script from ASAR: ${error}`);
+          }
+          
+          // Write to temp directory with executable permissions
+          const tempScriptPath = path.join(tempDir, `mcpPermissionBridge-${sessionId}.js`);
+          try {
+            // First write the file
+            fs.writeFileSync(tempScriptPath, scriptContent);
+            
+            // Then explicitly set permissions (more reliable than mode option)
+            fs.chmodSync(tempScriptPath, 0o755);
+            
+            // Verify the file was created and is readable
+            const stats = fs.statSync(tempScriptPath);
+            this.logger?.info(`[MCP] Script extracted successfully:`);
+            this.logger?.info(`[MCP]   Path: ${tempScriptPath}`);
+            this.logger?.info(`[MCP]   Size: ${stats.size} bytes`);
+            this.logger?.info(`[MCP]   Mode: ${stats.mode.toString(8)}`);
+            this.logger?.info(`[MCP]   Readable: ${fs.accessSync(tempScriptPath, fs.constants.R_OK) === undefined}`);
+            
+            mcpBridgePath = tempScriptPath;
+          } catch (error) {
+            this.logger?.error(`[MCP] Failed to write script to temp directory: ${error}`);
+            throw new Error(`Failed to extract MCP bridge script: ${error}`);
+          }
+        } else {
+          // Verify the MCP bridge file exists
+          if (!fs.existsSync(mcpBridgePath)) {
+            this.logger?.error(`MCP permission bridge not found at: ${mcpBridgePath}`);
+            throw new Error(`MCP permission bridge file not found. Expected at: ${mcpBridgePath}`);
+          }
+        }
+        
+        const mcpConfigPath = path.join(tempDir, `crystal-mcp-${sessionId}.json`);
+        
+        // Try to find node executable - critical for .dmg execution
+        let nodePath = 'node';
+        try {
+          const nodeInPath = await findExecutableInPath('node');
+          if (nodeInPath) {
+            nodePath = nodeInPath;
+            this.logger?.info(`[MCP] Found node in PATH: ${nodePath}`);
+          } else {
+            // When running from .dmg, try common node locations
+            const commonNodePaths = [
+              '/usr/local/bin/node',
+              '/opt/homebrew/bin/node',
+              '/usr/bin/node',
+              '/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc',
+              process.execPath // Use Electron's built-in Node if available
+            ];
+            
+            for (const tryPath of commonNodePaths) {
+              if (fs.existsSync(tryPath)) {
+                nodePath = tryPath;
+                this.logger?.info(`[MCP] Found node at common location: ${nodePath}`);
+                break;
+              }
+            }
+            
+            // If still not found and we're in packaged app, use Electron's node
+            if (nodePath === 'node' && app.isPackaged) {
+              nodePath = process.execPath;
+              this.logger?.info(`[MCP] Using Electron's built-in Node.js: ${nodePath}`);
+            }
+          }
+        } catch (e) {
+          this.logger?.warn(`[MCP] Could not find node in PATH: ${e}`);
+          // Use Electron's node as fallback for packaged apps
+          if (app.isPackaged) {
+            nodePath = process.execPath;
+            this.logger?.info(`[MCP] Fallback to Electron's built-in Node.js: ${nodePath}`);
+          }
+        }
+        
+        this.logger?.info(`[MCP] Final node path selected: ${nodePath}`);
+        
+        // Test if the selected node path actually works
+        try {
+          const testResult = execSync(`"${nodePath}" --version`, { encoding: 'utf8' });
+          this.logger?.info(`[MCP] Node version test successful: ${testResult.trim()}`);
+        } catch (e) {
+          this.logger?.error(`[MCP] Node executable test failed: ${e}`);
+          if (app.isPackaged) {
+            // Last resort: try to use the MCP bridge directly with Electron
+            this.logger?.warn(`[MCP] Will attempt to use Electron's process.fork instead`);
+          }
+        }
+        
+        // If using Electron's executable, we need to handle it specially
+        let mcpCommand: string = nodePath;
+        let mcpArgs: string[] = [mcpBridgePath, sessionId, this.permissionIpcPath];
+        
+        if (nodePath === process.execPath && app.isPackaged) {
+          // For Electron in packaged app, we need to use different approach
+          // Try to spawn a separate node process or use a different method
+          this.logger?.warn(`[MCP] Using Electron executable, attempting alternate approach`);
+          
+          // First, let's try to find any available node
+          const alternateNodes = ['/usr/local/bin/node', '/opt/homebrew/bin/node', '/usr/bin/node'];
+          let foundAlternate = false;
+          
+          for (const altNode of alternateNodes) {
+            if (fs.existsSync(altNode)) {
+              mcpCommand = altNode;
+              mcpArgs = [mcpBridgePath, sessionId, this.permissionIpcPath];
+              foundAlternate = true;
+              this.logger?.info(`[MCP] Found alternate node at: ${altNode}`);
+              break;
+            }
+          }
+          
+          if (!foundAlternate) {
+            // If no alternate node found, we'll try with Electron but might fail
+            this.logger?.warn(`[MCP] No alternate node found, using Electron with --require flag`);
+            mcpCommand = nodePath;
+            // Use Electron's --require flag to load the script
+            mcpArgs = ['--require', mcpBridgePath, '--', sessionId, this.permissionIpcPath];
+          }
+        } else {
+          // Normal node execution
+          mcpCommand = nodePath;
+          mcpArgs = [mcpBridgePath, sessionId, this.permissionIpcPath];
+        }
         
         const mcpConfig = {
           "mcpServers": {
             "crystal-permissions": {
-              "command": "node",
-              "args": [mcpBridgePath, sessionId, this.permissionIpcPath]
+              "command": mcpCommand,
+              "args": mcpArgs
             }
           }
         };
         
-        fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
+        this.logger?.info(`[MCP] Creating MCP config at: ${mcpConfigPath}`);
+        this.logger?.info(`[MCP] MCP bridge path: ${mcpBridgePath}`);
+        this.logger?.info(`[MCP] IPC socket path: ${this.permissionIpcPath}`);
+        this.logger?.info(`[MCP] Session ID: ${sessionId}`);
+        
+        try {
+          fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
+          
+          // Verify the config file was created
+          if (fs.existsSync(mcpConfigPath)) {
+            const configStats = fs.statSync(mcpConfigPath);
+            this.logger?.info(`[MCP] MCP config file created successfully:`);
+            this.logger?.info(`[MCP]   Size: ${configStats.size} bytes`);
+            this.logger?.info(`[MCP]   Mode: ${configStats.mode.toString(8)}`);
+            
+            // Make config file readable by all (might help with permission issues)
+            fs.chmodSync(mcpConfigPath, 0o644);
+          } else {
+            throw new Error('MCP config file was not created');
+          }
+        } catch (error) {
+          this.logger?.error(`[MCP] Failed to create MCP config file: ${error}`);
+          throw new Error(`Failed to create MCP config: ${error}`);
+        }
+        
+        this.logger?.info(`[MCP] MCP config content: ${JSON.stringify(mcpConfig, null, 2)}`);
+        
+        // Additional debugging: Test if the MCP bridge script can be executed
+        try {
+          const testCmd = `"${nodePath}" "${mcpBridgePath}" --version`;
+          this.logger?.info(`[MCP] Testing MCP bridge script: ${testCmd}`);
+          // Note: This will fail because the script expects different args, but it tests if node can execute it
+          execSync(testCmd, { encoding: 'utf8', timeout: 2000 });
+        } catch (testError: any) {
+          // Expected to fail, but check if it's a permission error vs argument error
+          if (testError.code === 'EACCES' || testError.message.includes('EACCES')) {
+            this.logger?.error(`[MCP] Permission denied executing MCP bridge script`);
+            throw new Error('MCP bridge script is not executable');
+          } else {
+            this.logger?.info(`[MCP] MCP bridge script is executable (test failed as expected)`);
+          }
+        }
         
         // Add MCP flags
         args.push('--mcp-config', mcpConfigPath);
         args.push('--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission');
         args.push('--allowedTools', 'mcp__crystal-permissions__approve_permission');
         
-        // Store config path for cleanup
+        this.logger?.info(`[MCP] Added MCP flags to Claude command`);
+        this.logger?.info(`[MCP] Full args: ${JSON.stringify(args)}`);
+        
+        // Store config path and temp script path for cleanup
         (global as any)[`mcp_config_${sessionId}`] = mcpConfigPath;
+        if (mcpBridgePath.includes(tempDir)) {
+          (global as any)[`mcp_script_${sessionId}`] = mcpBridgePath;
+        }
+        
+        // Add a small delay to ensure file is fully written and accessible
+        this.logger?.info(`[MCP] Waiting 100ms to ensure files are accessible...`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Final check that config file still exists
+        if (!fs.existsSync(mcpConfigPath)) {
+          throw new Error(`MCP config file disappeared after creation: ${mcpConfigPath}`);
+        }
+        this.logger?.info(`[MCP] Final check: MCP config file still exists`);
       } else {
         // Fallback to skip permissions if IPC path not available
         args.push('--dangerously-skip-permissions');
@@ -199,8 +421,15 @@ export class ClaudeCodeManager extends EventEmitter {
       const shellPath = getShellPath();
       const env = {
         ...process.env,
-        PATH: shellPath
+        PATH: shellPath,
+        // Ensure MCP-related environment variables are preserved
+        MCP_SOCKET_PATH: this.permissionIpcPath || '',
+        // Add debug mode for MCP if verbose logging is enabled
+        ...(this.configManager?.getConfig()?.verbose ? { MCP_DEBUG: '1' } : {})
       } as { [key: string]: string };
+      
+      this.logger?.info(`[MCP] Environment PATH: ${env.PATH}`);
+      this.logger?.info(`[MCP] MCP_SOCKET_PATH: ${env.MCP_SOCKET_PATH}`);
       
       // Use custom claude path if configured, otherwise find it in PATH
       let claudeCommand = this.configManager?.getConfig()?.claudeExecutablePath;
@@ -242,6 +471,29 @@ export class ClaudeCodeManager extends EventEmitter {
           throw new Error('Claude Code CLI not found in PATH. Please ensure claude is installed and in your PATH.');
         }
         claudeCommand = foundPath;
+      }
+      
+      // Log the full command and environment to a debug file (if MCP is enabled)
+      if (effectiveMode === 'approve' && this.permissionIpcPath) {
+        const debugFile = path.join(os.homedir(), '.crystal-mcp', `claude-command-${sessionId}.log`);
+        const debugInfo = {
+          timestamp: new Date().toISOString(),
+          command: claudeCommand,
+          args: args,
+          cwd: worktreePath,
+          env: {
+            PATH: env.PATH,
+            MCP_SOCKET_PATH: env.MCP_SOCKET_PATH,
+            MCP_DEBUG: env.MCP_DEBUG
+          },
+          fullCommand: `${claudeCommand} ${args.join(' ')}`
+        };
+        try {
+          fs.writeFileSync(debugFile, JSON.stringify(debugInfo, null, 2));
+          this.logger?.info(`[MCP] Debug info written to: ${debugFile}`);
+        } catch (e) {
+          this.logger?.warn(`[MCP] Could not write debug file: ${e}`);
+        }
       }
       
       let ptyProcess: pty.IPty;
@@ -409,15 +661,37 @@ export class ClaudeCodeManager extends EventEmitter {
         // Clear any pending permission requests
         PermissionManager.getInstance().clearPendingRequests(sessionId);
         
-        // Clean up MCP config file if it exists
+        // Clean up MCP config file if it exists (with a delay to ensure Claude had time to read it)
         const mcpConfigPath = (global as any)[`mcp_config_${sessionId}`];
         if (mcpConfigPath && fs.existsSync(mcpConfigPath)) {
-          try {
-            fs.unlinkSync(mcpConfigPath);
-            delete (global as any)[`mcp_config_${sessionId}`];
-          } catch (error) {
-            this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
-          }
+          // Delay cleanup to ensure Claude has read the file
+          setTimeout(() => {
+            try {
+              if (fs.existsSync(mcpConfigPath)) {
+                fs.unlinkSync(mcpConfigPath);
+                this.logger?.info(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
+              }
+              delete (global as any)[`mcp_config_${sessionId}`];
+            } catch (error) {
+              this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
+            }
+          }, 5000); // 5 second delay
+        }
+        
+        // Clean up temporary MCP script file if it exists (with same delay)
+        const mcpScriptPath = (global as any)[`mcp_script_${sessionId}`];
+        if (mcpScriptPath && fs.existsSync(mcpScriptPath)) {
+          setTimeout(() => {
+            try {
+              if (fs.existsSync(mcpScriptPath)) {
+                fs.unlinkSync(mcpScriptPath);
+                this.logger?.info(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
+              }
+              delete (global as any)[`mcp_script_${sessionId}`];
+            } catch (error) {
+              this.logger?.error(`Failed to delete temporary MCP script file:`, error instanceof Error ? error : undefined);
+            }
+          }, 5000); // 5 second delay
         }
         
         this.emit('exit', {
@@ -460,15 +734,37 @@ export class ClaudeCodeManager extends EventEmitter {
     // Clear any pending permission requests
     PermissionManager.getInstance().clearPendingRequests(sessionId);
     
-    // Clean up MCP config file if it exists
+    // Clean up MCP config file if it exists (with a delay to ensure Claude had time to read it)
     const mcpConfigPath = (global as any)[`mcp_config_${sessionId}`];
     if (mcpConfigPath && fs.existsSync(mcpConfigPath)) {
-      try {
-        fs.unlinkSync(mcpConfigPath);
-        delete (global as any)[`mcp_config_${sessionId}`];
-      } catch (error) {
-        this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
-      }
+      // Delay cleanup to ensure Claude has read the file
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(mcpConfigPath)) {
+            fs.unlinkSync(mcpConfigPath);
+            this.logger?.info(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
+          }
+          delete (global as any)[`mcp_config_${sessionId}`];
+        } catch (error) {
+          this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
+        }
+      }, 5000); // 5 second delay
+    }
+    
+    // Clean up temporary MCP script file if it exists (with same delay)
+    const mcpScriptPath = (global as any)[`mcp_script_${sessionId}`];
+    if (mcpScriptPath && fs.existsSync(mcpScriptPath)) {
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(mcpScriptPath)) {
+            fs.unlinkSync(mcpScriptPath);
+            this.logger?.info(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
+          }
+          delete (global as any)[`mcp_script_${sessionId}`];
+        } catch (error) {
+          this.logger?.error(`Failed to delete temporary MCP script file:`, error instanceof Error ? error : undefined);
+        }
+      }, 5000); // 5 second delay
     }
 
     claudeProcess.process.kill();

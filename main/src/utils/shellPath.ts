@@ -66,12 +66,25 @@ export function getShellPath(): string {
       console.log('Getting shell PATH using command:', shellCommand);
       
       // Execute the command to get the PATH
-      shellPath = execSync(shellCommand, {
-        encoding: 'utf8',
-        timeout: 5000,
-        // Important: In packaged Electron apps, we need to ensure we're not inheriting a restricted PATH
-        env: { ...process.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' }
-      }).trim();
+      // Note: -l and -i flags can cause slow startup, especially with complex shell configs
+      // Try a faster approach first
+      try {
+        shellPath = execSync(`${shell} -c 'echo $PATH'`, {
+          encoding: 'utf8',
+          timeout: 2000,
+          // Important: In packaged Electron apps, we need to ensure we're not inheriting a restricted PATH
+          env: { ...process.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' }
+        }).trim();
+      } catch (quickError) {
+        console.log('Quick PATH retrieval failed, trying with login shell...');
+        // Fall back to login shell if quick method fails
+        shellPath = execSync(shellCommand, {
+          encoding: 'utf8',
+          timeout: 10000, // Increase timeout for slow shell configs
+          // Important: In packaged Electron apps, we need to ensure we're not inheriting a restricted PATH
+          env: { ...process.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' }
+        }).trim();
+      }
     }
     
     console.log('Shell PATH result:', shellPath);

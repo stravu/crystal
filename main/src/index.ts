@@ -29,7 +29,7 @@ let executionTracker: ExecutionTracker;
 let worktreeNameGenerator: WorktreeNameGenerator;
 let databaseService: DatabaseService;
 let runCommandManager: RunCommandManager;
-let permissionIpcServer: PermissionIpcServer;
+let permissionIpcServer: PermissionIpcServer | null;
 
 // Store original console methods before overriding
 let originalLog: typeof console.log;
@@ -116,9 +116,20 @@ async function createWindow() {
   };
 
   console.error = (...args: any[]) => {
-    const message = args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
+    const message = args.map(arg => {
+      if (typeof arg === 'object') {
+        if (arg instanceof Error) {
+          return `Error: ${arg.message}\nStack: ${arg.stack}`;
+        }
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (e) {
+          // Handle circular structure
+          return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
+        }
+      }
+      return String(arg);
+    }).join(' ');
     
     // Extract Error object if present
     const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
@@ -135,9 +146,20 @@ async function createWindow() {
   };
 
   console.warn = (...args: any[]) => {
-    const message = args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
+    const message = args.map(arg => {
+      if (typeof arg === 'object') {
+        if (arg instanceof Error) {
+          return `Error: ${arg.message}\nStack: ${arg.stack}`;
+        }
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (e) {
+          // Handle circular structure
+          return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
+        }
+      }
+      return String(arg);
+    }).join(' ');
     
     // Extract Error object if present for warnings too
     const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
@@ -154,9 +176,20 @@ async function createWindow() {
   };
 
   console.info = (...args: any[]) => {
-    const message = args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
+    const message = args.map(arg => {
+      if (typeof arg === 'object') {
+        if (arg instanceof Error) {
+          return `Error: ${arg.message}\nStack: ${arg.stack}`;
+        }
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (e) {
+          // Handle circular structure
+          return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
+        }
+      }
+      return String(arg);
+    }).join(' ');
     
     if (logger) {
       logger.info(message);
@@ -198,8 +231,21 @@ async function initializeServices() {
   sessionManager.initializeFromDatabase();
   
   // Start permission IPC server
+  console.log('[Main] Initializing Permission IPC server...');
   permissionIpcServer = new PermissionIpcServer();
-  await permissionIpcServer.start();
+  console.log('[Main] Starting Permission IPC server...');
+  
+  let permissionIpcPath: string | null = null;
+  try {
+    await permissionIpcServer.start();
+    permissionIpcPath = permissionIpcServer.getSocketPath();
+    console.log('[Main] Permission IPC server started successfully');
+    console.log('[Main] Permission IPC socket path:', permissionIpcPath);
+  } catch (error) {
+    console.error('[Main] Failed to start Permission IPC server:', error);
+    console.error('[Main] Permission-based MCP will be disabled');
+    permissionIpcServer = null;
+  }
   
   // Create worktree manager without a specific path
   worktreeManager = new WorktreeManager();
@@ -211,7 +257,7 @@ async function initializeServices() {
   }
   
   const { ClaudeCodeManager } = await import('./services/claudeCodeManager');
-  claudeCodeManager = new ClaudeCodeManager(sessionManager, undefined, configManager, permissionIpcServer.getSocketPath());
+  claudeCodeManager = new ClaudeCodeManager(sessionManager, logger, configManager, permissionIpcPath);
   gitDiffManager = new GitDiffManager();
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
