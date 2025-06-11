@@ -86,6 +86,18 @@ export function formatJsonForOutput(jsonMessage: any): string {
            `\x1b[37m${content}\x1b[0m\r\n\r\n`;
   }
   
+  if (jsonMessage.type === 'session') {
+    const data = jsonMessage.data || {};
+    
+    if (data.status === 'error') {
+      return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[31m❌ Session Error\x1b[0m\r\n` +
+             `\x1b[91m${data.message || 'An error occurred'}\x1b[0m\r\n\r\n` +
+             (data.details ? `\x1b[90m${data.details}\x1b[0m\r\n\r\n` : '');
+    }
+    
+    return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[90m📝 Session: ${data.status || 'update'}\x1b[0m\r\n`;
+  }
+  
   // For other message types, show a generic format
   return `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[90m📄 ${jsonMessage.type}: ${jsonMessage.subtype || 'message'}\x1b[0m\r\n`;
 }

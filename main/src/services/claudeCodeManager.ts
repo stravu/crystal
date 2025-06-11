@@ -62,6 +62,40 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.error(`Claude Code not available: ${availability.error}`);
         this.logger?.error(`Current PATH: ${process.env.PATH}`);
         this.logger?.error(`Augmented PATH will be: ${getAugmentedPath()}`);
+        
+        // Emit a pseudo-message to show the error in the UI
+        const errorMessage = {
+          type: 'session',
+          data: {
+            status: 'error',
+            message: 'Claude Code not available',
+            details: [
+              `Error: ${availability.error}`,
+              '',
+              'Claude Code is not installed or not found in your PATH.',
+              '',
+              'Please install Claude Code:',
+              '1. Visit: https://docs.anthropic.com/en/docs/claude-code/overview',
+              '2. Follow the installation instructions for your platform',
+              '3. Verify installation by running "claude --version" in your terminal',
+              '',
+              'If Claude is installed but not in your PATH:',
+              '- Add the Claude installation directory to your PATH environment variable',
+              '- Or set a custom Claude executable path in Crystal Settings',
+              '',
+              `Current PATH: ${process.env.PATH}`,
+              `Attempted command: claude --version`
+            ].join('\n')
+          }
+        };
+        
+        this.emit('output', {
+          sessionId,
+          type: 'json',
+          data: errorMessage,
+          timestamp: new Date()
+        });
+        
         throw new Error(`Claude Code CLI not available: ${availability.error}`);
       }
       this.logger?.verbose(`Claude found: ${availability.version || 'version unknown'}`);
@@ -173,18 +207,91 @@ export class ClaudeCodeManager extends EventEmitter {
       if (!claudeCommand) {
         const foundPath = findExecutableInPath('claude');
         if (!foundPath) {
+          // Emit a pseudo-message to show the error in the UI
+          const errorMessage = {
+            type: 'session',
+            data: {
+              status: 'error',
+              message: 'Claude Code executable not found',
+              details: [
+                'Claude Code CLI not found in PATH.',
+                '',
+                'This can happen if:',
+                '1. Claude Code is not installed',
+                '2. Claude Code is installed but not in your PATH',
+                '3. The "claude" command has a different name on your system',
+                '',
+                'To fix this:',
+                '1. Install Claude Code: https://docs.anthropic.com/en/docs/claude-code/overview',
+                '2. Add Claude to your PATH environment variable',
+                '3. Or set a custom Claude executable path in Crystal Settings',
+                '',
+                `Current PATH: ${shellPath}`,
+                'Searched for: claude'
+              ].join('\n')
+            }
+          };
+          
+          this.emit('output', {
+            sessionId,
+            type: 'json',
+            data: errorMessage,
+            timestamp: new Date()
+          });
+          
           throw new Error('Claude Code CLI not found in PATH. Please ensure claude is installed and in your PATH.');
         }
         claudeCommand = foundPath;
       }
       
-      const ptyProcess = pty.spawn(claudeCommand, args, {
-        name: 'xterm-color',
-        cols: 80,
-        rows: 30,
-        cwd: worktreePath,
-        env
-      });
+      let ptyProcess: pty.IPty;
+      try {
+        ptyProcess = pty.spawn(claudeCommand, args, {
+          name: 'xterm-color',
+          cols: 80,
+          rows: 30,
+          cwd: worktreePath,
+          env
+        });
+      } catch (spawnError) {
+        // Handle spawn errors (e.g., command not found, permission denied)
+        const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
+        this.logger?.error(`Failed to spawn Claude process: ${errorMsg}`);
+        
+        // Emit a pseudo-message to show the error in the UI
+        const errorMessage = {
+          type: 'session',
+          data: {
+            status: 'error',
+            message: 'Failed to start Claude Code',
+            details: [
+              `Error: ${errorMsg}`,
+              '',
+              'This usually means:',
+              '1. Claude Code is not installed or not found in your PATH',
+              '2. The Claude executable path is incorrect',
+              '3. You don\'t have permission to execute the Claude command',
+              '',
+              `Command attempted: ${claudeCommand}`,
+              `Working directory: ${worktreePath}`,
+              '',
+              'Please check:',
+              '- Claude Code is installed: https://docs.anthropic.com/en/docs/claude-code/overview',
+              '- Run "claude --version" in your terminal to verify installation',
+              '- Check Settings for custom Claude executable path'
+            ].join('\n')
+          }
+        };
+        
+        this.emit('output', {
+          sessionId,
+          type: 'json',
+          data: errorMessage,
+          timestamp: new Date()
+        });
+        
+        throw new Error(`Failed to spawn Claude Code: ${errorMsg}`);
+      }
 
       const claudeProcess: ClaudeCodeProcess = {
         process: ptyProcess,
@@ -241,10 +348,59 @@ export class ClaudeCodeManager extends EventEmitter {
       ptyProcess.onExit(async ({ exitCode, signal }) => {
         if (exitCode !== 0) {
           this.logger?.error(`Claude process failed for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
+          
+          // If Claude failed to start (no output received), emit an error message
           if (!hasReceivedOutput) {
             this.logger?.error(`No output received from Claude. This might indicate a startup failure.`);
+            
+            // Emit a pseudo-message to show the error in the UI
+            const errorMessage = {
+              type: 'session',
+              data: {
+                status: 'error',
+                message: `Claude Code failed to start (exit code: ${exitCode})`,
+                details: [
+                  'This usually means Claude Code is not installed properly or not found in your PATH.',
+                  '',
+                  'Please ensure:',
+                  '1. Claude Code is installed: https://docs.anthropic.com/en/docs/claude-code/overview',
+                  '2. The "claude" command is available in your terminal',
+                  '3. Your PATH environment variable includes the Claude Code installation directory',
+                  '',
+                  `Full command attempted: ${claudeCommand} ${args.join(' ')}`,
+                  `Working directory: ${worktreePath}`,
+                  `Exit code: ${exitCode}${signal ? `, Signal: ${signal}` : ''}`,
+                  '',
+                  'You can also set a custom Claude executable path in the Settings.'
+                ].join('\n')
+              }
+            };
+            
+            this.emit('output', {
+              sessionId,
+              type: 'json',
+              data: errorMessage,
+              timestamp: new Date()
+            });
           } else {
             this.logger?.error(`Last output from Claude: ${lastOutput.substring(-500)}`);
+            
+            // If we got some output but it still failed, show that in the error message
+            const errorMessage = {
+              type: 'session',
+              data: {
+                status: 'error',
+                message: `Claude Code exited with error (exit code: ${exitCode})`,
+                details: lastOutput.length > 0 ? `Last output:\n${lastOutput.substring(-500)}` : 'No additional details available'
+              }
+            };
+            
+            this.emit('output', {
+              sessionId,
+              type: 'json',
+              data: errorMessage,
+              timestamp: new Date()
+            });
           }
         } else {
           this.logger?.info(`Claude process exited normally for session ${sessionId}`);

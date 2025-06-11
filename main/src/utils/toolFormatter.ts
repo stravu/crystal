@@ -257,6 +257,20 @@ export function formatJsonForOutputEnhanced(jsonMessage: any, gitRepoPath?: stri
     }
   }
   
+  // Handle session messages (like errors)
+  if (jsonMessage.type === 'session') {
+    const data = jsonMessage.data || {};
+    const time = new Date(timestamp).toLocaleTimeString();
+    
+    if (data.status === 'error') {
+      return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[31m❌ Session Error\x1b[0m\r\n` +
+             `\x1b[91m${data.message || 'An error occurred'}\x1b[0m\r\n\r\n` +
+             (data.details ? `\x1b[90m${data.details}\x1b[0m\r\n\r\n` : '');
+    }
+    
+    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[90m📝 Session: ${data.status || 'update'}\x1b[0m\r\n`;
+  }
+  
   // Fall back to original formatter for other message types
   return formatJsonForOutput(jsonMessage);
 }
