@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
 
+  // Version checking
+  checkForUpdates: (): Promise<IPCResponse> => ipcRenderer.invoke('version:check-for-updates'),
+  getVersionInfo: (): Promise<IPCResponse> => ipcRenderer.invoke('version:get-info'),
+
   // System utilities
   openExternal: (url: string): Promise<IPCResponse> => ipcRenderer.invoke('openExternal', url),
 
@@ -137,6 +141,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onMainLog: (callback: (level: string, message: string) => void) => {
       ipcRenderer.on('main-log', (_event, level, message) => callback(level, message));
       return () => ipcRenderer.removeAllListeners('main-log');
+    },
+
+    // Version updates
+    onVersionUpdateAvailable: (callback: (versionInfo: any) => void) => {
+      ipcRenderer.on('version:update-available', (_event, versionInfo) => callback(versionInfo));
+      return () => ipcRenderer.removeAllListeners('version:update-available');
     },
   },
 });

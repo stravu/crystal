@@ -27,6 +27,7 @@ export interface SessionUpdate {
   status?: Session['status'];
   lastActivity?: Date;
   error?: string;
+  run_started_at?: string | null;
 }
 
 export interface SessionOutput {

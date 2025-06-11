@@ -12,6 +12,7 @@ import { DatabaseService } from './database/database';
 import { RunCommandManager } from './services/runCommandManager';
 import { PermissionIpcServer } from './services/permissionIpcServer';
 import { PermissionManager } from './services/permissionManager';
+import { VersionChecker, type VersionInfo } from './services/versionChecker';
 import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
@@ -34,6 +35,7 @@ let runCommandManager: RunCommandManager;
 let permissionIpcServer: PermissionIpcServer | null;
 let stravuAuthManager: StravuAuthManager;
 let stravuNotebookService: StravuNotebookService;
+let versionChecker: VersionChecker;
 
 // Store original console methods before overriding
 let originalLog: typeof console.log;
@@ -294,6 +296,9 @@ async function initializeServices() {
   stravuAuthManager = new StravuAuthManager(logger);
   stravuNotebookService = new StravuNotebookService(stravuAuthManager, logger);
 
+  // Initialize version checker
+  versionChecker = new VersionChecker(configManager, logger);
+
   taskQueue = new TaskQueue({
     sessionManager,
     worktreeManager,
@@ -305,6 +310,9 @@ async function initializeServices() {
 
   // Set up IPC event listeners for real-time updates
   setupEventListeners();
+
+  // Start periodic version checking
+  versionChecker.startPeriodicCheck();
 }
 
 app.whenReady().then(async () => {
@@ -339,6 +347,11 @@ app.on('before-quit', async () => {
     console.log('[Main] Stopping permission IPC server...');
     await permissionIpcServer.stop();
     console.log('[Main] Permission IPC server stopped');
+  }
+
+  // Stop version checker
+  if (versionChecker) {
+    versionChecker.stopPeriodicCheck();
   }
 
   // Close logger to ensure all logs are flushed
@@ -505,6 +518,13 @@ function setupEventListeners() {
       sessionManager.addScriptOutput(info.sessionId, `\n[Exit] ${info.displayName} exited with code ${info.exitCode}\n`);
     }
   });
+
+  // Listen for version update events
+  process.on('version-update-available', (versionInfo: VersionInfo) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('version:update-available', versionInfo);
+    }
+  });
 }
 
 // Basic app info handlers
@@ -514,6 +534,32 @@ ipcMain.handle('get-app-version', () => {
 
 ipcMain.handle('get-platform', () => {
   return process.platform;
+});
+
+// Version checking handlers
+ipcMain.handle('version:check-for-updates', async () => {
+  try {
+    const versionInfo = await versionChecker.checkForUpdates();
+    return { success: true, data: versionInfo };
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+    return { success: false, error: 'Failed to check for updates' };
+  }
+});
+
+ipcMain.handle('version:get-info', () => {
+  try {
+    return {
+      success: true,
+      data: {
+        current: app.getVersion(),
+        name: app.getName()
+      }
+    };
+  } catch (error) {
+    console.error('Failed to get version info:', error);
+    return { success: false, error: 'Failed to get version info' };
+  }
 });
 
 // Session management handlers

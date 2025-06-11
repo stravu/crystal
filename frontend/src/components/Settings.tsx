@@ -18,6 +18,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications'>('general');
@@ -40,6 +41,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setGlobalSystemPrompt(data.systemPromptAppend || '');
       setClaudeExecutablePath(data.claudeExecutablePath || '');
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
+      setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -56,7 +58,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         anthropicApiKey, 
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath,
-        defaultPermissionMode
+        defaultPermissionMode,
+        autoCheckUpdates
       });
 
       if (!response.success) {
@@ -245,6 +248,20 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             </p>
           </div>
 
+          <div>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={autoCheckUpdates}
+                onChange={(e) => setAutoCheckUpdates(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Check for updates automatically</span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1">
+              Automatically check for new Crystal releases on GitHub every 24 hours. You'll be notified when updates are available.
+            </p>
+          </div>
           {/* Stravu Integration Section */}
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Stravu Integration</h3>

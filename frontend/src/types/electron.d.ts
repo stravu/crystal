@@ -13,6 +13,10 @@ interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
 
+  // Version checking
+  checkForUpdates: () => Promise<IPCResponse>;
+  getVersionInfo: () => Promise<IPCResponse>;
+
   // System utilities
   openExternal: (url: string) => Promise<void>;
 
@@ -112,6 +116,7 @@ interface ElectronAPI {
     onSessionOutput: (callback: (output: any) => void) => () => void;
     onScriptOutput: (callback: (output: any) => void) => () => void;
     onMainLog: (callback: (level: string, message: string) => void) => () => void;
+    onVersionUpdateAvailable: (callback: (versionInfo: any) => void) => () => void;
     removeAllListeners: (channel: string) => void;
   };
 }

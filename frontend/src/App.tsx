@@ -6,6 +6,7 @@ import { SessionView } from './components/SessionView';
 import { PromptHistory } from './components/PromptHistory';
 import Help from './components/Help';
 import Welcome from './components/Welcome';
+import { AboutDialog } from './components/AboutDialog';
 import { MainProcessLogger } from './components/MainProcessLogger';
 import { ErrorDialog } from './components/ErrorDialog';
 import { PermissionDialog } from './components/PermissionDialog';
@@ -28,12 +29,13 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [currentPermissionRequest, setCurrentPermissionRequest] = useState<PermissionRequest | null>(null);
   const { currentError, clearError } = useErrorStore();
   const { sessions, isLoaded } = useSessionStore();
   
   useSocket();
-  useNotifications();
+  const { showNotification } = useNotifications();
 
   useEffect(() => {
     // Only show welcome screen on first launch when no data exists
@@ -74,7 +76,28 @@ function App() {
       window.electron?.off('permission:request', handlePermissionRequest);
     };
   }, []);
-  
+
+  useEffect(() => {
+    // Set up version update listener
+    const handleVersionUpdate = (versionInfo: any) => {
+      console.log('[App] Version update available:', versionInfo);
+      showNotification(
+        `🚀 Update Available - Crystal v${versionInfo.latest}`,
+        'A new version of Crystal is available. Click the About dialog to learn more.',
+        '/favicon.ico'
+      );
+    };
+
+    // Set up the listener using the events API
+    const removeListener = window.electronAPI.events.onVersionUpdateAvailable(handleVersionUpdate);
+
+    return () => {
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, [showNotification]);
+
   const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: any, message?: string) => {
     try {
       await API.permissions.respond(requestId, {
@@ -93,7 +116,7 @@ function App() {
       <MainProcessLogger />
       {/* Draggable title bar area */}
       <div 
-        className="fixed top-0 left-0 right-0 h-8 z-50 flex items-center justify-end pr-4" 
+        className="fixed top-0 left-0 right-0 h-8 z-50 flex items-center justify-end pr-4"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* Stravu status indicator in top-right */}
@@ -101,11 +124,17 @@ function App() {
           <StravuStatusIndicator />
         </div>
       </div>
-      <Sidebar viewMode={viewMode} onViewModeChange={setViewMode} onHelpClick={() => setIsHelpOpen(true)} />
+      <Sidebar
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onHelpClick={() => setIsHelpOpen(true)}
+        onAboutClick={() => setIsAboutOpen(true)}
+      />
       {viewMode === 'sessions' ? <SessionView /> : <PromptHistory />}
       <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <Welcome isOpen={isWelcomeOpen} onClose={() => setIsWelcomeOpen(false)} />
-      <ErrorDialog 
+      <AboutDialog isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      <ErrorDialog
         isOpen={!!currentError}
         onClose={clearError}
         title={currentError?.title}
