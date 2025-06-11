@@ -393,6 +393,12 @@ function setupEventListeners() {
     }
   });
 
+  sessionManager.on('session-output', (output) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('session:output', output);
+    }
+  });
+
   // Listen to claudeCodeManager events
   claudeCodeManager.on('output', async (output: any) => {
     // Save output to database
@@ -470,6 +476,71 @@ function setupEventListeners() {
     } catch (error) {
       console.error(`Failed to end execution tracking for session ${sessionId}:`, error);
     }
+
+    // Add commit information when session ends
+    try {
+      const session = sessionManager.getSession(sessionId);
+      if (session && session.worktreePath) {
+        const timestamp = new Date().toLocaleTimeString();
+        let commitInfo = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 📊 SESSION SUMMARY \x1b[0m\r\n\r\n`;
+
+        // Check for uncommitted changes
+        const statusOutput = execSync('git status --porcelain', {
+          cwd: session.worktreePath,
+          encoding: 'utf8'
+        }).trim();
+
+        if (statusOutput) {
+          const uncommittedFiles = statusOutput.split('\n').length;
+          commitInfo += `\x1b[1m\x1b[33m⚠️  Uncommitted Changes:\x1b[0m ${uncommittedFiles} file${uncommittedFiles > 1 ? 's' : ''}\r\n`;
+
+          // Show first few uncommitted files
+          const filesToShow = statusOutput.split('\n').slice(0, 5);
+          filesToShow.forEach(file => {
+            const [status, ...nameParts] = file.trim().split(/\s+/);
+            const fileName = nameParts.join(' ');
+            commitInfo += `   \x1b[2m${status}\x1b[0m ${fileName}\r\n`;
+          });
+
+          if (uncommittedFiles > 5) {
+            commitInfo += `   \x1b[2m... and ${uncommittedFiles - 5} more\x1b[0m\r\n`;
+          }
+          commitInfo += '\r\n';
+        }
+
+        // Get commit history for this branch
+        const project = sessionManager.getProjectForSession(sessionId);
+        const mainBranch = project?.main_branch || 'main';
+        const commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
+
+        if (commits.length > 0) {
+          commitInfo += `\x1b[1m\x1b[32m📝 Commits in this session:\x1b[0m\r\n`;
+          commits.forEach((commit, index) => {
+            const shortHash = commit.hash.substring(0, 7);
+            const date = commit.date.toLocaleString();
+            const stats = commit.stats;
+            commitInfo += `\r\n  \x1b[1m${index + 1}.\x1b[0m \x1b[33m${shortHash}\x1b[0m - ${commit.message}\r\n`;
+            commitInfo += `     \x1b[2mby ${commit.author} on ${date}\x1b[0m\r\n`;
+            if (stats.filesChanged > 0) {
+              commitInfo += `     \x1b[32m+${stats.additions}\x1b[0m \x1b[31m-${stats.deletions}\x1b[0m (${stats.filesChanged} file${stats.filesChanged > 1 ? 's' : ''})\r\n`;
+            }
+          });
+        } else if (!statusOutput) {
+          commitInfo += `\x1b[2mNo commits were made in this session.\x1b[0m\r\n`;
+        }
+
+        commitInfo += `\r\n\x1b[2m─────────────────────────────────────────\x1b[0m\r\n`;
+
+        // Add this summary to the session output
+        sessionManager.addSessionOutput(sessionId, {
+          type: 'stdout',
+          data: commitInfo,
+          timestamp: new Date()
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to generate session summary for ${sessionId}:`, error);
+    }
   });
 
   claudeCodeManager.on('error', async ({ sessionId, error }: { sessionId: string; error: string }) => {
@@ -490,6 +561,71 @@ function setupEventListeners() {
       }
     } catch (trackingError) {
       console.error(`Failed to cancel execution tracking for session ${sessionId}:`, trackingError);
+    }
+
+    // Add commit information when session errors
+    try {
+      const session = sessionManager.getSession(sessionId);
+      if (session && session.worktreePath) {
+        const timestamp = new Date().toLocaleTimeString();
+        let commitInfo = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[41m\x1b[37m 📊 SESSION SUMMARY (ERROR) \x1b[0m\r\n\r\n`;
+
+        // Check for uncommitted changes
+        const statusOutput = execSync('git status --porcelain', {
+          cwd: session.worktreePath,
+          encoding: 'utf8'
+        }).trim();
+
+        if (statusOutput) {
+          const uncommittedFiles = statusOutput.split('\n').length;
+          commitInfo += `\x1b[1m\x1b[33m⚠️  Uncommitted Changes:\x1b[0m ${uncommittedFiles} file${uncommittedFiles > 1 ? 's' : ''}\r\n`;
+
+          // Show first few uncommitted files
+          const filesToShow = statusOutput.split('\n').slice(0, 5);
+          filesToShow.forEach(file => {
+            const [status, ...nameParts] = file.trim().split(/\s+/);
+            const fileName = nameParts.join(' ');
+            commitInfo += `   \x1b[2m${status}\x1b[0m ${fileName}\r\n`;
+          });
+
+          if (uncommittedFiles > 5) {
+            commitInfo += `   \x1b[2m... and ${uncommittedFiles - 5} more\x1b[0m\r\n`;
+          }
+          commitInfo += '\r\n';
+        }
+
+        // Get commit history for this branch
+        const project = sessionManager.getProjectForSession(sessionId);
+        const mainBranch = project?.main_branch || 'main';
+        const commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
+
+        if (commits.length > 0) {
+          commitInfo += `\x1b[1m\x1b[32m📝 Commits before error:\x1b[0m\r\n`;
+          commits.forEach((commit, index) => {
+            const shortHash = commit.hash.substring(0, 7);
+            const date = commit.date.toLocaleString();
+            const stats = commit.stats;
+            commitInfo += `\r\n  \x1b[1m${index + 1}.\x1b[0m \x1b[33m${shortHash}\x1b[0m - ${commit.message}\r\n`;
+            commitInfo += `     \x1b[2mby ${commit.author} on ${date}\x1b[0m\r\n`;
+            if (stats.filesChanged > 0) {
+              commitInfo += `     \x1b[32m+${stats.additions}\x1b[0m \x1b[31m-${stats.deletions}\x1b[0m (${stats.filesChanged} file${stats.filesChanged > 1 ? 's' : ''})\r\n`;
+            }
+          });
+        } else if (!statusOutput) {
+          commitInfo += `\x1b[2mNo commits were made before the error.\x1b[0m\r\n`;
+        }
+
+        commitInfo += `\r\n\x1b[2m─────────────────────────────────────────\x1b[0m\r\n`;
+
+        // Add this summary to the session output
+        sessionManager.addSessionOutput(sessionId, {
+          type: 'stdout',
+          data: commitInfo,
+          timestamp: new Date()
+        });
+      }
+    } catch (summaryError) {
+      console.error(`Failed to generate session summary for ${sessionId}:`, summaryError);
     }
   });
 
@@ -1486,11 +1622,39 @@ ipcMain.handle('sessions:rebase-main-into-worktree', async (_event, sessionId: s
 
     const mainBranch = project.main_branch || 'main';
 
+    // Add message to session output about starting the rebase
+    const timestamp = new Date().toLocaleTimeString();
+    const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
+                        `\x1b[1m\x1b[94mRebasing from ${mainBranch}...\x1b[0m\r\n\r\n`;
+    sessionManager.addSessionOutput(sessionId, {
+      type: 'stdout',
+      data: startMessage,
+      timestamp: new Date()
+    });
+
     await worktreeManager.rebaseMainIntoWorktree(session.worktreePath, mainBranch);
+
+    // Add success message to session output
+    const successMessage = `\x1b[32m✓ Successfully rebased ${mainBranch} into worktree\x1b[0m\r\n\r\n`;
+    sessionManager.addSessionOutput(sessionId, {
+      type: 'stdout',
+      data: successMessage,
+      timestamp: new Date()
+    });
 
     return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
   } catch (error: any) {
     console.error('Failed to rebase main into worktree:', error);
+
+    // Add error message to session output
+    const errorMessage = `\x1b[31m✗ Rebase failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
+                        (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
+                        `\r\n`;
+    sessionManager.addSessionOutput(sessionId, {
+      type: 'stderr',
+      data: errorMessage,
+      timestamp: new Date()
+    });
 
     // Pass detailed git error information to frontend
     return {
@@ -1525,11 +1689,40 @@ ipcMain.handle('sessions:squash-and-rebase-to-main', async (_event, sessionId: s
 
     const mainBranch = project.main_branch || 'main';
 
+    // Add message to session output about starting the squash and rebase
+    const timestamp = new Date().toLocaleTimeString();
+    const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
+                        `\x1b[1m\x1b[94mSquashing commits and rebasing to ${mainBranch}...\x1b[0m\r\n` +
+                        `\x1b[90mCommit message: ${commitMessage.split('\n')[0]}${commitMessage.includes('\n') ? '...' : ''}\x1b[0m\r\n\r\n`;
+    sessionManager.addSessionOutput(sessionId, {
+      type: 'stdout',
+      data: startMessage,
+      timestamp: new Date()
+    });
+
     await worktreeManager.squashAndRebaseWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage);
+
+    // Add success message to session output
+    const successMessage = `\x1b[32m✓ Successfully squashed and rebased worktree to ${mainBranch}\x1b[0m\r\n\r\n`;
+    sessionManager.addSessionOutput(sessionId, {
+      type: 'stdout',
+      data: successMessage,
+      timestamp: new Date()
+    });
 
     return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
   } catch (error: any) {
     console.error('Failed to squash and rebase worktree to main:', error);
+
+    // Add error message to session output
+    const errorMessage = `\x1b[31m✗ Squash and rebase failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
+                        (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
+                        `\r\n`;
+    sessionManager.addSessionOutput(sessionId, {
+      type: 'stderr',
+      data: errorMessage,
+      timestamp: new Date()
+    });
 
     // Pass detailed git error information to frontend
     return {

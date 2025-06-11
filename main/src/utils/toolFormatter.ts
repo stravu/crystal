@@ -126,7 +126,16 @@ export function formatToolInteraction(
       // Apply relative paths to the result content
       const processedContent = makePathsRelative(toolResult.content, gitRepoPath);
       const lines = processedContent.split('\n');
-      const maxLines = 15;
+      // Show more lines for errors to ensure important information isn't hidden
+      const isError = toolCall.name === 'Bash' && (
+        toolResult.content.includes('error:') || 
+        toolResult.content.includes('Error:') || 
+        toolResult.content.includes('ERROR') ||
+        toolResult.content.includes('fatal:') ||
+        toolResult.content.includes('Command failed') ||
+        toolResult.content.includes('aborted')
+      );
+      const maxLines = isError ? 30 : 15;
       
       // Special handling for file listings
       if (toolCall.name === 'Grep' && lines[0]?.startsWith('Found')) {
@@ -144,8 +153,38 @@ export function formatToolInteraction(
         }
       } else {
         // Generic result display
+        // Check if this is an error from a Bash command
+        const isGitError = toolCall.name === 'Bash' && 
+          lines.some(line => 
+            line.includes('error:') || 
+            line.includes('Error:') || 
+            line.includes('ERROR') ||
+            line.includes('fatal:') ||
+            line.includes('Command failed') ||
+            line.includes('aborted')
+          );
+        
         lines.slice(0, maxLines).forEach(line => {
-          output += `\x1b[90m│  \x1b[0m\x1b[37m${line}\x1b[0m\r\n`;
+          // Use red color for error lines, white for normal output
+          let lineColor = '\x1b[37m'; // Default white
+          
+          if (isGitError) {
+            // For git/bash errors, highlight specific error patterns
+            if (line.includes('error:') || 
+                line.includes('Error:') || 
+                line.includes('ERROR') ||
+                line.includes('fatal:') ||
+                line.includes('Command failed') ||
+                line.includes('aborted')) {
+              lineColor = '\x1b[91m'; // Bright red for errors
+            } else if (line.includes('warning:') || 
+                       line.includes('Warning:') ||
+                       line.includes('hint:')) {
+              lineColor = '\x1b[93m'; // Yellow for warnings/hints
+            }
+          }
+          
+          output += `\x1b[90m│  \x1b[0m${lineColor}${line}\x1b[0m\r\n`;
         });
         
         if (lines.length > maxLines) {
@@ -161,7 +200,21 @@ export function formatToolInteraction(
   }
   
   if (toolResult) {
-    output += `\x1b[90m└─ ✓ Complete\x1b[0m\r\n`;
+    // Check if this was an error result
+    const isError = toolCall.name === 'Bash' && toolResult.content && (
+      toolResult.content.includes('error:') || 
+      toolResult.content.includes('Error:') || 
+      toolResult.content.includes('ERROR') ||
+      toolResult.content.includes('fatal:') ||
+      toolResult.content.includes('Command failed') ||
+      toolResult.content.includes('aborted')
+    );
+    
+    if (isError) {
+      output += `\x1b[90m└─ \x1b[91m✗ Failed\x1b[0m\r\n`;
+    } else {
+      output += `\x1b[90m└─ ✓ Complete\x1b[0m\r\n`;
+    }
   }
   
   return output + '\r\n';

@@ -271,11 +271,30 @@ export class WorktreeManager {
   }
 
   async rebaseMainIntoWorktree(worktreePath: string, mainBranch: string): Promise<void> {
+    const executedCommands: string[] = [];
+    let lastOutput = '';
+    
     try {
       console.log(`[WorktreeManager] Rebasing ${mainBranch} into worktree: ${worktreePath}`);
       
+      // First, fetch the latest changes from the main branch
+      let command = `git fetch origin ${mainBranch}`;
+      executedCommands.push(`${command} (in ${worktreePath})`);
+      try {
+        const fetchResult = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = fetchResult.stdout || fetchResult.stderr || '';
+        console.log(`[WorktreeManager] Fetched latest ${mainBranch}`);
+      } catch (fetchError: any) {
+        // Fetch might fail if there's no remote, continue anyway
+        console.log(`[WorktreeManager] Fetch failed (might not have remote), continuing...`);
+        lastOutput = fetchError.stderr || fetchError.stdout || '';
+      }
+      
       // Rebase the current worktree branch onto main
-      await execWithShellPath(`git rebase ${mainBranch}`, { cwd: worktreePath });
+      command = `git rebase ${mainBranch}`;
+      executedCommands.push(`${command} (in ${worktreePath})`);
+      const rebaseResult = await execWithShellPath(command, { cwd: worktreePath });
+      lastOutput = rebaseResult.stdout || rebaseResult.stderr || '';
       
       console.log(`[WorktreeManager] Successfully rebased ${mainBranch} into worktree`);
     } catch (error: any) {
@@ -283,8 +302,8 @@ export class WorktreeManager {
       
       // Create detailed error with git command output
       const gitError = new Error(`Failed to rebase ${mainBranch} into worktree`) as any;
-      gitError.gitCommand = `git rebase ${mainBranch}`;
-      gitError.gitOutput = error.stderr || error.stdout || error.message || '';
+      gitError.gitCommand = executedCommands.join(' && ');
+      gitError.gitOutput = error.stderr || error.stdout || lastOutput || error.message || '';
       gitError.workingDirectory = worktreePath;
       gitError.originalError = error;
       
@@ -294,6 +313,7 @@ export class WorktreeManager {
 
   async squashAndRebaseWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string, commitMessage: string): Promise<void> {
     const executedCommands: string[] = [];
+    let lastOutput = '';
     
     try {
       console.log(`[WorktreeManager] Squashing and rebasing worktree to ${mainBranch}: ${worktreePath}`);
@@ -301,35 +321,55 @@ export class WorktreeManager {
       // Get current branch name in worktree
       let command = `git branch --show-current`;
       executedCommands.push(`git branch --show-current (in ${worktreePath})`);
-      const { stdout: currentBranch } = await execWithShellPath(command, { cwd: worktreePath });
+      const { stdout: currentBranch, stderr: stderr1 } = await execWithShellPath(command, { cwd: worktreePath });
+      lastOutput = currentBranch || stderr1 || '';
       const branchName = currentBranch.trim();
+      console.log(`[WorktreeManager] Current branch: ${branchName}`);
       
       // Get the base commit (where the worktree branch diverged from main)
       command = `git merge-base ${mainBranch} HEAD`;
       executedCommands.push(`git merge-base ${mainBranch} HEAD (in ${worktreePath})`);
-      const { stdout: baseCommit } = await execWithShellPath(command, { cwd: worktreePath });
+      const { stdout: baseCommit, stderr: stderr2 } = await execWithShellPath(command, { cwd: worktreePath });
+      lastOutput = baseCommit || stderr2 || '';
       const base = baseCommit.trim();
+      console.log(`[WorktreeManager] Base commit: ${base}`);
+      
+      // Check if there are any changes to squash
+      command = `git log --oneline ${base}..HEAD`;
+      const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
+      if (!commits.trim()) {
+        throw new Error(`No commits to squash. The branch is already up to date with ${mainBranch}.`);
+      }
+      console.log(`[WorktreeManager] Commits to squash:\n${commits}`);
       
       // Squash all commits since base into one
       command = `git reset --soft ${base}`;
       executedCommands.push(`git reset --soft ${base} (in ${worktreePath})`);
-      await execWithShellPath(command, { cwd: worktreePath });
+      const resetResult = await execWithShellPath(command, { cwd: worktreePath });
+      lastOutput = resetResult.stdout || resetResult.stderr || '';
+      console.log(`[WorktreeManager] Reset to base commit`);
       
       // Properly escape commit message for cross-platform compatibility
       const escapedMessage = commitMessage.replace(/"/g, '\\"');
       command = `git commit -m "${escapedMessage}"`;
       executedCommands.push(`git commit -m "..." (in ${worktreePath})`);
-      await execWithShellPath(command, { cwd: worktreePath });
+      const commitResult = await execWithShellPath(command, { cwd: worktreePath });
+      lastOutput = commitResult.stdout || commitResult.stderr || '';
+      console.log(`[WorktreeManager] Created squashed commit`);
       
       // Switch to main branch in the main repository
       command = `git checkout ${mainBranch}`;
       executedCommands.push(`git checkout ${mainBranch} (in ${projectPath})`);
-      await execWithShellPath(command, { cwd: projectPath });
+      const checkoutResult = await execWithShellPath(command, { cwd: projectPath });
+      lastOutput = checkoutResult.stdout || checkoutResult.stderr || '';
+      console.log(`[WorktreeManager] Switched to ${mainBranch} in main repository`);
       
       // Rebase the squashed commit onto main
       command = `git rebase ${branchName}`;
       executedCommands.push(`git rebase ${branchName} (in ${projectPath})`);
-      await execWithShellPath(command, { cwd: projectPath });
+      const rebaseResult = await execWithShellPath(command, { cwd: projectPath });
+      lastOutput = rebaseResult.stdout || rebaseResult.stderr || '';
+      console.log(`[WorktreeManager] Successfully rebased ${branchName} onto ${mainBranch}`);
       
       console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
     } catch (error: any) {
@@ -338,7 +378,7 @@ export class WorktreeManager {
       // Create detailed error with git command output
       const gitError = new Error(`Failed to squash and rebase worktree to ${mainBranch}`) as any;
       gitError.gitCommands = executedCommands;
-      gitError.gitOutput = error.stderr || error.stdout || error.message || '';
+      gitError.gitOutput = error.stderr || error.stdout || lastOutput || error.message || '';
       gitError.workingDirectory = worktreePath;
       gitError.projectPath = projectPath;
       gitError.originalError = error;

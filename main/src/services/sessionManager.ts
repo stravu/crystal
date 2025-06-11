@@ -201,6 +201,13 @@ export class SessionManager extends EventEmitter {
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
     this.db.addSessionOutput(id, output.type, dataToStore);
     
+    // Emit the output so it shows immediately in the UI
+    const outputToEmit: SessionOutput = {
+      sessionId: id,
+      ...output
+    };
+    this.emit('session-output', outputToEmit);
+    
     // Check if this is the initial system message with Claude's session ID
     if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'init' && output.data.session_id) {
       // Store Claude's actual session ID

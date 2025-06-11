@@ -527,10 +527,19 @@ export class ClaudeCodeManager extends EventEmitter {
             } catch (error) {
               // If not valid JSON, treat as regular output
               this.logger?.verbose(`Raw output from session ${sessionId}: ${line.substring(0, 200)}`);
+              
+              // Check if this looks like an error message
+              const isError = line.includes('ERROR') || 
+                            line.includes('Error:') || 
+                            line.includes('error:') ||
+                            line.includes('Command failed:') ||
+                            line.includes('aborted') ||
+                            line.includes('fatal:');
+              
               this.emit('output', {
                 sessionId,
-                type: 'stdout',
-                data: line,
+                type: isError ? 'stderr' : 'stdout',
+                data: line + '\n',
                 timestamp: new Date()
               });
             }
@@ -539,6 +548,34 @@ export class ClaudeCodeManager extends EventEmitter {
       });
 
       ptyProcess.onExit(async ({ exitCode, signal }) => {
+        // Process any remaining data in the buffer
+        if (buffer.trim()) {
+          try {
+            const jsonMessage = JSON.parse(buffer.trim());
+            this.emit('output', {
+              sessionId,
+              type: 'json',
+              data: jsonMessage,
+              timestamp: new Date()
+            });
+          } catch (error) {
+            // Not JSON, check if it's an error message
+            const isError = buffer.includes('ERROR') || 
+                          buffer.includes('Error:') || 
+                          buffer.includes('error:') ||
+                          buffer.includes('Command failed:') ||
+                          buffer.includes('aborted') ||
+                          buffer.includes('fatal:');
+            
+            this.emit('output', {
+              sessionId,
+              type: isError ? 'stderr' : 'stdout',
+              data: buffer,
+              timestamp: new Date()
+            });
+          }
+        }
+        
         if (exitCode !== 0) {
           this.logger?.error(`Claude process failed for session ${sessionId}. Exit code: ${exitCode}, Signal: ${signal}`);
           

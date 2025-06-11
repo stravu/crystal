@@ -202,6 +202,56 @@ export function SessionView() {
   const lastProcessedOutputLength = useRef(0);
   const lastProcessedScriptOutputLength = useRef(0);
   
+  // Helper function to format git output for better readability
+  const formatGitOutput = (output: string): string => {
+    if (!output) return '';
+    
+    // Highlight common git error patterns
+    return output
+      .replace(/error:/gi, '\x1b[31mERROR:\x1b[0m')
+      .replace(/fatal:/gi, '\x1b[31mFATAL:\x1b[0m')
+      .replace(/warning:/gi, '\x1b[33mWARNING:\x1b[0m')
+      .replace(/hint:/gi, '\x1b[36mHINT:\x1b[0m')
+      .replace(/CONFLICT \(.*?\):/g, '\x1b[31mCONFLICT\x1b[0m ($1):')
+      .replace(/Auto-merging (.*)/g, '\x1b[33mAuto-merging\x1b[0m $1')
+      .replace(/Merge conflict in (.*)/g, '\x1b[31mMerge conflict in\x1b[0m $1');
+  };
+  
+  // Helper function to get contextual troubleshooting tips based on error
+  const getGitErrorTips = (errorDetails: any): string[] => {
+    const tips: string[] = [];
+    const output = errorDetails.output?.toLowerCase() || '';
+    const message = errorDetails.message?.toLowerCase() || '';
+    
+    // Check for specific error patterns and provide relevant tips
+    if (output.includes('conflict') || message.includes('conflict')) {
+      tips.push('• You have merge conflicts that need to be resolved manually');
+      tips.push('• Use "git status" to see conflicted files');
+      tips.push('• Edit the conflicted files to resolve conflicts, then stage and commit');
+      tips.push('• After resolving, run "git rebase --continue" or "git rebase --abort"');
+    } else if (output.includes('uncommitted changes') || output.includes('unstaged changes')) {
+      tips.push('• You have uncommitted changes that prevent the operation');
+      tips.push('• Either commit your changes first or stash them with "git stash"');
+      tips.push('• After the operation, you can apply stashed changes with "git stash pop"');
+    } else if (output.includes('cannot rebase') || output.includes('no commits')) {
+      tips.push('• There may be no commits to rebase or the branches are already in sync');
+      tips.push('• Check your branch history with "git log --oneline"');
+      tips.push('• Verify you\'re on the correct branch with "git branch"');
+    } else if (output.includes('pathspec') || output.includes('did not match')) {
+      tips.push('• The specified branch or path was not found');
+      tips.push('• Check available branches with "git branch -a"');
+      tips.push('• Ensure the main branch name is correct in project settings');
+    } else {
+      // Generic tips
+      tips.push('• Check if you have uncommitted changes that need to be resolved');
+      tips.push('• Verify that the main branch exists and is up to date');
+      tips.push('• Look for specific error messages in the git output above');
+      tips.push('• Consider manually running the git commands in your terminal for more control');
+    }
+    
+    return tips;
+  };
+  
   const loadOutputContent = async (sessionId: string, retryCount = 0) => {
     if (!terminalInstance.current) return;
     
@@ -1521,9 +1571,9 @@ export function SessionView() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Git Output</h3>
                   <div className="bg-gray-900 text-gray-100 rounded-md p-4 max-h-80 overflow-y-auto">
-                    <pre className="text-sm whitespace-pre-wrap font-mono">
-                      {gitErrorDetails.output || 'No output available'}
-                    </pre>
+                    <pre className="text-sm whitespace-pre-wrap font-mono" dangerouslySetInnerHTML={{ 
+                      __html: formatGitOutput(gitErrorDetails.output || 'No output available')
+                    }} />
                   </div>
                 </div>
 
@@ -1536,10 +1586,9 @@ export function SessionView() {
                     <div>
                       <h4 className="text-sm font-medium text-blue-900 mb-1">Troubleshooting Tips</h4>
                       <ul className="text-sm text-blue-800 space-y-1">
-                        <li>• Check if you have uncommitted changes that need to be resolved</li>
-                        <li>• Verify that the main branch exists and is up to date</li>
-                        <li>• Look for merge conflicts in the git output above</li>
-                        <li>• Consider manually running the git commands in your terminal for more control</li>
+                        {getGitErrorTips(gitErrorDetails).map((tip, idx) => (
+                          <li key={idx}>{tip}</li>
+                        ))}
                       </ul>
                     </div>
                   </div>
