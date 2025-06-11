@@ -92,8 +92,26 @@ export class ExecutionTracker extends EventEmitter {
           
           this.logger?.verbose(`Auto-committed changes with message: ${commitMessage}`);
         }
-      } catch (commitError) {
+      } catch (commitError: any) {
         this.logger?.error(`Failed to auto-commit changes:`, commitError instanceof Error ? commitError : undefined);
+        
+        // Add error to session output so users can see what went wrong
+        const errorDetails = commitError.stderr || commitError.stdout || commitError.message || 'Unknown error';
+        const timestamp = new Date().toLocaleTimeString();
+        
+        const errorMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[41m\x1b[37m ❌ GIT COMMIT FAILED \x1b[0m\r\n` +
+                           `\x1b[91mFailed to auto-commit changes during Claude Code execution.\x1b[0m\r\n` +
+                           `\x1b[91mThis usually means a pre-commit hook failed.\x1b[0m\r\n\r\n` +
+                           `\x1b[90mCommand: git commit -m "${context.prompt || `Claude Code execution ${context.executionSequence}`}"\x1b[0m\r\n\r\n` +
+                           `\x1b[91mError output:\x1b[0m\r\n${errorDetails}\r\n\r\n` +
+                           `\x1b[93m⚠️  Changes remain uncommitted. You may need to fix the issues and commit manually.\x1b[0m\r\n\r\n`;
+        
+        this.sessionManager.addSessionOutput(sessionId, {
+          type: 'stderr',
+          data: errorMessage,
+          timestamp: new Date()
+        });
+        
         // Continue with diff capture even if commit fails
       }
       
