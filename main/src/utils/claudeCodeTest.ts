@@ -139,8 +139,9 @@ export async function testClaudeCodeAvailability(): Promise<{ available: boolean
 
 export async function testClaudeCodeInDirectory(directory: string): Promise<{ success: boolean; error?: string; output?: string }> {
   try {
-    const augmentedPath = getAugmentedPath();
-    const env = { ...process.env, PATH: augmentedPath };
+    // Use the same enhanced shell PATH that build scripts use
+    const shellPath = getShellPath();
+    const env = { ...process.env, PATH: shellPath };
     
     const { stdout, stderr } = await execAsync('claude --help', { 
       cwd: directory,

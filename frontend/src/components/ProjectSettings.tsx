@@ -190,7 +190,6 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                   </p>
                 </div>
 
-                {/* Build Script - Hidden for now
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Build Script
@@ -207,7 +206,6 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     One command per line. These run in the worktree directory before Claude starts.
                   </p>
                 </div>
-                */}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">

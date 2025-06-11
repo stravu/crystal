@@ -220,9 +220,6 @@ importers:
       electron-updater:
         specifier: ^6.6.2
         version: 6.6.2
-      express:
-        specifier: ^4.18.2
-        version: 4.21.2
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12

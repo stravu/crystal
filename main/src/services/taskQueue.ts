@@ -138,9 +138,8 @@ export class TaskQueue {
           run_script: activeProject.run_script
         }, null, 2));
 
-        const { worktreePath, buildOutput } = await worktreeManager.createWorktree(activeProject.path, worktreeName, undefined, activeProject.build_script);
+        const { worktreePath } = await worktreeManager.createWorktree(activeProject.path, worktreeName, undefined);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
-        console.log(`[TaskQueue] Build output items:`, buildOutput.length);
         
         const sessionName = worktreeName;
         console.log(`[TaskQueue] Creating session in database`);
@@ -153,17 +152,6 @@ export class TaskQueue {
           permissionMode
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
-        
-        // Store build output as script output for the session
-        if (buildOutput.length > 0) {
-          console.log(`[TaskQueue] Storing build output for session ${session.id}`);
-          // Add a header to indicate this is build output
-          sessionManager.addScriptOutput(session.id, '\x1b[1m\x1b[32m=== Build Script Output ===\x1b[0m\n');
-          for (const output of buildOutput) {
-            sessionManager.addScriptOutput(session.id, output.data);
-          }
-          sessionManager.addScriptOutput(session.id, '\x1b[1m\x1b[32m=== Build Script Complete ===\x1b[0m\n\n');
-        }
 
         // Add the initial prompt marker
         sessionManager.addInitialPromptMarker(session.id, prompt);
@@ -184,9 +172,26 @@ export class TaskQueue {
         });
         console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
         
-        // Now emit the session-created event after initial output has been added
+        // Emit the session-created event BEFORE running build script so UI shows immediately
         sessionManager.emitSessionCreated(session);
         console.log(`[TaskQueue] Emitted session-created event for session ${session.id}`);
+        
+        // Run build script after session is visible in UI
+        if (activeProject.build_script) {
+          console.log(`[TaskQueue] Running build script for session ${session.id}`);
+          
+          // Add a "waiting for build" message to output
+          const buildWaitingMessage = `\x1b[36m[${new Date().toLocaleTimeString()}]\x1b[0m \x1b[1m\x1b[33m⏳ Waiting for build script to complete...\x1b[0m\r\n\r\n`;
+          await sessionManager.addSessionOutput(session.id, {
+            type: 'stdout',
+            data: buildWaitingMessage,
+            timestamp: new Date()
+          });
+          
+          const buildCommands = activeProject.build_script.split('\n').filter(cmd => cmd.trim());
+          const buildResult = await sessionManager.runBuildScript(session.id, buildCommands, worktreePath);
+          console.log(`[TaskQueue] Build script completed. Success: ${buildResult.success}`);
+        }
 
         console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
         await claudeCodeManager.startSession(session.id, session.worktreePath, prompt, permissionMode);

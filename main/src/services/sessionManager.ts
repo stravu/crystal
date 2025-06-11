@@ -443,6 +443,18 @@ export class SessionManager extends EventEmitter {
     return null;
   }
 
+  getProjectBuildScript(sessionId: string): string[] | null {
+    const dbSession = this.getDbSession(sessionId);
+    if (dbSession?.project_id) {
+      const project = this.getProjectById(dbSession.project_id);
+      if (project?.build_script) {
+        // Split by newlines to get array of commands
+        return project.build_script.split('\n').filter(cmd => cmd.trim());
+      }
+    }
+    return null;
+  }
+
   runScript(sessionId: string, commands: string[], workingDirectory: string): void {
     // Stop any currently running script
     this.stopRunningScript();
@@ -502,6 +514,109 @@ export class SessionManager extends EventEmitter {
       this.setSessionRunning(sessionId, false);
       this.currentRunningSessionId = null;
       this.runningScriptProcess = null;
+    });
+  }
+
+  async runBuildScript(sessionId: string, commands: string[], workingDirectory: string): Promise<{ success: boolean; output: string }> {
+    // Get enhanced shell PATH
+    const shellPath = getShellPath();
+    
+    // Add build start message to script output (terminal tab)
+    const timestamp = new Date().toLocaleTimeString();
+    const buildStartMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔨 BUILD SCRIPT RUNNING \x1b[0m\r\n`;
+    this.emit('script-output', { sessionId, type: 'stdout', data: buildStartMessage });
+    
+    // Show PATH information for debugging in terminal
+    this.emit('script-output', { 
+      sessionId, 
+      type: 'stdout', 
+      data: `\x1b[1m\x1b[33mUsing PATH:\x1b[0m ${shellPath.split(':').slice(0, 5).join(':')}\x1b[2m...\x1b[0m\n` 
+    });
+    
+    // Check if yarn is available
+    try {
+      const { stdout: yarnPath } = await this.execWithShellPath('which yarn', { cwd: workingDirectory });
+      if (yarnPath.trim()) {
+        this.emit('script-output', { 
+          sessionId, 
+          type: 'stdout', 
+          data: `\x1b[1m\x1b[32myarn found at:\x1b[0m ${yarnPath.trim()}\n` 
+        });
+      }
+    } catch {
+      this.emit('script-output', { 
+        sessionId, 
+        type: 'stdout', 
+        data: `\x1b[1m\x1b[31myarn not found in PATH\x1b[0m\n` 
+      });
+    }
+    
+    let allOutput = '';
+    let overallSuccess = true;
+    
+    // Run commands sequentially
+    for (const command of commands) {
+      if (command.trim()) {
+        console.log(`[SessionManager] Executing build command: ${command}`);
+        
+        // Add command to script output (terminal tab)
+        this.emit('script-output', { 
+          sessionId, 
+          type: 'stdout', 
+          data: `\x1b[1m\x1b[34m$ ${command}\x1b[0m\n` 
+        });
+        
+        try {
+          const { stdout, stderr } = await this.execWithShellPath(command, { cwd: workingDirectory });
+          
+          if (stdout) {
+            allOutput += stdout;
+            this.emit('script-output', { sessionId, type: 'stdout', data: stdout });
+          }
+          if (stderr) {
+            allOutput += stderr;
+            this.emit('script-output', { sessionId, type: 'stderr', data: stderr });
+          }
+        } catch (cmdError: any) {
+          console.error(`[SessionManager] Build command failed: ${command}`, cmdError);
+          const errorMessage = cmdError.stderr || cmdError.stdout || cmdError.message || String(cmdError);
+          allOutput += errorMessage;
+          
+          this.emit('script-output', { 
+            sessionId, 
+            type: 'stderr', 
+            data: `\x1b[1m\x1b[31mCommand failed:\x1b[0m ${command}\n${errorMessage}\n` 
+          });
+          
+          overallSuccess = false;
+          // Continue with next command instead of stopping entirely
+        }
+      }
+    }
+    
+    // Add completion message to script output (terminal tab)
+    const buildEndTimestamp = new Date().toLocaleTimeString();
+    const buildEndMessage = overallSuccess
+      ? `\r\n\x1b[36m[${buildEndTimestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m ✅ BUILD COMPLETED \x1b[0m\r\n\r\n`
+      : `\r\n\x1b[36m[${buildEndTimestamp}]\x1b[0m \x1b[1m\x1b[41m\x1b[37m ❌ BUILD FAILED \x1b[0m\r\n\r\n`;
+    
+    this.emit('script-output', { sessionId, type: 'stdout', data: buildEndMessage });
+    
+    return { success: overallSuccess, output: allOutput };
+  }
+  
+  private async execWithShellPath(command: string, options?: { cwd?: string }): Promise<{ stdout: string; stderr: string }> {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    const shellPath = getShellPath();
+    return execAsync(command, {
+      ...options,
+      env: {
+        ...process.env,
+        PATH: shellPath
+      }
     });
   }
 

@@ -43,9 +43,8 @@ export class WorktreeManager {
     }
   }
 
-  async createWorktree(projectPath: string, name: string, branch?: string, buildScript?: string): Promise<{ worktreePath: string; buildOutput: Array<{ type: string; data: string; timestamp: Date }> }> {
+  async createWorktree(projectPath: string, name: string, branch?: string): Promise<{ worktreePath: string }> {
     console.log(`[WorktreeManager] Creating worktree: ${name} in project: ${projectPath}`);
-    console.log(`[WorktreeManager] Received buildScript parameter:`, buildScript);
     
     const { baseDir } = this.getProjectPaths(projectPath);
     const worktreePath = join(baseDir, name);
@@ -124,57 +123,7 @@ export class WorktreeManager {
       
       console.log(`[WorktreeManager] Worktree created successfully at: ${worktreePath}`);
       
-      const buildOutput: Array<{ type: string; data: string; timestamp: Date }> = [];
-      
-      // Run build script if provided
-      if (buildScript) {
-        console.log(`[WorktreeManager] Running build script...`);
-        console.log(`[WorktreeManager] Build script content:`, buildScript);
-        try {
-          // Split build script into individual commands and run them sequentially
-          const commands = buildScript.split('\n').filter(cmd => cmd.trim());
-          
-          for (const command of commands) {
-            if (command.trim()) {
-              console.log(`[WorktreeManager] Executing: ${command}`);
-              
-              // Add command to output
-              buildOutput.push({
-                type: 'stdout',
-                data: `\x1b[1m\x1b[34m$ ${command}\x1b[0m\n`,
-                timestamp: new Date()
-              });
-              
-              const { stdout, stderr } = await execWithShellPath(command, { cwd: worktreePath });
-              
-              if (stdout) {
-                console.log(`[WorktreeManager] Output:`, stdout);
-                buildOutput.push({
-                  type: 'stdout',
-                  data: stdout,
-                  timestamp: new Date()
-                });
-              }
-              if (stderr) {
-                console.log(`[WorktreeManager] Warning:`, stderr);
-                buildOutput.push({
-                  type: 'stderr',
-                  data: stderr,
-                  timestamp: new Date()
-                });
-              }
-            }
-          }
-          
-          console.log(`[WorktreeManager] Build script completed successfully`);
-        } catch (error: any) {
-          console.error(`[WorktreeManager] Build script failed:`, error);
-          // Don't throw - we still want to create the session even if build fails
-          console.warn(`[WorktreeManager] Continuing despite build script failure`);
-        }
-      }
-      
-      return { worktreePath, buildOutput };
+      return { worktreePath };
     } catch (error) {
       console.error(`[WorktreeManager] Failed to create worktree:`, error);
       throw new Error(`Failed to create worktree: ${error instanceof Error ? error.message : String(error)}`);
