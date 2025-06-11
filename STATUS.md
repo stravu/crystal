@@ -2,10 +2,11 @@
 
 ## Summary
 
-Previous 7 tasks completed. Now implementing 3 new tasks from TODO.md:
-- 🔄 Session count input improvement  
-- 🔄 Running time display fix
-- 🔄 Prompt duration display
+All 10 tasks completed successfully:
+- ✅ Previous 7 tasks (UI improvements, logo positioning, auto-open project, build/run commands, backend cleanup)
+- ✅ Session count input changed from spinner to text input (max 10)
+- ✅ Running time display now shows actual Claude start time
+- ✅ Prompt duration display added to sidebar
 
 ## Changes Progress
 
