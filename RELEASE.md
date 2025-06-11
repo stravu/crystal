@@ -2,7 +2,7 @@
 
 ## Overview
 
-Crystal uses GitHub Actions to automatically build and release for macOS and Linux when you create a new version tag.
+Crystal uses GitHub Actions to automatically build and release for macOS when you create a new version tag.
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ git push origin v0.2.0
 1. Go to the [Actions tab](https://github.com/stravu/crystal/actions)
 2. Watch the "Release Crystal" workflow
 3. The workflow will:
-   - Build Crystal for macOS and Linux
+   - Build Crystal for macOS
    - Upload the artifacts to GitHub
    - Create a draft release
 
@@ -55,7 +55,6 @@ git push origin v0.2.0
 
 The release workflow creates:
 - **macOS**: `Crystal-{version}.dmg`
-- **Linux**: `Crystal-{version}.AppImage`
 
 ## Manual Release (Alternative)
 

@@ -247,14 +247,8 @@ pnpm lint
 ### Building Packaged Electron App
 
 ```bash
-# Build for current platform
-pnpm build
-
-# Build for specific platforms
+# Build for macOS
 pnpm build:mac    # macOS (only works on macOS)
-pnpm build:win    # Windows
-pnpm build:linux  # Linux
-pnpm build:all    # All platforms at once
 ```
 
 ## Project Structure

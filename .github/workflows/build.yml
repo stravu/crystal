@@ -9,18 +9,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            build_cmd: build:linux
-          - os: macos-latest
-            build_cmd: build:mac
-          - os: windows-latest
-            build_cmd: build:win
-
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     steps:
     - name: Checkout code
@@ -50,26 +39,23 @@ jobs:
       run: pnpm run electron:rebuild
 
     - name: Build application
-      run: pnpm run ${{ matrix.build_cmd }}
+      run: pnpm run build:mac
       env:
         # macOS code signing (optional for CI builds)
-        CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
-        CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+        CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
+        CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         # macOS notarization (optional for CI builds)
-        APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
-        APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_APP_PASSWORD || '' }}
-        APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         # Only enable signing when certificates are available
-        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'true' || 'false' }}
+        CSC_IDENTITY_AUTO_DISCOVERY: 'true'
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: crystal-${{ matrix.os }}
-        path: |
-          dist-electron/*.dmg
-          dist-electron/*.AppImage
-          dist-electron/*.exe
+        name: crystal-macos
+        path: dist-electron/*.dmg
         if-no-files-found: error
         retention-days: 7
 

@@ -16,18 +16,7 @@ on:
 
 jobs:
   release:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            build_cmd: build:linux
-          - os: macos-latest
-            build_cmd: build:mac
-          - os: windows-latest
-            build_cmd: build:win
-
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     steps:
     - name: Checkout code
@@ -57,29 +46,21 @@ jobs:
       run: pnpm run electron:rebuild
 
     - name: Build and publish application
-      run: |
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          pnpm run release:linux
-        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-          pnpm run release:mac
-        else
-          pnpm run build:win
-        fi
-      shell: bash
+      run: pnpm run release:mac
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # macOS code signing
-        CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
-        CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+        CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
+        CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         # macOS notarization
-        APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
-        APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_APP_PASSWORD || '' }}
-        APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         # Only enable signing when certificates are available
-        CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'true' || 'false' }}
+        CSC_IDENTITY_AUTO_DISCOVERY: 'true'
 
     - name: Ad-hoc sign macOS app
-      if: matrix.os == 'macos-latest' && !secrets.APPLE_CERTIFICATE
+      if: '!secrets.APPLE_CERTIFICATE'
       run: |
         # Find the built .app
         APP_PATH=$(find dist-electron -name "*.app" -type d | head -1)
@@ -93,11 +74,8 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: crystal-${{ matrix.os }}
-        path: |
-          dist-electron/*.dmg
-          dist-electron/*.AppImage
-          dist-electron/*.exe
+        name: crystal-macos
+        path: dist-electron/*.dmg
         if-no-files-found: error
         retention-days: 7
 
@@ -127,10 +105,6 @@ jobs:
           ### Installation
 
           **macOS**: Download the `.dmg` file and drag Crystal to your Applications folder.
-          
-          **Windows**: Download the `.exe` installer and run it. If you see a security warning, click "More info" → "Run anyway".
-          
-          **Linux**: Download the `.AppImage` file, make it executable with `chmod +x`, and run it.
 
           ### What's New
           - See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details
