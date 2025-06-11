@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from '../utils/formatters';
 import { API } from '../utils/api';
+import { useSessionStore } from '../stores/sessionStore';
 
 interface PromptMarker {
   id: number;
@@ -20,6 +21,42 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
   const [prompts, setPrompts] = useState<PromptMarker[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
+  const activeSession = useSessionStore((state) => state.sessions.find(s => s.id === sessionId));
+
+  const calculateDuration = (currentPrompt: PromptMarker, nextPrompt?: PromptMarker, isLast: boolean = false): string => {
+    const startTime = new Date(currentPrompt.timestamp).getTime();
+    
+    // For the last prompt, only show duration if session is not actively running
+    if (isLast && activeSession && (activeSession.status === 'running' || activeSession.status === 'waiting')) {
+      const durationMs = Date.now() - startTime;
+      const seconds = Math.floor(durationMs / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      
+      if (hours > 0) {
+        return `${hours}h ${minutes % 60}m (ongoing)`;
+      } else if (minutes > 0) {
+        return `${minutes}m ${seconds % 60}s (ongoing)`;
+      } else {
+        return `${seconds}s (ongoing)`;
+      }
+    }
+    
+    const endTime = nextPrompt ? new Date(nextPrompt.timestamp).getTime() : Date.now();
+    const durationMs = endTime - startTime;
+    
+    const seconds = Math.floor(durationMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
 
   useEffect(() => {
     if (!sessionId) return;
@@ -44,6 +81,21 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
     const interval = setInterval(fetchPrompts, 5000);
     return () => clearInterval(interval);
   }, [sessionId]);
+
+  // Update timer for ongoing prompts
+  useEffect(() => {
+    if (!activeSession || (activeSession.status !== 'running' && activeSession.status !== 'waiting')) {
+      return;
+    }
+
+    // Force re-render every second to update ongoing duration
+    const timer = setInterval(() => {
+      // Force component re-render by updating a dummy state
+      setPrompts(prev => [...prev]);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [activeSession?.status]);
 
   const handlePromptClick = (marker: PromptMarker) => {
     setSelectedPromptId(marker.id);
@@ -91,8 +143,12 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
                     <div className="text-sm text-gray-800 line-clamp-2">
                       {marker.prompt_text}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formatDistanceToNow(new Date(marker.timestamp))} ago
+                    <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                      <span>{formatDistanceToNow(new Date(marker.timestamp))} ago</span>
+                      <span className="text-gray-400">•</span>
+                      <span className="font-medium text-gray-600">
+                        {calculateDuration(marker, prompts[index + 1], index === prompts.length - 1)}
+                      </span>
                     </div>
                   </div>
                 </div>

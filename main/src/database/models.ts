@@ -83,6 +83,7 @@ export interface PromptMarker {
   output_index: number;
   output_line?: number;
   timestamp: string;
+  completion_timestamp?: string;
 }
 
 export interface ExecutionDiff {
