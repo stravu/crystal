@@ -2,12 +2,10 @@
 
 ## Summary
 
-All 7 tasks from TODO.md have been successfully completed:
-- ✅ UI improvements (brain emoji timer, legend positioning, diff viewer)  
-- ✅ Logo repositioning to sidebar
-- ✅ Auto-open project after creation
-- ✅ Build/run commands implementation
-- ✅ Backend folder cleanup
+Previous 7 tasks completed. Now implementing 3 new tasks from TODO.md:
+- 🔄 Session count input improvement  
+- 🔄 Running time display fix
+- 🔄 Prompt duration display
 
 ## Changes Progress
 
@@ -20,3 +18,6 @@ All 7 tasks from TODO.md have been successfully completed:
 | Auto-open project | After you create a project, open it automatically | ✅ | ✅ | 1. Modified handleCreateProject 2. Added handleSelectProject call after creation 3. Used response.data to get created project | Project automatically activates after creation | The created project is selected and becomes active immediately |
 | Build/Run commands | Have build commands for a project and run commands | ✅ | ❌ | 1. Added build_script field to projects 2. Created RunCommandManager service 3. Integrated with session lifecycle 4. Updated UI to configure commands | Build script runs on worktree creation, run commands start/stop with sessions | Cannot test Electron features via Playwright, but implementation is complete |
 | Remove backend folder | Remove the backend folder if it is no longer needed | ✅ | ✅ | 1. Checked for references to backend folder 2. Verified no imports or dependencies 3. Removed backend folder 4. Updated CLAUDE.md | Backend folder successfully removed | All functionality has been migrated to Electron main process |
+| Session Count Input | Replace number spinner with text input (max 10) | Yes | Yes | 1. Changed input type from number to text 2. Added regex validation for numbers only 3. Limited max value to 10 4. Added placeholder "1" 5. Updated help text to show "(max 10)" | Successfully changed to text input, only accepts numbers, enforces max 10 limit | Tested via code inspection and frontend dev server |
+| Running Time Display | Fix timestamp to show actual Claude run start time | No | No | - | - | - |
+| Prompt Duration Display | Show duration for each prompt in sidebar | No | No | - | - | - |
