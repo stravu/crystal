@@ -2,13 +2,16 @@ name: Release Crystal
 
 on:
   push:
+    branches: [ main ]
     tags:
       - 'v*'
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       tag:
         description: 'Release tag (e.g., v1.0.0)'
-        required: true
+        required: false
         type: string
 
 jobs:
@@ -86,6 +89,17 @@ jobs:
           echo "Removing quarantine attribute"
           xattr -cr "$APP_PATH"
         fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: crystal-${{ matrix.os }}
+        path: |
+          dist-electron/*.dmg
+          dist-electron/*.AppImage
+          dist-electron/*.exe
+        if-no-files-found: error
+        retention-days: 7
 
   create-release:
     needs: release
