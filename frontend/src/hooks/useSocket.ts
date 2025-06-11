@@ -18,21 +18,25 @@ export function useSocket() {
 
     // Listen for session events
     const unsubscribeSessionCreated = window.electronAPI.events.onSessionCreated((session: Session) => {
+      console.log('[useSocket] Session created:', session.id);
       addSession({...session, output: session.output || [], jsonMessages: session.jsonMessages || []});
     });
     unsubscribeFunctions.push(unsubscribeSessionCreated);
 
     const unsubscribeSessionUpdated = window.electronAPI.events.onSessionUpdated((session: Session) => {
+      console.log('[useSocket] Session updated:', session.id, session.status);
       updateSession({...session, jsonMessages: session.jsonMessages || []});
     });
     unsubscribeFunctions.push(unsubscribeSessionUpdated);
 
     const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((session: Session) => {
+      console.log('[useSocket] Session deleted:', session.id);
       deleteSession(session);
     });
     unsubscribeFunctions.push(unsubscribeSessionDeleted);
 
     const unsubscribeSessionsLoaded = window.electronAPI.events.onSessionsLoaded((sessions: Session[]) => {
+      console.log('[useSocket] Sessions loaded:', sessions.length);
       const sessionsWithJsonMessages = sessions.map(session => ({
         ...session,
         jsonMessages: session.jsonMessages || []
@@ -49,6 +53,7 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionOutput);
 
     const unsubscribeScriptOutput = window.electronAPI.events.onScriptOutput((output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
+      console.log(`[useSocket] Received script output for ${output.sessionId}`);
       // Store script output in session store for display
       useSessionStore.getState().addScriptOutput(output);
     });

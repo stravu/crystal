@@ -7,6 +7,7 @@ import { StatusIndicator } from './StatusIndicator';
 import { PromptNavigation } from './PromptNavigation';
 import CombinedDiffView from './CombinedDiffView';
 import { API } from '../utils/api';
+import type { SessionOutput } from '../types/session';
 import '@xterm/xterm/css/xterm.css';
 
 export function SessionView() {
@@ -97,6 +98,12 @@ export function SessionView() {
     // Reset output length tracking so new content gets written
     lastProcessedOutputLength.current = 0;
     lastProcessedScriptOutputLength.current = 0;
+    
+    // For new sessions, mark as waiting for first output
+    if (activeSession && activeSession.status === 'running' && (!activeSession.output || activeSession.output.length === 0)) {
+      setIsWaitingForFirstOutput(true);
+      setStartTime(Date.now());
+    }
     
     // Don't format output here - let it happen after loadOutputContent completes
   }, [activeSession?.id]); // Changed dependency to activeSession?.id to trigger on session change
@@ -200,7 +207,24 @@ export function SessionView() {
     setLoadError(null);
     
     try {
-      // First, clear any existing output for this session to prevent stale data
+      // Store any outputs that arrive while we're loading
+      const outputBuffer: SessionOutput[] = [];
+      const bufferUnsubscribe = useSessionStore.subscribe((state, prevState) => {
+        const currentSession = state.sessions.find(s => s.id === sessionId);
+        const prevSession = prevState.sessions.find(s => s.id === sessionId);
+        
+        if (currentSession && prevSession) {
+          const newOutputs = currentSession.output.slice(prevSession.output.length);
+          outputBuffer.push(...newOutputs.map((data) => ({
+            sessionId,
+            type: 'stdout' as const,
+            data,
+            timestamp: new Date().toISOString()
+          })));
+        }
+      });
+      
+      // Clear any existing output for this session to prevent stale data
       useSessionStore.getState().clearSessionOutput(sessionId);
       
       const response = await API.sessions.getOutput(sessionId);
@@ -213,6 +237,7 @@ export function SessionView() {
       // Check if we're still on the same session before adding outputs
       const currentActiveSession = useSessionStore.getState().getActiveSession();
       if (!currentActiveSession || currentActiveSession.id !== sessionId) {
+        bufferUnsubscribe();
         return;
       }
       
@@ -220,6 +245,14 @@ export function SessionView() {
       outputs.forEach((output: any) => {
         useSessionStore.getState().addSessionOutput(output);
       });
+      
+      // Add any buffered outputs that arrived while loading
+      outputBuffer.forEach((output) => {
+        useSessionStore.getState().addSessionOutput(output);
+      });
+      
+      // Clean up the buffer subscription
+      bufferUnsubscribe();
       
       // After loading all outputs, we don't need to format here anymore
       // The formatting will happen in the useEffect that watches for changes
@@ -297,6 +330,7 @@ export function SessionView() {
     // Reset terminal when switching sessions (preserves scrollback capability)
     terminalInstance.current.reset();
     lastProcessedOutputLength.current = 0;
+    
     setFormattedOutput(''); // Reset formatted output
 
     // For newly created sessions (status: initializing), add a delay before loading output
@@ -308,22 +342,17 @@ export function SessionView() {
       // Mark that we're waiting for first output
       setIsWaitingForFirstOutput(true);
       
-      // Try loading immediately first to get any initial prompt
-      loadOutputContent(activeSession.id);
-      
-      // Then also try again after a delay in case more output arrives
+      // Load output after a longer delay for new sessions
       setTimeout(() => {
-        // Only reload if we're still on the same session
-        const currentActiveSession = useSessionStore.getState().getActiveSession();
-        if (currentActiveSession && currentActiveSession.id === activeSession.id) {
-          loadOutputContent(activeSession.id);
-        }
-      }, 2000);
+        loadOutputContent(activeSession.id);
+      }, 500);
     } else {
-      // For existing sessions, load immediately
-      setIsWaitingForFirstOutput(false);
-      loadOutputContent(activeSession.id);
+      // For existing sessions, load output after a short delay
+      setTimeout(() => {
+        loadOutputContent(activeSession.id);
+      }, 50);
     }
+    
   }, [activeSession?.id]);
 
   useEffect(() => {
