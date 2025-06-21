@@ -29,6 +29,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [currentContent, setCurrentContent] = useState<string>(file.newValue || '');
   const savedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isProgrammaticUpdateRef = useRef<boolean>(false);
 
   // Get file extension for language detection
   const getLanguage = (filePath: string): string => {
@@ -138,6 +139,12 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
         const newContent = modifiedEditor.getValue();
         setCurrentContent(newContent);
         
+        // Skip auto-save if this is a programmatic update (e.g., from switching commits)
+        if (isProgrammaticUpdateRef.current) {
+          console.log('Skipping auto-save: programmatic update detected');
+          return;
+        }
+        
         // Show pending status immediately
         if (newContent !== file.newValue) {
           setSaveStatus('pending');
@@ -162,9 +169,28 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
 
   // Refresh content when file changes
   useEffect(() => {
+    // Set flag to prevent auto-save during programmatic update
+    isProgrammaticUpdateRef.current = true;
+    
     setCurrentContent(file.newValue || '');
     setSaveStatus('idle');
     setSaveError(null);
+    
+    // Update the editor content if it exists
+    if (editorRef.current) {
+      const modifiedEditor = editorRef.current.getModifiedEditor();
+      const currentValue = modifiedEditor.getValue();
+      
+      // Only update if content is different
+      if (currentValue !== (file.newValue || '')) {
+        modifiedEditor.setValue(file.newValue || '');
+      }
+    }
+    
+    // Reset flag after a small delay to ensure the change event has fired
+    setTimeout(() => {
+      isProgrammaticUpdateRef.current = false;
+    }, 100);
   }, [file.path, file.newValue]);
 
   // Cleanup timeout on unmount
