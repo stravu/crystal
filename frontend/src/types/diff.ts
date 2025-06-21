@@ -44,6 +44,7 @@ export interface DiffViewerProps {
   className?: string;
   sessionId?: string;
   onFileSave?: (filePath: string) => void;
+  isAllCommitsSelected?: boolean;
 }
 
 export interface ExecutionListProps {

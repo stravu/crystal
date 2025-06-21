@@ -131,7 +131,7 @@ const parseUnifiedDiff = (diff: string): FileDiff[] => {
   return files;
 };
 
-const DiffViewer: React.FC<DiffViewerProps> = memo(({ diff, sessionId, className = '', onFileSave }) => {
+const DiffViewer: React.FC<DiffViewerProps> = memo(({ diff, sessionId, className = '', onFileSave, isAllCommitsSelected = true }) => {
   const [viewType, setViewType] = useState<'split' | 'inline'>('split');
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
@@ -290,6 +290,7 @@ const DiffViewer: React.FC<DiffViewerProps> = memo(({ diff, sessionId, className
                       isDarkMode={isDarkMode}
                       viewType={viewType}
                       onSave={() => handleFileSave(file.path)}
+                      isReadOnly={!isAllCommitsSelected}
                     />
                   </div>
                 )}

@@ -11,6 +11,7 @@ interface MonacoDiffViewerProps {
   isDarkMode: boolean;
   viewType: 'split' | 'inline';
   onSave?: () => void;
+  isReadOnly?: boolean;
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'pending';
@@ -20,7 +21,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
   sessionId,
   isDarkMode,
   viewType,
-  onSave
+  onSave,
+  isReadOnly = false
 }) => {
   const editorRef = useRef<MonacoDiffEditor | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -124,37 +126,39 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     [performSave]
   );
 
-  const handleEditorDidMount: DiffEditorProps['onMount'] = (editor) => {
+  const handleEditorDidMount: DiffEditorProps['onMount'] = useCallback((editor: MonacoDiffEditor) => {
     editorRef.current = editor;
     
     // Get the modified editor (right side)
     const modifiedEditor = editor.getModifiedEditor();
     
-    // Track changes and auto-save
-    modifiedEditor.onDidChangeModelContent(() => {
-      const newContent = modifiedEditor.getValue();
-      setCurrentContent(newContent);
-      
-      // Show pending status immediately
-      if (newContent !== file.newValue) {
-        setSaveStatus('pending');
-        setSaveError(null);
-        // Trigger debounced save
-        debouncedSave(newContent);
-      }
-    });
+    // Track changes and auto-save (only if not read-only)
+    if (!isReadOnly) {
+      modifiedEditor.onDidChangeModelContent(() => {
+        const newContent = modifiedEditor.getValue();
+        setCurrentContent(newContent);
+        
+        // Show pending status immediately
+        if (newContent !== file.newValue) {
+          setSaveStatus('pending');
+          setSaveError(null);
+          // Trigger debounced save
+          debouncedSave(newContent);
+        }
+      });
 
-    // Add save keyboard shortcut for immediate save
-    modifiedEditor.addCommand(
-      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
-      () => {
-        const content = modifiedEditor.getValue();
-        // Cancel any pending debounced save
-        debouncedSave.cancel?.();
-        performSave(content);
-      }
-    );
-  };
+      // Add save keyboard shortcut for immediate save
+      modifiedEditor.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+        () => {
+          const content = modifiedEditor.getValue();
+          // Cancel any pending debounced save
+          debouncedSave.cancel?.();
+          performSave(content);
+        }
+      );
+    }
+  }, [isReadOnly, debouncedSave, performSave, file.newValue]);
 
   // Refresh content when file changes
   useEffect(() => {
@@ -173,7 +177,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
   }, []);
 
   const options: monaco.editor.IStandaloneDiffEditorConstructionOptions = {
-    readOnly: false,
+    readOnly: isReadOnly,
     renderSideBySide: viewType === 'split',
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -243,8 +247,13 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
           </span>
         </div>
         
-        {/* Save Status */}
-        {saveStatus !== 'idle' && (
+        {/* Save Status or Read-only indicator */}
+        {isReadOnly ? (
+          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <AlertCircle className="w-3 h-3" />
+            <span>Read-only (select all commits to edit)</span>
+          </div>
+        ) : saveStatus !== 'idle' && (
           <div className={`flex items-center gap-1 text-xs ${getSaveStatusColor()}`}>
             {getSaveStatusIcon()}
             <span>{getSaveStatusText()}</span>

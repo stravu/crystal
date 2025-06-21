@@ -45,9 +45,20 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
           const data = response.data;
           setExecutions(data);
           
-          // If no initial selection, select all executions
-          if (initialSelected.length === 0) {
-            setSelectedExecutions(data.map((exec: ExecutionDiff) => exec.id));
+          // If no initial selection, select all executions by default
+          if (initialSelected.length === 0 && data.length > 0) {
+            // Select all commits (excluding uncommitted changes if present)
+            const allCommitIds = data
+              .filter((exec: ExecutionDiff) => exec.id !== 0)
+              .map((exec: ExecutionDiff) => exec.id);
+            
+            if (allCommitIds.length > 0) {
+              // Select from first to last commit as a range
+              setSelectedExecutions([allCommitIds[allCommitIds.length - 1], allCommitIds[0]]);
+            } else {
+              // If only uncommitted changes exist, select them
+              setSelectedExecutions(data.map((exec: ExecutionDiff) => exec.id));
+            }
           }
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to load executions');
@@ -151,6 +162,20 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       newSet.add(filePath);
       return newSet;
     });
+    
+    // Refresh executions list to show uncommitted changes
+    const refreshExecutions = async () => {
+      try {
+        console.log('Refreshing executions after file save');
+        const response = await API.sessions.getExecutions(sessionId);
+        if (response.success) {
+          setExecutions(response.data);
+        }
+      } catch (err) {
+        console.error('Failed to refresh executions:', err);
+      }
+    };
+    refreshExecutions();
     
     // Refresh only uncommitted changes when a file is saved
     if (selectedExecutions.includes(0)) {
@@ -288,6 +313,27 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
               sessionId={sessionId} 
               className="h-full" 
               onFileSave={handleFileSave}
+              isAllCommitsSelected={(() => {
+                // Check if this is showing all commits
+                const commits = executions.filter(e => e.id !== 0);
+                if (commits.length === 0) return true; // No commits yet
+                
+                // If selectedExecutions is empty, it means "all"
+                if (selectedExecutions.length === 0) return true;
+                
+                // If it's a range selection [start, end], check if it covers all commits
+                if (selectedExecutions.length === 2) {
+                  const [start, end] = selectedExecutions;
+                  const minId = Math.min(start, end);
+                  const maxId = Math.max(start, end);
+                  const firstCommitId = commits[commits.length - 1].id;
+                  const lastCommitId = commits[0].id;
+                  return minId <= firstCommitId && maxId >= lastCommitId;
+                }
+                
+                // Otherwise, check if all commits are individually selected
+                return selectedExecutions.length === executions.length;
+              })()}
             />
           ) : isMainRepo ? (
             <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-400">
