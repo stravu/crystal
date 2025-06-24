@@ -45,7 +45,7 @@ The following packages are licensed under the MIT license:
   - @emotion/unitless (0.10.0)
   - @emotion/utils (1.4.2)
   - @emotion/weak-memoize (0.4.0)
-  - @esbuild/darwin-arm64 (0.25.5)
+  - @esbuild/linux-x64 (0.25.5)
   - @eslint-community/regexpp (4.12.1) - Toru Nagashima
   - @floating-ui/core (1.7.1) - atomiks
   - @floating-ui/dom (1.7.1) - atomiks
@@ -53,14 +53,17 @@ The following packages are licensed under the MIT license:
   - @gar/promisify (1.1.3) - Gar <gar+npm@danger.computer>
   - @homebridge/node-pty-prebuilt-multiarch (0.12.0) - Microsoft Corporation
   - @ioredis/commands (1.2.0) - Zihua Li <i@zihua.li> (http://zihua.li)
+  - @isaacs/balanced-match (4.0.1)
+  - @isaacs/brace-expansion (5.0.0)
   - @jridgewell/gen-mapping (0.3.8) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/resolve-uri (3.1.2) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/set-array (1.2.1) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/sourcemap-codec (1.5.0) - Rich Harris
   - @jridgewell/trace-mapping (0.3.25) - Justin Ridgewell <justin@ridgewell.name>
   - @malept/flatpak-bundler (0.4.0) - Matt Watson <mattdangerw@gmail.com>
-  - @modelcontextprotocol/sdk (1.12.1) - Anthropic, PBC (https://anthropic.com)
-  - @msgpackr-extract/msgpackr-extract-darwin-arm64 (3.0.3) - Kris Zyp
+  - @modelcontextprotocol/sdk (1.13.1) - Anthropic, PBC (https://anthropic.com)
+  - @monaco-editor/loader (1.5.0) - Suren Atoyan <contact@surenatoyan.com>
+  - @msgpackr-extract/msgpackr-extract-linux-x64 (3.0.3) - Kris Zyp
   - @nodelib/fs.scandir (2.1.5)
   - @nodelib/fs.stat (2.0.5)
   - @nodelib/fs.walk (1.2.8)
@@ -69,8 +72,9 @@ The following packages are licensed under the MIT license:
   - @radix-ui/number (1.1.1)
   - @radix-ui/primitive (1.1.2)
   - @radix-ui/rect (1.1.1)
-  - @rolldown/pluginutils (1.0.0-beta.9)
-  - @rollup/rollup-darwin-arm64 (4.42.0) - Lukas Taegert-Atkinson
+  - @rolldown/pluginutils (1.0.0-beta.19)
+  - @rollup/rollup-linux-x64-gnu (4.44.0) - Lukas Taegert-Atkinson
+  - @rollup/rollup-linux-x64-musl (4.44.0) - Lukas Taegert-Atkinson
   - @sindresorhus/is (4.6.0) - Sindre Sorhus
   - @szmarczak/http-timer (4.0.6) - Szymon Marczak
   - @tootallnate/once (2.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
@@ -79,7 +83,7 @@ The following packages are licensed under the MIT license:
   - 7zip-bin (5.2.0)
   - accepts (1.3.8)
   - accepts (2.0.0)
-  - acorn (8.14.1)
+  - acorn (8.15.0)
   - acorn-jsx (5.3.2)
   - agent-base (6.0.2) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - agent-base (7.1.3) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
@@ -102,12 +106,10 @@ The following packages are licensed under the MIT license:
   - arg (5.0.2) - Josh Junon <junon@wavetilt.com>
   - aria-hidden (1.2.6) - Anton Korzunov <thekashey@gmail.com>
   - array-flatten (1.1.1) - Blake Embrey
-  - assert-plus (1.0.0) - Mark Cavage <mcavage@gmail.com>
-  - astral-regex (2.0.0) - Kevin Mårtensson
   - async (3.2.6) - Caolan McMahon
   - async-exit-hook (2.0.1) - Tapani Moilanen
   - asynckit (0.4.0) - Alex Indigo <iam@alexindigo.com>
-  - axios (1.9.0) - Matt Zabriskie
+  - axios (1.10.0) - Matt Zabriskie
   - babel-plugin-macros (3.1.0) - Kent C. Dodds <me@kentcdodds.com> (https://kentcdodds.com)
   - balanced-match (1.0.2) - Julian Gruber
   - base64-js (1.5.1) - T. Jameson Little <t.jameson.little@gmail.com>
@@ -120,8 +122,8 @@ The following packages are licensed under the MIT license:
   - body-parser (1.20.3)
   - body-parser (2.2.0)
   - boolean (3.2.0)
-  - brace-expansion (1.1.11) - Julian Gruber
-  - brace-expansion (2.0.1) - Julian Gruber
+  - brace-expansion (1.1.12) - Julian Gruber
+  - brace-expansion (2.0.2) - Julian Gruber
   - braces (3.0.3) - Jon Schlinkert (https://github.com/jonschlinkert)
   - browserslist (4.25.0) - Andrey Sitnik <andrey@sitnik.ru>
   - buffer (5.7.1) - Feross Aboukhadijeh
@@ -146,7 +148,6 @@ The following packages are licensed under the MIT license:
   - clean-stack (2.2.0) - Sindre Sorhus
   - cli-cursor (3.1.0) - Sindre Sorhus
   - cli-spinners (2.9.2) - Sindre Sorhus
-  - cli-truncate (2.1.0) - Sindre Sorhus
   - clone (1.0.4) - Paul Vorbach <paul@vorba.ch> (http://paul.vorba.ch/)
   - clone-response (1.0.3) - Luke Childs <lukechilds123@gmail.com> (http://lukechilds.co.uk)
   - clsx (2.1.1) - Luke Edwards
@@ -158,7 +159,7 @@ The following packages are licensed under the MIT license:
   - compare-version (0.1.2) - Kevin Mårtensson
   - compress-commons (4.1.2) - Chris Talkington
   - concat-map (0.0.1) - James Halliday
-  - conf (13.1.0) - Sindre Sorhus
+  - conf (14.0.0) - Sindre Sorhus
   - config-file-ts (0.2.8-rc1) - lee mighdoll
   - content-disposition (0.5.4) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - content-disposition (1.0.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
@@ -169,11 +170,9 @@ The following packages are licensed under the MIT license:
   - cookie (0.7.2) - Roman Shtylman <shtylman@gmail.com>
   - cookie-signature (1.0.6) - TJ Holowaychuk <tj@learnboost.com>
   - cookie-signature (1.2.2) - TJ Holowaychuk <tj@learnboost.com>
-  - core-util-is (1.0.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - core-util-is (1.0.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - cors (2.8.5) - Troy Goode <troygoode@gmail.com> (https://github.com/troygoode/)
   - cosmiconfig (7.1.0) - David Clark <david.dave.clark@gmail.com>
-  - crc (3.8.0) - Alex Gorbatchev
   - crc32-stream (4.0.3) - Chris Talkington
   - cron-parser (4.9.0) - Harri Siirak
   - cross-spawn (7.0.6) - André Cruz <andre@moxy.studio>
@@ -199,21 +198,20 @@ The following packages are licensed under the MIT license:
   - dir-compare (4.2.0) - Liviu Grigorescu
   - dlv (1.1.3) - Jason Miller <jason@developit.ca> (http://jasonformat.com)
   - dmg-builder (25.1.8) - Vladimir Krivosheev
-  - dmg-license (1.0.11) - argvminusone
   - dot-prop (9.0.0) - Sindre Sorhus
   - dunder-proto (1.0.1) - Jordan Harband <ljharb@gmail.com>
   - eastasianwidth (0.2.0) - Masaki Komagata
   - ee-first (1.1.1) - Jonathan Ong
-  - electron (36.4.0) - Electron Community
+  - electron (29.4.6) - Electron Community
   - electron-publish (25.1.7) - Vladimir Krivosheev
-  - electron-store (10.0.1) - Sindre Sorhus
+  - electron-store (10.1.0) - Sindre Sorhus
   - electron-updater (6.6.2) - Vladimir Krivosheev
   - emoji-regex (8.0.0) - Mathias Bynens
   - emoji-regex (9.2.2) - Mathias Bynens
   - encodeurl (1.0.2)
   - encodeurl (2.0.0)
   - encoding (0.1.13) - Andris Reinman
-  - end-of-stream (1.4.4) - Mathias Buus <mathiasbuus@gmail.com>
+  - end-of-stream (1.4.5) - Mathias Buus <mathiasbuus@gmail.com>
   - env-paths (2.2.1) - Sindre Sorhus
   - env-paths (3.0.0) - Sindre Sorhus
   - err-code (2.0.3) - IndigoUnited <hello@indigounited.com> (http://indigounited.com)
@@ -232,14 +230,13 @@ The following packages are licensed under the MIT license:
   - eventsource-parser (3.0.2) - Espen Hovlandsdal <espen@hovlandsdal.com>
   - express (4.21.2) - TJ Holowaychuk <tj@vision-media.ca>
   - express (5.1.0) - TJ Holowaychuk <tj@vision-media.ca>
-  - express-rate-limit (7.5.0) - Nathan Friedly
-  - extsprintf (1.4.1)
+  - express-rate-limit (7.5.1) - Nathan Friedly
   - fast-deep-equal (3.1.3) - Evgeny Poberezkin
   - fast-glob (3.3.3) - Denis Malinochkin
   - fast-json-stable-stringify (2.1.0) - James Halliday
   - fast-levenshtein (2.0.6) - Ramesh Nair <ram@hiddentao.com> (http://www.hiddentao.com/)
   - fd-slicer (1.1.0) - Andrew Kelley <superjoe30@gmail.com>
-  - fdir (6.4.5) - thecodrr <thecodrr@protonmail.com>
+  - fdir (6.4.6) - thecodrr <thecodrr@protonmail.com>
   - file-entry-cache (8.0.0) - Jared Wray
   - file-uri-to-path (1.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - fill-range (7.1.1) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -259,8 +256,6 @@ The following packages are licensed under the MIT license:
   - fs-extra (11.3.0) - JP Richardson <jprichardson@gmail.com>
   - fs-extra (8.1.0) - JP Richardson <jprichardson@gmail.com>
   - fs-extra (9.1.0) - JP Richardson <jprichardson@gmail.com>
-  - fsevents (2.3.2)
-  - fsevents (2.3.3)
   - function-bind (1.1.2) - Raynos <raynos2@gmail.com>
   - gensync (1.0.0-beta.2) - Logan Smyth <loganfsmyth@gmail.com>
   - get-intrinsic (1.3.0) - Jordan Harband <ljharb@gmail.com>
@@ -285,7 +280,6 @@ The following packages are licensed under the MIT license:
   - https-proxy-agent (5.0.1) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - https-proxy-agent (7.0.6) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - humanize-ms (1.2.1) - dead-horse
-  - iconv-corefoundation (1.1.7) - argv-minus-one
   - iconv-lite (0.4.24) - Alexander Shtuchkin <ashtuchkin@gmail.com>
   - iconv-lite (0.6.3) - Alexander Shtuchkin <ashtuchkin@gmail.com>
   - ignore (5.3.2) - kael
@@ -369,6 +363,7 @@ The following packages are licensed under the MIT license:
   - minimist (1.2.8) - James Halliday
   - minipass-fetch (2.1.2) - GitHub Inc.
   - minizlib (2.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - monaco-editor (0.52.2) - Microsoft Corporation
   - ms (2.0.0)
   - ms (2.1.3)
   - msgpackr (1.11.4) - Kris Zyp
@@ -381,7 +376,6 @@ The following packages are licensed under the MIT license:
   - negotiator (0.6.4)
   - negotiator (1.0.0)
   - node-abi (3.75.0) - Lukas Geiger
-  - node-addon-api (1.7.2)
   - node-addon-api (3.2.1)
   - node-addon-api (7.1.1)
   - node-api-version (0.1.4) - Tim Fish <tim@timfish.uk>
@@ -431,7 +425,7 @@ The following packages are licensed under the MIT license:
   - prop-types (15.8.1)
   - proxy-addr (2.0.7) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - proxy-from-env (1.1.0) - Rob Wu <rob@robwu.nl> (https://robwu.nl/)
-  - pump (3.0.2) - Mathias Buus Madsen <mathiasbuus@gmail.com>
+  - pump (3.0.3) - Mathias Buus Madsen <mathiasbuus@gmail.com>
   - punycode (2.3.1) - Mathias Bynens
   - queue-microtask (1.2.3) - Feross Aboukhadijeh
   - quick-lru (5.1.1) - Sindre Sorhus
@@ -461,7 +455,7 @@ The following packages are licensed under the MIT license:
   - restore-cursor (3.1.0) - Sindre Sorhus
   - retry (0.12.0) - Tim Koschützki <tim@debuggable.com> (http://debuggable.com/)
   - reusify (1.1.0) - Matteo Collina <hello@matteocollina.com>
-  - rollup (4.42.0) - Rich Harris
+  - rollup (4.44.0) - Rich Harris
   - router (2.2.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - run-parallel (1.2.0) - Feross Aboukhadijeh
   - safe-buffer (5.1.2) - Feross Aboukhadijeh
@@ -484,13 +478,13 @@ The following packages are licensed under the MIT license:
   - simple-concat (1.0.1) - Feross Aboukhadijeh
   - simple-get (4.0.1) - Feross Aboukhadijeh
   - simple-update-notifier (2.0.0) - alexbrazier
-  - slice-ansi (3.0.0)
   - smart-buffer (4.2.0) - Josh Glazebrook
-  - socks (2.8.4) - Josh Glazebrook
+  - socks (2.8.5) - Josh Glazebrook
   - socks-proxy-agent (7.0.0) - Nathan Rajlich
   - source-map-support (0.5.21)
   - standard-as-callback (2.1.0) - luin <i@zihua.li>
   - stat-mode (1.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
+  - state-local (1.0.7) - Suren Atoyan <contact@surenatoyan.com>
   - statuses (2.0.1)
   - statuses (2.0.2)
   - string_decoder (1.1.1)
@@ -533,7 +527,6 @@ The following packages are licensed under the MIT license:
   - utils-merge (1.0.1) - Jared Hanson
   - uuid (8.3.2)
   - vary (1.1.2) - Douglas Christopher Wilson <doug@somethingdoug.com>
-  - verror (1.10.1)
   - wcwidth (1.0.1) - Tim Oxley
   - when-exit (2.1.4)
   - word-wrap (1.2.5) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -544,7 +537,7 @@ The following packages are licensed under the MIT license:
   - yauzl (2.10.0) - Josh Wolfe <thejoshwolfe@gmail.com>
   - yocto-queue (0.1.0) - Sindre Sorhus
   - zip-stream (4.1.1) - Chris Talkington
-  - zod (3.25.56) - Colin McDonnell <zod@colinhacks.com>
+  - zod (3.25.67) - Colin McDonnell <zod@colinhacks.com>
 
 MIT License
 
@@ -575,7 +568,7 @@ The following packages are licensed under the ISC license:
   - cliui (8.0.1) - Ben Coe <ben@npmjs.com>
   - color-support (1.1.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - console-control-strings (1.1.0) - Rebecca Turner <me@re-becca.org> (http://re-becca.org/)
-  - electron-to-chromium (1.5.165) - Kilian Valkhof
+  - electron-to-chromium (1.5.172) - Kilian Valkhof
   - fastq (1.19.1) - Matteo Collina <hello@matteocollina.com>
   - flatted (3.3.3) - Andrea Giammarchi
   - foreground-child (3.3.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
@@ -584,7 +577,7 @@ The following packages are licensed under the ISC license:
   - gauge (4.0.4) - GitHub Inc.
   - get-caller-file (2.0.5) - Stefan Penner
   - glob (10.4.5) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
-  - glob (11.0.2) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
+  - glob (11.0.3) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
   - glob (7.2.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - glob (8.1.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - glob-parent (5.1.2) - Gulp Team <team@gulpjs.com> (https://gulpjs.com/)
@@ -605,7 +598,7 @@ The following packages are licensed under the ISC license:
   - lru-cache (7.18.3) - Isaac Z. Schlueter <i@izs.me>
   - lucide-react (0.468.0) - Eric Fennis
   - make-fetch-happen (10.2.1) - GitHub Inc.
-  - minimatch (10.0.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
+  - minimatch (10.0.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (3.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (5.1.6) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (9.0.5) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
@@ -670,7 +663,7 @@ The following packages are licensed under the Apache-2.0 license:
   - @humanwhocodes/module-importer (1.0.1) - Nicholas C. Zaks
   - @humanwhocodes/retry (0.3.1) - Nicholas C. Zaks
   - @humanwhocodes/retry (0.4.3) - Nicholas C. Zaks
-  - @img/sharp-darwin-arm64 (0.33.5) - Lovell Fuller <npm@lovell.info>
+  - @img/sharp-linux-x64 (0.33.5) - Lovell Fuller <npm@lovell.info>
   - @malept/cross-spawn-promise (2.0.0) - Mark Lee
   - class-variance-authority (0.7.1) - Joe Bell (https://joebell.co.uk)
   - cluster-key-slot (1.1.2) - Mike Diarmid
@@ -682,7 +675,7 @@ The following packages are licensed under the Apache-2.0 license:
   - exponential-backoff (3.1.2) - Sami Sayegh
   - filelist (1.0.4) - Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)
   - jake (10.9.2) - Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)
-  - openai (5.1.1) - OpenAI <support@openai.com>
+  - openai (5.7.0) - OpenAI <support@openai.com>
   - readdir-glob (1.1.3) - Yann Armelin
   - rxjs (7.8.2) - Ben Lesh <ben@benlesh.com>
   - sumchecker (3.0.1) - Mark Lee
@@ -1405,7 +1398,7 @@ The following packages are licensed under the BSD-2-Clause license:
   - @electron/osx-sign (1.3.1) - electron
   - dotenv (16.5.0)
   - dotenv-expand (11.0.7) - motdotla
-  - espree (10.3.0) - Nicholas C. Zakas <nicholas+npm@nczconsulting.com>
+  - espree (10.4.0) - Nicholas C. Zakas <nicholas+npm@nczconsulting.com>
   - esrecurse (4.3.0)
   - estraverse (5.3.0)
   - esutils (2.0.3)
@@ -1867,7 +1860,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ================================================================================
 
 Package: caniuse-lite
-Version: 1.0.30001721
+Version: 1.0.30001724
 Author: Ben Briggs
 Repository: browserslist/caniuse-lite
 
@@ -2273,7 +2266,7 @@ Creative Commons may be contacted at creativecommons.org.
 ## LGPL-3.0-or-later LICENSE
 ================================================================================
 
-Package: @img/sharp-libvips-darwin-arm64
+Package: @img/sharp-libvips-linux-x64
 Version: 1.0.4
 Author: Lovell Fuller <npm@lovell.info>
 Homepage: https://sharp.pixelplumbing.com
@@ -2552,7 +2545,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ================================================================================
 
 Package: @anthropic-ai/claude-code
-Version: 1.0.17
+Version: 1.0.33
 Author: Boris Cherny <boris@anthropic.com>
 Homepage: https://github.com/anthropics/claude-code
 
@@ -2565,7 +2558,7 @@ Homepage: https://github.com/anthropics/claude-code
 ================================================================================
 
 Package: Crystal
-Version: 0.1.2
+Version: 0.1.5
 Author: Crystal Team
 License: MIT
 

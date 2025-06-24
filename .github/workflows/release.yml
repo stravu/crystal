@@ -9,7 +9,7 @@ jobs:
   release:
     strategy:
       matrix:
-        os: [macos-latest]  # ubuntu-latest commented out
+        os: [macos-latest, ubuntu-latest, windows-latest]
         include:
           - os: macos-latest
             release_cmd: release:mac
@@ -18,15 +18,22 @@ jobs:
               dist-electron/*.dmg
               dist-electron/*.zip
               dist-electron/latest-mac.yml
-          # - os: ubuntu-latest
-          #   release_cmd: release:linux
-          #   artifact_name: crystal-linux
-          #   artifact_path: |
-          #     dist-electron/*.deb
-          #     dist-electron/*.AppImage
-          #     dist-electron/*.snap
-          #     dist-electron/*.flatpak
-          #     dist-electron/latest-linux.yml
+          - os: ubuntu-latest
+            release_cmd: release:linux
+            artifact_name: crystal-linux
+            artifact_path: |
+              dist-electron/*.deb
+              dist-electron/*.AppImage
+              dist-electron/*.snap
+              dist-electron/*.flatpak
+              dist-electron/latest-linux.yml
+          - os: windows-latest
+            release_cmd: release:win
+            artifact_name: crystal-windows
+            artifact_path: |
+              dist-electron/*.exe
+              dist-electron/*.msi
+              dist-electron/latest.yml
     
     runs-on: ${{ matrix.os }}
     
@@ -48,11 +55,14 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22.15.1'
+        node-version: '20.18.0'
         cache: 'pnpm'
 
     - name: Install dependencies
       run: pnpm install
+
+    - name: Verify Electron version
+      run: pnpm list electron
 
     - name: Build main process
       run: pnpm run build:main
@@ -78,42 +88,42 @@ jobs:
     - name: List release artifacts
       run: ls -la dist-electron/
 
-    # - name: Build Flatpak
-    #   if: matrix.os == 'ubuntu-latest'
-    #   run: |
-    #     # Install flatpak-builder
-    #     sudo apt-get update
-    #     sudo apt-get install -y flatpak flatpak-builder
-    #     
-    #     # Add flathub repository
-    #     sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-    #     
-    #     # Install required runtime and SDK
-    #     sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.electronjs.Electron2.BaseApp//23.08
-    #     
-    #     # Find the actual AppImage file
-    #     echo "Looking for AppImage files..."
-    #     ls -la dist-electron/*.AppImage || true
-    #     
-    #     # Get the AppImage path (handle different naming patterns)
-    #     APPIMAGE=$(ls dist-electron/*.AppImage 2>/dev/null | head -n1)
-    #     if [ -z "$APPIMAGE" ]; then
-    #       echo "Error: No AppImage found in dist-electron/"
-    #       exit 1
-    #     fi
-    #     echo "Found AppImage: $APPIMAGE"
-    #     
-    #     # Update manifest with actual AppImage path
-    #     sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" com.stravu.crystal.yml
-    #     
-    #     # Build Flatpak
-    #     flatpak-builder --force-clean --repo=repo build-dir com.stravu.crystal.yml
-    #     
-    #     # Create bundle
-    #     flatpak build-bundle repo dist-electron/crystal.flatpak com.stravu.crystal
-    #     
-    #     # List artifacts again to confirm
-    #     ls -la dist-electron/
+    - name: Build Flatpak
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Install flatpak-builder
+        sudo apt-get update
+        sudo apt-get install -y flatpak flatpak-builder
+        
+        # Add flathub repository
+        sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        
+        # Install required runtime and SDK
+        sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.electronjs.Electron2.BaseApp//23.08
+        
+        # Find the actual AppImage file
+        echo "Looking for AppImage files..."
+        ls -la dist-electron/*.AppImage || true
+        
+        # Get the AppImage path (handle different naming patterns)
+        APPIMAGE=$(ls dist-electron/*.AppImage 2>/dev/null | head -n1)
+        if [ -z "$APPIMAGE" ]; then
+          echo "Error: No AppImage found in dist-electron/"
+          exit 1
+        fi
+        echo "Found AppImage: $APPIMAGE"
+        
+        # Update manifest with actual AppImage path
+        sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" com.stravu.crystal.yml
+        
+        # Build Flatpak
+        flatpak-builder --force-clean --repo=repo build-dir com.stravu.crystal.yml
+        
+        # Create bundle
+        flatpak build-bundle repo dist-electron/crystal.flatpak com.stravu.crystal
+        
+        # List artifacts again to confirm
+        ls -la dist-electron/
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

@@ -19,10 +19,26 @@ export class TerminalSessionManager extends EventEmitter {
     // Clean up any existing session
     this.closeTerminalSession(sessionId);
 
-    // For Linux, use the current PATH to avoid slow shell detection
+    // Platform-specific shell and PATH handling
+    const isWindows = process.platform === 'win32';
     const isLinux = process.platform === 'linux';
-    const shellPath = isLinux ? (process.env.PATH || '') : getShellPath();
-    const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/bash';
+    
+    let shell: string;
+    let shellPath: string;
+    
+    if (isWindows) {
+      // On Windows, prefer PowerShell but fall back to cmd.exe
+      shell = process.env.COMSPEC || 'cmd.exe';
+      shellPath = getShellPath();
+    } else if (isLinux) {
+      // For Linux, use current PATH to avoid slow shell detection
+      shell = process.env.SHELL || '/bin/bash';
+      shellPath = process.env.PATH || '';
+    } else {
+      // macOS and other Unix-like systems
+      shell = process.env.SHELL || '/bin/bash';
+      shellPath = getShellPath();
+    }
     
     // Create a new PTY instance
     const ptyProcess = pty.spawn(shell, [], {

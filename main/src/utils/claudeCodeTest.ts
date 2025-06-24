@@ -13,7 +13,7 @@ const execAsync = promisify(exec);
 export function getAugmentedPath(): string {
   const platform = os.platform();
   const homeDir = os.homedir();
-  const pathSeparator = platform === 'win32' ? ';' : ':';
+  const pathSeparator = path.delimiter;
   
   // Start with existing PATH
   const paths = (process.env.PATH || '').split(pathSeparator);
@@ -52,7 +52,18 @@ export function getAugmentedPath(): string {
       'C:\\Program Files (x86)\\Claude',
       path.join(homeDir, 'AppData', 'Local', 'Programs', 'Claude'),
       path.join(homeDir, 'AppData', 'Roaming', 'npm'),
-      path.join(homeDir, '.yarn', 'bin')
+      path.join(homeDir, 'AppData', 'Local', 'Yarn', 'bin'),
+      path.join(homeDir, '.yarn', 'bin'),
+      // Windows-specific paths for Python and other tools
+      'C:\\Python39\\Scripts',
+      'C:\\Python310\\Scripts',
+      'C:\\Python311\\Scripts',
+      'C:\\Python312\\Scripts',
+      path.join(process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local'), 'Programs', 'Python'),
+      // Scoop package manager
+      path.join(homeDir, 'scoop', 'shims'),
+      // Chocolatey package manager
+      'C:\\ProgramData\\chocolatey\\bin'
     );
   }
   

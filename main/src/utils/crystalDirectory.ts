@@ -14,7 +14,7 @@ export function setCrystalDirectory(dir: string): void {
 /**
  * Gets the Crystal directory path. Returns the custom directory if set,
  * otherwise falls back to the environment variable CRYSTAL_DIR,
- * and finally defaults to ~/.crystal
+ * and finally defaults to platform-specific location
  */
 export function getCrystalDirectory(): string {
   // 1. Check if custom directory was set programmatically
@@ -28,8 +28,17 @@ export function getCrystalDirectory(): string {
     return envDir;
   }
 
-  // 3. Default to ~/.crystal
-  return join(homedir(), '.crystal');
+  // 3. Default to platform-specific location
+  const isWindows = process.platform === 'win32';
+  
+  if (isWindows) {
+    // On Windows, use %APPDATA%\Crystal for better integration
+    const appData = process.env.APPDATA || join(homedir(), 'AppData', 'Roaming');
+    return join(appData, 'Crystal');
+  } else {
+    // On Unix-like systems, use ~/.crystal
+    return join(homedir(), '.crystal');
+  }
 }
 
 /**

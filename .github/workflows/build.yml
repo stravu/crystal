@@ -11,7 +11,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         include:
           - os: macos-latest
             build_cmd: build:mac
@@ -25,6 +25,12 @@ jobs:
               dist-electron/*.AppImage
               dist-electron/*.snap
               dist-electron/*.flatpak
+          - os: windows-latest
+            build_cmd: build:win
+            artifact_name: crystal-windows
+            artifact_path: |
+              dist-electron/*.exe
+              dist-electron/*.msi
     
     runs-on: ${{ matrix.os }}
 
@@ -43,11 +49,14 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22.15.1'
+        node-version: '20.18.0'
         cache: 'pnpm'
 
     - name: Install dependencies
       run: pnpm install
+
+    - name: Verify Electron version
+      run: pnpm list electron
 
     - name: Build main process
       run: pnpm run build:main

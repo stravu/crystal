@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(pnpm run:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(grep:*)",
+      "Bash(source:*)",
+      "Bash(pnpm:*)",
+      "Bash(export PNPM_HOME=\"/home/matth/.local/share/pnpm\")",
+      "Bash(export PATH=\"$PNPM_HOME:$PATH\")",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  }
+}
