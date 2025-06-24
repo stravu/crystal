@@ -9,7 +9,10 @@
       "Bash(pnpm:*)",
       "Bash(export PNPM_HOME=\"/home/matth/.local/share/pnpm\")",
       "Bash(export PATH=\"$PNPM_HOME:$PATH\")",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(rm:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

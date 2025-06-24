@@ -50,6 +50,7 @@ coverage/
 
 # Git worktrees (except the main directory)
 /worktree-*/
+worktrees/
 
 # Claude Code session data
 sessions/
@@ -79,3 +80,4 @@ release/
 *.db-journal
 
 # Generated files
+test-results/
