@@ -91,7 +91,9 @@ export function getAugmentedPath(): string {
     }
   }
   
-  return paths.join(pathSeparator);
+  // Deduplicate paths to avoid redundant PATH entries
+  const dedupedPaths = Array.from(new Set(paths));
+  return dedupedPaths.join(pathSeparator);
 }
 
 /**
