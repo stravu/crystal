@@ -14,7 +14,7 @@ jobs:
         os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
-            build_cmd: build:mac
+            build_cmd: build:mac:universal
             artifact_name: crystal-macos
             artifact_path: dist-electron/*.dmg
           - os: ubuntu-latest

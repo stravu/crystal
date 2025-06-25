@@ -74,6 +74,15 @@ To verify Intel Mac support:
    - Database operations (uses better-sqlite3)
    - Claude Code integration
 
+## CI/CD Updates
+
+The GitHub Actions workflows have been updated to build universal binaries by default:
+
+- **`.github/workflows/build.yml`**: Changed from `build:mac` to `build:mac:universal`
+- **`.github/workflows/release.yml`**: Changed from `release:mac` to `release:mac:universal`
+
+This ensures that all CI builds and releases automatically create universal binaries that work on both Intel and Apple Silicon Macs.
+
 ## Release Process
 
 For releases supporting both architectures:
@@ -82,3 +91,8 @@ pnpm run release:mac:universal
 ```
 
 This creates a universal binary and publishes it to the configured release channel.
+
+When pushing a release tag, GitHub Actions will automatically:
+1. Build a universal binary DMG
+2. Create a GitHub release
+3. Upload the universal binary that works on all Macs
