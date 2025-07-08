@@ -91,6 +91,14 @@ When everything looks good:
 
 ## Building from Source
 
+### Prerequisites
+
+- Node.js 22.14.0 or higher
+- pnpm 8.0.0 or higher
+- Python 3.x (for building native modules)
+  - **Python 3.12+ users**: You'll need to install setuptools: `python3 -m pip install setuptools`
+  - Alternatively, use Python 3.11 or earlier
+
 ```bash
 # Clone the repository
 git clone https://github.com/stravu/crystal.git
@@ -102,6 +110,8 @@ pnpm run setup
 # Run in development
 pnpm run electron-dev
 ```
+
+**Note**: If you encounter Python-related errors during setup, run `node scripts/check-python.js` to diagnose the issue.
 
 ## Building for Production
 
