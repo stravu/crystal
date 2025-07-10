@@ -12,9 +12,7 @@
 
 Crystal is an Electron desktop application that lets you run, inspect, and test multiple Claude Code instances simultaneously using git worktrees. Crystal is an independent project created by [Stravu](https://stravu.com/). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
 
-<div align="center">
-  <iframe width="640" height="412" src="https://www.loom.com/embed/2aadafbdbdb74d93a07a4dfdb1bae9db?sid=6664f19b-4f02-48cd-87ce-26ad3aec8066" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
-</div>
+<iframe width="640" height="412" src="https://www.loom.com/embed/2aadafbdbdb74d93a07a4dfdb1bae9db?sid=e95121e7-0620-4c07-b348-d5ea61e06e35" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
 
 ## The Crystal Workflow
 
