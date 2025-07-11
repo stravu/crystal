@@ -20,6 +20,7 @@ import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
 import { ClaudeCodeManager } from './services/claudeCodeManager';
+import { setupContentSecurityPolicy, setupAdditionalSecurity } from './security/contentSecurityPolicy';
 
 let mainWindow: BrowserWindow | null = null;
 let taskQueue: TaskQueue | null = null;
@@ -388,7 +389,14 @@ async function initializeServices() {
 }
 
 app.whenReady().then(async () => {
-  console.log('[Main] App is ready, initializing services...');
+  console.log('[Main] App is ready, setting up security policies...');
+  
+  // Setup security measures before creating window
+  setupContentSecurityPolicy();
+  setupAdditionalSecurity();
+  console.log('[Main] Security policies configured');
+  
+  console.log('[Main] Initializing services...');
   await initializeServices();
   console.log('[Main] Services initialized, creating window...');
   await createWindow();
