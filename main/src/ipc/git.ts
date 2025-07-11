@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 import { execSync } from '../utils/commandExecutor';
+import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager } = services;
@@ -114,15 +115,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       // Stage all changes
       execSync('git add -A', { cwd: session.worktreePath });
 
-      // Create the commit with Crystal's signature
-      const commitCommand = `git commit -m "$(cat <<'EOF'
-${message}
-
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"`.replace(/\n/g, '\\n');
+      // Create the commit with Crystal's signature using safe escaping
+      const commitCommand = buildGitCommitCommand(message);
 
       try {
         execSync(commitCommand, { 
@@ -939,8 +933,10 @@ EOF
       const mainBranch = await worktreeManager.getEffectiveMainBranch(project);
 
       // Get current branch name
-      const { execSync } = require('child_process');
-      const currentBranch = execSync(`cd "${session.worktreePath}" && git branch --show-current`, { encoding: 'utf8' }).trim();
+      const currentBranch = execSync('git branch --show-current', { 
+        cwd: session.worktreePath,
+        encoding: 'utf8' 
+      }).trim();
 
       const rebaseCommands = worktreeManager.generateRebaseCommands(mainBranch);
       const squashCommands = worktreeManager.generateSquashCommands(mainBranch, currentBranch);

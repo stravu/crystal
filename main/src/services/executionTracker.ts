@@ -4,6 +4,7 @@ import type { SessionManager } from './sessionManager';
 import { GitDiffManager, type GitDiffResult } from './gitDiffManager';
 import type { CreateExecutionDiffData } from '../database/models';
 import { execSync } from '../utils/commandExecutor';
+import { buildGitCommitCommand } from '../utils/shellEscape';
 import { formatForDisplay } from '../utils/timestampUtils';
 
 interface ExecutionContext {
@@ -102,8 +103,9 @@ export class ExecutionTracker extends EventEmitter {
               commitMessage = commitMessage.substring(0, MAX_COMMIT_MESSAGE_LENGTH - 3) + '...';
             }
             
-            // Commit with the prompt as the message
-            execSync(`git commit -m ${JSON.stringify(commitMessage)}`, { cwd: context.worktreePath });
+            // Commit with the prompt as the message using safe escaping
+            const commitCommand = buildGitCommitCommand(commitMessage);
+            execSync(commitCommand, { cwd: context.worktreePath });
             
             this.logger?.verbose(`Auto-committed changes with message: ${commitMessage}`);
           }
