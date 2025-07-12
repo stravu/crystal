@@ -5,7 +5,6 @@ export interface Project {
   system_prompt?: string;
   run_script?: string;
   build_script?: string;
-  main_branch?: string; // Deprecated - kept for backward compatibility but ignored by the application
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -29,7 +28,6 @@ export interface CreateProjectRequest {
   systemPrompt?: string;
   runScript?: string;
   buildScript?: string;
-  mainBranch?: string; // Deprecated - ignored by the application
   openIdeCommand?: string;
 }
 
@@ -39,7 +37,6 @@ export interface UpdateProjectRequest {
   system_prompt?: string;
   run_script?: string;
   build_script?: string;
-  main_branch?: string; // Deprecated - ignored by the application
   active?: boolean;
   open_ide_command?: string;
   worktree_folder?: string;

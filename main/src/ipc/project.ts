@@ -74,7 +74,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       let mainBranch: string | undefined;
       if (isGitRepo) {
         try {
-          mainBranch = await worktreeManager.detectMainBranch(projectData.path);
+          mainBranch = await worktreeManager.getProjectMainBranch(projectData.path);
           console.log('[Main] Detected main branch:', mainBranch);
         } catch (error) {
           console.log('[Main] Could not detect main branch, skipping:', error);
@@ -240,7 +240,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('projects:detect-branch', async (_event, path: string) => {
     try {
-      const branch = await worktreeManager.detectMainBranch(path);
+      const branch = await worktreeManager.getProjectMainBranch(path);
       return { success: true, data: branch };
     } catch (error) {
       console.log('[Main] Could not detect branch:', error);

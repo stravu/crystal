@@ -1,6 +1,17 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.1.14] - 2025-07-11
+
+### Fixed
+- Fixed git main branch detection to properly detect the repository's actual main branch
+- Fixed terminal and output screens auto-scrolling when user is not at the bottom
+- Fixed delay in streaming new output to improve real-time responsiveness
+
+### Improved
+- Better handling of git commit list display
+- Updated Crystal-on-Crystal instructions for improved self-hosting experience
+
 ## [0.1.13] - 2025-07-09
 
 ### Added

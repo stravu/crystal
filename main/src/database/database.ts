@@ -646,9 +646,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, main_branch, build_script, default_permission_mode, open_ide_command, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder);
+      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder);
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -705,10 +705,6 @@ export class DatabaseService {
     if (updates.build_script !== undefined) {
       fields.push('build_script = ?');
       values.push(updates.build_script);
-    }
-    if (updates.main_branch !== undefined) {
-      fields.push('main_branch = ?');
-      values.push(updates.main_branch);
     }
     if (updates.default_permission_mode !== undefined) {
       fields.push('default_permission_mode = ?');

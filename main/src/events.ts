@@ -233,13 +233,32 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         }
 
         // Get commit history for this branch
-        let mainBranch = 'main';
-        try {
-          mainBranch = await worktreeManager.detectMainBranch(session.worktreePath);
-        } catch (error) {
-          console.log(`[Main] Could not detect main branch, using default: ${error}`);
+        const project = sessionManager.getProjectForSession(session.id);
+        if (!project?.path) {
+          throw new Error('Project path not found for session');
         }
-        const commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
+        const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
+        
+        console.log(`[Events] Getting commits for session summary`);
+        console.log(`[Events] Project path: ${project?.path || 'not found'}`);
+        console.log(`[Events] Using main branch: ${mainBranch}`);
+        
+        let commits: any[] = [];
+        try {
+          commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
+          console.log(`[Events] getCommitHistory returned ${commits.length} commits`);
+        } catch (error) {
+          console.error(`[Events] Error getting commit history:`, error);
+          // If there's an error, try without specifying main branch (get all commits)
+          try {
+            const fallbackCommand = `git log --format="%H|%s|%ai|%an" --numstat -n 10`;
+            console.log(`[Events] Trying fallback command: ${fallbackCommand}`);
+            const logOutput = execSync(fallbackCommand, { cwd: session.worktreePath, encoding: 'utf8' });
+            console.log(`[Events] Fallback command output: ${logOutput.substring(0, 200)}...`);
+          } catch (fallbackError) {
+            console.error(`[Events] Fallback also failed:`, fallbackError);
+          }
+        }
 
         if (commits.length > 0) {
           commitInfo += `\x1b[1m\x1b[32m📝 Commits in this session:\x1b[0m\r\n`;
@@ -323,13 +342,32 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         }
 
         // Get commit history for this branch
-        let mainBranch = 'main';
-        try {
-          mainBranch = await worktreeManager.detectMainBranch(session.worktreePath);
-        } catch (error) {
-          console.log(`[Main] Could not detect main branch, using default: ${error}`);
+        const project = sessionManager.getProjectForSession(session.id);
+        if (!project?.path) {
+          throw new Error('Project path not found for session');
         }
-        const commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
+        const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
+        
+        console.log(`[Events] Getting commits for session summary`);
+        console.log(`[Events] Project path: ${project?.path || 'not found'}`);
+        console.log(`[Events] Using main branch: ${mainBranch}`);
+        
+        let commits: any[] = [];
+        try {
+          commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
+          console.log(`[Events] getCommitHistory returned ${commits.length} commits`);
+        } catch (error) {
+          console.error(`[Events] Error getting commit history:`, error);
+          // If there's an error, try without specifying main branch (get all commits)
+          try {
+            const fallbackCommand = `git log --format="%H|%s|%ai|%an" --numstat -n 10`;
+            console.log(`[Events] Trying fallback command: ${fallbackCommand}`);
+            const logOutput = execSync(fallbackCommand, { cwd: session.worktreePath, encoding: 'utf8' });
+            console.log(`[Events] Fallback command output: ${logOutput.substring(0, 200)}...`);
+          } catch (fallbackError) {
+            console.error(`[Events] Fallback also failed:`, fallbackError);
+          }
+        }
 
         if (commits.length > 0) {
           commitInfo += `\x1b[1m\x1b[32m📝 Commits before error:\x1b[0m\r\n`;
