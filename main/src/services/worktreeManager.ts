@@ -249,90 +249,38 @@ export class WorktreeManager {
     }
   }
 
-  async detectMainBranch(projectPath: string): Promise<string> {
-    try {
-      // Try to get the default branch from remote first
-      try {
-        // Use cross-platform approach
-        let remoteHead = '';
-        try {
-          const result = await execWithShellPath(`git symbolic-ref refs/remotes/origin/HEAD`, { cwd: projectPath });
-          remoteHead = result.stdout;
-        } catch {
-          // Remote HEAD not available
-          remoteHead = '';
-        }
-        if (remoteHead.trim()) {
-          const mainBranch = remoteHead.trim().replace('refs/remotes/origin/', '');
-          console.log(`[WorktreeManager] Detected main branch from remote: ${mainBranch}`);
-          return mainBranch;
-        }
-      } catch {
-        // Remote HEAD not available, continue with other methods
-      }
-
-      // Try to get current branch
-      try {
-        // Use cross-platform approach
-        let currentBranch = '';
-        try {
-          const result = await execWithShellPath(`git branch --show-current`, { cwd: projectPath });
-          currentBranch = result.stdout;
-        } catch {
-          // Current branch not available
-          currentBranch = '';
-        }
-        if (currentBranch.trim()) {
-          console.log(`[WorktreeManager] Using current branch as main: ${currentBranch.trim()}`);
-          return currentBranch.trim();
-        }
-      } catch {
-        // Current branch not available
-      }
-
-      // Try common main branch names
-      const commonNames = ['main', 'master', 'develop', 'dev'];
-      for (const branchName of commonNames) {
-        try {
-          await execWithShellPath(`git show-ref --verify --quiet refs/heads/${branchName}`, { cwd: projectPath });
-          console.log(`[WorktreeManager] Found common main branch: ${branchName}`);
-          return branchName;
-        } catch {
-          // Branch doesn't exist, try next
-        }
-      }
-
-      // Fallback to 'main' as default
-      console.log(`[WorktreeManager] No main branch detected, defaulting to 'main'`);
-      return 'main';
-    } catch (error) {
-      console.error(`[WorktreeManager] Error detecting main branch:`, error);
-      return 'main';
-    }
-  }
-
   async getProjectMainBranch(projectPath: string): Promise<string> {
+    console.log(`[WorktreeManager] getProjectMainBranch called with path: ${projectPath}`);
+    
     try {
-      // Get the current branch of the main project directory (not a worktree)
-      const result = await execWithShellPath(`git branch --show-current`, { cwd: projectPath });
-      const currentBranch = result.stdout.trim();
+      // ONLY check the current branch in the project root directory
+      const currentBranchResult = await execWithShellPath(`git branch --show-current`, { cwd: projectPath });
+      const currentBranch = currentBranchResult.stdout.trim();
+      console.log(`[WorktreeManager] Current branch in project directory: ${currentBranch}`);
       
       if (currentBranch) {
-        console.log(`[WorktreeManager] Main project directory is on branch: ${currentBranch}`);
         return currentBranch;
       }
       
-      // If we can't get the current branch, fall back to detectMainBranch
-      return await this.detectMainBranch(projectPath);
+      // Throw error if we're in detached HEAD state
+      throw new Error(`Cannot determine main branch: repository at ${projectPath} is in detached HEAD state`);
     } catch (error) {
-      console.error(`[WorktreeManager] Error getting project main branch:`, error);
-      // Fall back to detectMainBranch method
-      return await this.detectMainBranch(projectPath);
+      if (error instanceof Error && error.message.includes('detached HEAD')) {
+        throw error;
+      }
+      throw new Error(`Failed to get main branch for project at ${projectPath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  async getEffectiveMainBranch(project: { path: string }): Promise<string> {
-    // Always auto-detect the main branch
+  // Deprecated: Use getProjectMainBranch instead
+  async detectMainBranch(projectPath: string): Promise<string> {
+    console.warn('[WorktreeManager] detectMainBranch is deprecated, use getProjectMainBranch instead');
+    return await this.getProjectMainBranch(projectPath);
+  }
+
+  // Deprecated: Use getProjectMainBranch instead
+  async getEffectiveMainBranch(project: { path: string; main_branch?: string }): Promise<string> {
+    console.warn('[WorktreeManager] getEffectiveMainBranch is deprecated, use getProjectMainBranch instead');
     return await this.getProjectMainBranch(project.path);
   }
 

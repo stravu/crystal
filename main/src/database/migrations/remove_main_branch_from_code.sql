@@ -1,0 +1,11 @@
+-- The main_branch column is now completely removed from the codebase
+-- The system ONLY uses the current branch from the project root directory
+-- via getProjectMainBranch() which calls `git branch --show-current`
+--
+-- This migration documents that:
+-- 1. The main_branch field has been removed from all TypeScript interfaces
+-- 2. The createProject and updateProject methods no longer accept main_branch
+-- 3. getProjectMainBranch() no longer uses the project object parameter
+-- 4. There is NO caching - the current branch is always checked dynamically
+--
+-- The database column remains for backward compatibility but is completely ignored

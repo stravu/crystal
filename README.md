@@ -109,7 +109,7 @@ If you're using Crystal to develop Crystal itself, you need to use a separate da
 
 ```bash
 # Set the run script in your Crystal project settings to:
-pnpm run setup && CRYSTAL_DIR=~/.crystal_test pnpm electron-dev
+pnpm run setup && pnpm run build:main && CRYSTAL_DIR=~/.crystal_test pnpm electron-dev
 ```
 
 This ensures:

@@ -5,7 +5,6 @@ export interface Project {
   system_prompt?: string;
   run_script?: string;
   build_script?: string;
-  main_branch?: string; // Deprecated - kept for backward compatibility but ignored by the application
   active: boolean;
   created_at: string;
   updated_at: string;
