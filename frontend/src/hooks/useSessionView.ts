@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { API } from '../utils/api';
@@ -1353,74 +1353,16 @@ export const useSessionView = (
     }
   };
 
-  const formatGitOutput = (output: string): Array<{ text: string; className?: string }> => {
-    if (!output) return [{ text: '' }];
-    
-    const result: Array<{ text: string; className?: string }> = [];
-    
-    // Split the output into lines to process each line
-    const lines = output.split('\n');
-    
-    lines.forEach((line, lineIndex) => {
-      // Define patterns and their corresponding styles
-      const patterns = [
-        { regex: /error:/gi, className: 'text-red-500 font-semibold' },
-        { regex: /fatal:/gi, className: 'text-red-500 font-semibold' },
-        { regex: /warning:/gi, className: 'text-yellow-500 font-semibold' },
-        { regex: /hint:/gi, className: 'text-cyan-500 font-semibold' },
-        { regex: /CONFLICT \((.*?)\):/g, className: 'text-red-500 font-semibold' },
-        { regex: /Auto-merging/g, className: 'text-yellow-500' },
-        { regex: /Merge conflict in/g, className: 'text-red-500' }
-      ];
-      
-      // Track which parts of the line have been processed
-      const replacements: Array<{start: number, end: number, text: string, className: string}> = [];
-      
-      // Find all matches across all patterns
-      patterns.forEach(({ regex, className }) => {
-        let match;
-        regex.lastIndex = 0; // Reset regex state
-        while ((match = regex.exec(line)) !== null) {
-          replacements.push({
-            start: match.index,
-            end: match.index + match[0].length,
-            text: match[0],
-            className
-          });
-        }
-      });
-      
-      // Sort replacements by start position
-      replacements.sort((a, b) => a.start - b.start);
-      
-      // Build the final line with replacements
-      let currentPos = 0;
-      replacements.forEach(({ start, end, text, className }) => {
-        // Skip overlapping replacements
-        if (start < currentPos) return;
-        
-        // Add text before the match
-        if (start > currentPos) {
-          result.push({ text: line.substring(currentPos, start) });
-        }
-        
-        // Add the matched text with styling
-        result.push({ text, className });
-        currentPos = end;
-      });
-      
-      // Add any remaining text
-      if (currentPos < line.length) {
-        result.push({ text: line.substring(currentPos) });
-      }
-      
-      // Add newline if not the last line
-      if (lineIndex < lines.length - 1) {
-        result.push({ text: '\n' });
-      }
-    });
-    
-    return result;
+  const formatGitOutput = (output: string): string => {
+    if (!output) return '';
+    return output
+      .replace(/error:/gi, '\x1b[31mERROR:\x1b[0m')
+      .replace(/fatal:/gi, '\x1b[31mFATAL:\x1b[0m')
+      .replace(/warning:/gi, '\x1b[33mWARNING:\x1b[0m')
+      .replace(/hint:/gi, '\x1b[36mHINT:\x1b[0m')
+      .replace(/CONFLICT \(.*?\):/g, '\x1b[31mCONFLICT\x1b[0m ($1):')
+      .replace(/Auto-merging (.*)/g, '\x1b[33mAuto-merging\x1b[0m $1')
+      .replace(/Merge conflict in (.*)/g, '\x1b[31mMerge conflict in\x1b[0m $1');
   };
 
   const getGitErrorTips = (details: GitErrorDetails): string[] => {
