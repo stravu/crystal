@@ -11,6 +11,7 @@ import { getShellPath, findExecutableInPath } from '../utils/shellPath';
 import { PermissionManager } from './permissionManager';
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
+import { findNodeExecutable, testNodeExecutable, findClaudeCodeScript } from '../utils/nodeFinder';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
@@ -450,9 +451,18 @@ export class ClaudeCodeManager extends EventEmitter {
         shellPath = getShellPath();
       }
       
+      // Find Node.js and ensure it's in the PATH
+      const nodePath = await findNodeExecutable();
+      console.log(`[ClaudeManager] Found Node.js at: ${nodePath}`);
+      
+      // Add Node.js directory to PATH to ensure it's available
+      const nodeDir = path.dirname(nodePath);
+      const pathSeparator = process.platform === 'win32' ? ';' : ':';
+      const pathWithNode = nodeDir + pathSeparator + shellPath;
+      
       const env = {
         ...process.env,
-        PATH: shellPath,
+        PATH: pathWithNode,
         // Ensure MCP-related environment variables are preserved
         MCP_SOCKET_PATH: this.permissionIpcPath || '',
         // Add debug mode for MCP if verbose logging is enabled
@@ -507,33 +517,88 @@ export class ClaudeCodeManager extends EventEmitter {
       
       
       let ptyProcess: pty.IPty;
-      try {
-        console.log(`[ClaudeManager] Spawning Claude process...`);
-        console.log(`[ClaudeManager] Command: ${claudeCommand}`);
-        console.log(`[ClaudeManager] Working directory: ${worktreePath}`);
-        console.log(`[ClaudeManager] PATH entries: ${shellPath.split(':').length}`);
-        const startTime = Date.now();
-        
-        // On Linux, add a small delay before spawning to avoid resource contention
-        if (isLinux && this.processes.size > 0) {
-          console.log(`[ClaudeManager] Linux: Adding 500ms delay before spawn (${this.processes.size} active processes)`);
-          await new Promise(resolve => setTimeout(resolve, 500));
+      let spawnAttempt = 0;
+      let lastError: any;
+      
+      // Try normal spawn first, then fallback to Node.js invocation if it fails
+      while (spawnAttempt < 2) {
+        try {
+          console.log(`[ClaudeManager] Spawning Claude process (attempt ${spawnAttempt + 1})...`);
+          console.log(`[ClaudeManager] Command: ${claudeCommand}`);
+          console.log(`[ClaudeManager] Working directory: ${worktreePath}`);
+          console.log(`[ClaudeManager] PATH entries: ${pathWithNode.split(pathSeparator).length}`);
+          const startTime = Date.now();
+          
+          // On Linux, add a small delay before spawning to avoid resource contention
+          if (isLinux && this.processes.size > 0) {
+            console.log(`[ClaudeManager] Linux: Adding 500ms delay before spawn (${this.processes.size} active processes)`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          if (spawnAttempt === 0) {
+            // First attempt: normal spawn
+            ptyProcess = pty.spawn(claudeCommand, args, {
+              name: 'xterm-color',
+              cols: 80,
+              rows: 30,
+              cwd: worktreePath,
+              env
+            });
+          } else {
+            // Second attempt: use Node.js directly with Claude script
+            console.log(`[ClaudeManager] First spawn failed, trying Node.js direct invocation...`);
+            
+            // Find the Claude Code script
+            const claudeScript = findClaudeCodeScript(claudeCommand);
+            if (!claudeScript) {
+              throw new Error('Could not find Claude Code script for Node.js invocation');
+            }
+            
+            console.log(`[ClaudeManager] Using Node.js: ${nodePath}`);
+            console.log(`[ClaudeManager] Claude script: ${claudeScript}`);
+            
+            // Spawn with Node.js directly, bypassing the shebang
+            const nodeArgs = ['--no-warnings', '--enable-source-maps', claudeScript, ...args];
+            ptyProcess = pty.spawn(nodePath, nodeArgs, {
+              name: 'xterm-color',
+              cols: 80,
+              rows: 30,
+              cwd: worktreePath,
+              env
+            });
+          }
+          
+          const spawnTime = Date.now() - startTime;
+          console.log(`[ClaudeManager] Claude process spawned successfully in ${spawnTime}ms`);
+          break; // Success, exit the loop
+        } catch (spawnError) {
+          lastError = spawnError;
+          spawnAttempt++;
+          
+          if (spawnAttempt === 1) {
+            // First attempt failed, check if it's the shebang issue
+            const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
+            console.error(`[ClaudeManager] First spawn attempt failed: ${errorMsg}`);
+            
+            // Check for typical shebang-related errors
+            if (errorMsg.includes('No such file or directory') || 
+                errorMsg.includes('env: node:') ||
+                errorMsg.includes('ENOENT')) {
+              console.log(`[ClaudeManager] Error suggests shebang issue, will try Node.js fallback`);
+              continue; // Try the fallback
+            }
+          }
+          
+          // If we've tried both methods or the error isn't shebang-related, give up
+          break;
         }
-        
-        ptyProcess = pty.spawn(claudeCommand, args, {
-          name: 'xterm-color',
-          cols: 80,
-          rows: 30,
-          cwd: worktreePath,
-          env
-        });
-        
-        const spawnTime = Date.now() - startTime;
-        console.log(`[ClaudeManager] Claude process spawned successfully in ${spawnTime}ms`);
-      } catch (spawnError) {
+      }
+      
+      // If we failed after all attempts, handle the error
+      if (!ptyProcess!) {
         // Handle spawn errors (e.g., command not found, permission denied)
-        const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
-        this.logger?.error(`[ClaudeManager] Failed to spawn Claude process: ${errorMsg}`);
+        const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
+        this.logger?.error(`[ClaudeManager] Failed to spawn Claude process after ${spawnAttempt} attempts: ${errorMsg}`);
         
         // Emit a pseudo-message to show the error in the UI
         const errorMessage = {
@@ -544,19 +609,26 @@ export class ClaudeCodeManager extends EventEmitter {
             details: [
               `Error: ${errorMsg}`,
               '',
-              'This usually means:',
-              '1. Claude Code is not installed or not found in your PATH',
-              '2. The Claude executable path is incorrect',
-              '3. You don\'t have permission to execute the Claude command',
+              `Crystal tried ${spawnAttempt} method(s) to start Claude Code:`,
+              '1. Direct execution of claude command',
+              spawnAttempt > 1 ? '2. Node.js fallback for macOS GUI compatibility' : '',
+              '',
+              'This error usually means:',
+              '- Claude Code is not installed or not found in your PATH',
+              '- The Claude executable path is incorrect',
+              '- You don\'t have permission to execute the Claude command',
+              '- Node.js is not available (for fallback method)',
               '',
               `Command attempted: ${claudeCommand}`,
               `Working directory: ${worktreePath}`,
+              `Node.js path: ${nodePath}`,
               '',
-              'Please check:',
-              '- Claude Code is installed: https://docs.anthropic.com/en/docs/claude-code/overview',
-              '- Run "claude --version" in your terminal to verify installation',
-              '- Check Settings for custom Claude executable path'
-            ].join('\n')
+              'To fix this:',
+              '1. Install Claude Code: https://docs.anthropic.com/en/docs/claude-code/overview',
+              '2. Run "claude --version" in your terminal to verify installation',
+              '3. Check Settings for custom Claude executable path',
+              '4. Ensure Node.js is installed and available'
+            ].filter(line => line).join('\n')
           }
         };
         
