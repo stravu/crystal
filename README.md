@@ -10,7 +10,9 @@
 
 </div>
 
-Crystal is an Electron desktop application that lets you run, inspect, and test multiple Claude Code instances simultaneously using git worktrees. Crystal is an independent project created by [Stravu](https://stravu.com/). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
+Instead of waiting for Claude Code to finsih, manage parallel sessions with git worktree isolation, diff viewing, and integrated testing. Manage multiple AI coding approaches at once.
+
+Crystal is an independent project created by [Stravu](https://stravu.com/). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
 
 
 
