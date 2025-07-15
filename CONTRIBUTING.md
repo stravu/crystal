@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Crystal! We welcome contributions from the community and are excited to work with you.
 
-Crystal is an open source project created by [Stravu](https://stravu.com/).  Stravu is the way AI-first teams collaborate.
+Crystal is an open source project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1).  Stravu is the way AI-first teams collaborate.
 
 ## Getting Started
 

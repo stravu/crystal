@@ -235,7 +235,7 @@ export function registerFileHandlers(ipcMain: IpcMain, services: AppServices): v
         // Create the commit with Crystal signature
         const commitMessage = `${request.message}
 
-🤖 Generated with [Crystal](https://stravu.com/)
+🤖 Generated with [Crystal](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1)
 
 Co-Authored-By: Crystal <noreply@stravu.com>`;
 
@@ -257,7 +257,7 @@ EOF
             const command = `git commit -m "$(cat <<'EOF'
 ${request.message}
 
-🤖 Generated with [Crystal](https://stravu.com/)
+🤖 Generated with [Crystal](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1)
 
 Co-Authored-By: Crystal <noreply@stravu.com>
 EOF

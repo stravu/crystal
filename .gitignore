@@ -50,6 +50,7 @@ coverage/
 
 # Git worktrees (except the main directory)
 /worktree-*/
+/worktrees/
 
 # Claude Code session data
 sessions/

@@ -4,7 +4,7 @@ import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
 import type { Session, SessionOutput } from '../types/session';
 
-export function useSocket() {
+export function useIPCEvents() {
   const { setSessions, loadSessions, addSession, updateSession, deleteSession } = useSessionStore();
   const { showError } = useErrorStore();
   
@@ -20,7 +20,7 @@ export function useSocket() {
 
     // Listen for session events
     const unsubscribeSessionCreated = window.electronAPI.events.onSessionCreated((session: Session) => {
-      console.log('[useSocket] Session created:', session.id);
+      console.log('[useIPCEvents] Session created:', session.id);
       addSession({...session, output: session.output || [], jsonMessages: session.jsonMessages || []});
     });
     unsubscribeFunctions.push(unsubscribeSessionCreated);
@@ -29,7 +29,7 @@ export function useSocket() {
       
       // Ensure we have valid session data
       if (!session || !session.id) {
-        console.error('[useSocket] Invalid session data received:', session);
+        console.error('[useIPCEvents] Invalid session data received:', session);
         return;
       }
       
@@ -55,7 +55,7 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionUpdated);
 
     const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((sessionData: any) => {
-      console.log('[useSocket] Session deleted:', sessionData);
+      console.log('[useIPCEvents] Session deleted:', sessionData);
       // The backend sends just { id } for deleted sessions
       const sessionId = sessionData.id || sessionData;
       
@@ -70,7 +70,7 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionDeleted);
 
     const unsubscribeSessionsLoaded = window.electronAPI.events.onSessionsLoaded((sessions: Session[]) => {
-      console.log('[useSocket] Sessions loaded:', sessions.length);
+      console.log('[useIPCEvents] Sessions loaded:', sessions.length);
       const sessionsWithJsonMessages = sessions.map(session => ({
         ...session,
         jsonMessages: session.jsonMessages || []
@@ -80,7 +80,7 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionsLoaded);
 
     const unsubscribeSessionOutput = window.electronAPI.events.onSessionOutput((output: SessionOutput) => {
-      console.log(`[useSocket] Received session output for ${output.sessionId}, type: ${output.type}`);
+      console.log(`[useIPCEvents] Received session output for ${output.sessionId}, type: ${output.type}`);
       
       // Don't add output to session store anymore - we'll reload from database
       // This prevents duplicate outputs from being displayed
@@ -95,14 +95,14 @@ export function useSocket() {
     unsubscribeFunctions.push(unsubscribeSessionOutput);
 
     const unsubscribeScriptOutput = window.electronAPI.events.onScriptOutput((output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
-      console.log(`[useSocket] Received script output for ${output.sessionId}`);
+      console.log(`[useIPCEvents] Received script output for ${output.sessionId}`);
       // Store script output in session store for display
       useSessionStore.getState().addScriptOutput(output);
     });
     unsubscribeFunctions.push(unsubscribeScriptOutput);
     
     const unsubscribeOutputAvailable = window.electronAPI.events.onSessionOutputAvailable((info: { sessionId: string }) => {
-      console.log(`[useSocket] Output available notification for session ${info.sessionId}`);
+      console.log(`[useIPCEvents] Output available notification for session ${info.sessionId}`);
       
       // Emit custom event to notify that output is available
       window.dispatchEvent(new CustomEvent('session-output-available', {
@@ -113,7 +113,7 @@ export function useSocket() {
     
     // Listen for zombie process detection
     const unsubscribeZombieProcesses = window.electronAPI.events.onZombieProcessesDetected((data: { sessionId?: string | null; pids?: number[]; message: string }) => {
-      console.error('[useSocket] Zombie processes detected:', data);
+      console.error('[useIPCEvents] Zombie processes detected:', data);
       
       // Show error to user
       const errorMessage = data.message || 'Some child processes could not be terminated. Please check your system process list.';

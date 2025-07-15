@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSocket } from './hooks/useSocket';
+import { useIPCEvents } from './hooks/useIPCEvents';
 import { useNotifications } from './hooks/useNotifications';
 import { useResizable } from './hooks/useResizable';
 import { Sidebar } from './components/Sidebar';
@@ -47,7 +47,7 @@ function App() {
     storageKey: 'crystal-sidebar-width'
   });
   
-  useSocket();
+  useIPCEvents();
   const { showNotification } = useNotifications();
 
   useEffect(() => {

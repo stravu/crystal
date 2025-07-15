@@ -130,7 +130,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <p className="text-xs text-gray-500 dark:text-gray-500">
               Created by{' '}
               <a 
-                href="https://stravu.com" 
+                href="https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 hover:underline"
