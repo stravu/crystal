@@ -90,21 +90,13 @@ export const SessionView = memo(() => {
           {hook.isLoadingOutput && (
             <div className="absolute top-4 left-4 text-gray-600 dark:text-gray-400 z-10">Loading output...</div>
           )}
-          <div className={`bg-gray-50 dark:bg-black h-full ${hook.viewMode === 'output' ? 'block' : 'hidden'} relative`}>
-            <div ref={terminalRef} className="h-full" />
-            {hook.loadError && hook.viewMode === 'output' && (
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Failed to load output content</p>
-                  <p className="text-gray-600 dark:text-gray-500 text-sm mb-4">{hook.loadError}</p>
-                  <button onClick={() => hook.loadOutputContent(activeSession.id)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                    Reload Output
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className={`bg-gray-50 dark:bg-black h-full ${hook.viewMode === 'output' ? 'flex flex-col' : 'hidden'} relative`}>
+            <div 
+              ref={terminalRef} 
+              className="flex-1 min-h-0"
+            />
             {(activeSession.status === 'running' || activeSession.status === 'initializing') && (
-              <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 flex-shrink-0">
                 <div className="flex items-center justify-between text-gray-700 dark:text-gray-300">
                     <div className="flex items-center space-x-3">
                         <div className="flex space-x-1">
@@ -124,6 +116,17 @@ export const SessionView = memo(() => {
                             Cancel
                         </button>
                     </div>
+                </div>
+              </div>
+            )}
+            {hook.loadError && hook.viewMode === 'output' && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <p className="text-gray-700 dark:text-gray-300 mb-2">Failed to load output content</p>
+                  <p className="text-gray-600 dark:text-gray-500 text-sm mb-4">{hook.loadError}</p>
+                  <button onClick={() => hook.loadOutputContent(activeSession.id)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    Reload Output
+                  </button>
                 </div>
               </div>
             )}

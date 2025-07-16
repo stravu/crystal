@@ -859,6 +859,17 @@ export const useSessionView = (
     return () => observer.disconnect();
   }, [terminalRef, viewMode]);
 
+  // Trigger terminal resize when session status changes (for padding adjustment)
+  useEffect(() => {
+    if (viewMode === 'output' && fitAddon.current && activeSession) {
+      // Small delay to ensure DOM updates have completed
+      const timer = setTimeout(() => {
+        fitAddon.current?.fit();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeSession?.status, viewMode]);
+
   useEffect(() => {
     if (terminalInstance.current) terminalInstance.current.options.theme = theme === 'light' ? lightTheme : darkTheme;
     if (scriptTerminalInstance.current) scriptTerminalInstance.current.options.theme = theme === 'light' ? lightTheme : scriptDarkTheme;
