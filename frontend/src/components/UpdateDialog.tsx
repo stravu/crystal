@@ -30,14 +30,16 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
 
   useEffect(() => {
     // Check if app is packaged (auto-update only works in packaged apps)
-    window.electronAPI.isPackaged().then((packaged) => {
-      console.log('[UpdateDialog] App packaged state:', packaged);
-      setIsPackaged(packaged);
-    });
+    if (window.electronAPI?.isPackaged) {
+      window.electronAPI.isPackaged().then((packaged) => {
+        console.log('[UpdateDialog] App packaged state:', packaged);
+        setIsPackaged(packaged);
+      });
+    }
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !window.electronAPI?.events) return;
 
     // Set up auto-updater event listeners
     const cleanupFns: Array<() => void> = [];
@@ -92,6 +94,10 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
   }, [isOpen]);
 
   const handleCheckForUpdates = async () => {
+    if (!window.electronAPI?.updater) {
+      setError('Update functionality not available');
+      return;
+    }
     try {
       setError(null);
       await window.electronAPI.updater.checkAndDownload();
@@ -102,6 +108,10 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
   };
 
   const handleDownloadUpdate = async () => {
+    if (!window.electronAPI?.updater) {
+      setError('Update functionality not available');
+      return;
+    }
     try {
       setError(null);
       await window.electronAPI.updater.downloadUpdate();
@@ -112,6 +122,10 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
   };
 
   const handleInstallUpdate = async () => {
+    if (!window.electronAPI?.updater) {
+      setError('Update functionality not available');
+      return;
+    }
     try {
       await window.electronAPI.updater.installUpdate();
       // App will restart, so no need to handle response

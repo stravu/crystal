@@ -204,6 +204,8 @@ function App() {
 
   useEffect(() => {
     // Set up version update listener
+    if (!window.electronAPI?.events) return;
+    
     const handleVersionUpdate = (versionInfo: any) => {
       console.log('[App] Version update available:', versionInfo);
       setUpdateVersionInfo(versionInfo);

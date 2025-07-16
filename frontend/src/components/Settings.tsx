@@ -225,7 +225,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 />
                 <div className="flex items-center gap-2">
                   <ShieldOff className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm text-gray-700 dark:text-gray-200">Skip Permissions</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-200">Skip Permissions (Default)</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">(faster, less secure)</span>
                 </div>
               </label>
@@ -240,7 +240,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 />
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-gray-700 dark:text-gray-200">Manual Approval</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-200">Approve Actions</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">(safer, interactive)</span>
                 </div>
               </label>
