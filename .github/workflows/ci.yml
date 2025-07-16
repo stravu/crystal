@@ -19,7 +19,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
@@ -41,7 +41,7 @@ jobs:
           ${{ runner.os }}-pnpm-store-
           
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: pnpm install
       
     - name: Run type checking
       run: pnpm typecheck
@@ -66,7 +66,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
@@ -88,7 +88,7 @@ jobs:
           ${{ runner.os }}-pnpm-store-
           
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: pnpm install
       
     - name: Install Playwright browsers
       run: pnpm exec playwright install --with-deps chromium
@@ -121,7 +121,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
@@ -143,7 +143,7 @@ jobs:
           ${{ runner.os }}-pnpm-store-
           
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: pnpm install
       
     - name: Build application
       run: pnpm build
