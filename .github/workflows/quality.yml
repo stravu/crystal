@@ -54,14 +54,51 @@ jobs:
     - name: Install dependencies
       run: pnpm install
       
+    - name: Cache Electron binaries
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/electron
+          ~/.cache/electron-builder
+        key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-electron-
+      
     - name: Build application
       run: pnpm build
+      
+    - name: Setup display for Electron
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+        export DISPLAY=:99
+        sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+      
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-
       
     - name: Install Playwright browsers
       run: pnpm exec playwright install --with-deps chromium
       
+    - name: Configure git for tests
+      run: |
+        git config --global init.defaultBranch main
+        git config --global user.email "test@example.com"
+        git config --global user.name "Test User"
+      
     - name: Run tests
-      run: pnpm test
+      run: |
+        export DISPLAY=:99
+        pnpm test:ci
+      env:
+        CI: true
+        ELECTRON_DISABLE_SANDBOX: 1
+      timeout-minutes: 10
       
     - name: Upload test artifacts
       if: failure()

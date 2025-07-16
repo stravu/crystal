@@ -10,9 +10,9 @@ export async function setupTestProject() {
   
   // Initialize git in the test directory
   const { execSync } = require('child_process');
-  execSync('git init', { cwd: testProjectPath });
-  execSync('git config user.email "test@example.com"', { cwd: testProjectPath });
-  execSync('git config user.name "Test User"', { cwd: testProjectPath });
+  execSync('git init -b main', { cwd: testProjectPath, stdio: 'pipe' });
+  execSync('git config user.email "test@example.com"', { cwd: testProjectPath, stdio: 'pipe' });
+  execSync('git config user.name "Test User"', { cwd: testProjectPath, stdio: 'pipe' });
   execSync('touch README.md', { cwd: testProjectPath });
   execSync('git add .', { cwd: testProjectPath });
   execSync('git commit -m "Initial commit"', { cwd: testProjectPath });
