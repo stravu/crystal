@@ -285,12 +285,12 @@ export class API {
       return window.electronAPI.folders.getByProject(projectId);
     },
 
-    async create(name: string, projectId: number) {
+    async create(name: string, projectId: number, parentFolderId?: string | null) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.folders.create(name, projectId);
+      return window.electronAPI.folders.create(name, projectId, parentFolderId);
     },
 
-    async update(folderId: string, updates: { name?: string; display_order?: number }) {
+    async update(folderId: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.folders.update(folderId, updates);
     },
@@ -308,6 +308,11 @@ export class API {
     async moveSession(sessionId: string, folderId: string | null) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.folders.moveSession(sessionId, folderId);
+    },
+
+    async move(folderId: string, parentFolderId: string | null) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.folders.move(folderId, parentFolderId);
     },
   };
 

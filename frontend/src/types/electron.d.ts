@@ -120,11 +120,12 @@ interface ElectronAPI {
   // Folders
   folders: {
     getByProject: (projectId: number) => Promise<IPCResponse>;
-    create: (name: string, projectId: number) => Promise<IPCResponse>;
-    update: (folderId: string, updates: { name?: string; display_order?: number }) => Promise<IPCResponse>;
+    create: (name: string, projectId: number, parentFolderId?: string | null) => Promise<IPCResponse>;
+    update: (folderId: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }) => Promise<IPCResponse>;
     delete: (folderId: string) => Promise<IPCResponse>;
     reorder: (projectId: number, folderIds: string[]) => Promise<IPCResponse>;
     moveSession: (sessionId: string, folderId: string | null) => Promise<IPCResponse>;
+    move: (folderId: string, parentFolderId: string | null) => Promise<IPCResponse>;
   };
 
   // Configuration

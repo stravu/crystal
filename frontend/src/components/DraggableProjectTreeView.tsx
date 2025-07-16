@@ -52,6 +52,7 @@ export function DraggableProjectTreeView() {
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+  const [parentFolderForCreate, setParentFolderForCreate] = useState<Folder | null>(null);
   const { showError } = useErrorStore();
   
   // Drag state
@@ -382,6 +383,47 @@ export function DraggableProjectTreeView() {
     });
   };
 
+  // Helper function to build folder tree structure
+  const buildFolderTree = (folders: Folder[]): Folder[] => {
+    const folderMap = new Map<string, Folder>();
+    const rootFolders: Folder[] = [];
+
+    // First pass: create a map of all folders
+    folders.forEach(folder => {
+      folderMap.set(folder.id, { ...folder, children: [] });
+    });
+
+    // Second pass: build the tree structure
+    folders.forEach(folder => {
+      const currentFolder = folderMap.get(folder.id)!;
+      
+      if (folder.parentFolderId && folderMap.has(folder.parentFolderId)) {
+        // This folder has a parent, add it to parent's children
+        const parentFolder = folderMap.get(folder.parentFolderId)!;
+        if (!parentFolder.children) {
+          parentFolder.children = [];
+        }
+        parentFolder.children.push(currentFolder);
+      } else {
+        // This is a root folder
+        rootFolders.push(currentFolder);
+      }
+    });
+
+    // Sort children at each level by display order
+    const sortFolders = (folders: Folder[]) => {
+      folders.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      folders.forEach(folder => {
+        if (folder.children && folder.children.length > 0) {
+          sortFolders(folder.children);
+        }
+      });
+    };
+
+    sortFolders(rootFolders);
+    return rootFolders;
+  };
+
   const handleDeleteFolder = async (folder: Folder, projectId: number) => {
     // Check if folder has sessions
     const project = projectsWithSessions.find(p => p.id === projectId);
@@ -594,8 +636,12 @@ export function DraggableProjectTreeView() {
     if (!newFolderName || !selectedProjectForFolder) return;
 
     try {
-      console.log('[DraggableProjectTreeView] Creating folder:', newFolderName, 'in project:', selectedProjectForFolder.id);
-      const response = await API.folders.create(newFolderName, selectedProjectForFolder.id);
+      console.log('[DraggableProjectTreeView] Creating folder:', newFolderName, 'in project:', selectedProjectForFolder.id, 'parent:', parentFolderForCreate?.id);
+      const response = await API.folders.create(
+        newFolderName, 
+        selectedProjectForFolder.id,
+        parentFolderForCreate?.id || null
+      );
 
       if (response.success && response.data) {
         console.log('[DraggableProjectTreeView] Folder created successfully:', response.data);
@@ -613,10 +659,16 @@ export function DraggableProjectTreeView() {
           return project;
         }));
 
+        // Auto-expand parent folder if it exists
+        if (parentFolderForCreate) {
+          setExpandedFolders(prev => new Set([...prev, parentFolderForCreate.id]));
+        }
+
         // Close dialog and reset
         setShowCreateFolderDialog(false);
         setNewFolderName('');
         setSelectedProjectForFolder(null);
+        setParentFolderForCreate(null);
       } else {
         showError({
           title: 'Failed to Create Folder',
@@ -787,6 +839,40 @@ export function DraggableProjectTreeView() {
       // Handle session drop on project (move out of folder)
       await handleProjectDropForSession(e, targetProject);
       return;
+    } else if (dragState.type === 'folder' && dragState.folderId) {
+      // Move folder to root level (set parent_folder_id to null)
+      try {
+        console.log('[DraggableProjectTreeView] Moving folder', dragState.folderId, 'to root level');
+        const response = await API.folders.move(dragState.folderId, null);
+        
+        if (response.success) {
+          console.log('[DraggableProjectTreeView] Folder moved to root successfully');
+          
+          // Update local state - update the parent_folder_id of the moved folder
+          setProjectsWithSessions(prev => prev.map(project => {
+            if (project.id === targetProject.id) {
+              const updatedFolders = project.folders.map(f => 
+                f.id === dragState.folderId 
+                  ? { ...f, parentFolderId: null }
+                  : f
+              );
+              return { ...project, folders: updatedFolders };
+            }
+            return project;
+          }));
+        } else {
+          showError({
+            title: 'Failed to move folder',
+            error: response.error || 'Unknown error occurred'
+          });
+        }
+      } catch (error: any) {
+        console.error('Failed to move folder:', error);
+        showError({
+          title: 'Failed to move folder',
+          error: error.message || 'Unknown error occurred'
+        });
+      }
     }
     
     handleDragEnd();
@@ -915,51 +1001,39 @@ export function DraggableProjectTreeView() {
         });
       }
     } else if (dragState.type === 'folder' && dragState.folderId && dragState.folderId !== folder.id) {
-      // Reorder folders
+      // Move folder into another folder (nesting)
       try {
-        const project = projectsWithSessions.find(p => p.id === projectId);
-        if (project && project.folders) {
-          const draggedFolder = project.folders.find(f => f.id === dragState.folderId);
-          if (draggedFolder) {
-            // Calculate new order
-            const folders = [...project.folders].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-            const dragIndex = folders.findIndex(f => f.id === dragState.folderId);
-            const dropIndex = folders.findIndex(f => f.id === folder.id);
-            
-            if (dragIndex !== -1 && dropIndex !== -1) {
-              // Remove dragged folder and insert at new position
-              const [removed] = folders.splice(dragIndex, 1);
-              folders.splice(dropIndex, 0, removed);
-              
-              // Update display orders
-              const folderIds = folders.map(f => f.id);
-              const response = await API.folders.reorder(projectId, folderIds);
-              
-              if (response.success) {
-                // Update local state
-                setProjectsWithSessions(prev => prev.map(p => {
-                  if (p.id === projectId) {
-                    const updatedFolders = folders.map((f, index) => ({
-                      ...f,
-                      displayOrder: index
-                    }));
-                    return { ...p, folders: updatedFolders };
-                  }
-                  return p;
-                }));
-              } else {
-                showError({
-                  title: 'Failed to reorder folders',
-                  error: response.error || 'Unknown error occurred'
-                });
-              }
+        console.log('[DraggableProjectTreeView] Moving folder', dragState.folderId, 'into folder', folder.id);
+        const response = await API.folders.move(dragState.folderId, folder.id);
+        
+        if (response.success) {
+          console.log('[DraggableProjectTreeView] Folder moved successfully');
+          
+          // Update local state - update the parent_folder_id of the moved folder
+          setProjectsWithSessions(prev => prev.map(project => {
+            if (project.id === projectId) {
+              const updatedFolders = project.folders.map(f => 
+                f.id === dragState.folderId 
+                  ? { ...f, parentFolderId: folder.id }
+                  : f
+              );
+              return { ...project, folders: updatedFolders };
             }
-          }
+            return project;
+          }));
+          
+          // Auto-expand the target folder to show the moved folder
+          setExpandedFolders(prev => new Set([...prev, folder.id]));
+        } else {
+          showError({
+            title: 'Failed to move folder',
+            error: response.error || 'Unknown error occurred'
+          });
         }
       } catch (error: any) {
-        console.error('Failed to reorder folders:', error);
+        console.error('Failed to move folder:', error);
         showError({
-          title: 'Failed to reorder folders',
+          title: 'Failed to move folder',
           error: error.message || 'Unknown error occurred'
         });
       }
@@ -1031,6 +1105,137 @@ export function DraggableProjectTreeView() {
       </div>
     );
   }
+
+  // Recursive function to render a folder and its children
+  const renderFolder = (folder: Folder, project: ProjectWithSessions, level: number = 0) => {
+    const isExpanded = expandedFolders.has(folder.id);
+    const folderSessions = project.sessions.filter(s => s.folderId === folder.id);
+    const isDraggingOverFolder = dragState.overType === 'folder' && dragState.overFolderId === folder.id;
+    const hasChildren = (folder.children && folder.children.length > 0) || folderSessions.length > 0;
+    
+    return (
+      <div key={folder.id} className="ml-4" style={{ marginLeft: `${level * 1}rem` }}>
+        <div 
+          className={`group/folder flex items-center space-x-1 px-2 py-1 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            isDraggingOverFolder ? 'bg-blue-100 dark:bg-blue-900' : ''
+          }`}
+          draggable
+          onDragStart={(e) => handleFolderDragStart(e, folder, project.id)}
+          onDragOver={(e) => handleFolderDragOver(e, folder, project.id)}
+          onDrop={(e) => handleFolderDrop(e, folder, project.id)}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+        >
+          <div className="opacity-0 group-hover/folder:opacity-100 transition-opacity cursor-move">
+            <GripVertical className="w-3 h-3 text-gray-400" />
+          </div>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFolder(folder.id);
+            }}
+            className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+            disabled={!hasChildren}
+          >
+            {hasChildren ? (
+              isExpanded ? (
+                <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+              ) : (
+                <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+              )
+            ) : (
+              <div className="w-3 h-3" />
+            )}
+          </button>
+          
+          <div className="flex items-center space-x-2 flex-1 min-w-0">
+            {isExpanded ? (
+              <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+            ) : (
+              <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+            )}
+            <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+              {folder.name}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-500">
+              ({folderSessions.length})
+            </span>
+          </div>
+          
+          {/* Add subfolder button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedProjectForFolder(project);
+              setParentFolderForCreate(folder);
+              setShowCreateFolderDialog(true);
+              setNewFolderName('');
+            }}
+            className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+            title="Add subfolder"
+          >
+            <Plus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+          </button>
+          
+          {/* Delete folder button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteFolder(folder, project.id);
+            }}
+            className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-600/20"
+            title="Delete folder"
+          >
+            <span className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">🗑️</span>
+          </button>
+        </div>
+        
+        {isExpanded && hasChildren && (
+          <div className="ml-4 mt-1 space-y-1">
+            {/* Render subfolders first */}
+            {folder.children && folder.children.map(childFolder => 
+              renderFolder(childFolder, project, level + 1)
+            )}
+            
+            {/* Then render sessions in this folder */}
+            {folderSessions
+              .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+              .map((session) => {
+                const isDraggingOverSession = dragState.overType === 'session' && 
+                                             dragState.overSessionId === session.id &&
+                                             dragState.overProjectId === project.id;
+                
+                return (
+                  <div
+                    key={session.id}
+                    className={`group flex items-center ${
+                      isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
+                    }`}
+                    draggable
+                    onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
+                    onDrop={(e) => handleSessionDrop(e, session, project.id)}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
+                      <GripVertical className="w-3 h-3 text-gray-400" />
+                    </div>
+                    <SessionListItem 
+                      key={session.id} 
+                      session={session}
+                      isNested
+                    />
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -1130,124 +1335,11 @@ export function DraggableProjectTreeView() {
               
               {isExpanded && (sessionCount > 0 || (project.folders && project.folders.length > 0)) && (
                 <div className="mt-1 space-y-1">
-                  {/* Render folders */}
-                  {project.folders && project.folders
-                    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-                    .map((folder) => {
-                      const isExpanded = expandedFolders.has(folder.id);
-                      const folderSessions = project.sessions.filter(s => s.folderId === folder.id);
-                      const isDraggingOverFolder = dragState.overType === 'folder' && 
-                                                   dragState.overFolderId === folder.id;
-                      
-                      console.log('[DraggableProjectTreeView] Rendering folder:', {
-                        folder,
-                        isExpanded,
-                        folderSessionCount: folderSessions.length,
-                        isDraggingOverFolder
-                      });
-                      
-                      return (
-                        <div key={folder.id} className="ml-4">
-                          <div 
-                            className={`group/folder flex items-center space-x-1 px-2 py-1 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                              isDraggingOverFolder ? 'bg-blue-100 dark:bg-blue-900' : ''
-                            }`}
-                            draggable
-                            onDragStart={(e) => handleFolderDragStart(e, folder, project.id)}
-                            onDragOver={(e) => handleFolderDragOver(e, folder, project.id)}
-                            onDrop={(e) => handleFolderDrop(e, folder, project.id)}
-                            onDragEnter={handleDragEnter}
-                            onDragLeave={handleDragLeave}
-                          >
-                            <div className="opacity-0 group-hover/folder:opacity-100 transition-opacity cursor-move">
-                              <GripVertical className="w-3 h-3 text-gray-400" />
-                            </div>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFolder(folder.id);
-                              }}
-                              className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-                              disabled={folderSessions.length === 0}
-                            >
-                              {folderSessions.length > 0 ? (
-                                isExpanded ? (
-                                  <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                                ) : (
-                                  <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                                )
-                              ) : (
-                                <div className="w-3 h-3" />
-                              )}
-                            </button>
-                            
-                            <div className="flex items-center space-x-2 flex-1 min-w-0">
-                              {isExpanded ? (
-                                <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-                              ) : (
-                                <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                              )}
-                              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                                {folder.name}
-                              </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-500">
-                                ({folderSessions.length})
-                              </span>
-                            </div>
-                            
-                            {/* Delete folder button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteFolder(folder, project.id);
-                              }}
-                              className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-600/20"
-                              title="Delete folder"
-                            >
-                              <span className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">🗑️</span>
-                            </button>
-                          </div>
-                          
-                          {isExpanded && folderSessions.length > 0 && (
-                            <div className="ml-4 mt-1 space-y-1">
-                              {folderSessions
-                                .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-                                .map((session) => {
-                                  const isDraggingOverSession = dragState.overType === 'session' && 
-                                                               dragState.overSessionId === session.id &&
-                                                               dragState.overProjectId === project.id;
-                                  
-                                  return (
-                                    <div
-                                      key={session.id}
-                                      className={`group flex items-center ${
-                                        isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
-                                      }`}
-                                      draggable
-                                      onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
-                                      onDragEnd={handleDragEnd}
-                                      onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
-                                      onDrop={(e) => handleSessionDrop(e, session, project.id)}
-                                      onDragEnter={handleDragEnter}
-                                      onDragLeave={handleDragLeave}
-                                    >
-                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
-                                        <GripVertical className="w-3 h-3 text-gray-400" />
-                                      </div>
-                                      <SessionListItem 
-                                        key={session.id} 
-                                        session={session}
-                                        isNested
-                                      />
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  {/* Render folders using recursive structure */}
+                  {project.folders && (() => {
+                    const folderTree = buildFolderTree(project.folders);
+                    return folderTree.map(folder => renderFolder(folder, project));
+                  })()}
                   
                   {/* Render sessions without folders */}
                   <div className="ml-4">
@@ -1501,7 +1593,10 @@ export function DraggableProjectTreeView() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl border border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">
-              Create Folder in {selectedProjectForFolder.name}
+              {parentFolderForCreate 
+                ? `Create Subfolder in "${parentFolderForCreate.name}"`
+                : `Create Folder in ${selectedProjectForFolder.name}`
+              }
             </h3>
             
             <div className="space-y-4">
@@ -1531,6 +1626,7 @@ export function DraggableProjectTreeView() {
                   setShowCreateFolderDialog(false);
                   setNewFolderName('');
                   setSelectedProjectForFolder(null);
+                  setParentFolderForCreate(null);
                 }}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
               >

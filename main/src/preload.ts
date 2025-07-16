@@ -120,11 +120,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Folders
   folders: {
     getByProject: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('folders:get-by-project', projectId),
-    create: (name: string, projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('folders:create', name, projectId),
-    update: (folderId: string, updates: { name?: string; display_order?: number }): Promise<IPCResponse> => ipcRenderer.invoke('folders:update', folderId, updates),
+    create: (name: string, projectId: number, parentFolderId?: string | null): Promise<IPCResponse> => ipcRenderer.invoke('folders:create', name, projectId, parentFolderId),
+    update: (folderId: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }): Promise<IPCResponse> => ipcRenderer.invoke('folders:update', folderId, updates),
     delete: (folderId: string): Promise<IPCResponse> => ipcRenderer.invoke('folders:delete', folderId),
     reorder: (projectId: number, folderIds: string[]): Promise<IPCResponse> => ipcRenderer.invoke('folders:reorder', projectId, folderIds),
     moveSession: (sessionId: string, folderId: string | null): Promise<IPCResponse> => ipcRenderer.invoke('folders:move-session', sessionId, folderId),
+    move: (folderId: string, parentFolderId: string | null): Promise<IPCResponse> => ipcRenderer.invoke('folders:move', folderId, parentFolderId),
   },
 
   // Configuration
