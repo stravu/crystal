@@ -6,6 +6,7 @@
 
 <div align="center">
 
+[![CI](https://github.com/stravu/crystal/actions/workflows/ci.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/ci.yml)
 [![Join our Discord](https://img.shields.io/badge/Join%20our-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/XrVa6q7DPY)
 
 </div>

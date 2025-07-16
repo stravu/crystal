@@ -45,9 +45,9 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
         
         // Try to clean up mermaid's internal state
         try {
-          // @ts-ignore
+          // @ts-expect-error - Mermaid API types don't include reset method
           if (window.mermaid?.mermaidAPI?.reset) {
-            // @ts-ignore
+            // @ts-expect-error - Mermaid API types don't include reset method
             window.mermaid.mermaidAPI.reset();
           }
         } catch (e) {
