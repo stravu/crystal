@@ -40,7 +40,7 @@ function filterBase64Data(obj: any): any {
     const filtered: any = {};
     
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         // Check if this is a base64 source object
         if (key === 'source' && obj[key]?.type === 'base64' && obj[key]?.data) {
           // Replace base64 data with placeholder
