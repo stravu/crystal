@@ -15,7 +15,7 @@ export function useNotifications() {
   const settings = useRef<NotificationSettings>({
     enabled: true,
     playSound: true,
-    notifyOnStatusChange: true,
+    notifyOnStatusChange: false,
     notifyOnWaiting: true,
     notifyOnComplete: true,
   });
