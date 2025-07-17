@@ -83,9 +83,16 @@ export function getShellPath(): string {
       
       // For Linux, avoid slow interactive shell startup
       // Use non-interactive mode for better performance
-      const shellCommand = isLinux 
-        ? `${shell} -c 'echo $PATH'`  // Fast non-interactive mode for Linux
-        : `${shell} -l -i -c 'echo $PATH'`;  // Keep login shell for macOS
+      let shellCommand: string;
+      if (isLinux) {
+        shellCommand = `${shell} -c 'echo $PATH'`;  // Fast non-interactive mode for Linux
+      } else if (shell.includes('zsh')) {
+        // For zsh on macOS, use login shell without interactive to avoid Oh My Zsh delays
+        // but ensure we get all PATH modifications
+        shellCommand = `${shell} -l -c 'echo $PATH'`;  // Login shell loads zshenv, zprofile
+      } else {
+        shellCommand = `${shell} -l -i -c 'echo $PATH'`;  // Keep interactive for other shells
+      }
       
       console.log(`[ShellPath] Unix/Linux PATH detection - Shell: ${shell}, isLinux: ${isLinux}`);
       console.log(`[ShellPath] Shell command: ${shellCommand}`);
@@ -107,8 +114,11 @@ export function getShellPath(): string {
           const homeDir = os.homedir();
           
           if (shell.includes('zsh')) {
-            // For zsh, source the standard config files
-            sourceCommand = `source /etc/zprofile 2>/dev/null || true; ` +
+            // For zsh, source the standard config files in proper order
+            // zshenv is loaded for ALL zsh instances (including non-interactive)
+            sourceCommand = `source /etc/zshenv 2>/dev/null || true; ` +
+                           `source ${homeDir}/.zshenv 2>/dev/null || true; ` +
+                           `source /etc/zprofile 2>/dev/null || true; ` +
                            `source ${homeDir}/.zprofile 2>/dev/null || true; ` +
                            `source /etc/zshrc 2>/dev/null || true; ` +
                            `source ${homeDir}/.zshrc 2>/dev/null || true; `;
@@ -158,23 +168,34 @@ export function getShellPath(): string {
           }
         }
       } else {
-        // In development, try faster approach first
-        try {
-          shellPath = execSync(`${shell} -c 'echo $PATH'`, {
+        // In development, try appropriate approach based on shell
+        if (shell.includes('zsh') && !isLinux) {
+          // For zsh on macOS, always use login shell to ensure zshenv is loaded
+          console.log(`[ShellPath] Using login shell for zsh to ensure proper PATH loading`);
+          shellPath = execSync(`${shell} -l -c 'echo $PATH'`, {
             encoding: 'utf8',
-            timeout: 2000,
+            timeout: 5000,
             env: process.env
           }).trim();
-          console.log(`[ShellPath] Quick PATH retrieval succeeded`);
-        } catch (quickError) {
-          console.log(`[ShellPath] Quick PATH retrieval failed: ${quickError instanceof Error ? quickError.message : quickError}`);
-          console.log(`[ShellPath] Falling back to login shell approach...`);
-          shellPath = execSync(shellCommand, {
-            encoding: 'utf8',
-            timeout: isLinux ? 3000 : 10000,  // Shorter timeout for Linux
-            env: process.env
-          }).trim();
-          console.log(`[ShellPath] Login shell PATH retrieval succeeded`);
+        } else {
+          // For other shells or Linux, try faster approach first
+          try {
+            shellPath = execSync(`${shell} -c 'echo $PATH'`, {
+              encoding: 'utf8',
+              timeout: 2000,
+              env: process.env
+            }).trim();
+            console.log(`[ShellPath] Quick PATH retrieval succeeded`);
+          } catch (quickError) {
+            console.log(`[ShellPath] Quick PATH retrieval failed: ${quickError instanceof Error ? quickError.message : quickError}`);
+            console.log(`[ShellPath] Falling back to login shell approach...`);
+            shellPath = execSync(shellCommand, {
+              encoding: 'utf8',
+              timeout: isLinux ? 3000 : 10000,  // Shorter timeout for Linux
+              env: process.env
+            }).trim();
+            console.log(`[ShellPath] Login shell PATH retrieval succeeded`);
+          }
         }
       }
     }
@@ -243,7 +264,15 @@ export function getShellPath(): string {
       // Unix/macOS-specific paths
       additionalPaths.push(
         path.join(os.homedir(), '.yarn', 'bin'),
-        path.join(os.homedir(), '.config', 'yarn', 'global', 'node_modules', '.bin')
+        path.join(os.homedir(), '.config', 'yarn', 'global', 'node_modules', '.bin'),
+        // Common Oh My Zsh and tool paths
+        path.join(os.homedir(), '.local', 'bin'),
+        path.join(os.homedir(), 'bin'),
+        // Homebrew paths (both Intel and Apple Silicon)
+        '/opt/homebrew/bin',
+        '/opt/homebrew/sbin',
+        '/usr/local/bin',
+        '/usr/local/sbin'
       );
       
       // Check for nvm directories - look for all versions
@@ -287,11 +316,14 @@ export function getShellPath(): string {
       try {
         const homeDir = os.homedir();
         const shellConfigPaths = [
+          path.join(homeDir, '.zshenv'),    // Most important for zsh - loaded for ALL instances
           path.join(homeDir, '.zshrc'),
           path.join(homeDir, '.bashrc'),
           path.join(homeDir, '.bash_profile'),
           path.join(homeDir, '.profile'),
-          path.join(homeDir, '.zprofile')
+          path.join(homeDir, '.zprofile'),
+          '/etc/zshenv',                     // System-wide zsh environment
+          '/etc/zprofile'                    // System-wide zsh profile
         ];
         
         console.log(`[ShellPath] Checking shell config files: ${shellConfigPaths.join(', ')}`);
