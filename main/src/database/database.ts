@@ -982,6 +982,13 @@ export class DatabaseService {
     return this.db.prepare('SELECT * FROM sessions WHERE (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY created_at DESC').all() as Session[];
   }
 
+  getArchivedSessions(projectId?: number): Session[] {
+    if (projectId !== undefined) {
+      return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND archived = 1 AND (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY updated_at DESC').all(projectId) as Session[];
+    }
+    return this.db.prepare('SELECT * FROM sessions WHERE archived = 1 AND (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY updated_at DESC').all() as Session[];
+  }
+
   getMainRepoSession(projectId: number): Session | undefined {
     return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND is_main_repo = 1 AND (archived = 0 OR archived IS NULL)').get(projectId) as Session | undefined;
   }
@@ -1081,6 +1088,11 @@ export class DatabaseService {
 
   archiveSession(id: string): boolean {
     const result = this.db.prepare('UPDATE sessions SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  restoreSession(id: string): boolean {
+    const result = this.db.prepare('UPDATE sessions SET archived = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     return result.changes > 0;
   }
 
