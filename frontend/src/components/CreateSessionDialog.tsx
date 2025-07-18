@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
-import { Shield, ShieldOff, Sparkles, GitBranch } from 'lucide-react';
+import { Shield, ShieldOff, Sparkles, GitBranch, Cpu } from 'lucide-react';
 import FilePathAutocomplete from './FilePathAutocomplete';
 
 interface CreateSessionDialogProps {
@@ -17,7 +17,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     prompt: '',
     worktreeTemplate: '',
     count: 1,
-    permissionMode: 'ignore'
+    permissionMode: 'ignore',
+    model: 'claude-sonnet-4-20250514' // Default to Sonnet 4
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
@@ -31,7 +32,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   
   useEffect(() => {
     if (isOpen) {
-      // Fetch the default permission mode and check for API key when dialog opens
+      // Fetch the default permission mode, default model, and check for API key when dialog opens
       API.config.get().then(response => {
         if (response.success) {
           if (response.data?.defaultPermissionMode) {
@@ -40,6 +41,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               permissionMode: response.data.defaultPermissionMode
             }));
           }
+          // Don't load defaultModel - always start with Sonnet 4 for new sessions
+          // The model choice is remembered per session, not globally
           // Check if API key exists
           setHasApiKey(!!response.data?.anthropicApiKey);
         }
@@ -148,12 +151,15 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       }
       
       onClose();
-      // Reset form but fetch the default permission mode again
+      // Reset form but fetch the default permission mode and model again
       const configResponse = await API.config.get();
       const defaultPermissionMode = configResponse.success && configResponse.data?.defaultPermissionMode 
         ? configResponse.data.defaultPermissionMode 
         : 'ignore';
-      setFormData({ prompt: '', worktreeTemplate: '', count: 1, permissionMode: defaultPermissionMode as 'ignore' | 'approve' });
+      const defaultModel = configResponse.success && configResponse.data?.defaultModel
+        ? configResponse.data.defaultModel
+        : 'claude-sonnet-4-20250514';
+      setFormData({ prompt: '', worktreeTemplate: '', count: 1, permissionMode: defaultPermissionMode as 'ignore' | 'approve', model: defaultModel });
       setWorktreeError(null);
       setUltrathink(false);
       setAutoCommit(true); // Reset to default
@@ -239,6 +245,42 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
                   Automatically commit changes after each prompt. Can be toggled later during the session.
                 </p>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              AI Model
+            </label>
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu className="w-4 h-4 text-gray-400" />
+              <select
+                value={formData.model || 'claude-sonnet-4-20250514'}
+                onChange={(e) => {
+                  const newModel = e.target.value;
+                  setFormData({ ...formData, model: newModel });
+                  // Don't save as default - always start fresh with Sonnet 4
+                }}
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+              >
+                <option value="claude-sonnet-4-20250514">Sonnet 4 (Balanced - Recommended)</option>
+                <option value="claude-opus-4-20250514">Opus 4 (Maximum Capability)</option>
+                <option value="claude-3-5-haiku-20241022">Haiku 3.5 (Fast & Lightweight)</option>
+              </select>
+            </div>
+            <div className="space-y-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <strong className="text-gray-700 dark:text-gray-300">Sonnet 4:</strong> Best for most coding tasks. Excellent balance of speed and capability.
+              </div>
+              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <strong className="text-gray-700 dark:text-gray-300">Opus 4:</strong> Use for complex architecture, large refactors, and challenging problems. Slower but more thorough.
+              </div>
+              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <strong className="text-gray-700 dark:text-gray-300">Haiku 3.5:</strong> Fast and cost-effective for simple tasks and repetitive work.
+              </div>
+              <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-700">
+                <span className="text-amber-700 dark:text-amber-300">⚠️ Larger models will hit limits faster</span>
               </div>
             </div>
           </div>

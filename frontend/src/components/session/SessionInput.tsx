@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Session } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
+import { Cpu } from 'lucide-react';
+import { API } from '../../utils/api';
 
 interface SessionInputProps {
   activeSession: Session;
@@ -10,7 +12,7 @@ interface SessionInputProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleTerminalCommand: () => void;
   handleSendInput: () => void;
-  handleContinueConversation: () => void;
+  handleContinueConversation: (model?: string) => void;
   isStravuConnected: boolean;
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
@@ -33,6 +35,18 @@ export const SessionInput: React.FC<SessionInputProps> = ({
   setUltrathink,
   handleToggleAutoCommit,
 }) => {
+  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
+
+  useEffect(() => {
+    // Update selected model when switching to a different session
+    console.log('[SessionInput] Session changed:', {
+      id: activeSession.id,
+      model: activeSession.model,
+      name: activeSession.name
+    });
+    setSelectedModel(activeSession.model || 'claude-sonnet-4-20250514');
+  }, [activeSession.id]); // Only reset when session ID changes, not when model updates
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const shouldSend = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
     if (shouldSend) {
@@ -42,7 +56,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
       } else if (activeSession.status === 'waiting') {
         handleSendInput();
       } else {
-        handleContinueConversation();
+        handleContinueConversation(selectedModel);
       }
     }
   };
@@ -53,7 +67,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
     } else if (activeSession.status === 'waiting') {
       handleSendInput();
     } else {
-      handleContinueConversation();
+      handleContinueConversation(selectedModel);
     }
   };
 
@@ -103,6 +117,35 @@ export const SessionInput: React.FC<SessionInputProps> = ({
           <input type="checkbox" checked={activeSession.autoCommit ?? true} onChange={handleToggleAutoCommit} className="h-4 w-4 text-green-600 rounded border-gray-300 dark:border-gray-600 focus:ring-green-500" />
           <span className="text-sm text-gray-700 dark:text-gray-300">auto-commit</span>
         </label>
+        {/* Model selector for continue conversation */}
+        {activeSession.status !== 'waiting' && !(viewMode === 'terminal' && !activeSession.isRunning) && (
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-gray-400" />
+            <select
+              value={selectedModel}
+              onChange={async (e) => {
+                const newModel = e.target.value;
+                setSelectedModel(newModel);
+                
+                // Don't update the session in the store immediately
+                // The backend will update it when continue is pressed
+                
+                // Save as default for future sessions
+                try {
+                  await API.config.update({ defaultModel: newModel });
+                } catch (err) {
+                  console.error('Failed to save default model:', err);
+                }
+              }}
+              className="text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+              title="AI model to use for continuing the conversation"
+            >
+              <option value="claude-sonnet-4-20250514">Sonnet 4: Best for most coding tasks</option>
+              <option value="claude-opus-4-20250514">Opus 4: Complex architecture, large refactors</option>
+              <option value="claude-3-5-haiku-20241022">Haiku 3.5: Fast & cost-effective for simple tasks</option>
+            </select>
+          </div>
+        )}
       </div>
       {activeSession.status !== 'waiting' && !(viewMode === 'terminal' && !activeSession.isRunning) && (
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">

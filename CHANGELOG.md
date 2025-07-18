@@ -1,6 +1,24 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.1.15] - 2025-07-17
+
+### Added
+- Model selection support for each session - users can now choose which Claude model to use
+- Enhanced prompt history UX with modal dialogs for better readability
+- Double-click to view full prompt text in a dedicated modal
+
+### Fixed
+- Fixed Node PATH issues on latest macOS versions (hopefully)
+
+### Security
+- Fixed potential command injection vulnerabilities in git operations (#36)
+- Fixed potential XSS vulnerability in GitErrorDialog (#35)
+
+### Changed
+- Improved prompt navigation with better UI interactions
+- Cleaned up legacy pre-Electron code
+
 ## [0.1.14] - 2025-07-11
 
 ### Fixed
