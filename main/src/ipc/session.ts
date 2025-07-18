@@ -92,7 +92,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
       if (count > 1) {
         console.log('[IPC] Creating multiple sessions...');
-        const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode, targetProject.id, request.baseBranch, request.autoCommit);
+        const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode, targetProject.id, request.baseBranch, request.autoCommit, request.model);
         console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
         return { success: true, data: { jobIds: jobs.map(job => job.id) } };
       } else {
@@ -103,7 +103,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           permissionMode: request.permissionMode,
           projectId: targetProject.id,
           baseBranch: request.baseBranch,
-          autoCommit: request.autoCommit
+          autoCommit: request.autoCommit,
+          model: request.model
         });
         console.log('[IPC] Created job with ID:', job.id);
         return { success: true, data: { jobId: job.id } };
@@ -267,7 +268,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string) => {
+  ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string, model?: string) => {
     try {
       // Get session details
       const session = sessionManager.getSession(sessionId);
@@ -286,10 +287,19 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const isMainRepoFirstStart = dbSession?.is_main_repo && conversationHistory.length === 0 && continuePrompt;
 
       // Update session status to initializing and clear run_started_at
-      sessionManager.updateSession(sessionId, {
+      // Also update the model if provided
+      const updateData: any = {
         status: 'initializing',
         run_started_at: null // Clear previous run time
-      });
+      };
+      
+      // If a model was provided and it's different, update it now
+      if (model && model !== dbSession?.model) {
+        updateData.model = model;
+        console.log(`[IPC] Updating session ${sessionId} model from ${dbSession?.model} to ${model}`);
+      }
+      
+      sessionManager.updateSession(sessionId, updateData);
 
       if (isMainRepoFirstStart && continuePrompt) {
         // First message in main repo session - start Claude Code without --continue
@@ -329,7 +339,9 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         }
 
         // Start Claude Code with the user's prompt
-        await claudeCodeManager.startSession(sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode);
+        // Use the provided model if specified, otherwise fall back to the session's original model
+        const modelToUse = model || dbSession?.model || 'claude-sonnet-4-20250514';
+        await claudeCodeManager.startSession(sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode, modelToUse);
       } else {
         // Normal continue for existing sessions
         if (continuePrompt) {
@@ -337,7 +349,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         }
 
         // Continue the session with the existing conversation
-        await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory);
+        // Use the provided model if specified, otherwise fall back to the session's original model
+        const modelToUse = model || dbSession?.model || 'claude-sonnet-4-20250514';
+        
+        console.log(`[IPC] Continue session ${sessionId} - provided model: ${model}, current model: ${dbSession?.model}, modelToUse: ${modelToUse}`);
+        
+        await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory, modelToUse);
       }
 
       // The session manager will update status based on Claude output

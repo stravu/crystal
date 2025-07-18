@@ -20,6 +20,7 @@ export interface Session {
   displayOrder?: number;
   isFavorite?: boolean;
   autoCommit?: boolean;
+  model?: string;
 }
 
 export interface CreateSessionRequest {
@@ -31,6 +32,7 @@ export interface CreateSessionRequest {
   isMainRepo?: boolean;
   baseBranch?: string;
   autoCommit?: boolean;
+  model?: string;
 }
 
 export interface SessionOutput {

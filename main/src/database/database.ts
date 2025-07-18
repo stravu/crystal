@@ -586,6 +586,15 @@ export class DatabaseService {
       console.log('[Database] Created app_opens table');
     }
 
+    // Add model column to sessions table if it doesn't exist
+    const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasModelColumn = sessionTableInfoModel.some((col: any) => col.name === 'model');
+    
+    if (!hasModelColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN model TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      console.log('[Database] Added model column to sessions table');
+    }
+
     // Add user_preferences table to store all user preferences
     const userPreferencesTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'").all();
     if (userPreferencesTable.length === 0) {
@@ -947,9 +956,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     this.db.prepare(`
-      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1);
+      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514');
     
     const session = this.getSession(data.id);
     if (!session) {
@@ -1028,14 +1037,18 @@ export class DatabaseService {
       updates.push('auto_commit = ?');
       values.push(data.auto_commit ? 1 : 0);
     }
+    if (data.model !== undefined) {
+      updates.push('model = ?');
+      values.push(data.model);
+    }
 
     if (updates.length === 0) {
       return this.getSession(id);
     }
 
-    // Only update the updated_at timestamp if we're changing something other than is_favorite or auto_commit
-    // This prevents the session from showing as "unviewed" when just toggling favorites or auto_commit
-    const isOnlyToggleUpdate = updates.length === 1 && (updates[0] === 'is_favorite = ?' || updates[0] === 'auto_commit = ?');
+    // Only update the updated_at timestamp if we're changing something other than is_favorite, auto_commit, or model
+    // This prevents the session from showing as "unviewed" when just toggling these settings
+    const isOnlyToggleUpdate = updates.length === 1 && (updates[0] === 'is_favorite = ?' || updates[0] === 'auto_commit = ?' || updates[0] === 'model = ?');
     if (!isOnlyToggleUpdate) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
     }
