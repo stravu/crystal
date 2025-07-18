@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { StatusIndicator } from './StatusIndicator';
 import { API } from '../utils/api';
-import { Star } from 'lucide-react';
+import { Star, Archive } from 'lucide-react';
 import type { Session } from '../types/session';
 
 interface SessionListItemProps {
@@ -196,9 +196,11 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     // Prevent deletion if already being deleted
     if (isDeleting) return;
     
-    const confirmMessage = session.isMainRepo 
-      ? `Archive main repository session "${session.name}"? This will keep the session history but close the active connection.`
-      : `Delete session "${session.name}" and its worktree? This action cannot be undone.`;
+    const confirmMessage = `Archive session "${session.name}"? This will:\n` +
+      `• Move the session to the archived sessions list\n` +
+      `• Preserve all session history and outputs\n` +
+      (session.isMainRepo ? `• Close the active Claude Code connection` : `• Remove the git worktree (${session.worktreePath?.split('/').pop() || 'worktree'})`);
+    
     const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
     
@@ -207,7 +209,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
       const response = await API.sessions.delete(session.id);
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to delete session');
+        throw new Error(response.error || 'Failed to archive session');
       }
       
       // If this was the active session, clear the selection
@@ -215,8 +217,8 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
         setActiveSession(null);
       }
     } catch (error) {
-      console.error('Error deleting session:', error);
-      alert('Failed to delete session');
+      console.error('Error archiving session:', error);
+      alert('Failed to archive session');
     } finally {
       removeDeletingSessionId(session.id);
     }
@@ -358,51 +360,57 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
         <div className="flex items-center space-x-1">
           {!isEditing && (
             <>
-              <button
-                onClick={handleToggleFavorite}
-                className={`p-1 rounded transition-all ${
-                  session.isFavorite 
-                    ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300' 
-                    : 'text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 opacity-0 group-hover:opacity-100'
-                } hover:bg-gray-100 dark:hover:bg-gray-700/50`}
-                title={session.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-              >
-                <Star 
-                  className="w-4 h-4" 
-                  fill={session.isFavorite ? 'currentColor' : 'none'}
-                  strokeWidth={session.isFavorite ? 0 : 2}
-                />
-              </button>
-              <button
-                onClick={isRunning ? handleStopScript : handleRunScript}
-                className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
-                  isClosing
-                    ? 'cursor-wait text-amber-600 dark:text-amber-400'
-                    : isRunning 
-                    ? 'hover:bg-red-100 dark:hover:bg-red-600/20 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300' 
-                    : hasRunScript
-                      ? 'hover:bg-green-100 dark:hover:bg-green-600/20 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-600/20 text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
-                }`}
-                title={isClosing ? 'Closing script...' : isRunning ? 'Stop script' : (hasRunScript ? 'Run script' : 'No run script configured - Click to configure')}
-                disabled={isClosing}
-              >
-                {isClosing ? '⏸️' : isRunning ? '⏹️' : '▶️'}
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-600/20 ${
-                  isDeleting ? 'cursor-not-allowed' : ''
-                }`}
-                title="Delete session and worktree"
-              >
-                {isDeleting ? (
-                  <span className="text-gray-600 dark:text-gray-400">⏳</span>
-                ) : (
-                  <span className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">🗑️</span>
-                )}
-              </button>
+              {!session.archived && (
+                <button
+                  onClick={handleToggleFavorite}
+                  className={`p-1 rounded transition-all ${
+                    session.isFavorite 
+                      ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300' 
+                      : 'text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 opacity-0 group-hover:opacity-100'
+                  } hover:bg-gray-100 dark:hover:bg-gray-700/50`}
+                  title={session.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <Star 
+                    className="w-4 h-4" 
+                    fill={session.isFavorite ? 'currentColor' : 'none'}
+                    strokeWidth={session.isFavorite ? 0 : 2}
+                  />
+                </button>
+              )}
+              {!session.archived && (
+                <button
+                  onClick={isRunning ? handleStopScript : handleRunScript}
+                  className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
+                    isClosing
+                      ? 'cursor-wait text-amber-600 dark:text-amber-400'
+                      : isRunning 
+                      ? 'hover:bg-red-100 dark:hover:bg-red-600/20 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300' 
+                      : hasRunScript
+                        ? 'hover:bg-green-100 dark:hover:bg-green-600/20 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-600/20 text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
+                  }`}
+                  title={isClosing ? 'Closing script...' : isRunning ? 'Stop script' : (hasRunScript ? 'Run script' : 'No run script configured - Click to configure')}
+                  disabled={isClosing}
+                >
+                  {isClosing ? '⏸️' : isRunning ? '⏹️' : '▶️'}
+                </button>
+              )}
+              {!session.archived && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-600/20 ${
+                    isDeleting ? 'cursor-not-allowed' : ''
+                  }`}
+                  title="Archive session"
+                >
+                  {isDeleting ? (
+                    <span className="text-gray-600 dark:text-gray-400">⏳</span>
+                  ) : (
+                    <Archive className="w-4 h-4 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300" />
+                  )}
+                </button>
+              )}
             </>
           )}
         </div>
