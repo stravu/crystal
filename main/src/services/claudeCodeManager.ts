@@ -40,7 +40,7 @@ export class ClaudeCodeManager extends EventEmitter {
     this.setMaxListeners(50);
   }
 
-  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false, permissionMode?: 'approve' | 'ignore'): Promise<void> {
+  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
     try {
       this.logger?.verbose(`Spawning Claude for session ${sessionId} in ${worktreePath}`);
       this.logger?.verbose(`Command: claude -p "${prompt}"`);
@@ -155,6 +155,12 @@ export class ClaudeCodeManager extends EventEmitter {
       
       // Build the command arguments
       const args = ['--verbose', '--output-format', 'stream-json'];
+      
+      // Add model argument if specified
+      if (model) {
+        args.push('--model', model);
+        this.logger?.verbose(`Using model: ${model}`);
+      }
       
       // Determine permission mode
       const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
@@ -996,11 +1002,11 @@ export class ClaudeCodeManager extends EventEmitter {
     return this.processes.has(sessionId);
   }
 
-  async startSession(sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore'): Promise<void> {
-    return this.spawnClaudeCode(sessionId, worktreePath, prompt, undefined, false, permissionMode);
+  async startSession(sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
+    return this.spawnClaudeCode(sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
   }
 
-  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[]): Promise<void> {
+  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
     // Kill any existing process for this session first
     if (this.processes.has(sessionId)) {
       await this.killProcess(sessionId);
@@ -1012,7 +1018,7 @@ export class ClaudeCodeManager extends EventEmitter {
     
     // For continuing a session, we use the --continue flag
     // The conversationHistory parameter is kept for compatibility but not used with --continue
-    return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true, permissionMode);
+    return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true, permissionMode, model);
   }
 
   async stopSession(sessionId: string): Promise<void> {

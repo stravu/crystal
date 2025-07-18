@@ -69,6 +69,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   }),
   
   updateSession: (updatedSession) => set((state) => {
+    console.log(`[SessionStore] updateSession called for ${updatedSession.id}`, {
+      model: updatedSession.model,
+      status: updatedSession.status,
+      fullUpdate: updatedSession
+    });
+    
     // If this is the active main repo session, update it
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === updatedSession.id) {
       const newActiveSession = {
@@ -77,6 +83,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         output: state.activeMainRepoSession.output,
         jsonMessages: state.activeMainRepoSession.jsonMessages
       };
+      console.log(`[SessionStore] Updated active main repo session ${updatedSession.id} model:`, newActiveSession.model);
       return {
         ...state,
         activeMainRepoSession: newActiveSession
@@ -92,6 +99,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           output: session.output,
           jsonMessages: session.jsonMessages
         };
+        console.log(`[SessionStore] Updated session ${updatedSession.id} model: ${session.model} -> ${updatedSessionWithOutput.model}`);
         return updatedSessionWithOutput;
       }
       return session;

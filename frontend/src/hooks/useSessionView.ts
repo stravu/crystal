@@ -1086,7 +1086,7 @@ export const useSessionView = (
     }
   };
 
-  const handleContinueConversation = async (attachedImages?: any[]) => {
+  const handleContinueConversation = async (attachedImages?: any[], model?: string) => {
     if (!input.trim() || !activeSession) return;
     
     // Mark that we're continuing a conversation to prevent output reload
@@ -1116,7 +1116,7 @@ export const useSessionView = (
       }
     }
     
-    const response = await API.sessions.continue(activeSession.id, finalInput);
+    const response = await API.sessions.continue(activeSession.id, finalInput, model);
     if (response.success) {
       setInput('');
       setUltrathink(false);
