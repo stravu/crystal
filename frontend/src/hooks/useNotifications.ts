@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { API } from '../utils/api';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -19,6 +20,7 @@ export function useNotifications() {
     notifyOnWaiting: true,
     notifyOnComplete: true,
   });
+  const settingsLoaded = useRef(false);
 
   const requestPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
@@ -87,6 +89,7 @@ export function useNotifications() {
       case 'running': return '🏃';
       case 'waiting': return '⏸️';
       case 'stopped': return '✅';
+      case 'completed_unviewed': return '🔔';
       case 'error': return '❌';
       default: return '📝';
     }
@@ -98,6 +101,7 @@ export function useNotifications() {
       case 'running': return 'is working';
       case 'waiting': return 'needs your input';
       case 'stopped': return 'has completed';
+      case 'completed_unviewed': return 'has new activity';
       case 'error': return 'encountered an error';
       default: return 'status changed';
     }
@@ -132,9 +136,9 @@ export function useNotifications() {
             `Input Required ${emoji}`,
             `"${currentSession.name}" is waiting for your response`
           );
-        } else if (currentSession.status === 'stopped' && settings.notifyOnComplete) {
+        } else if (currentSession.status === 'completed_unviewed' && settings.notifyOnComplete) {
           showNotification(
-            `Session Complete ${emoji}`,
+            `Session Complete ✅`,
             `"${currentSession.name}" has finished`
           );
         } else if (currentSession.status === 'error') {
@@ -155,9 +159,21 @@ export function useNotifications() {
     prevSessionsRef.current = sessions;
   }, [sessions]);
 
-  // Request permission on first load
+  // Load settings on first mount
   useEffect(() => {
-    requestPermission();
+    if (!settingsLoaded.current) {
+      settingsLoaded.current = true;
+      
+      API.config.get().then(response => {
+        if (response.success && response.data?.notifications) {
+          setSettings(response.data.notifications);
+        }
+      }).catch(error => {
+        console.error('Failed to load notification settings:', error);
+      });
+      
+      requestPermission();
+    }
   }, []);
 
   return {
