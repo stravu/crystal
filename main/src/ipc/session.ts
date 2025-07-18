@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import type { AppServices } from './types';
 import type { CreateSessionRequest } from '../types/session';
 import { getCrystalSubdirectory } from '../utils/crystalDirectory';
+import { convertDbFolderToFolder } from './folders';
 
 export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices): void {
   const {
@@ -49,10 +50,11 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const projectsWithSessions = allProjects.map(project => {
         const sessions = sessionManager.getSessionsForProject(project.id);
         const folders = databaseService.getFoldersForProject(project.id);
+        const convertedFolders = folders.map(convertDbFolderToFolder);
         return {
           ...project,
           sessions,
-          folders
+          folders: convertedFolders
         };
       });
       return { success: true, data: projectsWithSessions };

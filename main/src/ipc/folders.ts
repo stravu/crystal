@@ -2,6 +2,19 @@ import { IpcMain } from 'electron';
 import type { Folder } from '../database/models';
 import type { AppServices } from './types';
 
+// Convert database folder (snake_case) to frontend folder (camelCase)
+export function convertDbFolderToFolder(dbFolder: Folder) {
+  return {
+    id: dbFolder.id,
+    name: dbFolder.name,
+    projectId: dbFolder.project_id,
+    parentFolderId: dbFolder.parent_folder_id,
+    displayOrder: dbFolder.display_order,
+    createdAt: dbFolder.created_at,
+    updatedAt: dbFolder.updated_at
+  };
+}
+
 export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) {
   const { databaseService, getMainWindow } = services;
 
@@ -9,7 +22,8 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
   ipcMain.handle('folders:get-by-project', async (_, projectId: number) => {
     try {
       const folders = databaseService.getFoldersForProject(projectId);
-      return { success: true, data: folders };
+      const convertedFolders = folders.map(convertDbFolderToFolder);
+      return { success: true, data: convertedFolders };
     } catch (error: any) {
       console.error('[IPC] Failed to get folders:', error);
       return { success: false, error: error.message || 'Failed to get folders' };
@@ -20,7 +34,8 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
   ipcMain.handle('folders:create', async (_, name: string, projectId: number, parentFolderId?: string | null) => {
     try {
       const folder = databaseService.createFolder(name, projectId, parentFolderId);
-      return { success: true, data: folder };
+      const convertedFolder = convertDbFolderToFolder(folder);
+      return { success: true, data: convertedFolder };
     } catch (error: any) {
       console.error('[IPC] Failed to create folder:', error);
       return { success: false, error: error.message || 'Failed to create folder' };
@@ -40,7 +55,8 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
         const mainWindow = getMainWindow();
         if (mainWindow && !mainWindow.isDestroyed()) {
           console.log(`[IPC] Emitting folder:updated event for folder ${folderId}`);
-          mainWindow.webContents.send('folder:updated', updatedFolder);
+          const convertedFolder = convertDbFolderToFolder(updatedFolder);
+          mainWindow.webContents.send('folder:updated', convertedFolder);
         }
       }
       
