@@ -11,11 +11,11 @@ jobs:
   build:
     strategy:
       matrix:
-        # Skip macOS on PR for faster CI - only build Ubuntu for validation
-        os: ${{ github.event_name == 'pull_request' && fromJson('["ubuntu-latest"]') || fromJson('["macos-latest", "ubuntu-latest"]') }}
+        # Build both platforms for validation, but use different commands for speed
+        os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
-            build_cmd: build:mac:universal
+            build_cmd: build:mac:ci
             artifact_name: crystal-macos
             artifact_path: dist-electron/*.dmg
           - os: ubuntu-latest
