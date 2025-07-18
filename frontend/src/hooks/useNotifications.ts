@@ -21,6 +21,7 @@ export function useNotifications() {
     notifyOnComplete: true,
   });
   const settingsLoaded = useRef(false);
+  const initialLoadComplete = useRef(false);
 
   const requestPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
@@ -110,6 +111,20 @@ export function useNotifications() {
   useEffect(() => {
     const prevSessions = prevSessionsRef.current;
     
+    // If this is the initial load (prevSessions is empty and we have sessions),
+    // just update the ref without triggering notifications
+    if (!initialLoadComplete.current && prevSessions.length === 0 && sessions.length > 0) {
+      console.log('[useNotifications] Initial session load detected, skipping notifications for', sessions.length, 'sessions');
+      prevSessionsRef.current = sessions;
+      initialLoadComplete.current = true;
+      return;
+    }
+    
+    // Only process notifications after the initial load is complete
+    if (!initialLoadComplete.current) {
+      return;
+    }
+    
     // Compare current sessions with previous sessions to detect changes
     sessions.forEach((currentSession) => {
       const prevSession = prevSessions.find(s => s.id === currentSession.id);
@@ -157,7 +172,7 @@ export function useNotifications() {
 
     // Update the ref for next comparison
     prevSessionsRef.current = sessions;
-  }, [sessions]);
+  }, [sessions, settings]);
 
   // Load settings on first mount
   useEffect(() => {
