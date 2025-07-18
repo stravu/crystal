@@ -113,9 +113,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: |
-          /var/lib/flatpak
-          ~/.local/share/flatpak
-        key: ${{ runner.os }}-flatpak-runtime-v1
+          ~/.local/share/flatpak/repo
+          ~/.cache/flatpak-builder
+        key: ${{ runner.os }}-flatpak-runtime-v2
         restore-keys: |
           ${{ runner.os }}-flatpak-runtime-
 
@@ -147,8 +147,8 @@ jobs:
         # Update manifest with actual AppImage path
         sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" com.stravu.crystal.yml
         
-        # Build Flatpak with ccache for faster rebuilds
-        flatpak-builder --force-clean --repo=repo --ccache build-dir com.stravu.crystal.yml
+        # Build Flatpak (ccache causes permission issues in CI)
+        flatpak-builder --force-clean --repo=repo build-dir com.stravu.crystal.yml
         
         # Create bundle
         flatpak build-bundle repo dist-electron/crystal.flatpak com.stravu.crystal
