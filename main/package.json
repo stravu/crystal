@@ -1,6 +1,6 @@
 {
   "name": "main",
-  "version": "0.1.13",
+  "version": "0.1.15",
   "description": "Electron main process for Claude Code Commander",
   "main": "dist/index.js",
   "type": "commonjs",

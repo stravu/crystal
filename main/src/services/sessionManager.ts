@@ -111,7 +111,8 @@ export class SessionManager extends EventEmitter {
       projectId: dbSession.project_id, // Add the missing projectId field
       folderId: dbSession.folder_id,
       isFavorite: dbSession.is_favorite,
-      autoCommit: dbSession.auto_commit
+      autoCommit: dbSession.auto_commit,
+      model: dbSession.model
     };
   }
 
@@ -161,11 +162,11 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string): Session {
-    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId);
+  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
+    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model);
   }
 
-  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string): Session {
+  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
     let targetProject;
@@ -195,7 +196,8 @@ export class SessionManager extends EventEmitter {
       folder_id: folderId,
       permission_mode: permissionMode,
       is_main_repo: isMainRepo,
-      auto_commit: autoCommit
+      auto_commit: autoCommit,
+      model: model
     };
     console.log(`[SessionManager] Session data:`, sessionData);
 
@@ -247,7 +249,9 @@ export class SessionManager extends EventEmitter {
       project.default_permission_mode || 'ignore', // Default to 'ignore' if not set
       projectId,
       true, // isMainRepo = true
-      true  // autoCommit = true (default for main repo sessions)
+      true, // autoCommit = true (default for main repo sessions)
+      undefined, // folderId
+      'claude-sonnet-4-20250514' // default model for main repo sessions
     );
     
     console.log(`[SessionManager] Created main repo session: ${session.id}`);
@@ -267,6 +271,11 @@ export class SessionManager extends EventEmitter {
     if (update.status !== undefined) {
       dbUpdate.status = this.mapSessionStatusToDbStatus(update.status);
       console.log(`[SessionManager] Mapping status ${update.status} to DB status ${dbUpdate.status}`);
+    }
+    
+    if (update.model !== undefined) {
+      dbUpdate.model = update.model;
+      console.log(`[SessionManager] Updating model to ${update.model}`);
     }
     
     const updatedDbSession = this.db.updateSession(id, dbUpdate);

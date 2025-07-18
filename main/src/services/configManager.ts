@@ -21,6 +21,7 @@ export class ConfigManager extends EventEmitter {
       systemPromptAppend: undefined,
       runScript: undefined,
       defaultPermissionMode: 'ignore',
+      defaultModel: 'claude-sonnet-4-20250514',
       stravuApiKey: undefined,
       stravuServerUrl: 'https://api.stravu.com'
     };
@@ -88,5 +89,9 @@ export class ConfigManager extends EventEmitter {
 
   getStravuServerUrl(): string {
     return this.config.stravuServerUrl || 'https://api.stravu.com';
+  }
+
+  getDefaultModel(): string {
+    return this.config.defaultModel || 'claude-sonnet-4-20250514';
   }
 }
