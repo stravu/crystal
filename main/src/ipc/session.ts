@@ -62,6 +62,24 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  ipcMain.handle('sessions:get-archived-with-projects', async () => {
+    try {
+      const allProjects = databaseService.getAllProjects();
+      const projectsWithArchivedSessions = allProjects.map(project => {
+        const archivedSessions = databaseService.getArchivedSessions(project.id);
+        return {
+          ...project,
+          sessions: archivedSessions,
+          folders: [] // Archived sessions don't need folders
+        };
+      }).filter(project => project.sessions.length > 0); // Only include projects with archived sessions
+      return { success: true, data: projectsWithArchivedSessions };
+    } catch (error) {
+      console.error('Failed to get archived sessions with projects:', error);
+      return { success: false, error: 'Failed to get archived sessions with projects' };
+    }
+  });
+
   ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) => {
     console.log('[IPC] sessions:create handler called with request:', request);
     try {
@@ -94,6 +112,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         console.log('[IPC] Creating multiple sessions...');
         const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode, targetProject.id, request.baseBranch, request.autoCommit, request.model);
         console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
+        
+        // Update project's lastUsedModel
+        if (request.model) {
+          await databaseService.updateProject(targetProject.id, { lastUsedModel: request.model });
+        }
+        
         return { success: true, data: { jobIds: jobs.map(job => job.id) } };
       } else {
         console.log('[IPC] Creating single session...');
@@ -107,6 +131,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           model: request.model
         });
         console.log('[IPC] Created job with ID:', job.id);
+        
+        // Update project's lastUsedModel
+        if (request.model) {
+          await databaseService.updateProject(targetProject.id, { lastUsedModel: request.model });
+        }
+        
         return { success: true, data: { jobId: job.id } };
       }
     } catch (error) {
@@ -153,6 +183,11 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const dbSession = databaseService.getSession(sessionId);
       if (!dbSession) {
         return { success: false, error: 'Session not found' };
+      }
+      
+      // Check if session is already archived
+      if (dbSession.archived) {
+        return { success: false, error: 'Session is already archived' };
       }
 
       // Add a message to session output about archiving
@@ -600,6 +635,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       throw error;
     }
   });
+
+  // Restore functionality removed - worktrees are deleted on archive so restore doesn't make sense
 
   // Debug handler to check table structure
   ipcMain.handle('debug:get-table-structure', async (_event, tableName: 'folders' | 'sessions') => {

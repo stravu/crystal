@@ -10,4 +10,11 @@ export interface AppConfig {
   stravuApiKey?: string;
   stravuServerUrl?: string;
   theme?: 'light' | 'dark';
+  notifications?: {
+    enabled: boolean;
+    playSound: boolean;
+    notifyOnStatusChange: boolean;
+    notifyOnWaiting: boolean;
+    notifyOnComplete: boolean;
+  };
 }

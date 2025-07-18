@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { API } from '../utils/api';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -12,13 +13,14 @@ interface NotificationSettings {
 export function useNotifications() {
   const sessions = useSessionStore((state) => state.sessions);
   const prevSessionsRef = useRef<typeof sessions>([]);
-  const settings = useRef<NotificationSettings>({
+  const [settings, setSettings] = useState<NotificationSettings>({
     enabled: true,
     playSound: true,
     notifyOnStatusChange: true,
     notifyOnWaiting: true,
     notifyOnComplete: true,
   });
+  const settingsLoaded = useRef(false);
 
   const requestPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
@@ -39,7 +41,7 @@ export function useNotifications() {
   };
 
   const playNotificationSound = () => {
-    if (!settings.current.playSound) return;
+    if (!settings.playSound) return;
     
     try {
       // Create a simple notification sound using Web Audio API
@@ -64,7 +66,7 @@ export function useNotifications() {
   };
 
   const showNotification = (title: string, body: string, icon?: string) => {
-    if (!settings.current.enabled) return;
+    if (!settings.enabled) return;
 
     requestPermission().then((hasPermission) => {
       if (hasPermission) {
@@ -87,6 +89,7 @@ export function useNotifications() {
       case 'running': return '🏃';
       case 'waiting': return '⏸️';
       case 'stopped': return '✅';
+      case 'completed_unviewed': return '🔔';
       case 'error': return '❌';
       default: return '📝';
     }
@@ -98,6 +101,7 @@ export function useNotifications() {
       case 'running': return 'is working';
       case 'waiting': return 'needs your input';
       case 'stopped': return 'has completed';
+      case 'completed_unviewed': return 'has new activity';
       case 'error': return 'encountered an error';
       default: return 'status changed';
     }
@@ -112,7 +116,7 @@ export function useNotifications() {
       
       if (!prevSession) {
         // New session created
-        if (settings.current.notifyOnStatusChange) {
+        if (settings.notifyOnStatusChange) {
           showNotification(
             `New Session Created ${getStatusEmoji('initializing')}`,
             `"${currentSession.name}" is starting up`
@@ -127,14 +131,14 @@ export function useNotifications() {
         const message = getStatusMessage(currentSession.status);
         
         // Notify based on specific status
-        if (currentSession.status === 'waiting' && settings.current.notifyOnWaiting) {
+        if (currentSession.status === 'waiting' && settings.notifyOnWaiting) {
           showNotification(
             `Input Required ${emoji}`,
             `"${currentSession.name}" is waiting for your response`
           );
-        } else if (currentSession.status === 'stopped' && settings.current.notifyOnComplete) {
+        } else if (currentSession.status === 'completed_unviewed' && settings.notifyOnComplete) {
           showNotification(
-            `Session Complete ${emoji}`,
+            `Session Complete ✅`,
             `"${currentSession.name}" has finished`
           );
         } else if (currentSession.status === 'error') {
@@ -142,7 +146,7 @@ export function useNotifications() {
             `Session Error ${emoji}`,
             `"${currentSession.name}" encountered an error`
           );
-        } else if (settings.current.notifyOnStatusChange) {
+        } else if (settings.notifyOnStatusChange) {
           showNotification(
             `Status Update ${emoji}`,
             `"${currentSession.name}" ${message}`
@@ -155,15 +159,27 @@ export function useNotifications() {
     prevSessionsRef.current = sessions;
   }, [sessions]);
 
-  // Request permission on first load
+  // Load settings on first mount
   useEffect(() => {
-    requestPermission();
+    if (!settingsLoaded.current) {
+      settingsLoaded.current = true;
+      
+      API.config.get().then(response => {
+        if (response.success && response.data?.notifications) {
+          setSettings(response.data.notifications);
+        }
+      }).catch(error => {
+        console.error('Failed to load notification settings:', error);
+      });
+      
+      requestPermission();
+    }
   }, []);
 
   return {
-    settings: settings.current,
+    settings,
     updateSettings: (newSettings: Partial<NotificationSettings>) => {
-      settings.current = { ...settings.current, ...newSettings };
+      setSettings(prev => ({ ...prev, ...newSettings }));
     },
     requestPermission,
     showNotification,
