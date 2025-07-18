@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 
 interface NotificationSettings {
@@ -12,7 +12,7 @@ interface NotificationSettings {
 export function useNotifications() {
   const sessions = useSessionStore((state) => state.sessions);
   const prevSessionsRef = useRef<typeof sessions>([]);
-  const settings = useRef<NotificationSettings>({
+  const [settings, setSettings] = useState<NotificationSettings>({
     enabled: true,
     playSound: true,
     notifyOnStatusChange: true,
@@ -39,7 +39,7 @@ export function useNotifications() {
   };
 
   const playNotificationSound = () => {
-    if (!settings.current.playSound) return;
+    if (!settings.playSound) return;
     
     try {
       // Create a simple notification sound using Web Audio API
@@ -64,7 +64,7 @@ export function useNotifications() {
   };
 
   const showNotification = (title: string, body: string, icon?: string) => {
-    if (!settings.current.enabled) return;
+    if (!settings.enabled) return;
 
     requestPermission().then((hasPermission) => {
       if (hasPermission) {
@@ -112,7 +112,7 @@ export function useNotifications() {
       
       if (!prevSession) {
         // New session created
-        if (settings.current.notifyOnStatusChange) {
+        if (settings.notifyOnStatusChange) {
           showNotification(
             `New Session Created ${getStatusEmoji('initializing')}`,
             `"${currentSession.name}" is starting up`
@@ -127,12 +127,12 @@ export function useNotifications() {
         const message = getStatusMessage(currentSession.status);
         
         // Notify based on specific status
-        if (currentSession.status === 'waiting' && settings.current.notifyOnWaiting) {
+        if (currentSession.status === 'waiting' && settings.notifyOnWaiting) {
           showNotification(
             `Input Required ${emoji}`,
             `"${currentSession.name}" is waiting for your response`
           );
-        } else if (currentSession.status === 'stopped' && settings.current.notifyOnComplete) {
+        } else if (currentSession.status === 'stopped' && settings.notifyOnComplete) {
           showNotification(
             `Session Complete ${emoji}`,
             `"${currentSession.name}" has finished`
@@ -142,7 +142,7 @@ export function useNotifications() {
             `Session Error ${emoji}`,
             `"${currentSession.name}" encountered an error`
           );
-        } else if (settings.current.notifyOnStatusChange) {
+        } else if (settings.notifyOnStatusChange) {
           showNotification(
             `Status Update ${emoji}`,
             `"${currentSession.name}" ${message}`
@@ -161,9 +161,9 @@ export function useNotifications() {
   }, []);
 
   return {
-    settings: settings.current,
+    settings,
     updateSettings: (newSettings: Partial<NotificationSettings>) => {
-      settings.current = { ...settings.current, ...newSettings };
+      setSettings(prev => ({ ...prev, ...newSettings }));
     },
     requestPermission,
     showNotification,

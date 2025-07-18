@@ -12,6 +12,7 @@ export interface Project {
   open_ide_command?: string;
   display_order?: number;
   worktree_folder?: string;
+  lastUsedModel?: string;
 }
 
 export interface ProjectRunCommand {

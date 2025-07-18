@@ -35,6 +35,7 @@ interface ElectronAPI {
   sessions: {
     getAll: () => Promise<IPCResponse>;
     getAllWithProjects: () => Promise<IPCResponse>;
+    getArchivedWithProjects: () => Promise<IPCResponse>;
     get: (sessionId: string) => Promise<IPCResponse>;
     create: (request: any) => Promise<IPCResponse>;
     delete: (sessionId: string) => Promise<IPCResponse>;

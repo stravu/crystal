@@ -90,21 +90,13 @@ export const SessionView = memo(() => {
           {hook.isLoadingOutput && (
             <div className="absolute top-4 left-4 text-gray-600 dark:text-gray-400 z-10">Loading output...</div>
           )}
-          <div className={`bg-gray-50 dark:bg-black h-full ${hook.viewMode === 'output' ? 'block' : 'hidden'} relative`}>
-            <div ref={terminalRef} className="h-full" />
-            {hook.loadError && hook.viewMode === 'output' && (
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Failed to load output content</p>
-                  <p className="text-gray-600 dark:text-gray-500 text-sm mb-4">{hook.loadError}</p>
-                  <button onClick={() => hook.loadOutputContent(activeSession.id)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                    Reload Output
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className={`bg-gray-50 dark:bg-black h-full ${hook.viewMode === 'output' ? 'flex flex-col' : 'hidden'} relative`}>
+            <div 
+              ref={terminalRef} 
+              className="flex-1 min-h-0"
+            />
             {(activeSession.status === 'running' || activeSession.status === 'initializing') && (
-              <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 flex-shrink-0">
                 <div className="flex items-center justify-between text-gray-700 dark:text-gray-300">
                     <div className="flex items-center space-x-3">
                         <div className="flex space-x-1">
@@ -127,6 +119,17 @@ export const SessionView = memo(() => {
                 </div>
               </div>
             )}
+            {hook.loadError && hook.viewMode === 'output' && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <p className="text-gray-700 dark:text-gray-300 mb-2">Failed to load output content</p>
+                  <p className="text-gray-600 dark:text-gray-500 text-sm mb-4">{hook.loadError}</p>
+                  <button onClick={() => hook.loadOutputContent(activeSession.id)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    Reload Output
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className={`h-full ${hook.viewMode === 'messages' ? 'block' : 'hidden'}`}>
             <JsonMessageView messages={activeSession.jsonMessages || []} />
@@ -145,28 +148,53 @@ export const SessionView = memo(() => {
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Terminal
               </div>
-              <button
-                onClick={hook.handleClearTerminal}
-                className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                title="Clear terminal"
-              >
-                <svg 
-                  className="w-4 h-4" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
+              {!activeSession.archived && (
+                <button
+                  onClick={hook.handleClearTerminal}
+                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                  title="Clear terminal"
                 >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
-                  />
-                </svg>
-              </button>
+                  <svg 
+                    className="w-4 h-4" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
-            <div ref={scriptTerminalRef} className="flex-1" />
-            <div className="h-2" />
+            {activeSession.archived ? (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center max-w-md">
+                  <div className="mb-4">
+                    <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    No Terminal History Available
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    This session has been archived. Terminal history is not preserved for archived sessions to save resources.
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    The session outputs and conversation history are still available in the Output and Messages views.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div ref={scriptTerminalRef} className="flex-1" />
+                <div className="h-2" />
+              </>
+            )}
           </div>
           <div className={`h-full ${hook.viewMode === 'editor' ? 'block' : 'hidden'}`}>
             <FileEditor sessionId={activeSession.id} />

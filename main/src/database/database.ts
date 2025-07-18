@@ -657,6 +657,15 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
       console.log('[Database] Added worktree_folder column to projects table');
     }
+
+    // Add lastUsedModel column to projects table if it doesn't exist
+    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
+    
+    if (!hasLastUsedModelColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      console.log('[Database] Added lastUsedModel column to projects table');
+    }
   }
 
   // Project operations
@@ -741,6 +750,10 @@ export class DatabaseService {
     if (updates.worktree_folder !== undefined) {
       fields.push('worktree_folder = ?');
       values.push(updates.worktree_folder);
+    }
+    if (updates.lastUsedModel !== undefined) {
+      fields.push('lastUsedModel = ?');
+      values.push(updates.lastUsedModel);
     }
     if (updates.active !== undefined) {
       fields.push('active = ?');
@@ -1068,6 +1081,13 @@ export class DatabaseService {
     return this.db.prepare('SELECT * FROM sessions WHERE (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY created_at DESC').all() as Session[];
   }
 
+  getArchivedSessions(projectId?: number): Session[] {
+    if (projectId !== undefined) {
+      return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND archived = 1 AND (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY updated_at DESC').all(projectId) as Session[];
+    }
+    return this.db.prepare('SELECT * FROM sessions WHERE archived = 1 AND (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY updated_at DESC').all() as Session[];
+  }
+
   getMainRepoSession(projectId: number): Session | undefined {
     return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND is_main_repo = 1 AND (archived = 0 OR archived IS NULL)').get(projectId) as Session | undefined;
   }
@@ -1167,6 +1187,11 @@ export class DatabaseService {
 
   archiveSession(id: string): boolean {
     const result = this.db.prepare('UPDATE sessions SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  restoreSession(id: string): boolean {
+    const result = this.db.prepare('UPDATE sessions SET archived = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     return result.changes > 0;
   }
 
