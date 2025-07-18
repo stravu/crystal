@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings } from './Settings';
 import { DraggableProjectTreeView } from './DraggableProjectTreeView';
 import { Info, Clock } from 'lucide-react';
@@ -15,6 +15,29 @@ interface SidebarProps {
 export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width, onResize }: SidebarProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showStatusGuide, setShowStatusGuide] = useState(false);
+  const [version, setVersion] = useState<string>('');
+  const [gitCommit, setGitCommit] = useState<string>('');
+
+  useEffect(() => {
+    // Fetch version info on component mount
+    const fetchVersion = async () => {
+      try {
+        const result = await window.electronAPI.getVersionInfo();
+        if (result.success && result.data) {
+          if (result.data.current) {
+            setVersion(result.data.current);
+          }
+          if (result.data.gitCommit) {
+            setGitCommit(result.data.gitCommit);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch version:', error);
+      }
+    };
+    
+    fetchVersion();
+  }, []);
 
   return (
     <>
@@ -57,15 +80,6 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
               </svg>
             </button>
             <button
-              onClick={onAboutClick}
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              title="About Crystal"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button
               onClick={() => setIsSettingsOpen(true)}
               data-testid="settings-button"
               className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
@@ -102,6 +116,19 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
           </div>
           <DraggableProjectTreeView />
         </div>
+        
+        {/* Version display at bottom */}
+        {version && (
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+            <div 
+              className="text-xs text-gray-500 dark:text-gray-500 text-center cursor-pointer hover:text-gray-700 dark:hover:text-gray-400 transition-colors"
+              onClick={onAboutClick}
+              title="Click to view version details"
+            >
+              v{version}{gitCommit && ` • ${gitCommit}`}
+            </div>
+          </div>
+        )}
     </div>
 
       <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

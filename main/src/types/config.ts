@@ -18,6 +18,14 @@ export interface AppConfig {
   stravuServerUrl?: string;
   // Theme preference
   theme?: 'light' | 'dark';
+  // Notification settings
+  notifications?: {
+    enabled: boolean;
+    playSound: boolean;
+    notifyOnStatusChange: boolean;
+    notifyOnWaiting: boolean;
+    notifyOnComplete: boolean;
+  };
 }
 
 export interface UpdateConfigRequest {
@@ -31,4 +39,11 @@ export interface UpdateConfigRequest {
   stravuApiKey?: string;
   stravuServerUrl?: string;
   theme?: 'light' | 'dark';
+  notifications?: {
+    enabled: boolean;
+    playSound: boolean;
+    notifyOnStatusChange: boolean;
+    notifyOnWaiting: boolean;
+    notifyOnComplete: boolean;
+  };
 }
