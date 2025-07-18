@@ -27,6 +27,9 @@ jobs:
               dist-electron/*.flatpak
     
     runs-on: ${{ matrix.os }}
+    
+    permissions:
+      contents: read  # Required for accessing repository contents
 
     steps:
     - name: Checkout code
@@ -61,6 +64,8 @@ jobs:
     - name: Build application
       run: pnpm run ${{ matrix.build_cmd }}
       env:
+        # GitHub token (required by electron-builder even for non-publish builds)
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # macOS code signing (optional for CI builds)
         CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
         CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
