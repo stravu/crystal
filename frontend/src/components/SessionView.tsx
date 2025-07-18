@@ -68,8 +68,6 @@ export const SessionView = memo(() => {
         handleNameKeyDown={hook.handleNameKeyDown}
         handleSaveEditName={hook.handleSaveEditName}
         handleStartEditName={hook.handleStartEditName}
-        isPathCollapsed={hook.isPathCollapsed}
-        setIsPathCollapsed={hook.setIsPathCollapsed}
         isMerging={hook.isMerging}
         handleGitPull={hook.handleGitPull}
         handleGitPush={hook.handleGitPush}
@@ -223,6 +221,7 @@ export const SessionView = memo(() => {
           ultrathink={hook.ultrathink}
           setUltrathink={hook.setUltrathink}
           handleToggleAutoCommit={hook.handleToggleAutoCommit}
+          gitCommands={hook.gitCommands}
         />
       )}
 

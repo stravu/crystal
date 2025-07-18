@@ -12,8 +12,6 @@ interface SessionHeaderProps {
   handleNameKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   handleSaveEditName: () => void;
   handleStartEditName: () => void;
-  isPathCollapsed: boolean;
-  setIsPathCollapsed: (collapsed: boolean) => void;
   isMerging: boolean;
   handleGitPull: () => void;
   handleGitPush: () => void;
@@ -43,8 +41,6 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   handleNameKeyDown,
   handleSaveEditName,
   handleStartEditName,
-  isPathCollapsed,
-  setIsPathCollapsed,
   isMerging,
   handleGitPull,
   handleGitPush,
@@ -82,25 +78,13 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
               {activeSession.name}
             </h2>
           )}
-          <div className="flex items-center space-x-1 mt-1">
-            <button
-              onClick={() => setIsPathCollapsed(!isPathCollapsed)}
-              className="flex items-center space-x-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-              title={isPathCollapsed ? 'Show full path' : 'Hide full path'}
-            >
-              <svg className={`w-3 h-3 transition-transform ${isPathCollapsed ? '' : 'rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            </button>
-            <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-              {isPathCollapsed ? `.../${activeSession.worktreePath.split('/').slice(-2).join('/')}` : activeSession.worktreePath}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
+          {/* Status Indicator */}
+          <div className="flex items-center gap-2 mt-2">
             <StatusIndicator key={`status-${activeSession.id}-${activeSession.status}`} session={activeSession} size="medium" showText showProgress />
+          </div>
+          
+          {/* Git Actions */}
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             <div className="flex flex-wrap items-center gap-2 relative z-20">
               {activeSession.isMainRepo ? (
                 <>
