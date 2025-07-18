@@ -58,8 +58,14 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
       await sessionManager.runTerminalCommand(sessionId, command);
       return { success: true };
     } catch (error) {
-      console.error('Failed to run terminal command:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to run terminal command' };
+      const errorMessage = error instanceof Error ? error.message : 'Failed to run terminal command';
+      
+      // Don't log error for archived sessions - this is expected
+      if (!errorMessage.includes('archived session')) {
+        console.error('Failed to run terminal command:', error);
+      }
+      
+      return { success: false, error: errorMessage };
     }
   });
 
@@ -68,8 +74,14 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
       await sessionManager.sendTerminalInput(sessionId, data);
       return { success: true };
     } catch (error) {
-      console.error('Failed to send terminal input:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to send terminal input' };
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send terminal input';
+      
+      // Don't log error for archived sessions - this is expected
+      if (!errorMessage.includes('archived session')) {
+        console.error('Failed to send terminal input:', error);
+      }
+      
+      return { success: false, error: errorMessage };
     }
   });
 

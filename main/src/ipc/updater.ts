@@ -3,6 +3,7 @@ import { autoUpdater } from 'electron-updater';
 import type { AppServices } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { commandExecutor } from '../utils/commandExecutor';
 
 export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker }: AppServices): void {
   // Version checking handlers
@@ -19,6 +20,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
   ipcMain.handle('version:get-info', () => {
     try {
       let buildDate: string | undefined;
+      let gitCommit: string | undefined;
       
       // Try to read build info if in packaged app
       if (app.isPackaged) {
@@ -33,13 +35,38 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
         }
       }
 
+      // Try to get git commit hash
+      try {
+        const gitHash = commandExecutor.execSync('git rev-parse --short HEAD', { 
+          encoding: 'utf8',
+          cwd: app.isPackaged ? process.resourcesPath : process.cwd()
+        }).trim();
+        
+        // Check if the working directory is clean (no uncommitted changes)
+        try {
+          commandExecutor.execSync('git diff-index --quiet HEAD --', { 
+            encoding: 'utf8',
+            cwd: app.isPackaged ? process.resourcesPath : process.cwd()
+          });
+          gitCommit = gitHash;
+        } catch {
+          // Working directory has uncommitted changes
+          gitCommit = `${gitHash} (modified)`;
+        }
+      } catch (err) {
+        console.log('Could not get git commit:', err);
+        // In packaged app, git info might not be available
+        gitCommit = app.isPackaged ? undefined : 'unknown';
+      }
+
       return {
         success: true,
         data: {
           current: app.getVersion(),
           name: app.getName(),
           workingDirectory: process.cwd(),
-          buildDate
+          buildDate,
+          gitCommit
         }
       };
     } catch (error) {

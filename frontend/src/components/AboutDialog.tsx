@@ -11,6 +11,7 @@ interface VersionInfo {
   publishedAt?: string;
   workingDirectory?: string;
   buildDate?: string;
+  gitCommit?: string;
 }
 
 interface AboutDialogProps {
@@ -45,7 +46,8 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           latest: result.data.current,
           hasUpdate: false,
           workingDirectory: result.data.workingDirectory,
-          buildDate: result.data.buildDate
+          buildDate: result.data.buildDate,
+          gitCommit: result.data.gitCommit
         });
       }
     } catch (error) {
@@ -151,13 +153,24 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               </span>
             </div>
 
-            {versionInfo?.workingDirectory && !isPackaged && (
+            {versionInfo?.workingDirectory && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Working Directory
                 </span>
                 <span className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={versionInfo.workingDirectory}>
                   {versionInfo.workingDirectory.split('/').pop() || versionInfo.workingDirectory}
+                </span>
+              </div>
+            )}
+
+            {versionInfo?.gitCommit && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Git Commit
+                </span>
+                <span className="text-sm text-gray-900 dark:text-white font-mono">
+                  {versionInfo.gitCommit}
                 </span>
               </div>
             )}
