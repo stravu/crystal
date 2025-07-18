@@ -18,7 +18,7 @@ jobs:
             artifact_name: crystal-macos
             artifact_path: dist-electron/*.dmg
           - os: ubuntu-latest
-            build_cmd: build:linux
+            build_cmd: build:linux:ci
             artifact_name: crystal-linux
             artifact_path: |
               dist-electron/*.deb
@@ -49,11 +49,39 @@ jobs:
         node-version: '22.15.1'
         cache: 'pnpm'
 
+    # Cache native modules and electron binaries to speed up rebuilds
+    - name: Cache native modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          main/node_modules/.bin
+          main/build
+          ~/.electron
+          ~/.electron-gyp
+        key: ${{ runner.os }}-native-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-native-modules-
+
+    - name: Cache Electron binaries
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/electron
+          ~/.cache/electron-builder
+        key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-electron-
+
     - name: Install dependencies
       run: pnpm install
 
-    - name: Build main process
-      run: pnpm run build:main
+    # Build frontend and main process in parallel for faster builds
+    - name: Build frontend and main process
+      run: |
+        # Build both frontend and main process concurrently
+        pnpm run build:frontend &
+        pnpm run build:main &
+        wait
 
     - name: Rebuild native modules
       run: pnpm run electron:rebuild
@@ -79,18 +107,30 @@ jobs:
     - name: List build artifacts
       run: ls -la dist-electron/
 
+    # Cache Flatpak runtime and dependencies to speed up builds
+    - name: Cache Flatpak runtime
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/cache@v4
+      with:
+        path: |
+          /var/lib/flatpak
+          ~/.local/share/flatpak
+        key: ${{ runner.os }}-flatpak-runtime-v1
+        restore-keys: |
+          ${{ runner.os }}-flatpak-runtime-
+
     - name: Build Flatpak
       if: matrix.os == 'ubuntu-latest'
       run: |
-        # Install flatpak-builder
-        sudo apt-get update
-        sudo apt-get install -y flatpak flatpak-builder
+        # Install flatpak-builder with minimal package update
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
         
         # Add flathub repository
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         
-        # Install required runtime and SDK
-        sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.electronjs.Electron2.BaseApp//23.08
+        # Install required runtime and SDK (cached between runs)
+        sudo flatpak install -y --noninteractive flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.electronjs.Electron2.BaseApp//23.08 || true
         
         # Find the actual AppImage file
         echo "Looking for AppImage files..."
@@ -107,8 +147,8 @@ jobs:
         # Update manifest with actual AppImage path
         sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" com.stravu.crystal.yml
         
-        # Build Flatpak
-        flatpak-builder --force-clean --repo=repo build-dir com.stravu.crystal.yml
+        # Build Flatpak with ccache for faster rebuilds
+        flatpak-builder --force-clean --repo=repo --ccache build-dir com.stravu.crystal.yml
         
         # Create bundle
         flatpak build-bundle repo dist-electron/crystal.flatpak com.stravu.crystal
