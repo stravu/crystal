@@ -642,6 +642,15 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
       console.log('[Database] Added worktree_folder column to projects table');
     }
+
+    // Add lastUsedModel column to projects table if it doesn't exist
+    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
+    
+    if (!hasLastUsedModelColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      console.log('[Database] Added lastUsedModel column to projects table');
+    }
   }
 
   // Project operations
@@ -726,6 +735,10 @@ export class DatabaseService {
     if (updates.worktree_folder !== undefined) {
       fields.push('worktree_folder = ?');
       values.push(updates.worktree_folder);
+    }
+    if (updates.lastUsedModel !== undefined) {
+      fields.push('lastUsedModel = ?');
+      values.push(updates.lastUsedModel);
     }
     if (updates.active !== undefined) {
       fields.push('active = ?');
