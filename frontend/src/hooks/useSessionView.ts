@@ -353,9 +353,10 @@ export const useSessionView = (
     console.log(`[useSessionView] Setting up for session ${activeSession.id}, status: ${activeSession.status}`);
     setCurrentSessionIdForOutput(activeSession.id);
     
-    if (scriptTerminalInstance.current) {
-      scriptTerminalInstance.current.reset();
-    }
+    // Don't reset the terminal when switching sessions - preserve the state
+    // if (scriptTerminalInstance.current) {
+    //   scriptTerminalInstance.current.reset();
+    // }
     
     // Reset output tracking
     lastProcessedOutputLength.current = 0;
@@ -634,6 +635,9 @@ export const useSessionView = (
 
   useEffect(() => {
     if (viewMode === 'terminal') {
+      // Check if terminal is already initialized
+      const wasAlreadyInitialized = scriptTerminalInstance.current !== null;
+      
       initTerminal(scriptTerminalRef, scriptTerminalInstance, scriptFitAddon, true);
       
       // After initializing the terminal, immediately write any existing output
@@ -648,12 +652,21 @@ export const useSessionView = (
             lastProcessedScriptOutputLength.current = existingOutput.length;
           }
           
-          // Always send an empty input to trigger the PTY to show prompt
-          if (!activeSession.archived) {
-            console.log('[Terminal] Sending empty input to trigger PTY prompt');
+          // Only send empty input if this is a fresh terminal initialization
+          // Don't send it when just switching back to terminal view
+          if (!wasAlreadyInitialized && !activeSession.archived) {
+            console.log('[Terminal] Sending empty input to trigger PTY prompt (fresh initialization)');
             API.sessions.sendTerminalInput(activeSession.id, '').catch(error => {
               console.error('Failed to send terminal trigger input:', error);
             });
+          } else {
+            console.log('[Terminal] Terminal already initialized, skipping prompt trigger');
+          }
+          
+          // Focus the terminal after everything is set up
+          if (scriptTerminalInstance.current) {
+            console.log('[Terminal] Focusing terminal');
+            scriptTerminalInstance.current.focus();
           }
         }, 100);
       }
@@ -683,7 +696,9 @@ export const useSessionView = (
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
-    scriptTerminalInstance.current.reset();
+    // Don't reset terminal on session change - this causes the terminal to clear
+    // scriptTerminalInstance.current.reset();
+    // Instead, just reset the tracking counter
     lastProcessedScriptOutputLength.current = 0;
   }, [activeSessionId]);
 
@@ -783,11 +798,18 @@ export const useSessionView = (
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
     const fullScriptOutput = scriptOutput.join('');
-    if (fullScriptOutput.length < lastProcessedScriptOutputLength.current || fullScriptOutput.length === 0) {
+    
+    // Handle case where output was cleared (e.g., user clicked clear button)
+    if (fullScriptOutput.length === 0 && lastProcessedScriptOutputLength.current > 0) {
+      // Only reset if the output was explicitly cleared to 0
       scriptTerminalInstance.current.reset();
       lastProcessedScriptOutputLength.current = 0;
-    }
-    if (fullScriptOutput.length > lastProcessedScriptOutputLength.current) {
+    } else if (fullScriptOutput.length < lastProcessedScriptOutputLength.current) {
+      // Output got shorter but not cleared - this might be a sync issue
+      // Don't reset, just update the tracking
+      console.log('[Terminal] Script output got shorter, updating tracking without reset');
+      lastProcessedScriptOutputLength.current = fullScriptOutput.length;
+    } else if (fullScriptOutput.length > lastProcessedScriptOutputLength.current) {
       const newOutput = fullScriptOutput.substring(lastProcessedScriptOutputLength.current);
       scriptTerminalInstance.current.write(newOutput);
       lastProcessedScriptOutputLength.current = fullScriptOutput.length;

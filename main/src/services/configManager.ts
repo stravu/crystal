@@ -23,7 +23,14 @@ export class ConfigManager extends EventEmitter {
       defaultPermissionMode: 'ignore',
       defaultModel: 'claude-sonnet-4-20250514',
       stravuApiKey: undefined,
-      stravuServerUrl: 'https://api.stravu.com'
+      stravuServerUrl: 'https://api.stravu.com',
+      notifications: {
+        enabled: true,
+        playSound: true,
+        notifyOnStatusChange: true,
+        notifyOnWaiting: true,
+        notifyOnComplete: true
+      }
     };
   }
 
@@ -33,7 +40,17 @@ export class ConfigManager extends EventEmitter {
     
     try {
       const data = await fs.readFile(this.configPath, 'utf-8');
-      this.config = JSON.parse(data);
+      const loadedConfig = JSON.parse(data);
+      
+      // Merge loaded config with defaults, ensuring notification settings exist
+      this.config = {
+        ...this.config,
+        ...loadedConfig,
+        notifications: {
+          ...this.config.notifications,
+          ...loadedConfig.notifications
+        }
+      };
     } catch (error) {
       // Config file doesn't exist, use defaults
       await this.saveConfig();
