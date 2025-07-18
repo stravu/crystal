@@ -19,10 +19,17 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [notificationSettings, setNotificationSettings] = useState({
+    enabled: true,
+    playSound: true,
+    notifyOnStatusChange: true,
+    notifyOnWaiting: true,
+    notifyOnComplete: true
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
-  const { settings, updateSettings } = useNotifications();
+  const { updateSettings } = useNotifications();
 
   useEffect(() => {
     if (isOpen) {
@@ -42,6 +49,13 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setClaudeExecutablePath(data.claudeExecutablePath || '');
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
       setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
+      
+      // Load notification settings
+      if (data.notifications) {
+        setNotificationSettings(data.notifications);
+        // Update the useNotifications hook with loaded settings
+        updateSettings(data.notifications);
+      }
     } catch (err) {
       setError('Failed to load configuration');
     }
@@ -59,12 +73,16 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath,
         defaultPermissionMode,
-        autoCheckUpdates
+        autoCheckUpdates,
+        notifications: notificationSettings
       });
 
       if (!response.success) {
         throw new Error(response.error || 'Failed to update configuration');
       }
+
+      // Update the useNotifications hook with new settings
+      updateSettings(notificationSettings);
 
       // Refresh config from server
       await fetchConfig();
@@ -337,8 +355,10 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         
         {activeTab === 'notifications' && (
           <NotificationSettings
-            settings={settings}
-            onUpdateSettings={updateSettings}
+            settings={notificationSettings}
+            onUpdateSettings={(updates) => {
+              setNotificationSettings(prev => ({ ...prev, ...updates }));
+            }}
           />
         )}
         
@@ -378,7 +398,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         </div>
 
         {/* Footer */}
-        {activeTab === 'general' && (
+        {(activeTab === 'general' || activeTab === 'notifications') && (
           <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
@@ -389,8 +409,9 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
               Cancel
             </button>
             <button
-              type="submit"
-              form="settings-form"
+              type={activeTab === 'general' ? 'submit' : 'button'}
+              form={activeTab === 'general' ? 'settings-form' : undefined}
+              onClick={activeTab === 'notifications' ? (e) => handleSubmit(e as any) : undefined}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               disabled={isSubmitting}
             >

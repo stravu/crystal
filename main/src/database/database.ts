@@ -556,6 +556,21 @@ export class DatabaseService {
       `).run();
     }
 
+    // Add parent_folder_id column to folders table for nested folders support
+    const foldersTableInfo = this.db.prepare("PRAGMA table_info(folders)").all();
+    const hasParentFolderIdColumn = foldersTableInfo.some((col: any) => col.name === 'parent_folder_id');
+    
+    if (!hasParentFolderIdColumn) {
+      this.db.prepare('ALTER TABLE folders ADD COLUMN parent_folder_id TEXT REFERENCES folders(id) ON DELETE CASCADE').run();
+      console.log('[Database] Added parent_folder_id column to folders table for nested folders support');
+      
+      // Create index on parent_folder_id for efficient hierarchy queries
+      this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_folders_parent_id 
+        ON folders(parent_folder_id)
+      `).run();
+    }
+
     // Add UI state table if it doesn't exist
     const uiStateTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ui_state'").all();
     if (uiStateTable.length === 0) {
@@ -642,6 +657,15 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
       console.log('[Database] Added worktree_folder column to projects table');
     }
+
+    // Add lastUsedModel column to projects table if it doesn't exist
+    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
+    
+    if (!hasLastUsedModelColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      console.log('[Database] Added lastUsedModel column to projects table');
+    }
   }
 
   // Project operations
@@ -727,6 +751,10 @@ export class DatabaseService {
       fields.push('worktree_folder = ?');
       values.push(updates.worktree_folder);
     }
+    if (updates.lastUsedModel !== undefined) {
+      fields.push('lastUsedModel = ?');
+      values.push(updates.lastUsedModel);
+    }
     if (updates.active !== undefined) {
       fields.push('active = ?');
       values.push(updates.active ? 1 : 0);
@@ -764,7 +792,7 @@ export class DatabaseService {
   }
 
   // Folder operations
-  createFolder(name: string, projectId: number): Folder {
+  createFolder(name: string, projectId: number, parentFolderId?: string | null): Folder {
     // Validate inputs
     if (!name || typeof name !== 'string') {
       throw new Error('Folder name must be a non-empty string');
@@ -773,25 +801,43 @@ export class DatabaseService {
       throw new Error('Project ID must be a positive number');
     }
     
+    // Validate parent folder if provided
+    if (parentFolderId) {
+      const parentFolder = this.getFolder(parentFolderId);
+      if (!parentFolder) {
+        throw new Error('Parent folder not found');
+      }
+      if (parentFolder.project_id !== projectId) {
+        throw new Error('Parent folder belongs to a different project');
+      }
+      
+      // Check nesting depth
+      const depth = this.getFolderDepth(parentFolderId);
+      if (depth >= 4) { // Parent is at depth 4, so child would be at depth 5
+        throw new Error('Maximum nesting depth (5 levels) reached');
+      }
+    }
+    
     const id = `folder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log('[Database] Creating folder:', { id, name, projectId });
+    console.log('[Database] Creating folder:', { id, name, projectId, parentFolderId });
     
-    // Get the max display_order for folders in this project
+    // Get the max display_order for folders in this project at the same level
     const maxOrder = this.db.prepare(`
       SELECT MAX(display_order) as max_order 
       FROM folders 
-      WHERE project_id = ?
-    `).get(projectId) as { max_order: number | null };
+      WHERE project_id = ? 
+      AND (parent_folder_id ${parentFolderId ? '= ?' : 'IS NULL'})
+    `).get(parentFolderId ? [projectId, parentFolderId] : projectId) as { max_order: number | null };
     
     const displayOrder = (maxOrder?.max_order ?? -1) + 1;
     
     const stmt = this.db.prepare(`
-      INSERT INTO folders (id, name, project_id, display_order)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO folders (id, name, project_id, parent_folder_id, display_order)
+      VALUES (?, ?, ?, ?, ?)
     `);
     
-    stmt.run(id, name, projectId, displayOrder);
+    stmt.run(id, name, projectId, parentFolderId || null, displayOrder);
     
     const folder = this.getFolder(id);
     console.log('[Database] Created folder:', folder);
@@ -821,7 +867,7 @@ export class DatabaseService {
     return folders;
   }
 
-  updateFolder(id: string, updates: { name?: string; display_order?: number }): void {
+  updateFolder(id: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }): void {
     const fields: string[] = [];
     const values: any[] = [];
     
@@ -833,6 +879,11 @@ export class DatabaseService {
     if (updates.display_order !== undefined) {
       fields.push('display_order = ?');
       values.push(updates.display_order);
+    }
+    
+    if (updates.parent_folder_id !== undefined) {
+      fields.push('parent_folder_id = ?');
+      values.push(updates.parent_folder_id);
     }
     
     if (fields.length === 0) return;
@@ -878,6 +929,54 @@ export class DatabaseService {
     });
     
     transaction();
+  }
+
+  // Helper method to get the depth of a folder in the hierarchy
+  getFolderDepth(folderId: string): number {
+    let depth = 0;
+    let currentId: string | null = folderId;
+    
+    while (currentId) {
+      const folder = this.getFolder(currentId);
+      if (!folder || !folder.parent_folder_id) break;
+      depth++;
+      currentId = folder.parent_folder_id;
+      
+      // Safety check to prevent infinite loops
+      if (depth > 10) {
+        console.error('[Database] Circular reference detected in folder hierarchy');
+        break;
+      }
+    }
+    
+    return depth;
+  }
+
+  // Check if moving a folder would create a circular reference
+  wouldCreateCircularReference(folderId: string, proposedParentId: string): boolean {
+    // Check if proposedParentId is a descendant of folderId
+    let currentId: string | null = proposedParentId;
+    const visited = new Set<string>();
+    
+    while (currentId) {
+      // If we find the folder we're trying to move in the parent chain, it's circular
+      if (currentId === folderId) {
+        return true;
+      }
+      
+      // Safety check for circular references in existing data
+      if (visited.has(currentId)) {
+        console.error('[Database] Existing circular reference detected in folder hierarchy');
+        return true;
+      }
+      visited.add(currentId);
+      
+      const folder = this.getFolder(currentId);
+      if (!folder) break;
+      currentId = folder.parent_folder_id || null;
+    }
+    
+    return false;
   }
 
   // Project run commands operations
@@ -982,6 +1081,13 @@ export class DatabaseService {
     return this.db.prepare('SELECT * FROM sessions WHERE (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY created_at DESC').all() as Session[];
   }
 
+  getArchivedSessions(projectId?: number): Session[] {
+    if (projectId !== undefined) {
+      return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND archived = 1 AND (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY updated_at DESC').all(projectId) as Session[];
+    }
+    return this.db.prepare('SELECT * FROM sessions WHERE archived = 1 AND (is_main_repo = 0 OR is_main_repo IS NULL) ORDER BY updated_at DESC').all() as Session[];
+  }
+
   getMainRepoSession(projectId: number): Session | undefined {
     return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND is_main_repo = 1 AND (archived = 0 OR archived IS NULL)').get(projectId) as Session | undefined;
   }
@@ -1081,6 +1187,11 @@ export class DatabaseService {
 
   archiveSession(id: string): boolean {
     const result = this.db.prepare('UPDATE sessions SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  restoreSession(id: string): boolean {
+    const result = this.db.prepare('UPDATE sessions SET archived = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     return result.changes > 0;
   }
 

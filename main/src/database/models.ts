@@ -12,6 +12,7 @@ export interface Project {
   open_ide_command?: string;
   display_order?: number;
   worktree_folder?: string;
+  lastUsedModel?: string;
 }
 
 export interface ProjectRunCommand {
@@ -27,6 +28,7 @@ export interface Folder {
   id: string;
   name: string;
   project_id: number;
+  parent_folder_id?: string | null;
   display_order: number;
   created_at: string;
   updated_at: string;

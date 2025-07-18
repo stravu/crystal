@@ -22,8 +22,11 @@ export class TerminalSessionManager extends EventEmitter {
   }
 
   async createTerminalSession(sessionId: string, worktreePath: string): Promise<void> {
-    // Clean up any existing session
-    await this.closeTerminalSession(sessionId);
+    // Check if session already exists
+    if (this.terminalSessions.has(sessionId)) {
+      console.log(`Terminal session ${sessionId} already exists, skipping creation`);
+      return;
+    }
 
     // For Linux, use the current PATH to avoid slow shell detection
     const isLinux = process.platform === 'linux';
