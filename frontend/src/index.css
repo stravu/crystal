@@ -1,9 +1,9 @@
+/* Import markdown styles - must come first */
+@import './styles/markdown.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import markdown styles */
-@import './styles/markdown.css';
 
 /* Ensure proper overflow handling */
 html, body, #root {
@@ -95,4 +95,67 @@ body.dark {
 
 .xterm .xterm-screen {
   margin: 6px;
+}
+
+/* Custom animations for UX improvements */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out;
+}
+
+/* Terminal command bar styles */
+.command-bar-focus {
+  box-shadow: 
+    0 0 0 2px rgba(59, 130, 246, 0.5),
+    0 0 20px rgba(59, 130, 246, 0.3),
+    inset 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+.command-bar-focus-green {
+  box-shadow: 
+    0 0 0 2px rgba(34, 197, 94, 0.5),
+    0 0 20px rgba(34, 197, 94, 0.3),
+    inset 0 0 20px rgba(34, 197, 94, 0.1);
+}
+
+/* Pill toggle animations */
+@keyframes pillActivate {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.pill-activate {
+  animation: pillActivate 0.2s ease-out;
 }

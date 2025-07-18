@@ -21,6 +21,8 @@ interface FilePathAutocompleteProps {
   disabled?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
   onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   style?: React.CSSProperties;
 }
 
@@ -38,6 +40,8 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
   disabled = false,
   onKeyDown: externalOnKeyDown,
   onPaste,
+  onFocus,
+  onBlur,
   style
 }) => {
   const [suggestions, setSuggestions] = useState<FileItem[]>([]);
@@ -341,6 +345,8 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
     onSelect: handleSelectionChange,
     onKeyDown: handleKeyDown,
     onPaste,
+    onFocus,
+    onBlur,
     placeholder,
     className,
     disabled,

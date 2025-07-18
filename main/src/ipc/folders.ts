@@ -3,7 +3,7 @@ import type { Folder } from '../database/models';
 import type { AppServices } from './types';
 
 export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) {
-  const { databaseService } = services;
+  const { databaseService, getMainWindow } = services;
 
   // Get all folders for a project
   ipcMain.handle('folders:get-by-project', async (_, projectId: number) => {
@@ -31,6 +31,19 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
   ipcMain.handle('folders:update', async (_, folderId: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }) => {
     try {
       databaseService.updateFolder(folderId, updates);
+      
+      // Get the updated folder to emit the event
+      const updatedFolder = databaseService.getFolder(folderId);
+      if (updatedFolder) {
+        
+        // Emit the folder:updated event to notify the frontend
+        const mainWindow = getMainWindow();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          console.log(`[IPC] Emitting folder:updated event for folder ${folderId}`);
+          mainWindow.webContents.send('folder:updated', updatedFolder);
+        }
+      }
+      
       return { success: true };
     } catch (error: any) {
       console.error('[IPC] Failed to update folder:', error);

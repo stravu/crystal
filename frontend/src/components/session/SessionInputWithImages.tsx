@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
-import { Session } from '../../types/session';
+import { Session, GitCommands } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
-import { X, Image as ImageIcon, Cpu } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { API } from '../../utils/api';
 
@@ -27,6 +27,9 @@ interface SessionInputWithImagesProps {
   ultrathink: boolean;
   setUltrathink: (ultra: boolean) => void;
   handleToggleAutoCommit: () => void;
+  gitCommands: GitCommands | null;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = memo(({
@@ -43,10 +46,15 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   ultrathink,
   setUltrathink,
   handleToggleAutoCommit,
+  gitCommands,
+  onFocus,
+  onBlur,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
+  const [textareaHeight, setTextareaHeight] = useState<number>(52);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -170,153 +178,367 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   };
 
   const placeholder = viewMode === 'terminal'
-    ? (activeSession.isRunning ? "Script is running..." : (activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Enter terminal command... (⌘↵ to send)"))
-    : (activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Continue conversation... (⌘↵ to send)");
+    ? (activeSession.isRunning ? "Script is running..." : (activeSession.status === 'waiting' ? "Enter your response..." : "Enter terminal command..."))
+    : (activeSession.status === 'waiting' ? "Enter your response..." : "Write a command...");
+
+  // Determine button config based on state
+  const getButtonConfig = () => {
+    if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
+      return { text: 'Execute', icon: Play, color: 'green', isPrimary: false };
+    } else if (activeSession.status === 'waiting') {
+      return { text: 'Send', icon: Send, color: 'blue', isPrimary: false };
+    } else {
+      return { text: 'Continue', icon: ChevronRight, color: 'blue', isPrimary: true };
+    }
+  };
+
+  const buttonConfig = getButtonConfig();
+  const ButtonIcon = buttonConfig.icon;
+
+  // Get session status
+  const getSessionStatus = () => {
+    switch (activeSession.status) {
+      case 'initializing':
+        return { color: 'bg-yellow-500', pulse: true };
+      case 'ready':
+        return { color: 'bg-green-500', pulse: false };
+      case 'running':
+        return { color: 'bg-blue-500', pulse: true };
+      case 'waiting':
+        return { color: 'bg-orange-500', pulse: true };
+      case 'stopped':
+        return { color: 'bg-gray-500', pulse: false };
+      case 'completed_unviewed':
+        return { color: 'bg-green-500', pulse: true };
+      case 'error':
+        return { color: 'bg-red-500', pulse: false };
+      default:
+        return { color: 'bg-gray-500', pulse: false };
+    }
+  };
+
+  const sessionStatus = getSessionStatus();
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to auto to allow proper shrinking
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const newHeight = Math.min(Math.max(scrollHeight, 52), 200);
+      setTextareaHeight(newHeight);
+    }
+  }, [input, textareaRef]);
+
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+    onFocus?.();
+  }, [onFocus]);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    onBlur?.();
+  }, [onBlur]);
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800 flex-shrink-0">
-      {viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting' && (
-        <div className="mb-2 flex items-center text-sm text-gray-600 dark:text-gray-400">
-          <svg className="w-4 h-4 mr-1 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          Terminal mode: Commands will execute in the worktree directory
-        </div>
-      )}
-      
-      {/* Attached images preview */}
-      {attachedImages.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {attachedImages.map(image => (
-            <div key={image.id} className="relative group">
-              <img
-                src={image.dataUrl}
-                alt={image.name}
-                className="h-20 w-20 object-cover rounded-md border border-gray-300 dark:border-gray-600"
-              />
-              <button
-                onClick={() => removeImage(image.id)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="w-3 h-3" />
-              </button>
-              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate rounded-b-md">
-                {image.name}
+    <div className="border-t-2 border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+      <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+        {/* Context Bar */}
+        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/50 backdrop-blur-sm">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-3">
+              {/* Session status indicator */}
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${sessionStatus.color} ${sessionStatus.pulse ? 'animate-pulse' : ''}`} />
               </div>
+              
+              {/* Project Badge */}
+              <div className="px-2.5 py-1 rounded-full text-xs font-medium
+                bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 
+                border border-purple-200 dark:border-purple-800
+                flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                <span className="leading-none">
+                  {activeSession.worktreePath.split('/').slice(-3, -2)[0] || 'Project'}
+                </span>
+              </div>
+              
+              {/* Branch Badge */}
+              {gitCommands?.currentBranch && (
+                <div className="px-2.5 py-1 rounded-full text-xs font-medium
+                  bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 
+                  border border-green-200 dark:border-green-800
+                  flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12a3 3 0 003 3h6m-6-6l3-3-3-3m6 0a3 3 0 100 6 3 3 0 000-6z" />
+                  </svg>
+                  <span className="leading-none font-mono">
+                    {gitCommands.currentBranch}
+                  </span>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
-
-      <div 
-        className={`flex items-start gap-2 ${isDragging ? 'ring-2 ring-blue-500 rounded-md' : ''}`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        <div className="flex-1 relative">
-          <FilePathAutocomplete
-            value={input}
-            onChange={setInput}
-            sessionId={activeSession.id}
-            placeholder={isDragging ? "Drop images here..." : `${placeholder} (use @ to reference files)`}
-            className="w-full px-3 py-2 pr-10 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-none overflow-y-auto"
-            textareaRef={textareaRef}
-            isTextarea={true}
-            rows={4}
-            onKeyDown={onKeyDown}
-            onPaste={handlePaste}
-            style={{ minHeight: '42px', maxHeight: '200px' }}
-          />
-          <div className="absolute right-2 top-2 flex gap-1">
-            {isStravuConnected && (
-              <button onClick={() => setShowStravuSearch(true)} className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors" title="Search Stravu files">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-              </button>
+            {/* Mode indicator */}
+            {viewMode === 'terminal' && (
+              <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                <Terminal className="w-3 h-3" />
+                <span>Terminal Mode</span>
+              </div>
             )}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors"
-              title="Attach images"
-            >
-              <ImageIcon className="w-5 h-5" />
-            </button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={async (e) => {
-              const files = Array.from(e.target.files || []);
-              for (const file of files) {
-                const image = await processFile(file);
-                if (image) {
-                  setAttachedImages(prev => [...prev, image]);
-                }
-              }
-              e.target.value = ''; // Reset input
-            }}
-          />
         </div>
-        <button 
-          onClick={onClickSend} 
-          className="px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 min-w-[100px] font-medium transition-colors"
-          style={{ height: '67px' }}
+
+        {/* Command Input Area */}
+        <div className="p-4"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
         >
-          {viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting' ? 'Run' : (activeSession.status === 'waiting' ? 'Send' : 'Continue')}
-        </button>
-      </div>
-      
-      {isDragging && (
-        <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-          Drop images here to attach them to your message
-        </div>
-      )}
-      
-      <div className="mt-2 flex items-center gap-4">
-        <label className="flex items-center gap-2 cursor-pointer group" title="Triggers Claude Code to use its maximum thinking token limit. Slower but better for difficult tasks.">
-          <input type="checkbox" checked={ultrathink} onChange={(e) => setUltrathink(e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500" />
-          <span className="text-sm text-gray-700 dark:text-gray-300">ultrathink</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer group" title="Automatically commit changes after each prompt">
-          <input type="checkbox" checked={activeSession.autoCommit ?? true} onChange={handleToggleAutoCommit} className="h-4 w-4 text-green-600 rounded border-gray-300 dark:border-gray-600 focus:ring-green-500" />
-          <span className="text-sm text-gray-700 dark:text-gray-300">auto-commit</span>
-        </label>
-        {/* Model selector for continue conversation */}
-        {activeSession.status !== 'waiting' && !(viewMode === 'terminal' && !activeSession.isRunning) && (
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-gray-400" />
-            <select
-              value={selectedModel}
-              onChange={async (e) => {
-                const newModel = e.target.value;
-                setSelectedModel(newModel);
-                
-                // Don't update the session in the store immediately
-                // The backend will update it when continue is pressed
-                
-                // Save as default for future sessions
-                try {
-                  await API.config.update({ defaultModel: newModel });
-                } catch (err) {
-                  console.error('Failed to save default model:', err);
-                }
-              }}
-              className="text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
-              title="AI model to use for continuing the conversation"
-            >
-              <option value="claude-sonnet-4-20250514">Sonnet 4: Best for most coding tasks</option>
-              <option value="claude-opus-4-20250514">Opus 4: Complex architecture, large refactors</option>
-              <option value="claude-3-5-haiku-20241022">Haiku 3.5: Fast & cost-effective for simple tasks</option>
-            </select>
+          {/* Attached images */}
+          {attachedImages.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {attachedImages.map(image => (
+                <div key={image.id} className="relative group">
+                  <img
+                    src={image.dataUrl}
+                    alt={image.name}
+                    className="h-12 w-12 object-cover rounded border border-gray-200 dark:border-gray-700"
+                  />
+                  <button
+                    onClick={() => removeImage(image.id)}
+                    className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  >
+                    <X className="w-2.5 h-2.5 text-gray-500" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Clean Input Container */}
+          <div className={`
+            bg-gradient-to-r from-gray-900 to-gray-850 dark:from-gray-950 dark:to-gray-900 
+            rounded-lg border border-gray-700 dark:border-gray-600 
+            shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]
+            transition-all duration-200 backdrop-blur-sm
+            ${isFocused ? (buttonConfig.color === 'green' ? 'command-bar-focus-green' : 'command-bar-focus') : ''}
+          `}>
+            {/* Command prompt field */}
+            <div className="relative">
+              <div className="absolute left-4 top-[50%] -translate-y-[50%] text-gray-500 dark:text-gray-400 select-none pointer-events-none font-mono text-sm">
+                &gt;
+              </div>
+              <FilePathAutocomplete
+                value={input}
+                onChange={setInput}
+                sessionId={activeSession.id}
+                placeholder={isDragging ? "Drop images here..." : placeholder}
+                className={`
+                  w-full pl-10 pr-4 py-4 
+                  bg-transparent
+                  border-0 focus:outline-none
+                  resize-none font-mono text-sm
+                  text-gray-100 dark:text-gray-100
+                  placeholder-gray-500 dark:placeholder-gray-500
+                  transition-colors
+                `}
+                textareaRef={textareaRef}
+                isTextarea={true}
+                rows={1}
+                onKeyDown={onKeyDown}
+                onPaste={handlePaste}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+                style={{ 
+                  height: `${textareaHeight}px`,
+                  minHeight: '52px', 
+                  maxHeight: '200px',
+                  overflowY: textareaHeight >= 200 ? 'auto' : 'hidden',
+                  transition: 'height 0.1s ease-out'
+                }}
+              />
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  for (const file of files) {
+                    const image = await processFile(file);
+                    if (image) {
+                      setAttachedImages(prev => [...prev, image]);
+                    }
+                  }
+                  e.target.value = ''; // Reset input
+                }}
+              />
+            </div>
           </div>
-        )}
+
+          {/* Unified Action Bar */}
+          <div className="flex items-center justify-between mt-3 gap-4">
+            {/* Left Section - Tools and Settings */}
+            <div className="flex items-center gap-2">
+              {/* Attach Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3.5 py-1.5 rounded-full text-xs font-medium
+                  bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 
+                  hover:bg-gray-300 dark:hover:bg-gray-700 
+                  flex items-center gap-1.5 transition-all duration-200 
+                  hover:scale-105 active:scale-95
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950 focus:ring-gray-500"
+                title="Attach images"
+              >
+                <Paperclip className="w-3.5 h-3.5" />
+                <span className="leading-none">Attach</span>
+              </button>
+              
+              {/* Reference Button */}
+              {isStravuConnected && (
+                <button 
+                  onClick={() => setShowStravuSearch(true)}
+                  className="px-3.5 py-1.5 rounded-full text-xs font-medium
+                    bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 
+                    hover:bg-gray-300 dark:hover:bg-gray-700 
+                    flex items-center gap-1.5 transition-all duration-200 
+                    hover:scale-105 active:scale-95
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950 focus:ring-gray-500"
+                  title="Reference files (@)"
+                >
+                  <AtSign className="w-3.5 h-3.5" />
+                  <span className="leading-none">Reference</span>
+                </button>
+              )}
+
+              {/* Divider */}
+              <div className="h-6 w-px bg-gray-600 dark:bg-gray-500 mx-1" />
+
+              {/* Model Selector */}
+              <div className="relative inline-flex items-center">
+                <select 
+                  value={selectedModel}
+                  onChange={async (e) => {
+                    const newModel = e.target.value;
+                    setSelectedModel(newModel);
+                    
+                    try {
+                      await API.config.update({ defaultModel: newModel });
+                    } catch (err) {
+                      console.error('Failed to save default model:', err);
+                    }
+                  }}
+                  className="appearance-none bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 
+                    hover:bg-gray-300 dark:hover:bg-gray-700 
+                    px-3.5 py-1.5 pr-8 rounded-full text-xs font-medium leading-none
+                    transition-all duration-200 cursor-pointer
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 
+                    focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950 focus:ring-purple-500
+                    hover:scale-105 active:scale-95"
+                >
+                  <option value="claude-sonnet-4-20250514">Sonnet 4</option>
+                  <option value="claude-opus-4-20250514">Opus 4</option>
+                  <option value="claude-3-5-haiku-20241022">Haiku 3.5</option>
+                </select>
+                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 dark:text-gray-400 pointer-events-none" 
+                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {/* Auto-commit Toggle */}
+              <button
+                onClick={handleToggleAutoCommit}
+                className={`
+                  px-3.5 py-1.5 rounded-full text-xs font-medium
+                  transition-all duration-200 flex items-center gap-1.5
+                  hover:scale-105 active:scale-95
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950
+                  ${activeSession.autoCommit ?? true
+                    ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-950/30 focus:ring-green-500 border border-green-200 dark:border-green-800' 
+                    : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-gray-500'
+                  }
+                `}
+              >
+                <div className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-xs
+                  ${activeSession.autoCommit ?? true
+                    ? 'bg-green-500 border-green-500 text-white' 
+                    : 'border-gray-400 dark:border-gray-500'
+                  }`}>
+                  {(activeSession.autoCommit ?? true) && (
+                    <span className="font-bold leading-none">✓</span>
+                  )}
+                </div>
+                <span className="leading-none">Auto-commit</span>
+              </button>
+              
+              {/* Deep Analysis Toggle */}
+              <button
+                onClick={() => setUltrathink(!ultrathink)}
+                className={`
+                  px-3.5 py-1.5 rounded-full text-xs font-medium
+                  transition-all duration-200 flex items-center gap-1.5
+                  hover:scale-105 active:scale-95
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950
+                  ${ultrathink 
+                    ? 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/30 focus:ring-blue-500 border border-blue-200 dark:border-blue-800' 
+                    : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-gray-500'
+                  }
+                `}
+              >
+                <div className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 flex items-center justify-center
+                  ${ultrathink
+                    ? 'bg-blue-500 border-blue-500' 
+                    : 'border-gray-400 dark:border-gray-500'
+                  }`}>
+                  {ultrathink && (
+                    <Cpu className="w-2 h-2 text-white" />
+                  )}
+                </div>
+                <span className="leading-none">Deep Analysis</span>
+              </button>
+            </div>
+
+            {/* Right Section - Continue Button */}
+            <div className="flex items-center">
+              <button 
+                onClick={onClickSend}
+                className={`
+                  px-4 py-2 font-medium group
+                  flex items-center gap-2 transition-all duration-200
+                  rounded-lg border
+                  active:scale-[0.98]
+                  focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
+                  ${buttonConfig.isPrimary 
+                    ? `bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 
+                       text-white border-blue-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
+                       focus:ring-blue-400 hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
+                    : buttonConfig.color === 'green' 
+                      ? 'bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600 text-green-400 hover:text-green-300 border-gray-600 dark:border-gray-500 focus:ring-green-500' 
+                      : 'bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600 text-blue-400 hover:text-blue-300 border-gray-600 dark:border-gray-500 focus:ring-blue-500'
+                  }
+                `}
+              >
+                <ButtonIcon className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                <span className="font-semibold">{buttonConfig.text}</span>
+                
+                {/* Inline keyboard shortcut */}
+                <span 
+                  className="ml-2 text-xs font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-80 group-hover:opacity-100 transition-opacity"
+                  title="Keyboard Shortcut: ⌘ + Enter"
+                >
+                  ⌘⏎
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-      {activeSession.status !== 'waiting' && !(viewMode === 'terminal' && !activeSession.isRunning) && (
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-          This will interrupt the current session if running and restart with conversation history.
-        </p>
-      )}
     </div>
   );
 });

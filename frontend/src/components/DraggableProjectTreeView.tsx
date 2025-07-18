@@ -56,6 +56,10 @@ export function DraggableProjectTreeView() {
   const [parentFolderForCreate, setParentFolderForCreate] = useState<Folder | null>(null);
   const { showError } = useErrorStore();
   
+  // Folder rename state
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+  
   // Drag state
   const [dragState, setDragState] = useState<DragState>({
     type: null,
@@ -221,12 +225,33 @@ export function DraggableProjectTreeView() {
       );
     };
     
+    // Handler for folder updates
+    const handleFolderUpdated = (updatedFolder: Folder) => {
+      console.log('[DraggableProjectTreeView] Folder updated event received:', updatedFolder);
+      
+      // Update the folder in the appropriate project
+      setProjectsWithSessions(prevProjects => 
+        prevProjects.map(project => {
+          if (project.id === updatedFolder.projectId) {
+            return {
+              ...project,
+              folders: project.folders.map(folder => 
+                folder.id === updatedFolder.id ? updatedFolder : folder
+              )
+            };
+          }
+          return project;
+        })
+      );
+    };
+
     // Listen for IPC events
     if (window.electronAPI?.events) {
       const unsubscribeCreated = window.electronAPI.events.onSessionCreated(handleSessionCreated);
       const unsubscribeUpdated = window.electronAPI.events.onSessionUpdated(handleSessionUpdated);
       const unsubscribeDeleted = window.electronAPI.events.onSessionDeleted(handleSessionDeleted);
       const unsubscribeFolderCreated = window.electronAPI.events.onFolderCreated(handleFolderCreated);
+      const unsubscribeFolderUpdated = window.electronAPI.events.onFolderUpdated(handleFolderUpdated);
       
       // Listen for project updates
       const unsubscribeProjectUpdated = window.electronAPI.events.onProjectUpdated((updatedProject: Project) => {
@@ -253,6 +278,7 @@ export function DraggableProjectTreeView() {
         unsubscribeUpdated();
         unsubscribeDeleted();
         unsubscribeFolderCreated();
+        unsubscribeFolderUpdated();
         unsubscribeProjectUpdated();
       };
     }
@@ -364,6 +390,51 @@ export function DraggableProjectTreeView() {
     });
   };
 
+  const handleStartFolderEdit = (folder: Folder) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const handleSaveFolderEdit = async () => {
+    if (!editingFolderId || !editingFolderName.trim()) {
+      setEditingFolderId(null);
+      return;
+    }
+
+    try {
+      const response = await API.folders.update(editingFolderId, { name: editingFolderName.trim() });
+      if (response.success) {
+        // Update local state
+        setProjectsWithSessions(prev => prev.map(project => ({
+          ...project,
+          folders: project.folders.map(folder => 
+            folder.id === editingFolderId 
+              ? { ...folder, name: editingFolderName.trim() }
+              : folder
+          )
+        })));
+      } else {
+        showError({
+          title: 'Failed to rename folder',
+          error: response.error || 'Unknown error occurred'
+        });
+      }
+    } catch (error: any) {
+      showError({
+        title: 'Failed to rename folder',
+        error: error.message || 'Unknown error occurred'
+      });
+    } finally {
+      setEditingFolderId(null);
+      setEditingFolderName('');
+    }
+  };
+
+  const handleCancelFolderEdit = () => {
+    setEditingFolderId(null);
+    setEditingFolderName('');
+  };
+
   // Helper function to build folder tree structure
   const buildFolderTree = (folders: Folder[]): Folder[] => {
     const folderMap = new Map<string, Folder>();
@@ -432,7 +503,6 @@ export function DraggableProjectTreeView() {
     }, 300),
     [archivedProjectsWithSessions.length, isLoadingArchived]
   );
-
   const handleDeleteFolder = async (folder: Folder, projectId: number) => {
     // Check if folder has sessions
     const project = projectsWithSessions.find(p => p.id === projectId);
@@ -1148,18 +1218,46 @@ export function DraggableProjectTreeView() {
             )}
           </button>
           
-          <div className="flex items-center space-x-2 flex-1 min-w-0">
+          <div className="flex items-center space-x-2 flex-1 min-w-0"
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              handleStartFolderEdit(folder);
+            }}
+          >
             {isExpanded ? (
               <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
             ) : (
               <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
             )}
-            <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-              {folder.name}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-500">
-              ({folderSessions.length})
-            </span>
+            {editingFolderId === folder.id ? (
+              <input
+                type="text"
+                value={editingFolderName}
+                onChange={(e) => setEditingFolderName(e.target.value)}
+                onBlur={handleSaveFolderEdit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveFolderEdit();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    handleCancelFolderEdit();
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+                className="flex-1 px-1 py-0 text-sm bg-white dark:bg-gray-800 border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            ) : (
+              <>
+                <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                  {folder.name}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-500">
+                  ({folderSessions.length})
+                </span>
+              </>
+            )}
           </div>
           
           {/* Add subfolder button */}
