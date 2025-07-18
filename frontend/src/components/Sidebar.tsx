@@ -138,7 +138,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowStatusGuide(false)}>
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Session Status Guide</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Status Indicators Guide</h3>
               <button
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 onClick={() => setShowStatusGuide(false)}
@@ -150,6 +150,27 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
             </div>
             
             <div className="space-y-4">
+              {/* Project Indicators */}
+              <div className="pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Project Indicators</h4>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path d="M6 3v12M6 3a9 9 0 0 0 9 9m-9-9a9 9 0 0 1 9 9m0-9h12" />
+                    </svg>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full"></div>
+                  </div>
+                  <div>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">Git Project</span>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Project connected to a git repository</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Session Status Indicators */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Session Status</h4>
+                <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
                 <div>
@@ -195,6 +216,8 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
                 <div>
                   <span className="text-gray-700 dark:text-gray-200 font-medium">Error</span>
                   <p className="text-gray-500 dark:text-gray-400 text-sm">Something went wrong with the session</p>
+                </div>
+              </div>
                 </div>
               </div>
             </div>
