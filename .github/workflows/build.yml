@@ -122,9 +122,9 @@ jobs:
     - name: Build Flatpak
       if: matrix.os == 'ubuntu-latest'
       run: |
-        # Install flatpak-builder with minimal package update
+        # Install flatpak-builder with required dev tools
         sudo apt-get update -qq
-        sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+        sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
         
         # Add flathub repository
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
