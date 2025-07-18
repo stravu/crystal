@@ -20,6 +20,7 @@ export interface Session {
   folderId?: string;
   isFavorite?: boolean;
   autoCommit?: boolean;
+  model?: string;
 }
 
 export interface CreateSessionRequest {
@@ -30,6 +31,7 @@ export interface CreateSessionRequest {
   projectId?: number;
   baseBranch?: string;
   autoCommit?: boolean;
+  model?: string;
 }
 
 export interface SessionUpdate {
@@ -37,6 +39,7 @@ export interface SessionUpdate {
   lastActivity?: Date;
   error?: string;
   run_started_at?: string | null;
+  model?: string;
 }
 
 export interface SessionOutput {

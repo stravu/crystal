@@ -28,6 +28,7 @@ interface CreateSessionJob {
   folderId?: string;
   baseBranch?: string;
   autoCommit?: boolean;
+  model?: string;
 }
 
 interface ContinueSessionJob {
@@ -123,7 +124,7 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
       console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
@@ -187,7 +188,8 @@ export class TaskQueue {
           targetProject.id,
           false, // isMainRepo = false for regular sessions
           autoCommit,
-          job.data.folderId
+          job.data.folderId,
+          model
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
 
@@ -231,8 +233,8 @@ export class TaskQueue {
           console.log(`[TaskQueue] Build script completed. Success: ${buildResult.success}`);
         }
 
-        console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
-        await claudeCodeManager.startSession(session.id, session.worktreePath, prompt, permissionMode);
+        console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
+        await claudeCodeManager.startSession(session.id, session.worktreePath, prompt, permissionMode, model);
         console.log(`[TaskQueue] Claude Code started successfully for session ${session.id}`);
 
         return { sessionId: session.id };
@@ -270,7 +272,7 @@ export class TaskQueue {
     return job;
   }
 
-  async createMultipleSessions(prompt: string, worktreeTemplate: string, count: number, permissionMode?: 'approve' | 'ignore', projectId?: number, baseBranch?: string, autoCommit?: boolean): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
+  async createMultipleSessions(prompt: string, worktreeTemplate: string, count: number, permissionMode?: 'approve' | 'ignore', projectId?: number, baseBranch?: string, autoCommit?: boolean, model?: string): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
     
@@ -327,7 +329,7 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model }));
     }
     return Promise.all(jobs);
   }

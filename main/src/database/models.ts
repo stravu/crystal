@@ -55,6 +55,7 @@ export interface Session {
   display_order?: number;
   is_favorite?: boolean;
   auto_commit?: boolean;
+  model?: string;
 }
 
 export interface SessionOutput {
@@ -85,6 +86,7 @@ export interface CreateSessionData {
   is_main_repo?: boolean;
   display_order?: number;
   auto_commit?: boolean;
+  model?: string;
 }
 
 export interface UpdateSessionData {
@@ -98,6 +100,7 @@ export interface UpdateSessionData {
   run_started_at?: string;
   is_favorite?: boolean;
   auto_commit?: boolean;
+  model?: string;
 }
 
 export interface PromptMarker {
