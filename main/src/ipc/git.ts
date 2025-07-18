@@ -158,12 +158,21 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       if (!session || !session.worktreePath) {
         return { success: false, error: 'Session or worktree path not found' };
       }
+      
+      // Check if session is archived - worktree won't exist
+      if (session.archived) {
+        return { success: false, error: 'Cannot access git diff for archived session' };
+      }
 
       const diff = await gitDiffManager.getGitDiff(session.worktreePath);
       return { success: true, data: diff };
     } catch (error) {
-      console.error('Failed to get git diff:', error);
-      return { success: false, error: 'Failed to get git diff' };
+      // Don't log errors for expected failures
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get git diff';
+      if (!errorMessage.includes('archived session')) {
+        console.error('Failed to get git diff:', error);
+      }
+      return { success: false, error: errorMessage };
     }
   });
 
@@ -937,6 +946,11 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       if (!session || !session.worktreePath) {
         return { success: false, error: 'Session or worktree path not found' };
       }
+      
+      // Check if session is archived - worktree won't exist
+      if (session.archived) {
+        return { success: false, error: 'Cannot access git commands for archived session' };
+      }
 
       const project = sessionManager.getProjectForSession(sessionId);
       if (!project) {
@@ -965,8 +979,12 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         }
       };
     } catch (error) {
-      console.error('Failed to get git commands:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to get git commands' };
+      // Don't log errors for expected failures
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get git commands';
+      if (!errorMessage.includes('archived session')) {
+        console.error('Failed to get git commands:', error);
+      }
+      return { success: false, error: errorMessage };
     }
   });
 } 

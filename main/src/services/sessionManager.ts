@@ -112,7 +112,8 @@ export class SessionManager extends EventEmitter {
       folderId: dbSession.folder_id,
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
-      model: dbSession.model
+      model: dbSession.model,
+      archived: dbSession.archived || false
     };
   }
 
@@ -1123,6 +1124,14 @@ export class SessionManager extends EventEmitter {
   async runTerminalCommand(sessionId: string, command: string): Promise<void> {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
+      // Check if session exists in database and is archived
+      const dbSession = this.db.getSession(sessionId);
+      if (!dbSession) {
+        throw new Error('Session not found');
+      }
+      if (dbSession.archived) {
+        throw new Error('Cannot access terminal for archived session');
+      }
       throw new Error('Session not found');
     }
 
@@ -1144,7 +1153,11 @@ export class SessionManager extends EventEmitter {
       // Send the command to the persistent terminal session
       this.terminalSessionManager.sendCommand(sessionId, command);
     } catch (error) {
-      this.addScriptOutput(sessionId, `\nError: ${error}\n`, 'stderr');
+      // Don't write error to terminal for archived sessions
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('archived session')) {
+        this.addScriptOutput(sessionId, `\nError: ${error}\n`, 'stderr');
+      }
       throw error;
     }
   }
@@ -1159,6 +1172,12 @@ export class SessionManager extends EventEmitter {
       if (!dbSession || !dbSession.worktree_path) {
         throw new Error('Session not found');
       }
+      
+      // Check if session is archived
+      if (dbSession.archived) {
+        throw new Error('Cannot access terminal for archived session');
+      }
+      
       worktreePath = dbSession.worktree_path;
     } else {
       worktreePath = session.worktreePath;
@@ -1175,7 +1194,11 @@ export class SessionManager extends EventEmitter {
       // Send the raw input to the persistent terminal session
       this.terminalSessionManager.sendInput(sessionId, data);
     } catch (error) {
-      this.addScriptOutput(sessionId, `\nError: ${error}\n`, 'stderr');
+      // Don't write error to terminal for archived sessions
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('archived session')) {
+        this.addScriptOutput(sessionId, `\nError: ${error}\n`, 'stderr');
+      }
       throw error;
     }
   }
@@ -1202,6 +1225,12 @@ export class SessionManager extends EventEmitter {
       if (!dbSession || !dbSession.worktree_path) {
         throw new Error('Session not found');
       }
+      
+      // Check if session is archived
+      if (dbSession.archived) {
+        throw new Error('Cannot create terminal for archived session');
+      }
+      
       worktreePath = dbSession.worktree_path;
     } else {
       worktreePath = session.worktreePath;
