@@ -1,6 +1,27 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.1.16] - 2025-07-18
+
+Special thanks to eshaffer321 who contributed almost all the code in this release.
+
+### Added
+- Ability to rename folders
+- Support for nested folders within projects
+- Archive sessions and view archived sessions
+- Persistent version display with git commit SHA
+
+### Enhanced
+- Improved prompt input bar UX
+- Create Session dialog UX improvements
+
+### Fixed
+- prevents excessive notifications on startup
+- Terminal output being cut off by 'Claude is working' status panel
+- Auto-focus terminal when switching to terminal view
+- Notification settings persistence and completion sound timing
+- Notification settings toggle visual feedback
+
 ## [0.1.15] - 2025-07-17
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "crystal",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "private": true,
   "description": "Crystal - Claude Code Commander for managing multiple Claude Code instances",
   "author": {
@@ -31,6 +31,8 @@
     "build:mac:x64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --x64 --publish never",
     "build:mac:arm64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --arm64 --publish never",
     "build:linux": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
+    "build:linux:ci": "pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
+    "build:mac:ci": "pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish never",
     "inject-build-info": "node scripts/inject-build-info.js",
     "release:mac": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish always",
     "release:mac:universal": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --universal --publish always",

@@ -11,20 +11,19 @@ jobs:
   build:
     strategy:
       matrix:
+        # Build both platforms for validation, but use different commands for speed
         os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
-            build_cmd: build:mac:universal
+            build_cmd: build:mac:ci
             artifact_name: crystal-macos
             artifact_path: dist-electron/*.dmg
           - os: ubuntu-latest
-            build_cmd: build:linux
+            build_cmd: build:linux:ci
             artifact_name: crystal-linux
             artifact_path: |
               dist-electron/*.deb
               dist-electron/*.AppImage
-              dist-electron/*.snap
-              dist-electron/*.flatpak
     
     runs-on: ${{ matrix.os }}
     
@@ -49,14 +48,68 @@ jobs:
         node-version: '22.15.1'
         cache: 'pnpm'
 
+    # Cache native modules and electron binaries to speed up rebuilds
+    - name: Cache native modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          main/node_modules/.bin
+          main/build
+          ~/.electron
+          ~/.electron-gyp
+        key: ${{ runner.os }}-native-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-native-modules-
+
+    - name: Cache Electron binaries
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/electron
+          ~/.cache/electron-builder
+          ~/AppData/Local/electron/Cache
+          ~/AppData/Local/electron-builder/Cache
+        key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-electron-
+
+    # Cache built frontend and main process to avoid rebuilds
+    - name: Cache built components
+      uses: actions/cache@v4
+      with:
+        path: |
+          frontend/dist
+          main/dist
+        key: ${{ runner.os }}-build-${{ hashFiles('frontend/**', 'main/**', '**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+
     - name: Install dependencies
       run: pnpm install
 
-    - name: Build main process
-      run: pnpm run build:main
+    # Build frontend and main process in parallel for faster builds (skip if cached)
+    - name: Build frontend and main process
+      run: |
+        # Check if builds exist from cache
+        if [ ! -d "frontend/dist" ] || [ ! -d "main/dist" ]; then
+          echo "Building frontend and main process..."
+          # Build both frontend and main process concurrently
+          pnpm run build:frontend &
+          pnpm run build:main &
+          wait
+        else
+          echo "Using cached frontend and main builds"
+        fi
 
-    - name: Rebuild native modules
-      run: pnpm run electron:rebuild
+    - name: Rebuild native modules (if needed)
+      run: |
+        # Only rebuild if native modules cache missed or build files changed
+        if [ ! -f "main/node_modules/.bin/electron-rebuild" ] || [ ! -f "main/build/Release/better_sqlite3.node" ]; then
+          echo "Rebuilding native modules..."
+          pnpm run electron:rebuild
+        else
+          echo "Using cached native modules"
+        fi
 
     - name: Generate NOTICES file
       run: pnpm run generate-notices
@@ -79,42 +132,11 @@ jobs:
     - name: List build artifacts
       run: ls -la dist-electron/
 
-    - name: Build Flatpak
+    # Skip Flatpak build for CI speed - saves 4+ minutes
+    # Flatpak is built separately in release workflow
+    - name: Skip Flatpak build (CI optimization)
       if: matrix.os == 'ubuntu-latest'
-      run: |
-        # Install flatpak-builder
-        sudo apt-get update
-        sudo apt-get install -y flatpak flatpak-builder
-        
-        # Add flathub repository
-        sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        
-        # Install required runtime and SDK
-        sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.electronjs.Electron2.BaseApp//23.08
-        
-        # Find the actual AppImage file
-        echo "Looking for AppImage files..."
-        ls -la dist-electron/*.AppImage || true
-        
-        # Get the AppImage path (handle different naming patterns)
-        APPIMAGE=$(ls dist-electron/*.AppImage 2>/dev/null | head -n1)
-        if [ -z "$APPIMAGE" ]; then
-          echo "Error: No AppImage found in dist-electron/"
-          exit 1
-        fi
-        echo "Found AppImage: $APPIMAGE"
-        
-        # Update manifest with actual AppImage path
-        sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" com.stravu.crystal.yml
-        
-        # Build Flatpak
-        flatpak-builder --force-clean --repo=repo build-dir com.stravu.crystal.yml
-        
-        # Create bundle
-        flatpak build-bundle repo dist-electron/crystal.flatpak com.stravu.crystal
-        
-        # List artifacts again to confirm
-        ls -la dist-electron/
+      run: echo "Skipping Flatpak build for faster CI - will be built in release workflow"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
