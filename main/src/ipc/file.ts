@@ -401,6 +401,11 @@ EOF
       if (!session) {
         throw new Error(`Session not found: ${request.sessionId}`);
       }
+      
+      // Check if session is archived - worktree won't exist
+      if (session.archived) {
+        return { success: false, error: 'Cannot list files for archived session' };
+      }
 
       // Use the provided path or default to root
       const relativePath = request.path || '';
