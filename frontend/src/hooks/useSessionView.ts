@@ -565,7 +565,7 @@ export const useSessionView = (
         // Add keyboard handling for direct terminal input - pass everything through
         term.onData((data) => {
           // Pass all input directly to the PTY without buffering
-          if (activeSession) {
+          if (activeSession && !activeSession.archived) {
             API.sessions.sendTerminalInput(activeSession.id, data).catch(error => {
               console.error('Failed to send terminal input:', error);
             });
@@ -574,7 +574,7 @@ export const useSessionView = (
         
         // Send an initial empty input to ensure the PTY connection is established
         // and any buffered output is sent to the terminal
-        if (activeSession) {
+        if (activeSession && !activeSession.archived) {
           setTimeout(() => {
             API.sessions.sendTerminalInput(activeSession.id, '').catch(error => {
               console.error('Failed to send initial terminal input:', error);
@@ -649,10 +649,12 @@ export const useSessionView = (
           }
           
           // Always send an empty input to trigger the PTY to show prompt
-          console.log('[Terminal] Sending empty input to trigger PTY prompt');
-          API.sessions.sendTerminalInput(activeSession.id, '').catch(error => {
-            console.error('Failed to send terminal trigger input:', error);
-          });
+          if (!activeSession.archived) {
+            console.log('[Terminal] Sending empty input to trigger PTY prompt');
+            API.sessions.sendTerminalInput(activeSession.id, '').catch(error => {
+              console.error('Failed to send terminal trigger input:', error);
+            });
+          }
         }, 100);
       }
     }

@@ -21,6 +21,7 @@ export interface Session {
   isFavorite?: boolean;
   autoCommit?: boolean;
   model?: string;
+  archived?: boolean;
 }
 
 export interface CreateSessionRequest {
