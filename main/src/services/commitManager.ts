@@ -2,9 +2,7 @@ import { EventEmitter } from 'events';
 import type { Logger } from '../utils/logger';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand } from '../utils/shellEscape';
-import { formatForDisplay } from '../utils/timestampUtils';
 import {
-  CommitMode,
   CommitModeSettings,
   CommitResult,
   FinalizeSessionOptions,
@@ -43,9 +41,10 @@ export class CommitManager extends EventEmitter {
         this.logger?.verbose(`Disabled mode: No auto-commit`);
         return { success: true };
       
-      default:
+      default: {
         const exhaustiveCheck: never = settings.mode;
         throw new Error(`Unknown commit mode: ${exhaustiveCheck}`);
+      }
     }
   }
 
@@ -95,7 +94,7 @@ export class CommitManager extends EventEmitter {
       const result = execSync(commitCommand, { cwd: worktreePath, encoding: 'utf8' });
 
       // Extract commit hash from output
-      const commitHashMatch = result.match(/\[[\w\-]+ ([a-f0-9]+)\]/);
+      const commitHashMatch = result.match(/\[[\w-]+ ([a-f0-9]+)\]/);
       const commitHash = commitHashMatch ? commitHashMatch[1] : undefined;
 
       this.logger?.verbose(`Created checkpoint commit: ${commitHash}`);
