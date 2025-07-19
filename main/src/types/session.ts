@@ -24,6 +24,8 @@ export interface Session {
   archived?: boolean;
   baseCommit?: string;
   baseBranch?: string;
+  commitMode?: 'structured' | 'checkpoint' | 'disabled';
+  commitModeSettings?: string; // JSON string of CommitModeSettings
 }
 
 export interface CreateSessionRequest {
@@ -35,6 +37,8 @@ export interface CreateSessionRequest {
   baseBranch?: string;
   autoCommit?: boolean;
   model?: string;
+  commitMode?: 'structured' | 'checkpoint' | 'disabled';
+  commitModeSettings?: string; // JSON string of CommitModeSettings
 }
 
 export interface SessionUpdate {

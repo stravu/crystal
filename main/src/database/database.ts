@@ -681,10 +681,72 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN base_branch TEXT").run();
       console.log('[Database] Added base_branch column to sessions table');
     }
+
+    // Add commit mode settings columns to projects table if they don't exist
+    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasCommitModeColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
+    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_structured_prompt_template');
+    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_checkpoint_prefix');
+    const hasCommitAllowClaudeToolsColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_allow_claude_tools');
+    
+    if (!hasCommitModeColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_mode TEXT DEFAULT 'checkpoint'").run();
+      console.log('[Database] Added commit_mode column to projects table');
+    }
+    
+    if (!hasCommitStructuredPromptTemplateColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_structured_prompt_template TEXT").run();
+      console.log('[Database] Added commit_structured_prompt_template column to projects table');
+    }
+    
+    if (!hasCommitCheckpointPrefixColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_checkpoint_prefix TEXT DEFAULT 'checkpoint: '").run();
+      console.log('[Database] Added commit_checkpoint_prefix column to projects table');
+    }
+    
+    if (!hasCommitAllowClaudeToolsColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_allow_claude_tools BOOLEAN DEFAULT 0").run();
+      console.log('[Database] Added commit_allow_claude_tools column to projects table');
+    }
+
+    // Add commit mode settings columns to sessions table if they don't exist
+    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
+    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode_settings');
+    
+    if (!hasSessionCommitModeColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode TEXT").run();
+      console.log('[Database] Added commit_mode column to sessions table');
+    }
+    
+    if (!hasSessionCommitModeSettingsColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode_settings TEXT").run();
+      console.log('[Database] Added commit_mode_settings column to sessions table');
+    }
+
+    // Migrate existing auto_commit boolean to commit_mode
+    const hasAutoCommitMigrated = this.db.prepare("SELECT value FROM user_preferences WHERE key = 'auto_commit_migrated'").get();
+    if (!hasAutoCommitMigrated) {
+      console.log('[Database] Migrating auto_commit boolean to commit_mode...');
+      
+      // Update sessions: auto_commit=true -> commit_mode='checkpoint', auto_commit=false -> commit_mode='disabled'
+      this.db.prepare(`
+        UPDATE sessions 
+        SET commit_mode = CASE 
+          WHEN auto_commit = 1 THEN 'checkpoint'
+          ELSE 'disabled'
+        END
+        WHERE commit_mode IS NULL
+      `).run();
+      
+      // Mark migration as complete
+      this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('auto_commit_migrated', 'true')").run();
+      console.log('[Database] Completed auto_commit migration');
+    }
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, mainBranch?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string): Project {
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitStructuredPromptTemplate?: string, commitCheckpointPrefix?: string, commitAllowClaudeTools?: boolean): Project {
     // Get the max display_order for projects
     const maxOrderResult = this.db.prepare(`
       SELECT MAX(display_order) as max_order 
@@ -694,9 +756,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder);
+      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order, commit_mode, commit_structured_prompt_template, commit_checkpoint_prefix, commit_allow_claude_tools)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder, commitMode || 'checkpoint', commitStructuredPromptTemplate || null, commitCheckpointPrefix || 'checkpoint: ', commitAllowClaudeTools ? 1 : 0);
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -773,6 +835,22 @@ export class DatabaseService {
     if (updates.active !== undefined) {
       fields.push('active = ?');
       values.push(updates.active ? 1 : 0);
+    }
+    if (updates.commit_mode !== undefined) {
+      fields.push('commit_mode = ?');
+      values.push(updates.commit_mode);
+    }
+    if (updates.commit_structured_prompt_template !== undefined) {
+      fields.push('commit_structured_prompt_template = ?');
+      values.push(updates.commit_structured_prompt_template);
+    }
+    if (updates.commit_checkpoint_prefix !== undefined) {
+      fields.push('commit_checkpoint_prefix = ?');
+      values.push(updates.commit_checkpoint_prefix);
+    }
+    if (updates.commit_allow_claude_tools !== undefined) {
+      fields.push('commit_allow_claude_tools = ?');
+      values.push(updates.commit_allow_claude_tools ? 1 : 0);
     }
 
     if (fields.length === 0) {
@@ -1070,9 +1148,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     this.db.prepare(`
-      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514', data.base_commit || null, data.base_branch || null);
+      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch, commit_mode, commit_mode_settings)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514', data.base_commit || null, data.base_branch || null, data.commit_mode || null, data.commit_mode_settings || null);
     
     const session = this.getSession(data.id);
     if (!session) {

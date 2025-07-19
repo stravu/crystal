@@ -99,3 +99,8 @@ test-file.txt
 frontend/vite.config.d.ts
 
 # Generated files
+# Shared build artifacts
+shared/*.js
+shared/*.js.map
+shared/*.d.ts
+shared/*.d.ts.map

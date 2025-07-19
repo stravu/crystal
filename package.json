@@ -8,7 +8,7 @@
     "email": "jordan@stravu.com"
   },
   "license": "MIT",
-  "main": "main/dist/index.js",
+  "main": "main/dist/main/src/index.js",
   "engines": {
     "node": ">=22.14.0",
     "pnpm": ">=8.0.0"
