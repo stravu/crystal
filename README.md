@@ -120,6 +120,9 @@ This ensures:
 - Worktrees won't conflict between the two instances
 - You can safely test changes without affecting your primary Crystal setup
 
+## Additional Documentation
+
+See the [docs](./docs) directory for architecture diagrams, database schema details, release instructions, and license compatibility notes.
 
 ## 📄 License
 
