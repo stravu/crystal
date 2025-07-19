@@ -122,7 +122,7 @@ This ensures:
 
 ## Additional Documentation
 
-See the [docs](./docs) directory for architecture diagrams, database schema details, release instructions, and license compatibility notes.
+For a full project overview, see [CLAUDE.md](CLAUDE.md). Additional diagrams, database schema details, release instructions, and license notes can be found in the [docs](./docs) directory.
 
 ## 📄 License
 
