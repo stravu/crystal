@@ -444,6 +444,28 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  ipcMain.handle('sessions:get-json-messages', async (_event, sessionId: string) => {
+    try {
+      console.log(`[IPC] sessions:get-json-messages called for session: ${sessionId}`);
+      const outputs = await sessionManager.getSessionOutputs(sessionId);
+      console.log(`[IPC] Retrieved ${outputs.length} total outputs for session ${sessionId}`);
+      
+      // Filter to only JSON messages and include timestamp
+      const jsonMessages = outputs
+        .filter(output => output.type === 'json')
+        .map(output => ({
+          ...output.data,
+          timestamp: output.timestamp.toISOString()
+        }));
+      
+      console.log(`[IPC] Found ${jsonMessages.length} JSON messages for session ${sessionId}`);
+      return { success: true, data: jsonMessages };
+    } catch (error) {
+      console.error('Failed to get JSON messages:', error);
+      return { success: false, error: 'Failed to get JSON messages' };
+    }
+  });
+
   ipcMain.handle('sessions:mark-viewed', async (_event, sessionId: string) => {
     try {
       await sessionManager.markSessionAsViewed(sessionId);

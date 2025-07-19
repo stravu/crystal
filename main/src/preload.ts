@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     continue: (sessionId: string, prompt?: string, model?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt, model),
     getOutput: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-output', sessionId),
     getConversation: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-conversation', sessionId),
+    getJsonMessages: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-json-messages', sessionId),
     markViewed: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:mark-viewed', sessionId),
     stop: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:stop', sessionId),
     
