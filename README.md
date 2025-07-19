@@ -120,6 +120,9 @@ This ensures:
 - Worktrees won't conflict between the two instances
 - You can safely test changes without affecting your primary Crystal setup
 
+## Additional Documentation
+
+For a full project overview, see [CLAUDE.md](CLAUDE.md). Additional diagrams, database schema details, release instructions, and license notes can be found in the [docs](./docs) directory.
 
 ## 📄 License
 
