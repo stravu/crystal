@@ -112,7 +112,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
       if (count > 1) {
         console.log('[IPC] Creating multiple sessions...');
-        const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode, targetProject.id, request.baseBranch, request.autoCommit, request.model);
+        const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode, targetProject.id, request.baseBranch, request.autoCommit, request.model, request.commitMode, request.commitModeSettings);
         console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
         
         // Update project's lastUsedModel
@@ -130,7 +130,9 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           projectId: targetProject.id,
           baseBranch: request.baseBranch,
           autoCommit: request.autoCommit,
-          model: request.model
+          model: request.model,
+          commitMode: request.commitMode,
+          commitModeSettings: request.commitModeSettings
         });
         console.log('[IPC] Created job with ID:', job.id);
         
@@ -271,7 +273,33 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         timestamp: new Date()
       });
 
-      claudeCodeManager.sendInput(sessionId, input);
+      // Check if session uses structured commit mode and enhance the input
+      let finalInput = input;
+      const dbSession = databaseService.getSession(sessionId);
+      if (dbSession?.commit_mode === 'structured') {
+        console.log(`[IPC] Session ${sessionId} uses structured commit mode, enhancing input`);
+        
+        // Parse commit mode settings
+        let commitModeSettings;
+        try {
+          commitModeSettings = dbSession.commit_mode_settings ? 
+            JSON.parse(dbSession.commit_mode_settings) : 
+            { mode: 'structured' };
+        } catch (e) {
+          console.error(`[IPC] Failed to parse commit mode settings:`, e);
+          commitModeSettings = { mode: 'structured' };
+        }
+        
+        // Get structured prompt template from settings or use default
+        const { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } = require('../../../shared/types');
+        const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
+        
+        // Add structured commit instructions to the input
+        finalInput = `${input}\n\n${structuredPromptTemplate}`;
+        console.log(`[IPC] Added structured commit instructions to input`);
+      }
+
+      claudeCodeManager.sendInput(sessionId, finalInput);
       return { success: true };
     } catch (error) {
       console.error('Failed to send input:', error);

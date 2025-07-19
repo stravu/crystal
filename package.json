@@ -8,7 +8,7 @@
     "email": "jordan@stravu.com"
   },
   "license": "MIT",
-  "main": "main/dist/index.js",
+  "main": "main/dist/main/src/index.js",
   "engines": {
     "node": ">=22.14.0",
     "pnpm": ">=8.0.0"
@@ -31,8 +31,8 @@
     "build:mac:x64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --x64 --publish never",
     "build:mac:arm64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --arm64 --publish never",
     "build:linux": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
-    "build:linux:ci": "pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
-    "build:mac:ci": "pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish never",
+    "build:linux:ci": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
+    "build:mac:ci": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish never",
     "inject-build-info": "node scripts/inject-build-info.js",
     "release:mac": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish always",
     "release:mac:universal": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --universal --publish always",
