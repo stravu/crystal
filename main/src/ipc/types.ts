@@ -12,6 +12,7 @@ import type { VersionChecker } from '../services/versionChecker';
 import type { StravuAuthManager } from '../services/stravuAuthManager';
 import type { StravuNotebookService } from '../services/stravuNotebookService';
 import type { ClaudeCodeManager } from '../services/claudeCodeManager';
+import type { Logger } from '../utils/logger';
 
 export interface AppServices {
   app: App;
@@ -29,4 +30,5 @@ export interface AppServices {
   stravuNotebookService: StravuNotebookService;
   taskQueue: TaskQueue | null;
   getMainWindow: () => BrowserWindow | null;
+  logger?: Logger;
 } 

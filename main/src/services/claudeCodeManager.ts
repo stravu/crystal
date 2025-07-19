@@ -162,6 +162,11 @@ export class ClaudeCodeManager extends EventEmitter {
         this.logger?.verbose(`Using model: ${model}`);
       }
       
+      // Log commit mode for debugging (but don't pass to Claude Code)
+      if (dbSession?.commit_mode) {
+        this.logger?.verbose(`Session uses commit mode: ${dbSession.commit_mode}`);
+      }
+      
       // Determine permission mode
       const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
       const effectiveMode = permissionMode || defaultMode;
@@ -405,14 +410,61 @@ export class ClaudeCodeManager extends EventEmitter {
         
         // If a new prompt is provided, add it
         if (prompt && prompt.trim()) {
-          args.push('-p', prompt);
+          let finalPrompt = prompt;
+          
+          // Check if session has structured commit mode for continuation prompts too
+          if (dbSession?.commit_mode === 'structured') {
+            this.logger?.verbose(`Session ${sessionId} uses structured commit mode, enhancing continuation prompt`);
+            
+            let commitModeSettings;
+            if (dbSession.commit_mode_settings) {
+              try {
+                commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
+              } catch (e) {
+                this.logger?.error(`Failed to parse commit mode settings: ${e}`);
+              }
+            }
+            
+            // Get structured prompt template from settings or use default
+            const { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } = require('../../../shared/types');
+            const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
+            
+            // Add structured commit instructions to the prompt
+            finalPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
+            this.logger?.verbose(`Added structured commit instructions to continuation prompt`);
+          }
+          
+          args.push('-p', finalPrompt);
         }
       } else {
         // Initial prompt for new session
         let finalPrompt = prompt;
+        
+        // Check if session has structured commit mode
+        if (dbSession?.commit_mode === 'structured') {
+          this.logger?.verbose(`Session ${sessionId} uses structured commit mode, enhancing prompt`);
+          
+          let commitModeSettings;
+          if (dbSession.commit_mode_settings) {
+            try {
+              commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
+            } catch (e) {
+              this.logger?.error(`Failed to parse commit mode settings: ${e}`);
+            }
+          }
+          
+          // Get structured prompt template from settings or use default
+          const { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } = require('../../../shared/types');
+          const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
+          
+          // Add structured commit instructions to the prompt
+          finalPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
+          this.logger?.verbose(`Added structured commit instructions to prompt`);
+        }
+        
         if (systemPromptAppend) {
           // Append the system prompt to the user's prompt
-          finalPrompt = `${prompt}\n\n${systemPromptAppend}`;
+          finalPrompt = `${finalPrompt}\n\n${systemPromptAppend}`;
         }
         args.push('-p', finalPrompt);
       }
