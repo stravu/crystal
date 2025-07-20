@@ -444,28 +444,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('sessions:get-json-messages', async (_event, sessionId: string) => {
-    try {
-      console.log(`[IPC] sessions:get-json-messages called for session: ${sessionId}`);
-      const outputs = await sessionManager.getSessionOutputs(sessionId);
-      console.log(`[IPC] Retrieved ${outputs.length} total outputs for session ${sessionId}`);
-      
-      // Filter to only JSON messages and include timestamp
-      const jsonMessages = outputs
-        .filter(output => output.type === 'json')
-        .map(output => ({
-          ...output.data,
-          timestamp: output.timestamp.toISOString()
-        }));
-      
-      console.log(`[IPC] Found ${jsonMessages.length} JSON messages for session ${sessionId}`);
-      return { success: true, data: jsonMessages };
-    } catch (error) {
-      console.error('Failed to get JSON messages:', error);
-      return { success: false, error: 'Failed to get JSON messages' };
-    }
-  });
-
   ipcMain.handle('sessions:mark-viewed', async (_event, sessionId: string) => {
     try {
       await sessionManager.markSessionAsViewed(sessionId);
@@ -670,6 +648,60 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     } catch (error) {
       console.error('Failed to get table structure:', error);
       return { success: false, error: 'Failed to get table structure' };
+    }
+  });
+
+  // Token tracking handlers
+  ipcMain.handle('sessions:get-token-usage', async (_event, sessionId: string) => {
+    try {
+      console.log('[IPC] Getting token usage for session:', sessionId);
+      
+      const session = databaseService.getSession(sessionId);
+      if (!session) {
+        console.log('[IPC] Session not found:', sessionId);
+        return { success: false, error: 'Session not found' };
+      }
+
+      const { getSessionTokenUsageWithContext } = await import('../utils/tokenTracker');
+      const tokenData = getSessionTokenUsageWithContext(
+        databaseService,
+        sessionId,
+        session.model || 'claude-sonnet-4-20250514'
+      );
+
+      console.log('[IPC] Token data retrieved:', {
+        sessionId,
+        hasSummary: !!tokenData?.summary,
+        summary: tokenData?.summary,
+        contextWindow: tokenData?.contextWindow,
+        warning: tokenData?.warning,
+        currentContextUsage: tokenData?.currentContextUsage
+      });
+
+      return { success: true, data: tokenData };
+    } catch (error) {
+      console.error('[IPC] Failed to get token usage:', error);
+      return { success: false, error: 'Failed to get token usage' };
+    }
+  });
+
+  ipcMain.handle('sessions:get-token-history', async (_event, sessionId: string) => {
+    try {
+      const history = databaseService.getSessionTokenUsageHistory(sessionId);
+      return { success: true, data: history };
+    } catch (error) {
+      console.error('Failed to get token history:', error);
+      return { success: false, error: 'Failed to get token history' };
+    }
+  });
+
+  ipcMain.handle('models:get-context-windows', async () => {
+    try {
+      const models = databaseService.getAllModelContextWindows();
+      return { success: true, data: models };
+    } catch (error) {
+      console.error('Failed to get model context windows:', error);
+      return { success: false, error: 'Failed to get model context windows' };
     }
   });
 } 

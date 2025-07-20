@@ -173,9 +173,8 @@ export class TaskQueue {
           run_script: targetProject.run_script
         }, null, 2));
 
-        const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
+        const { worktreePath } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
-        console.log(`[TaskQueue] Base commit: ${baseCommit}, Base branch: ${actualBaseBranch}`);
         
         const sessionName = worktreeName;
         console.log(`[TaskQueue] Creating session in database`);
@@ -190,9 +189,7 @@ export class TaskQueue {
           false, // isMainRepo = false for regular sessions
           autoCommit,
           job.data.folderId,
-          model,
-          baseCommit,
-          actualBaseBranch
+          model
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
 

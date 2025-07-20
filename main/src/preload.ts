@@ -45,7 +45,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     continue: (sessionId: string, prompt?: string, model?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt, model),
     getOutput: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-output', sessionId),
     getConversation: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-conversation', sessionId),
-    getJsonMessages: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-json-messages', sessionId),
     markViewed: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:mark-viewed', sessionId),
     stop: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:stop', sessionId),
     
@@ -99,6 +98,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>): Promise<string[]> => ipcRenderer.invoke('sessions:save-images', sessionId, images),
+    
+    // Token tracking
+    getTokenUsage: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-token-usage', sessionId),
+    getTokenHistory: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-token-history', sessionId),
   },
 
   // Project management
@@ -112,11 +115,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectBranch: (path: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:detect-branch', path),
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>): Promise<IPCResponse> => ipcRenderer.invoke('projects:reorder', projectOrders),
     listBranches: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:list-branches', projectId),
-  },
-
-  // Project Dashboard
-  dashboard: {
-    getProjectStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('dashboard:get-project-status', projectId),
   },
 
   // Git operations
@@ -299,6 +297,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('zombie-processes-detected', wrappedCallback);
       return () => ipcRenderer.removeListener('zombie-processes-detected', wrappedCallback);
     },
+  },
+
+  // Model context windows
+  models: {
+    getContextWindows: (): Promise<IPCResponse> => ipcRenderer.invoke('models:get-context-windows'),
   },
 
   // Debug utilities

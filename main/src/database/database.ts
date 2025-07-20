@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
+import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, ModelContextWindow, MessageTokenUsage, SessionTokenSummary } from './models';
 
 export class DatabaseService {
   private db: Database.Database;
@@ -15,8 +15,11 @@ export class DatabaseService {
   }
 
   initialize(): void {
+    console.log('[Database] Starting database initialization...');
     this.initializeSchema();
+    console.log('[Database] Schema initialized, running migrations...');
     this.runMigrations();
+    console.log('[Database] Database initialization complete');
   }
 
   private initializeSchema(): void {
@@ -33,6 +36,8 @@ export class DatabaseService {
   }
 
   private runMigrations(): void {
+    console.log('[Database] runMigrations() called - starting migrations...');
+    
     // Check if archived column exists
     const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
     const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
@@ -667,20 +672,194 @@ export class DatabaseService {
       console.log('[Database] Added lastUsedModel column to projects table');
     }
 
-    // Add base_commit and base_branch columns to sessions table if they don't exist
-    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_commit');
-    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_branch');
-    
-    if (!hasBaseCommitColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN base_commit TEXT").run();
-      console.log('[Database] Added base_commit column to sessions table');
+    // Token tracking migration
+    console.log('[Database] Checking token tracking tables...');
+    const modelContextWindowsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='model_context_windows'").all();
+    if (modelContextWindowsTable.length === 0) {
+      console.log('[Database] Creating token tracking tables...');
+      // Create model context windows table
+      this.db.prepare(`
+        CREATE TABLE model_context_windows (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          model_name TEXT NOT NULL UNIQUE,
+          context_window_size INTEGER NOT NULL,
+          display_name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      
+      // Populate with known models
+      try {
+        const { getAllModels } = require('../utils/modelContextWindows');
+        const models = getAllModels();
+        for (const model of models) {
+          this.db.prepare(`
+            INSERT INTO model_context_windows (model_name, context_window_size, display_name)
+            VALUES (?, ?, ?)
+          `).run(model.name, model.contextWindow, model.displayName);
+        }
+        console.log('[Database] Created model_context_windows table and populated with', models.length, 'models');
+      } catch (error) {
+        console.error('[Database] Failed to populate model context windows:', error);
+      }
+    }
+
+    // Message token usage migration
+    const messageTokenUsageTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_token_usage'").all();
+    if (messageTokenUsageTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE message_token_usage (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          output_id INTEGER NOT NULL,
+          message_type TEXT NOT NULL CHECK (message_type IN ('user', 'assistant', 'system')),
+          input_tokens INTEGER DEFAULT 0,
+          output_tokens INTEGER DEFAULT 0,
+          total_tokens INTEGER DEFAULT 0,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          FOREIGN KEY (output_id) REFERENCES session_outputs(id) ON DELETE CASCADE
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_message_token_usage_session_id ON message_token_usage(session_id)").run();
+      this.db.prepare("CREATE INDEX idx_message_token_usage_output_id ON message_token_usage(output_id)").run();
+      console.log('[Database] Created message_token_usage table');
+    }
+
+    // Session token summary migration
+    const sessionTokenSummaryTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='session_token_summary'").all();
+    if (sessionTokenSummaryTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE session_token_summary (
+          session_id TEXT PRIMARY KEY,
+          total_input_tokens INTEGER DEFAULT 0,
+          total_output_tokens INTEGER DEFAULT 0,
+          total_tokens INTEGER DEFAULT 0,
+          last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        )
+      `).run();
+      console.log('[Database] Created session_token_summary table');
+      
+      // Initialize token summaries for existing sessions
+      const sessions = this.db.prepare("SELECT id FROM sessions").all() as Array<{ id: string }>;
+      for (const session of sessions) {
+        this.db.prepare(`
+          INSERT INTO session_token_summary (session_id)
+          VALUES (?)
+        `).run(session.id);
+      }
+      if (sessions.length > 0) {
+        console.log('[Database] Initialized token summaries for', sessions.length, 'existing sessions');
+      }
     }
     
-    if (!hasBaseBranchColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN base_branch TEXT").run();
-      console.log('[Database] Added base_branch column to sessions table');
+    // Backfill token usage from existing JSON messages
+    console.log('[Database] About to call backfillTokenUsage()...');
+    this.backfillTokenUsage();
+    console.log('[Database] runMigrations() completed');
+  }
+
+  private backfillTokenUsage(): void {
+    console.log('[Database] Checking for token usage backfill...');
+    
+    // Check if token tracking tables exist (for fresh installs)
+    const tables = this.db.prepare(`
+      SELECT name FROM sqlite_master 
+      WHERE type='table' 
+      AND name IN ('message_token_usage', 'session_token_summary')
+    `).all() as Array<{ name: string }>;
+    
+    if (tables.length !== 2) {
+      console.log('[Database] Token tracking tables not yet created, skipping backfill');
+      return;
     }
+    
+    // Get count of already processed outputs
+    const processedCount = this.db.prepare(`
+      SELECT COUNT(DISTINCT output_id) as count FROM message_token_usage
+    `).get() as { count: number };
+    
+    // Get all JSON outputs that haven't been processed yet
+    const jsonOutputs = this.db.prepare(`
+      SELECT so.id, so.session_id, so.data 
+      FROM session_outputs so
+      LEFT JOIN message_token_usage mtu ON mtu.output_id = so.id
+      WHERE so.type = 'json' AND mtu.id IS NULL
+      ORDER BY so.timestamp ASC
+    `).all() as Array<{ id: number; session_id: string; data: string }>;
+    
+    if (jsonOutputs.length === 0) {
+      if (processedCount.count > 0) {
+        console.log(`[Database] Token usage already backfilled (${processedCount.count} records exist)`);
+      } else {
+        console.log('[Database] No JSON outputs to backfill');
+      }
+      return;
+    }
+    
+    console.log(`[Database] Starting token usage backfill for ${jsonOutputs.length} new JSON messages (${processedCount.count} already processed)...`);
+    
+    let extractTokenUsage: any;
+    let getMessageType: any;
+    
+    try {
+      const tokenTracker = require('../utils/tokenTracker');
+      extractTokenUsage = tokenTracker.extractTokenUsage;
+      getMessageType = tokenTracker.getMessageType;
+      console.log('[Database] Successfully loaded tokenTracker utilities');
+    } catch (error) {
+      console.error('[Database] Failed to load tokenTracker utilities:', error);
+      return;
+    }
+    
+    let newlyProcessedCount = 0;
+    let errorCount = 0;
+    
+    // Process each JSON output
+    for (const output of jsonOutputs) {
+      try {
+        const jsonData = JSON.parse(output.data);
+        const usage = extractTokenUsage(jsonData);
+        
+        if (usage) {
+          const messageType = getMessageType(jsonData);
+          
+          // Insert token usage record
+          this.db.prepare(`
+            INSERT INTO message_token_usage (session_id, output_id, message_type, input_tokens, output_tokens, total_tokens)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(
+            output.session_id,
+            output.id,
+            messageType,
+            usage.inputTokens,
+            usage.outputTokens,
+            usage.totalTokens
+          );
+          
+          newlyProcessedCount++;
+        }
+      } catch (error) {
+        errorCount++;
+        if (errorCount <= 5) {
+          console.error(`[Database] Error processing output ${output.id}:`, error);
+        }
+        // Continue processing other messages even if one fails
+      }
+    }
+    
+    console.log(`[Database] Backfilled token usage for ${newlyProcessedCount} messages (${errorCount} errors)`);
+    
+    // Update all session summaries
+    const sessions = this.db.prepare("SELECT DISTINCT session_id FROM message_token_usage").all() as Array<{ session_id: string }>;
+    
+    for (const { session_id } of sessions) {
+      this.updateSessionTokenSummary(session_id);
+    }
+    
+    console.log(`[Database] Token usage backfill complete - updated summaries for ${sessions.length} sessions`);
   }
 
   // Project operations
@@ -1070,9 +1249,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     this.db.prepare(`
-      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514', data.base_commit || null, data.base_branch || null);
+      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514');
     
     const session = this.getSession(data.id);
     if (!session) {
@@ -1211,11 +1390,13 @@ export class DatabaseService {
   }
 
   // Session output operations
-  addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json', data: string): void {
-    this.db.prepare(`
+  addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json', data: string): number {
+    const result = this.db.prepare(`
       INSERT INTO session_outputs (session_id, type, data)
       VALUES (?, ?, ?)
     `).run(sessionId, type, data);
+    
+    return result.lastInsertRowid as number;
   }
 
   getSessionOutputs(sessionId: string, limit?: number): SessionOutput[] {
@@ -1628,6 +1809,128 @@ export class DatabaseService {
       preferences[row.key] = row.value;
     }
     return preferences;
+  }
+
+  // Token tracking operations
+  addMessageTokenUsage(sessionId: string, outputId: number, messageType: 'user' | 'assistant' | 'system', inputTokens: number, outputTokens: number): void {
+    const totalTokens = inputTokens + outputTokens;
+    
+    this.db.prepare(`
+      INSERT INTO message_token_usage (session_id, output_id, message_type, input_tokens, output_tokens, total_tokens)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(sessionId, outputId, messageType, inputTokens, outputTokens, totalTokens);
+    
+    // Update session summary
+    this.updateSessionTokenSummary(sessionId);
+  }
+
+  updateSessionTokenSummary(sessionId: string): void {
+    // Calculate totals from message_token_usage
+    const totals = this.db.prepare(`
+      SELECT 
+        SUM(input_tokens) as total_input,
+        SUM(output_tokens) as total_output,
+        SUM(total_tokens) as total
+      FROM message_token_usage
+      WHERE session_id = ?
+    `).get(sessionId) as { total_input: number | null; total_output: number | null; total: number | null };
+    
+    // Update or insert session summary
+    this.db.prepare(`
+      INSERT INTO session_token_summary (session_id, total_input_tokens, total_output_tokens, total_tokens)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET
+        total_input_tokens = excluded.total_input_tokens,
+        total_output_tokens = excluded.total_output_tokens,
+        total_tokens = excluded.total_tokens,
+        last_updated = CURRENT_TIMESTAMP
+    `).run(
+      sessionId,
+      totals.total_input || 0,
+      totals.total_output || 0,
+      totals.total || 0
+    );
+  }
+
+  getSessionTokenSummary(sessionId: string): SessionTokenSummary | undefined {
+    console.log('[DB] Getting token summary for session:', sessionId);
+    const result = this.db.prepare(`
+      SELECT * FROM session_token_summary
+      WHERE session_id = ?
+    `).get(sessionId) as SessionTokenSummary | undefined;
+    console.log('[DB] Token summary result:', result);
+    return result;
+  }
+
+  getSessionTokenUsageHistory(sessionId: string): MessageTokenUsage[] {
+    return this.db.prepare(`
+      SELECT * FROM message_token_usage
+      WHERE session_id = ?
+      ORDER BY timestamp ASC
+    `).all(sessionId) as MessageTokenUsage[];
+  }
+
+  updateSessionContextWindow(sessionId: string, contextWindowTokens: number): void {
+    console.log('[DB] Updating session context window:', sessionId, contextWindowTokens);
+    
+    // Store the latest context window usage in the token_usage_history table
+    // This gives us the most recent context window state
+    this.db.prepare(`
+      INSERT OR REPLACE INTO token_usage_history (
+        session_id,
+        input_tokens,
+        output_tokens, 
+        context_window_tokens,
+        timestamp
+      ) VALUES (?, 0, 0, ?, datetime('now'))
+    `).run(sessionId, contextWindowTokens);
+  }
+
+  getLatestContextWindowUsage(sessionId: string): number | null {
+    console.log('[DB] Getting latest context window usage for session:', sessionId);
+    
+    const result = this.db.prepare(`
+      SELECT context_window_tokens 
+      FROM token_usage_history 
+      WHERE session_id = ? AND context_window_tokens > 0
+      ORDER BY timestamp DESC 
+      LIMIT 1
+    `).get(sessionId) as { context_window_tokens: number } | undefined;
+    
+    const usage = result?.context_window_tokens;
+    console.log('[DB] Latest context window usage:', usage, 'type:', typeof usage);
+    return usage || null;
+  }
+
+  getLatestSessionOutputWithUsage(sessionId: string): { id: number; data: string } | null {
+    console.log('[DB] Getting latest session output with usage for session:', sessionId);
+    
+    const result = this.db.prepare(`
+      SELECT id, data
+      FROM session_outputs 
+      WHERE session_id = ? 
+        AND type = 'json'
+        AND (data LIKE '%"usage"%' OR data LIKE '%"message":{"usage"%')
+      ORDER BY id DESC 
+      LIMIT 1
+    `).get(sessionId) as { id: number; data: string } | undefined;
+    
+    console.log('[DB] Latest output with usage:', result ? { id: result.id, hasData: !!result.data } : null);
+    return result || null;
+  }
+
+  getModelContextWindow(modelName: string): ModelContextWindow | undefined {
+    return this.db.prepare(`
+      SELECT * FROM model_context_windows
+      WHERE model_name = ?
+    `).get(modelName) as ModelContextWindow | undefined;
+  }
+
+  getAllModelContextWindows(): ModelContextWindow[] {
+    return this.db.prepare(`
+      SELECT * FROM model_context_windows
+      ORDER BY display_name ASC
+    `).all() as ModelContextWindow[];
   }
 
   close(): void {

@@ -43,7 +43,6 @@ interface ElectronAPI {
     continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
     getOutput: (sessionId: string) => Promise<IPCResponse>;
     getConversation: (sessionId: string) => Promise<IPCResponse>;
-    getJsonMessages: (sessionId: string) => Promise<IPCResponse>;
     markViewed: (sessionId: string) => Promise<IPCResponse>;
     stop: (sessionId: string) => Promise<IPCResponse>;
     
@@ -99,6 +98,10 @@ interface ElectronAPI {
     
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>) => Promise<string[]>;
+    
+    // Token tracking
+    getTokenUsage: (sessionId: string) => Promise<IPCResponse>;
+    getTokenHistory: (sessionId: string) => Promise<IPCResponse>;
   };
 
   // Project management
@@ -112,11 +115,6 @@ interface ElectronAPI {
     detectBranch: (path: string) => Promise<IPCResponse>;
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>) => Promise<IPCResponse>;
     listBranches: (projectId: string) => Promise<IPCResponse>;
-  };
-
-  // Dashboard
-  dashboard: {
-    getProjectStatus: (projectId: number) => Promise<IPCResponse>;
   };
 
   // Git operations
@@ -240,6 +238,11 @@ interface ElectronAPI {
         sql: string;
       }>;
     }>>;
+  };
+
+  // Model context windows
+  models: {
+    getContextWindows: () => Promise<IPCResponse>;
   };
 }
 

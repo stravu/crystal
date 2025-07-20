@@ -10,7 +10,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     executionTracker,
     runCommandManager,
     gitDiffManager,
-    worktreeManager
+    worktreeManager,
+    databaseService
   } = services;
 
   // Listen to sessionManager events and broadcast to renderer
@@ -100,11 +101,17 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   // Listen to claudeCodeManager events
   claudeCodeManager.on('output', async (output: any) => {
     // Save raw output to database (including JSON)
-    sessionManager.addSessionOutput(output.sessionId, {
+    const outputId = sessionManager.addSessionOutput(output.sessionId, {
       type: output.type,
       data: output.data,
       timestamp: output.timestamp
     });
+
+    // Track token usage for JSON messages
+    if (output.type === 'json') {
+      const { trackTokenUsage } = await import('./utils/tokenTracker');
+      await trackTokenUsage(databaseService, output.sessionId, outputId, output.data);
+    }
 
     // Check if Claude is waiting for user input
     if (output.type === 'json' && output.data.type === 'prompt') {

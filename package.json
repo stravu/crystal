@@ -48,7 +48,9 @@
     "test:ci": "playwright test --config=playwright.ci.config.ts",
     "test:ci:minimal": "playwright test --config=playwright.ci.minimal.config.ts",
     "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed"
+    "test:headed": "playwright test --headed",
+    "backfill-tokens": "cd main && npx tsx ../scripts/backfill-tokens.ts",
+    "backfill-tokens:dry": "cd main && npx tsx ../scripts/backfill-tokens.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.33",

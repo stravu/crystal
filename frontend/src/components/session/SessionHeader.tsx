@@ -1,6 +1,7 @@
 import React from 'react';
 import { Session, GitCommands } from '../../types/session';
 import { StatusIndicator } from '../StatusIndicator';
+import { TokenUsageDisplay } from '../TokenUsageDisplay';
 import { ViewTabs } from './ViewTabs';
 import { ViewMode } from '../../hooks/useSessionView';
 
@@ -29,7 +30,6 @@ interface SessionHeaderProps {
     changes: boolean;
     terminal: boolean;
     editor: boolean;
-    dashboard: boolean;
   };
   setUnreadActivity: (activity: any) => void;
 }
@@ -80,8 +80,9 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
             </h2>
           )}
           {/* Status Indicator */}
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-3 mt-2">
             <StatusIndicator key={`status-${activeSession.id}-${activeSession.status}`} session={activeSession} size="medium" showText showProgress />
+            <TokenUsageDisplay sessionId={activeSession.id} compact />
           </div>
           
           {/* Git Actions */}

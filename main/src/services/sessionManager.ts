@@ -113,9 +113,7 @@ export class SessionManager extends EventEmitter {
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
       model: dbSession.model,
-      archived: dbSession.archived || false,
-      baseCommit: dbSession.base_commit,
-      baseBranch: dbSession.base_branch
+      archived: dbSession.archived || false
     };
   }
 
@@ -165,11 +163,11 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string): Session {
-    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model, baseCommit, baseBranch);
+  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
+    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model);
   }
 
-  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string): Session {
+  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
     let targetProject;
@@ -200,9 +198,7 @@ export class SessionManager extends EventEmitter {
       permission_mode: permissionMode,
       is_main_repo: isMainRepo,
       auto_commit: autoCommit,
-      model: model,
-      base_commit: baseCommit,
-      base_branch: baseBranch
+      model: model
     };
     console.log(`[SessionManager] Session data:`, sessionData);
 
@@ -306,14 +302,14 @@ export class SessionManager extends EventEmitter {
     this.emit('session-updated', session);
   }
 
-  addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): void {
+  addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): number {
     // Check if this is the first output for this session
     const existingOutputs = this.db.getSessionOutputs(id, 1);
     const isFirstOutput = existingOutputs.length === 0;
     
     // Store in database (stringify JSON objects)
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
-    this.db.addSessionOutput(id, output.type, dataToStore);
+    const outputId = this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Emit the output so it shows immediately in the UI
     const outputToEmit: SessionOutput = {
@@ -422,6 +418,8 @@ export class SessionManager extends EventEmitter {
     };
     
     this.emit('session-output', fullOutput);
+    
+    return outputId;
   }
 
   getSessionOutput(id: string, limit?: number): SessionOutput[] {

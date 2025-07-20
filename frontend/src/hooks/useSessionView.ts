@@ -7,7 +7,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard';
+export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -31,7 +31,6 @@ export const useSessionView = (
     changes: false,
     terminal: false,
     editor: false,
-    dashboard: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -267,28 +266,6 @@ export const useSessionView = (
     }
   }, [activeSession?.status, isWaitingForFirstOutput]);
 
-  // Load JSON messages for the Messages tab
-  const loadJsonMessages = useCallback(async (sessionId: string) => {
-    try {
-      console.log(`[loadJsonMessages] Loading JSON messages for session: ${sessionId}`);
-      const response = await API.sessions.getJsonMessages(sessionId);
-      
-      if (!response.success) {
-        console.error(`[loadJsonMessages] Failed to load JSON messages:`, response.error);
-        return;
-      }
-      
-      const jsonMessages = response.data || [];
-      console.log(`[loadJsonMessages] Received ${jsonMessages.length} JSON messages for session ${sessionId}`);
-      
-      // Update the session store with JSON messages
-      useSessionStore.getState().setSessionJsonMessages(sessionId, jsonMessages);
-      
-    } catch (error) {
-      console.error(`[loadJsonMessages] Error loading JSON messages for session ${sessionId}:`, error);
-    }
-  }, []);
-
   useEffect(() => {
     if (!activeSessionId) return;
     const unsubscribe = useSessionStore.subscribe((state) => {
@@ -354,7 +331,6 @@ export const useSessionView = (
       changes: false,
       terminal: false,
       editor: false,
-      dashboard: false,
     });
     
     // Clear terminal immediately when session changes
@@ -970,16 +946,8 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, dashboard: false });
+    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false });
   }, [activeSessionId]);
-
-  // Load JSON messages when switching to messages view
-  useEffect(() => {
-    if (!activeSession || viewMode !== 'messages') return;
-    
-    console.log(`[useSessionView] Loading JSON messages for session ${activeSession.id} due to view mode change`);
-    loadJsonMessages(activeSession.id);
-  }, [activeSession?.id, viewMode, loadJsonMessages]);
 
 
   useEffect(() => {
