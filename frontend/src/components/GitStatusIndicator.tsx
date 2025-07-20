@@ -304,9 +304,8 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
         {/* For diverged state */}
         {gitStatus.state === 'diverged' && (
           <>
-            {gitStatus.totalCommits && gitStatus.totalCommits > 0 ? (
-              <span className="font-medium">{gitStatus.totalCommits}</span>
-            ) : (
+            {/* Only show ahead/behind if we haven't already shown totalCommits */}
+            {(!gitStatus.totalCommits || gitStatus.totalCommits === 0) && (
               <>
                 {gitStatus.ahead && gitStatus.ahead > 0 && (
                   <span className="font-medium">↑{gitStatus.ahead}</span>
