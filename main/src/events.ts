@@ -10,6 +10,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     executionTracker,
     runCommandManager,
     gitDiffManager,
+    gitStatusManager,
     worktreeManager
   } = services;
 
@@ -446,6 +447,18 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     if (mw && !mw.isDestroyed()) {
       // Only send to renderer for custom dialog - no native dialogs
       mw.webContents.send('version:update-available', versionInfo);
+    }
+  });
+
+  // Listen to gitStatusManager events and broadcast to renderer
+  gitStatusManager.on('git-status-updated', (sessionId: string, gitStatus: any) => {
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) {
+      try {
+        mw.webContents.send('git-status-updated', { sessionId, gitStatus });
+      } catch (error) {
+        console.error('[Main] Failed to send git-status-updated event:', error);
+      }
     }
   });
 } 

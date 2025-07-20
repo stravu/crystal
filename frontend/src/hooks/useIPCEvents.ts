@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
-import type { Session, SessionOutput } from '../types/session';
+import type { Session, SessionOutput, GitStatus } from '../types/session';
 
 export function useIPCEvents() {
   const { setSessions, loadSessions, addSession, updateSession, deleteSession } = useSessionStore();
@@ -138,6 +138,13 @@ export function useIPCEvents() {
       }
     });
     unsubscribeFunctions.push(unsubscribeZombieProcesses);
+
+    // Listen for git status updates
+    const unsubscribeGitStatusUpdated = window.electronAPI.events.onGitStatusUpdated((data: { sessionId: string; gitStatus: GitStatus }) => {
+      console.log('[useIPCEvents] Git status updated:', data.sessionId);
+      useSessionStore.getState().updateSessionGitStatus(data.sessionId, data.gitStatus);
+    });
+    unsubscribeFunctions.push(unsubscribeGitStatusUpdated);
 
     // Load initial sessions
     API.sessions.getAll()

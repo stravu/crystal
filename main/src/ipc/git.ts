@@ -4,7 +4,7 @@ import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager } = services;
+  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager } = services;
 
   ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
     try {
@@ -985,6 +985,27 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         console.error('Failed to get git commands:', error);
       }
       return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('sessions:get-git-status', async (_event, sessionId: string) => {
+    try {
+      const session = await sessionManager.getSession(sessionId);
+      if (!session || !session.worktreePath) {
+        return { success: false, error: 'Session or worktree path not found' };
+      }
+
+      if (session.archived) {
+        return { success: false, error: 'Cannot get git status for archived session' };
+      }
+
+      // Use gitStatusManager's getGitStatus method which includes totalCommits
+      const gitStatus = await gitStatusManager.getGitStatus(sessionId);
+
+      return { success: true, gitStatus };
+    } catch (error) {
+      console.error('Error getting git status:', error);
+      return { success: false, error: (error as Error).message };
     }
   });
 } 

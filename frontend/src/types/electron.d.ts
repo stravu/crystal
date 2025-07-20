@@ -43,7 +43,6 @@ interface ElectronAPI {
     continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
     getOutput: (sessionId: string) => Promise<IPCResponse>;
     getConversation: (sessionId: string) => Promise<IPCResponse>;
-    getJsonMessages: (sessionId: string) => Promise<IPCResponse>;
     markViewed: (sessionId: string) => Promise<IPCResponse>;
     stop: (sessionId: string) => Promise<IPCResponse>;
     
@@ -114,11 +113,6 @@ interface ElectronAPI {
     listBranches: (projectId: string) => Promise<IPCResponse>;
   };
 
-  // Dashboard
-  dashboard: {
-    getProjectStatus: (projectId: number) => Promise<IPCResponse>;
-  };
-
   // Git operations
   git: {
     detectBranch: (path: string) => Promise<IPCResponse<string>>;
@@ -145,6 +139,12 @@ interface ElectronAPI {
   prompts: {
     getAll: () => Promise<IPCResponse>;
     getByPromptId: (promptId: string) => Promise<IPCResponse>;
+  };
+
+  // File operations
+  file: {
+    listProject: (projectId: number, path?: string) => Promise<IPCResponse>;
+    readProject: (projectId: number, filePath: string) => Promise<IPCResponse>;
   };
 
   // Dialog
@@ -186,6 +186,7 @@ interface ElectronAPI {
     onSessionsLoaded: (callback: (sessions: any[]) => void) => () => void;
     onSessionOutput: (callback: (output: any) => void) => () => void;
     onSessionOutputAvailable: (callback: (info: any) => void) => () => void;
+    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => () => void;
     
     // Project events
     onProjectUpdated: (callback: (project: any) => void) => () => void;

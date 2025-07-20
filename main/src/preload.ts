@@ -45,7 +45,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     continue: (sessionId: string, prompt?: string, model?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt, model),
     getOutput: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-output', sessionId),
     getConversation: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-conversation', sessionId),
-    getJsonMessages: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-json-messages', sessionId),
     markViewed: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:mark-viewed', sessionId),
     stop: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:stop', sessionId),
     
@@ -114,11 +113,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listBranches: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:list-branches', projectId),
   },
 
-  // Project Dashboard
-  dashboard: {
-    getProjectStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('dashboard:get-project-status', projectId),
-  },
-
   // Git operations
   git: {
     detectBranch: (path: string): Promise<IPCResponse<string>> => ipcRenderer.invoke('projects:detect-branch', path),
@@ -145,6 +139,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   prompts: {
     getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-all'),
     getByPromptId: (promptId: string): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-by-id', promptId),
+  },
+
+  // File operations
+  file: {
+    listProject: (projectId: number, path?: string): Promise<IPCResponse> => ipcRenderer.invoke('file:list-project', { projectId, path }),
+    readProject: (projectId: number, filePath: string): Promise<IPCResponse> => ipcRenderer.invoke('file:read-project', { projectId, filePath }),
   },
 
   // Dialog
@@ -200,6 +200,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const wrappedCallback = (_event: any, sessions: any[]) => callback(sessions);
       ipcRenderer.on('sessions:loaded', wrappedCallback);
       return () => ipcRenderer.removeListener('sessions:loaded', wrappedCallback);
+    },
+    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => {
+      const wrappedCallback = (_event: any, sessionId: string, gitStatus: any) => callback({ sessionId, gitStatus });
+      ipcRenderer.on('git-status-updated', wrappedCallback);
+      return () => ipcRenderer.removeListener('git-status-updated', wrappedCallback);
     },
     onSessionOutput: (callback: (output: any) => void) => {
       const wrappedCallback = (_event: any, output: any) => callback(output);

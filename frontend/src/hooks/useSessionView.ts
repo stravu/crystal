@@ -7,7 +7,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard';
+export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'planning';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -31,7 +31,7 @@ export const useSessionView = (
     changes: false,
     terminal: false,
     editor: false,
-    dashboard: false,
+    planning: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -267,28 +267,6 @@ export const useSessionView = (
     }
   }, [activeSession?.status, isWaitingForFirstOutput]);
 
-  // Load JSON messages for the Messages tab
-  const loadJsonMessages = useCallback(async (sessionId: string) => {
-    try {
-      console.log(`[loadJsonMessages] Loading JSON messages for session: ${sessionId}`);
-      const response = await API.sessions.getJsonMessages(sessionId);
-      
-      if (!response.success) {
-        console.error(`[loadJsonMessages] Failed to load JSON messages:`, response.error);
-        return;
-      }
-      
-      const jsonMessages = response.data || [];
-      console.log(`[loadJsonMessages] Received ${jsonMessages.length} JSON messages for session ${sessionId}`);
-      
-      // Update the session store with JSON messages
-      useSessionStore.getState().setSessionJsonMessages(sessionId, jsonMessages);
-      
-    } catch (error) {
-      console.error(`[loadJsonMessages] Error loading JSON messages for session ${sessionId}:`, error);
-    }
-  }, []);
-
   useEffect(() => {
     if (!activeSessionId) return;
     const unsubscribe = useSessionStore.subscribe((state) => {
@@ -354,7 +332,7 @@ export const useSessionView = (
       changes: false,
       terminal: false,
       editor: false,
-      dashboard: false,
+      planning: false,
     });
     
     // Clear terminal immediately when session changes
@@ -890,6 +868,46 @@ export const useSessionView = (
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Handle switch to View Diff tab event
+  useEffect(() => {
+    const handleSwitchToViewDiff = (event: CustomEvent) => {
+      const { sessionId } = event.detail;
+      if (sessionId && activeSession?.id === sessionId) {
+        console.log('[useSessionView] Switching to View Diff tab for session:', sessionId);
+        setViewMode('changes');
+      }
+    };
+
+    window.addEventListener('switch-to-view-diff', handleSwitchToViewDiff as EventListener);
+    return () => {
+      window.removeEventListener('switch-to-view-diff', handleSwitchToViewDiff as EventListener);
+    };
+  }, [activeSession?.id]);
+
+  // Handle select session and switch to View Diff tab event
+  useEffect(() => {
+    const handleSelectAndViewDiff = async (event: CustomEvent) => {
+      const { sessionId } = event.detail;
+      console.log('[useSessionView] Select session and view diff:', sessionId);
+      
+      // First, select the session if it's not already active
+      if (sessionId && activeSession?.id !== sessionId) {
+        await useSessionStore.getState().setActiveSession(sessionId);
+      }
+      
+      // Then switch to View Diff tab after a short delay to ensure session is loaded
+      setTimeout(() => {
+        setViewMode('changes');
+      }, 100);
+    };
+
+    const wrappedHandler = (event: Event) => handleSelectAndViewDiff(event as CustomEvent);
+    window.addEventListener('select-session-and-view-diff', wrappedHandler);
+    return () => {
+      window.removeEventListener('select-session-and-view-diff', wrappedHandler);
+    };
+  }, [activeSession?.id]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (viewMode === 'output') fitAddon.current?.fit();
@@ -970,16 +988,8 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, dashboard: false });
+    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, planning: false });
   }, [activeSessionId]);
-
-  // Load JSON messages when switching to messages view
-  useEffect(() => {
-    if (!activeSession || viewMode !== 'messages') return;
-    
-    console.log(`[useSessionView] Loading JSON messages for session ${activeSession.id} due to view mode change`);
-    loadJsonMessages(activeSession.id);
-  }, [activeSession?.id, viewMode, loadJsonMessages]);
 
 
   useEffect(() => {
