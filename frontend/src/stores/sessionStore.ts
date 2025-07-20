@@ -25,6 +25,7 @@ interface SessionStore {
   addSessionOutput: (output: SessionOutput) => void;
   setSessionOutput: (sessionId: string, output: string) => void;
   setSessionOutputs: (sessionId: string, outputs: SessionOutput[]) => void;
+  setSessionJsonMessages: (sessionId: string, jsonMessages: any[]) => void;
   clearSessionOutput: (sessionId: string) => void;
   addScriptOutput: (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => void;
   clearScriptOutput: (sessionId: string) => void;
@@ -319,6 +320,32 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === sessionId) {
       console.log(`[SessionStore] Also updating activeMainRepoSession`);
       updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: stdOutputs, jsonMessages };
+    }
+    
+    return {
+      ...state,
+      sessions: updatedSessions,
+      activeMainRepoSession: updatedActiveMainRepoSession
+    };
+  }),
+  
+  setSessionJsonMessages: (sessionId, jsonMessages) => set((state) => {
+    console.log(`[SessionStore] Setting ${jsonMessages.length} JSON messages for session ${sessionId}`);
+    
+    // Update the sessions array
+    const updatedSessions = state.sessions.map(session => {
+      if (session.id === sessionId) {
+        console.log(`[SessionStore] Updating session ${sessionId} with JSON messages`);
+        return { ...session, jsonMessages };
+      }
+      return session;
+    });
+    
+    // Also update activeMainRepoSession if it matches
+    let updatedActiveMainRepoSession = state.activeMainRepoSession;
+    if (state.activeMainRepoSession && state.activeMainRepoSession.id === sessionId) {
+      console.log(`[SessionStore] Also updating activeMainRepoSession with JSON messages`);
+      updatedActiveMainRepoSession = { ...state.activeMainRepoSession, jsonMessages };
     }
     
     return {

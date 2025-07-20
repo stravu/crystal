@@ -317,10 +317,10 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   return (
     <>
       <div
-        className={`w-full text-left ${isNested ? 'px-2 py-1.5' : 'px-3 py-2'} rounded-md flex items-center space-x-2 transition-colors group ${
+        className={`w-full text-left ${isNested ? 'px-2 py-1.5' : 'px-3 py-2'} rounded-md flex items-center space-x-2 transition-all group ${
           isActive 
-            ? 'bg-blue-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
-            : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
+            ? 'bg-blue-100 dark:bg-blue-600/20 text-gray-900 dark:text-white shadow-sm ring-1 ring-blue-200 dark:ring-blue-600/30' 
+            : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:shadow-sm'
         } ${isNested ? 'text-sm' : ''}`}
         onContextMenu={handleContextMenu}
       >
@@ -344,7 +344,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
               autoFocus
             />
           ) : (
-            <span className="flex-1 truncate text-sm text-left">
+            <span className={`flex-1 truncate text-sm text-left ${isActive || session.status === 'completed_unviewed' ? 'font-semibold' : ''} ${session.status === 'completed_unviewed' ? 'text-blue-700 dark:text-blue-300' : ''}`} title={session.name}>
               {session.name}
               {!!session.isMainRepo && (
                 <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">(main)</span>
