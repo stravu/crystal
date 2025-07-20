@@ -666,6 +666,21 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
       console.log('[Database] Added lastUsedModel column to projects table');
     }
+
+    // Add base_commit and base_branch columns to sessions table if they don't exist
+    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_commit');
+    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_branch');
+    
+    if (!hasBaseCommitColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN base_commit TEXT").run();
+      console.log('[Database] Added base_commit column to sessions table');
+    }
+    
+    if (!hasBaseBranchColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN base_branch TEXT").run();
+      console.log('[Database] Added base_branch column to sessions table');
+    }
   }
 
   // Project operations
@@ -1055,9 +1070,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     this.db.prepare(`
-      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514');
+      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514', data.base_commit || null, data.base_branch || null);
     
     const session = this.getSession(data.id);
     if (!session) {

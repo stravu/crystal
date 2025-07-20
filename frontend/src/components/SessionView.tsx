@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, memo, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useNavigationStore } from '../stores/navigationStore';
 import { JsonMessageView } from './JsonMessageView';
 import { EmptyState } from './EmptyState';
 import CombinedDiffView from './CombinedDiffView';
@@ -14,11 +15,13 @@ import { CommitMessageDialog } from './session/CommitMessageDialog';
 import { PromptNavigation } from './PromptNavigation';
 import { isDocumentVisible } from '../utils/performanceUtils';
 import { FileEditor } from './FileEditor';
+import { ProjectDashboard } from './ProjectDashboard';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const sessions = useSessionStore((state) => state.sessions);
   const activeMainRepoSession = useSessionStore((state) => state.activeMainRepoSession);
+  const { activeView, activeProjectId } = useNavigationStore();
   const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
 
   useEffect(() => {
@@ -44,6 +47,18 @@ export const SessionView = memo(() => {
   // Memoize props to prevent unnecessary re-renders
   const emptySelectedExecutions = useMemo(() => [], []);
   const isMainRepo = useMemo(() => activeSession?.isMainRepo || false, [activeSession?.isMainRepo]);
+
+  // Show project dashboard if navigation is set to dashboard
+  if (activeView === 'dashboard' && activeProjectId) {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 p-6">
+        <ProjectDashboard 
+          projectId={activeProjectId} 
+          projectName="" // Will be fetched by ProjectDashboard
+        />
+      </div>
+    );
+  }
 
   if (!activeSession) {
     return (
@@ -196,6 +211,14 @@ export const SessionView = memo(() => {
           </div>
           <div className={`h-full ${hook.viewMode === 'editor' ? 'block' : 'hidden'}`}>
             <FileEditor sessionId={activeSession.id} />
+          </div>
+          <div className={`h-full ${hook.viewMode === 'dashboard' ? 'flex flex-col p-6' : 'hidden'}`}>
+            {activeSession.projectId && (
+              <ProjectDashboard 
+                projectId={activeSession.projectId} 
+                projectName={activeSession.name.split(' - ')[0] || 'Project'} 
+              />
+            )}
           </div>
         </div>
         {hook.viewMode === 'output' && (

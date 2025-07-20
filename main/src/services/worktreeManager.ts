@@ -52,7 +52,7 @@ export class WorktreeManager {
     }
   }
 
-  async createWorktree(projectPath: string, name: string, branch?: string, baseBranch?: string, worktreeFolder?: string): Promise<{ worktreePath: string }> {
+  async createWorktree(projectPath: string, name: string, branch?: string, baseBranch?: string, worktreeFolder?: string): Promise<{ worktreePath: string; baseCommit: string; baseBranch: string }> {
     console.log(`[WorktreeManager] Creating worktree: ${name} in project: ${projectPath}`);
     
     const { baseDir } = this.getProjectPaths(projectPath, worktreeFolder);
@@ -120,13 +120,22 @@ export class WorktreeManager {
         // Branch doesn't exist, will create it
       }
 
+      // Capture the base commit before creating worktree
+      let baseCommit: string;
+      let actualBaseBranch: string;
+      
       if (branchExists) {
         // Use existing branch
         console.log(`[WorktreeManager] Adding worktree with existing branch...`);
         await execWithShellPath(`git worktree add "${worktreePath}" ${branchName}`, { cwd: projectPath });
+        
+        // Get the commit this branch is based on
+        baseCommit = (await execWithShellPath(`git rev-parse ${branchName}`, { cwd: projectPath })).stdout.trim();
+        actualBaseBranch = branchName;
       } else {
         // Create new branch from specified base branch (or current HEAD if not specified)
         const baseRef = baseBranch || 'HEAD';
+        actualBaseBranch = baseBranch || 'HEAD';
         console.log(`[WorktreeManager] Creating new branch from ${baseRef} and adding worktree...`);
         
         // Verify that the base branch exists if specified
@@ -139,12 +148,16 @@ export class WorktreeManager {
           }
         }
         
+        // Capture the base commit before creating the worktree
+        baseCommit = (await execWithShellPath(`git rev-parse ${baseRef}`, { cwd: projectPath })).stdout.trim();
+        console.log(`[WorktreeManager] Base commit: ${baseCommit}`);
+        
         await execWithShellPath(`git worktree add -b ${branchName} "${worktreePath}" ${baseRef}`, { cwd: projectPath });
       }
       
       console.log(`[WorktreeManager] Worktree created successfully at: ${worktreePath}`);
       
-      return { worktreePath };
+      return { worktreePath, baseCommit, baseBranch: actualBaseBranch };
     } catch (error) {
       console.error(`[WorktreeManager] Failed to create worktree:`, error);
       throw new Error(`Failed to create worktree: ${error instanceof Error ? error.message : String(error)}`);

@@ -113,6 +113,11 @@ interface ElectronAPI {
     listBranches: (projectId: string) => Promise<IPCResponse>;
   };
 
+  // Dashboard
+  dashboard: {
+    getProjectStatus: (projectId: number) => Promise<IPCResponse>;
+  };
+
   // Git operations
   git: {
     detectBranch: (path: string) => Promise<IPCResponse<string>>;

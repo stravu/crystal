@@ -29,6 +29,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [ultrathink, setUltrathink] = useState(false);
   const [autoCommit, setAutoCommit] = useState(true); // Default to true
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [mainBranch, setMainBranch] = useState<string>('main');
+  const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
   const { showError } = useErrorStore();
   
   // Fetch project details to get last used model
@@ -71,13 +73,37 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       // Fetch branches if projectId is provided
       if (projectId) {
         setIsLoadingBranches(true);
-        API.projects.listBranches(projectId.toString()).then(response => {
-          if (response.success && response.data) {
-            setBranches(response.data);
+        // First get the project to get its path
+        API.projects.getAll().then(projectsResponse => {
+          if (!projectsResponse.success || !projectsResponse.data) {
+            throw new Error('Failed to fetch projects');
+          }
+          const project = projectsResponse.data.find((p: any) => p.id === projectId);
+          if (!project) {
+            throw new Error('Project not found');
+          }
+          
+          return Promise.all([
+            API.projects.listBranches(projectId.toString()),
+            // Get the main branch for this project using its path
+            API.projects.detectBranch(project.path)
+          ]);
+        }).then(([branchesResponse, mainBranchResponse]) => {
+          if (branchesResponse.success && branchesResponse.data) {
+            setBranches(branchesResponse.data);
             // Set the current branch as default if available
-            const currentBranch = response.data.find((b: any) => b.isCurrent);
+            const currentBranch = branchesResponse.data.find((b: any) => b.isCurrent);
             if (currentBranch && !formData.baseBranch) {
               setFormData(prev => ({ ...prev, baseBranch: currentBranch.name }));
+            }
+          }
+          
+          if (mainBranchResponse.success && mainBranchResponse.data) {
+            setMainBranch(mainBranchResponse.data);
+            // Check if the current base branch is the main branch
+            if (formData.baseBranch === mainBranchResponse.data || 
+                (!formData.baseBranch && branchesResponse.data?.find((b: any) => b.isCurrent)?.name === mainBranchResponse.data)) {
+              setShowMainBranchWarning(true);
             }
           }
         }).catch((err: any) => {
@@ -457,7 +483,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     <select
                       id="baseBranch"
                       value={formData.baseBranch || ''}
-                      onChange={(e) => setFormData({ ...formData, baseBranch: e.target.value })}
+                      onChange={(e) => {
+                        const selectedBranch = e.target.value;
+                        setFormData({ ...formData, baseBranch: selectedBranch });
+                        // Check if the selected branch is the main branch
+                        setShowMainBranchWarning(selectedBranch === mainBranch);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
                       disabled={isLoadingBranches}
                     >
@@ -484,6 +515,25 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Create the new session branch from this existing branch
                     </p>
+                    
+                    {/* Main Branch Warning */}
+                    {showMainBranchWarning && (
+                      <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md">
+                        <div className="flex items-start gap-2">
+                          <span className="text-amber-600 dark:text-amber-400 text-sm">⚠️</span>
+                          <div className="flex-1">
+                            <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                              Creating from {mainBranch} branch
+                            </p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                              You're creating a session from the {mainBranch} branch. For better workflow management, 
+                              consider creating from a feature branch instead. This helps keep your main branch 
+                              clean and allows you to manage multiple approaches in parallel.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 

@@ -283,6 +283,14 @@ export class API {
     },
   };
 
+  // Dashboard
+  static dashboard = {
+    async getProjectStatus(projectId: number) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.dashboard.getProjectStatus(projectId);
+    },
+  };
+
   // Folders
   static folders = {
     async getByProject(projectId: number) {

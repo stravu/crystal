@@ -113,7 +113,9 @@ export class SessionManager extends EventEmitter {
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
       model: dbSession.model,
-      archived: dbSession.archived || false
+      archived: dbSession.archived || false,
+      baseCommit: dbSession.base_commit,
+      baseBranch: dbSession.base_branch
     };
   }
 
@@ -163,11 +165,11 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
-    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model);
+  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string): Session {
+    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model, baseCommit, baseBranch);
   }
 
-  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
+  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
     let targetProject;
@@ -198,7 +200,9 @@ export class SessionManager extends EventEmitter {
       permission_mode: permissionMode,
       is_main_repo: isMainRepo,
       auto_commit: autoCommit,
-      model: model
+      model: model,
+      base_commit: baseCommit,
+      base_branch: baseBranch
     };
     console.log(`[SessionManager] Session data:`, sessionData);
 

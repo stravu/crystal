@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
+import { useNavigationStore } from '../stores/navigationStore';
 import { SessionListItem } from './SessionListItem';
 import { CreateSessionDialog } from './CreateSessionDialog';
-import { MainBranchWarningDialog } from './MainBranchWarningDialog';
 import ProjectSettings from './ProjectSettings';
 import { EmptyState } from './EmptyState';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -46,9 +46,6 @@ export function DraggableProjectTreeView() {
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
-  const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
-  const [pendingMainBranchProject, setPendingMainBranchProject] = useState<Project | null>(null);
-  const [detectedMainBranch, setDetectedMainBranch] = useState<string>('main');
   const [detectedBranchForNewProject, setDetectedBranchForNewProject] = useState<string | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
@@ -606,58 +603,11 @@ export function DraggableProjectTreeView() {
   };
 
   const handleProjectClick = async (project: Project) => {
-    // Check if we should show the warning
-    const warningKey = `mainBranchWarning_${project.id}`;
-    const hasShownWarning = localStorage.getItem(warningKey);
-    
-    if (!hasShownWarning) {
-      // Fetch the current branch before showing warning
-      try {
-        const response = await window.electronAPI.git.detectBranch(project.path);
-        if (response.success && response.data) {
-          setDetectedMainBranch(response.data);
-        } else {
-          setDetectedMainBranch('main');
-        }
-      } catch (error) {
-        console.error('Failed to detect branch:', error);
-        setDetectedMainBranch('main');
-      }
-      
-      // Show warning dialog
-      setPendingMainBranchProject(project);
-      setShowMainBranchWarning(true);
-    } else {
-      // Proceed directly
-      await openMainRepoSession(project);
-    }
+    // Navigate to the project dashboard
+    const { navigateToProjectDashboard } = useNavigationStore.getState();
+    navigateToProjectDashboard(project.id);
   };
   
-  const openMainRepoSession = async (project: Project) => {
-    try {
-      // Get or create the main repo session
-      const response = await API.sessions.getOrCreateMainRepoSession(project.id);
-      
-      if (response.success && response.data) {
-        // Navigate to the main repo session
-        const session = response.data;
-        useSessionStore.getState().setActiveSession(session.id);
-        
-        // Don't expand the project - main repo sessions are accessed via folder click only
-      } else {
-        showError({
-          title: 'Failed to open main repository session',
-          error: response.error || 'Unknown error occurred'
-        });
-      }
-    } catch (error: any) {
-      console.error('Error handling project click:', error);
-      showError({
-        title: 'Failed to open main repository session',
-        error: error.message || 'Unknown error occurred'
-      });
-    }
-  };
 
   const handleCreateSession = (project: Project) => {
     // Just show the dialog for any project
@@ -1565,7 +1515,10 @@ export function DraggableProjectTreeView() {
                             <div
                               key={session.id}
                               className="cursor-pointer"
-                              onClick={() => useSessionStore.getState().setActiveSession(session.id)}
+                              onClick={() => {
+                                useSessionStore.getState().setActiveSession(session.id);
+                                useNavigationStore.getState().navigateToSessions();
+                              }}
                             >
                               <SessionListItem 
                                 session={session}
@@ -1741,26 +1694,6 @@ export function DraggableProjectTreeView() {
         </div>
       )}
       
-      {/* Main Branch Warning Dialog */}
-      {pendingMainBranchProject && (
-        <MainBranchWarningDialog
-          isOpen={showMainBranchWarning}
-          onClose={() => {
-            setShowMainBranchWarning(false);
-            setPendingMainBranchProject(null);
-          }}
-          onContinue={() => {
-            setShowMainBranchWarning(false);
-            if (pendingMainBranchProject) {
-              openMainRepoSession(pendingMainBranchProject);
-            }
-            setPendingMainBranchProject(null);
-          }}
-          projectName={pendingMainBranchProject.name}
-          projectId={pendingMainBranchProject.id}
-          mainBranch={detectedMainBranch}
-        />
-      )}
       
       {/* Create Folder Dialog */}
       {showCreateFolderDialog && selectedProjectForFolder && (

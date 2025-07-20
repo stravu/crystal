@@ -58,6 +58,8 @@ export interface Session {
   is_favorite?: boolean;
   auto_commit?: boolean;
   model?: string;
+  base_commit?: string;
+  base_branch?: string;
 }
 
 export interface SessionOutput {
@@ -89,6 +91,8 @@ export interface CreateSessionData {
   display_order?: number;
   auto_commit?: boolean;
   model?: string;
+  base_commit?: string;
+  base_branch?: string;
 }
 
 export interface UpdateSessionData {

@@ -22,6 +22,8 @@ export interface Session {
   autoCommit?: boolean;
   model?: string;
   archived?: boolean;
+  baseCommit?: string;
+  baseBranch?: string;
 }
 
 export interface CreateSessionRequest {
