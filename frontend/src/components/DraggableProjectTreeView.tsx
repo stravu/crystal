@@ -1160,7 +1160,7 @@ export function DraggableProjectTreeView() {
     const folderUnviewedCount = folderSessions.filter(s => s.status === 'completed_unviewed').length;
     
     return (
-      <div key={folder.id} className="relative" style={{ marginLeft: `${level * 16}px` }}>        
+      <div key={folder.id} className="relative" style={{ marginLeft: `${Math.min(level, 1) * 8}px` }}>        
         {/* Tree lines for this folder */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Vertical lines for parent levels */}
@@ -1169,24 +1169,17 @@ export function DraggableProjectTreeView() {
               <div
                 key={parentLevel}
                 className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                style={{ left: `${parentLevel * 16 + 10}px` }}
+                style={{ left: `${Math.min(parentLevel, 1) * 8 + 4}px` }}
               />
             )
           ))}
           
-          {/* Horizontal connector line for this level */}
-          {level > 0 && (
-            <div
-              className="absolute top-3 w-3 h-px bg-black/[0.06] dark:bg-white/[0.06]"
-              style={{ left: `${(level - 1) * 16 + 10}px` }}
-            />
-          )}
           
           {/* Vertical line for this level (if not last and has children when expanded) */}
           {level > 0 && !isLastInLevel && (
             <div
               className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-              style={{ left: `${(level - 1) * 16 + 10}px` }}
+              style={{ left: `${Math.min(level - 1, 1) * 8 + 4}px` }}
             />
           )}
           
@@ -1195,7 +1188,7 @@ export function DraggableProjectTreeView() {
             <div
               className="absolute w-px bg-black/[0.06] dark:bg-white/[0.06]"
               style={{ 
-                left: `${level * 16 + 10}px`,
+                left: `${Math.min(level, 1) * 8 + 4}px`,
                 top: '24px',
                 bottom: '0px'
               }}
@@ -1206,7 +1199,7 @@ export function DraggableProjectTreeView() {
           className={`relative group/folder flex items-center space-x-1 py-1 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
             isDraggingOverFolder ? 'bg-blue-100 dark:bg-blue-900' : ''
           }`}
-          style={{ marginLeft: `${20}px`, paddingLeft: '8px', paddingRight: '8px' }}
+          style={{ marginLeft: `${0}px`, paddingLeft: '8px', paddingRight: '8px' }}
           draggable
           onDragStart={(e) => handleFolderDragStart(e, folder, project.id)}
           onDragOver={(e) => handleFolderDragOver(e, folder, project.id)}
@@ -1344,23 +1337,18 @@ export function DraggableProjectTreeView() {
                           <div
                             key={parentLevel}
                             className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                            style={{ left: `${parentLevel * 16 + 10}px` }}
+                            style={{ left: `${Math.min(parentLevel, 1) * 8 + 4}px` }}
                           />
                         )
                       ))}
                       
-                      {/* Horizontal connector line for this session */}
-                      <div
-                        className="absolute top-3 w-3 h-px bg-black/[0.06] dark:bg-white/[0.06]"
-                        style={{ left: `${level * 16 + 10}px` }}
-                      />
                     </div>
                     
                     <div
                       className={`relative group flex items-center ${
                         isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
                       }`}
-                      style={{ marginLeft: '20px', paddingLeft: '8px' }}
+                      style={{ marginLeft: '0px', paddingLeft: '8px' }}
                       draggable
                       onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
                       onDragEnd={handleDragEnd}
@@ -1527,18 +1515,13 @@ export function DraggableProjectTreeView() {
                                 />
                               )}
                               
-                              {/* Horizontal connector line */}
-                              <div
-                                className="absolute top-3 w-3 h-px bg-black/[0.06] dark:bg-white/[0.06]"
-                                style={{ left: '10px' }}
-                              />
                             </div>
                             
                             <div
                               className={`relative group flex items-center ${
                                 isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
                               }`}
-                              style={{ marginLeft: '20px', paddingLeft: '8px' }}
+                              style={{ marginLeft: '0px', paddingLeft: '8px' }}
                               draggable
                               onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
                               onDragEnd={handleDragEnd}
@@ -1570,11 +1553,10 @@ export function DraggableProjectTreeView() {
                         setShowCreateFolderDialog(true);
                         setNewFolderName('');
                       }}
-                      className="w-full px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded border border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600 transition-all flex items-center justify-center space-x-1"
+                      className="w-full px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center space-x-1"
                     >
-                      <FolderIcon className="w-3 h-3" />
-                      <Plus className="w-2.5 h-2.5 -ml-1" />
-                      <span>Add Folder to {project.name}</span>
+                      <Plus className="w-3 h-3" />
+                      <span>Add Folder</span>
                     </button>
                   </div>
                 </div>

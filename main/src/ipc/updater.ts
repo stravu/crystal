@@ -21,6 +21,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
     try {
       let buildDate: string | undefined;
       let gitCommit: string | undefined;
+      let buildTimestamp: number | undefined;
       
       // Try to read build info if in packaged app
       if (app.isPackaged) {
@@ -29,34 +30,37 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
           if (fs.existsSync(buildInfoPath)) {
             const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
             buildDate = buildInfo.buildDate;
+            gitCommit = buildInfo.gitCommit;
+            buildTimestamp = buildInfo.buildTimestamp;
           }
         } catch (err) {
           console.log('Could not read build info:', err);
         }
       }
 
-      // Try to get git commit hash
-      try {
-        const gitHash = commandExecutor.execSync('git rev-parse --short HEAD', { 
-          encoding: 'utf8',
-          cwd: app.isPackaged ? process.resourcesPath : process.cwd()
-        }).trim();
-        
-        // Check if the working directory is clean (no uncommitted changes)
+      // For development builds, try to get git commit hash dynamically
+      if (!app.isPackaged) {
         try {
-          commandExecutor.execSync('git diff-index --quiet HEAD --', { 
+          const gitHash = commandExecutor.execSync('git rev-parse --short HEAD', { 
             encoding: 'utf8',
-            cwd: app.isPackaged ? process.resourcesPath : process.cwd()
-          });
-          gitCommit = gitHash;
-        } catch {
-          // Working directory has uncommitted changes
-          gitCommit = `${gitHash} (modified)`;
+            cwd: process.cwd()
+          }).trim();
+          
+          // Check if the working directory is clean (no uncommitted changes)
+          try {
+            commandExecutor.execSync('git diff-index --quiet HEAD --', { 
+              encoding: 'utf8',
+              cwd: process.cwd()
+            });
+            gitCommit = gitHash;
+          } catch {
+            // Working directory has uncommitted changes
+            gitCommit = `${gitHash} (modified)`;
+          }
+        } catch (err) {
+          console.log('Could not get git commit:', err);
+          gitCommit = 'unknown';
         }
-      } catch (err) {
-        console.log('Could not get git commit:', err);
-        // In packaged app, git info might not be available
-        gitCommit = app.isPackaged ? undefined : 'unknown';
       }
 
       return {
@@ -66,7 +70,8 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
           name: app.getName(),
           workingDirectory: process.cwd(),
           buildDate,
-          gitCommit
+          gitCommit,
+          buildTimestamp
         }
       };
     } catch (error) {

@@ -12,6 +12,8 @@ This file includes only packages with licenses that require attribution. Public 
 The following packages are licensed under the MIT license:
 
   - @alloc/quick-lru (5.2.0) - Sindre Sorhus
+  - @antfu/install-pkg (1.1.0) - Anthony Fu <anthonyfu117@hotmail.com>
+  - @antfu/utils (8.1.1) - Anthony Fu <anthonyfu117@hotmail.com>
   - @anthropic-ai/sdk (0.53.0) - Anthropic <support@anthropic.com>
   - @babel/code-frame (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/compat-data (7.27.5) - The Babel Team (https://babel.dev/team)
@@ -29,6 +31,7 @@ The following packages are licensed under the MIT license:
   - @babel/template (7.27.2) - The Babel Team (https://babel.dev/team)
   - @babel/traverse (7.27.4) - The Babel Team (https://babel.dev/team)
   - @babel/types (7.27.6) - The Babel Team (https://babel.dev/team)
+  - @braintree/sanitize-url (7.1.1)
   - @develar/schema-utils (2.6.5) - webpack Contrib (https://github.com/webpack-contrib)
   - @electron/asar (3.4.1)
   - @electron/get (2.0.3) - Samuel Attard
@@ -52,6 +55,8 @@ The following packages are licensed under the MIT license:
   - @floating-ui/utils (0.2.9) - atomiks
   - @gar/promisify (1.1.3) - Gar <gar+npm@danger.computer>
   - @homebridge/node-pty-prebuilt-multiarch (0.12.0) - Microsoft Corporation
+  - @iconify/types (2.0.0) - Vjacheslav Trushkin
+  - @iconify/utils (2.3.0) - Vjacheslav Trushkin
   - @ioredis/commands (1.2.0) - Zihua Li <i@zihua.li> (http://zihua.li)
   - @jridgewell/gen-mapping (0.3.8) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/resolve-uri (3.1.2) - Justin Ridgewell <justin@ridgewell.name>
@@ -59,6 +64,7 @@ The following packages are licensed under the MIT license:
   - @jridgewell/sourcemap-codec (1.5.0) - Rich Harris
   - @jridgewell/trace-mapping (0.3.25) - Justin Ridgewell <justin@ridgewell.name>
   - @malept/flatpak-bundler (0.4.0) - Matt Watson <mattdangerw@gmail.com>
+  - @mermaid-js/parser (0.6.1) - Yokozuna59
   - @modelcontextprotocol/sdk (1.12.1) - Anthropic, PBC (https://anthropic.com)
   - @monaco-editor/loader (1.5.0) - Suren Atoyan <contact@surenatoyan.com>
   - @msgpackr-extract/msgpackr-extract-darwin-arm64 (3.0.3) - Kris Zyp
@@ -78,7 +84,6 @@ The following packages are licensed under the MIT license:
   - @xmldom/xmldom (0.8.10)
   - @xterm/xterm (5.5.0)
   - 7zip-bin (5.2.0)
-  - accepts (1.3.8)
   - accepts (2.0.0)
   - acorn (8.14.1)
   - acorn-jsx (5.3.2)
@@ -102,7 +107,6 @@ The following packages are licensed under the MIT license:
   - archiver-utils (3.0.4) - Chris Talkington
   - arg (5.0.2) - Josh Junon <junon@wavetilt.com>
   - aria-hidden (1.2.6) - Anton Korzunov <thekashey@gmail.com>
-  - array-flatten (1.1.1) - Blake Embrey
   - assert-plus (1.0.0) - Mark Cavage <mcavage@gmail.com>
   - astral-regex (2.0.0) - Kevin Mårtensson
   - async (3.2.6) - Caolan McMahon
@@ -110,6 +114,7 @@ The following packages are licensed under the MIT license:
   - asynckit (0.4.0) - Alex Indigo <iam@alexindigo.com>
   - axios (1.9.0) - Matt Zabriskie
   - babel-plugin-macros (3.1.0) - Kent C. Dodds <me@kentcdodds.com> (https://kentcdodds.com)
+  - bail (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - balanced-match (1.0.2) - Julian Gruber
   - base64-js (1.5.1) - T. Jameson Little <t.jameson.little@gmail.com>
   - better-sqlite3 (11.10.0) - Joshua Wise <joshuathomaswise@gmail.com>
@@ -118,7 +123,6 @@ The following packages are licensed under the MIT license:
   - bl (4.1.0)
   - bluebird (3.7.2) - Petka Antonov
   - bluebird-lst (1.0.9) - Vladimir Krivosheev
-  - body-parser (1.20.3)
   - body-parser (2.2.0)
   - boolean (3.2.0)
   - brace-expansion (1.1.11) - Julian Gruber
@@ -139,7 +143,13 @@ The following packages are licensed under the MIT license:
   - call-bound (1.0.4) - Jordan Harband <ljharb@gmail.com>
   - callsites (3.1.0) - Sindre Sorhus
   - camelcase-css (2.0.1) - Steven Vachon <contact@svachon.com> (https://www.svachon.com/)
+  - ccount (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - chalk (4.1.2)
+  - character-entities (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - character-entities-html4 (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - character-entities-legacy (3.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - character-reference-invalid (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - chevrotain-allstar (0.3.1) - TypeFox
   - chokidar (3.6.0) - Paul Miller (https://paulmillr.com)
   - chromium-pickle-js (0.2.0)
   - ci-info (3.9.0) - Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)
@@ -154,25 +164,29 @@ The following packages are licensed under the MIT license:
   - color-convert (2.0.1) - Heather Arthur <fayearthur@gmail.com>
   - color-name (1.1.4) - DY <dfcreative@gmail.com>
   - combined-stream (1.0.8) - Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)
+  - comma-separated-tokens (2.0.3) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - commander (4.1.1) - TJ Holowaychuk <tj@vision-media.ca>
   - commander (5.1.0) - TJ Holowaychuk <tj@vision-media.ca>
+  - commander (7.2.0) - TJ Holowaychuk <tj@vision-media.ca>
+  - commander (8.3.0) - TJ Holowaychuk <tj@vision-media.ca>
   - compare-version (0.1.2) - Kevin Mårtensson
   - compress-commons (4.1.2) - Chris Talkington
   - concat-map (0.0.1) - James Halliday
   - conf (13.1.0) - Sindre Sorhus
+  - confbox (0.1.8)
+  - confbox (0.2.2)
   - config-file-ts (0.2.8-rc1) - lee mighdoll
-  - content-disposition (0.5.4) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - content-disposition (1.0.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - content-type (1.0.5) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - convert-source-map (1.9.0) - Thorsten Lorenz
   - convert-source-map (2.0.0) - Thorsten Lorenz
-  - cookie (0.7.1) - Roman Shtylman <shtylman@gmail.com>
   - cookie (0.7.2) - Roman Shtylman <shtylman@gmail.com>
-  - cookie-signature (1.0.6) - TJ Holowaychuk <tj@learnboost.com>
   - cookie-signature (1.2.2) - TJ Holowaychuk <tj@learnboost.com>
   - core-util-is (1.0.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - core-util-is (1.0.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - cors (2.8.5) - Troy Goode <troygoode@gmail.com> (https://github.com/troygoode/)
+  - cose-base (1.0.3)
+  - cose-base (2.2.0)
   - cosmiconfig (7.1.0) - David Clark <david.dave.clark@gmail.com>
   - crc (3.8.0) - Alex Gorbatchev
   - crc32-stream (4.0.3) - Chris Talkington
@@ -180,10 +194,15 @@ The following packages are licensed under the MIT license:
   - cross-spawn (7.0.6) - André Cruz <andre@moxy.studio>
   - cssesc (3.0.0) - Mathias Bynens
   - csstype (3.1.3) - Fredrik Nicol <fredrik.nicol@gmail.com>
+  - cytoscape (3.32.1)
+  - cytoscape-cose-bilkent (4.1.0)
+  - cytoscape-fcose (2.2.0) - iVis-at-Bilkent
+  - dagre-d3-es (7.0.11)
   - date-fns (4.1.0)
+  - dayjs (1.11.13) - iamkun
   - debounce-fn (6.0.0) - Sindre Sorhus
-  - debug (2.6.9) - TJ Holowaychuk <tj@vision-media.ca>
   - debug (4.4.1) - Josh Junon (https://github.com/qix-)
+  - decode-named-character-reference (1.2.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - decompress-response (6.0.0) - Sindre Sorhus
   - deep-extend (0.6.0) - Viacheslav Lotsmanov <lotsmanov89@gmail.com>
   - deep-is (0.1.4) - Thorsten Lorenz
@@ -194,9 +213,10 @@ The following packages are licensed under the MIT license:
   - delayed-stream (1.0.0) - Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)
   - delegates (1.0.0)
   - depd (2.0.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
-  - destroy (1.2.0) - Jonathan Ong
+  - dequal (2.0.3) - Luke Edwards
   - detect-node (2.1.0) - Ilya Kantor
   - detect-node-es (1.1.0) - Ilya Kantor
+  - devlop (1.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - dir-compare (4.2.0) - Liviu Grigorescu
   - dlv (1.1.3) - Jason Miller <jason@developit.ca> (http://jasonformat.com)
   - dmg-builder (25.1.8) - Vladimir Krivosheev
@@ -211,7 +231,6 @@ The following packages are licensed under the MIT license:
   - electron-updater (6.6.2) - Vladimir Krivosheev
   - emoji-regex (8.0.0) - Mathias Bynens
   - emoji-regex (9.2.2) - Mathias Bynens
-  - encodeurl (1.0.2)
   - encodeurl (2.0.0)
   - encoding (0.1.13) - Andris Reinman
   - end-of-stream (1.4.4) - Mathias Buus <mathiasbuus@gmail.com>
@@ -228,12 +247,15 @@ The following packages are licensed under the MIT license:
   - escalade (3.2.0) - Luke Edwards
   - escape-html (1.0.3)
   - escape-string-regexp (4.0.0) - Sindre Sorhus
+  - escape-string-regexp (5.0.0) - Sindre Sorhus
+  - estree-util-is-identifier-name (3.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - etag (1.8.1)
   - eventsource (3.0.7) - Espen Hovlandsdal <espen@hovlandsdal.com>
   - eventsource-parser (3.0.2) - Espen Hovlandsdal <espen@hovlandsdal.com>
-  - express (4.21.2) - TJ Holowaychuk <tj@vision-media.ca>
   - express (5.1.0) - TJ Holowaychuk <tj@vision-media.ca>
   - express-rate-limit (7.5.0) - Nathan Friedly
+  - exsolve (1.0.7)
+  - extend (3.0.2) - Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)
   - extsprintf (1.4.1)
   - fast-deep-equal (3.1.3) - Evgeny Poberezkin
   - fast-glob (3.3.3) - Denis Malinochkin
@@ -244,7 +266,6 @@ The following packages are licensed under the MIT license:
   - file-entry-cache (8.0.0) - Jared Wray
   - file-uri-to-path (1.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - fill-range (7.1.1) - Jon Schlinkert (https://github.com/jonschlinkert)
-  - finalhandler (1.3.1) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - finalhandler (2.1.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - find-root (1.1.0) - jsdnxx
   - find-up (5.0.0) - Sindre Sorhus
@@ -253,7 +274,6 @@ The following packages are licensed under the MIT license:
   - form-data (4.0.3) - Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)
   - forwarded (0.2.0)
   - fraction.js (4.3.7) - Robert Eisele
-  - fresh (0.5.2) - TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)
   - fresh (2.0.0) - TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)
   - fs-constants (1.0.0) - Mathias Buus (@mafintosh)
   - fs-extra (10.1.0) - JP Richardson <jprichardson@gmail.com>
@@ -274,11 +294,15 @@ The following packages are licensed under the MIT license:
   - gopd (1.2.0) - Jordan Harband <ljharb@gmail.com>
   - got (11.8.6)
   - graphemer (1.4.0) - Matt Davies <matt@filament.so> (https://github.com/mattpauldavies)
+  - hachure-fill (0.5.2) - Preet Shihn
   - has-flag (4.0.0) - Sindre Sorhus
   - has-property-descriptors (1.0.2) - Jordan Harband <ljharb@gmail.com>
   - has-symbols (1.1.0) - Jordan Harband
   - has-tostringtag (1.0.2) - Jordan Harband
   - hasown (2.0.2) - Jordan Harband <ljharb@gmail.com>
+  - hast-util-to-jsx-runtime (2.3.6) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - hast-util-whitespace (3.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - html-url-attributes (3.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - http-errors (2.0.0) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - http-proxy-agent (5.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - http-proxy-agent (7.0.2) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
@@ -287,26 +311,31 @@ The following packages are licensed under the MIT license:
   - https-proxy-agent (7.0.6) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - humanize-ms (1.2.1) - dead-horse
   - iconv-corefoundation (1.1.7) - argv-minus-one
-  - iconv-lite (0.4.24) - Alexander Shtuchkin <ashtuchkin@gmail.com>
   - iconv-lite (0.6.3) - Alexander Shtuchkin <ashtuchkin@gmail.com>
   - ignore (5.3.2) - kael
   - ignore (7.0.5) - kael
   - import-fresh (3.3.1) - Sindre Sorhus
   - imurmurhash (0.1.4) - Jens Taylor
   - indent-string (4.0.0) - Sindre Sorhus
+  - inline-style-parser (0.2.4)
   - ioredis (5.6.1) - Zihua Li <i@zihua.li> (http://zihua.li)
   - ip-address (9.0.5) - Beau Gunderson <beau@beaugunderson.com> (https://beaugunderson.com/)
   - ipaddr.js (1.9.1) - whitequark <whitequark@whitequark.org>
+  - is-alphabetical (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - is-alphanumerical (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - is-arrayish (0.2.1) - Qix (http://github.com/qix-)
   - is-binary-path (2.1.0) - Sindre Sorhus
   - is-ci (3.0.1) - Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)
   - is-core-module (2.16.1) - Jordan Harband <ljharb@gmail.com>
+  - is-decimal (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - is-extglob (2.1.1) - Jon Schlinkert (https://github.com/jonschlinkert)
   - is-fullwidth-code-point (3.0.0) - Sindre Sorhus
   - is-glob (4.0.3) - Jon Schlinkert (https://github.com/jonschlinkert)
+  - is-hexadecimal (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - is-interactive (1.0.0) - Sindre Sorhus
   - is-lambda (1.0.1) - Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)
   - is-number (7.0.0) - Jon Schlinkert (https://github.com/jonschlinkert)
+  - is-plain-obj (4.1.0) - Sindre Sorhus
   - is-promise (4.0.0) - ForbesLindesay
   - is-unicode-supported (0.1.0) - Sindre Sorhus
   - isarray (1.0.0) - Julian Gruber
@@ -325,14 +354,21 @@ The following packages are licensed under the MIT license:
   - json5 (2.2.3) - Aseem Kishore <aseem.kishore@gmail.com>
   - jsonfile (4.0.0) - JP Richardson <jprichardson@gmail.com>
   - jsonfile (6.1.0) - JP Richardson <jprichardson@gmail.com>
+  - katex (0.16.22)
   - keyv (4.5.4) - Jared Wray <me@jaredwray.com> (http://jaredwray.com)
+  - kolorist (1.8.0) - Marvin Hagemeister <hello@marvinh.dev>
+  - langium (3.3.1) - TypeFox
+  - layout-base (1.0.2)
+  - layout-base (2.0.1)
   - lazy-val (1.0.5) - Vladimir Krivosheev
   - lazystream (1.0.1) - Jonas Pommerening
   - levn (0.4.1) - George Zahariev <z@georgezahariev.com>
   - lilconfig (3.1.3) - antonk52
   - lines-and-columns (1.2.4) - Brian Donovan <brian@donovans.cc>
+  - local-pkg (1.1.1) - Anthony Fu <anthonyfu117@hotmail.com>
   - locate-path (6.0.0) - Sindre Sorhus
   - lodash (4.17.21) - John-David Dalton <john.david.dalton@gmail.com>
+  - lodash-es (4.17.21) - John-David Dalton <john.david.dalton@gmail.com>
   - lodash.defaults (4.2.0) - John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)
   - lodash.difference (4.5.0) - John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)
   - lodash.escaperegexp (4.1.2) - John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)
@@ -343,21 +379,64 @@ The following packages are licensed under the MIT license:
   - lodash.merge (4.6.2) - John-David Dalton <john.david.dalton@gmail.com>
   - lodash.union (4.6.0) - John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)
   - log-symbols (4.1.0) - Sindre Sorhus
+  - longest-streak (3.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - loose-envify (1.4.0) - Andres Suarez <zertosh@gmail.com>
   - lowercase-keys (2.0.0) - Sindre Sorhus
   - luxon (3.6.1) - Isaac Cambron
   - lzma-native (8.0.6) - Anna Henningsen
+  - markdown-table (3.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - marked (15.0.12) - Christopher Jeffrey
   - matcher (3.0.0) - Sindre Sorhus
   - math-intrinsics (1.1.0) - Jordan Harband <ljharb@gmail.com>
-  - media-typer (0.3.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
+  - mdast-util-find-and-replace (3.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-from-markdown (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-gfm (3.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-gfm-autolink-literal (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-gfm-footnote (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-gfm-strikethrough (2.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-gfm-table (2.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-gfm-task-list-item (2.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-mdx-expression (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-mdx-jsx (3.2.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-mdxjs-esm (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-phrasing (4.1.0) - Victor Felder <victor@draft.li> (https://draft.li)
+  - mdast-util-to-hast (13.2.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-to-markdown (2.1.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - mdast-util-to-string (4.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - media-typer (1.1.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - memoize-one (6.0.0) - Alex Reardon <alexreardon@gmail.com>
-  - merge-descriptors (1.0.3) - Jonathan Ong
   - merge-descriptors (2.0.0)
   - merge2 (1.4.1)
-  - methods (1.1.2)
+  - mermaid (11.8.1) - Knut Sveidqvist
+  - micromark (4.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-core-commonmark (2.0.3) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm (3.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm-autolink-literal (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm-footnote (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm-strikethrough (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm-table (2.1.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm-tagfilter (2.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-extension-gfm-task-list-item (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-factory-destination (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-factory-label (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-factory-space (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-factory-title (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-factory-whitespace (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-character (2.1.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-chunked (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-classify-character (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-combine-extensions (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-decode-numeric-character-reference (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-decode-string (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-encode (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-html-tag-name (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-normalize-identifier (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-resolve-all (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-sanitize-uri (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-subtokenize (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-symbol (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - micromark-util-types (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - micromatch (4.0.8) - Jon Schlinkert (https://github.com/jonschlinkert)
-  - mime (1.6.0) - Robert Kieffer
   - mime (2.6.0) - Robert Kieffer
   - mime-db (1.52.0)
   - mime-db (1.54.0)
@@ -370,8 +449,8 @@ The following packages are licensed under the MIT license:
   - minimist (1.2.8) - James Halliday
   - minipass-fetch (2.1.2) - GitHub Inc.
   - minizlib (2.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - mlly (1.7.4)
   - monaco-editor (0.52.2) - Microsoft Corporation
-  - ms (2.0.0)
   - ms (2.1.3)
   - msgpackr (1.11.4) - Kris Zyp
   - msgpackr-extract (3.0.3) - Kris Zyp
@@ -379,7 +458,6 @@ The following packages are licensed under the MIT license:
   - nanoid (3.3.11) - Andrey Sitnik <andrey@sitnik.ru>
   - napi-build-utils (2.0.0) - Jim Schlight
   - natural-compare (1.4.0) - Lauri Rooden (https://github.com/litejs/natural-compare-lite)
-  - negotiator (0.6.3)
   - negotiator (0.6.4)
   - negotiator (1.0.0)
   - node-abi (3.75.0) - Lukas Geiger
@@ -407,16 +485,19 @@ The following packages are licensed under the MIT license:
   - p-limit (3.1.0) - Sindre Sorhus
   - p-locate (5.0.0) - Sindre Sorhus
   - p-map (4.0.0) - Sindre Sorhus
+  - package-manager-detector (1.3.0) - Anthony Fu <anthonyfu117@hotmail.com>
   - parent-module (1.0.1) - Sindre Sorhus
+  - parse-entities (4.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - parse-json (5.2.0) - Sindre Sorhus
   - parseurl (1.3.3)
+  - path-data-parser (0.1.0) - Preet Shihn
   - path-exists (4.0.0) - Sindre Sorhus
   - path-is-absolute (1.0.1) - Sindre Sorhus
   - path-key (3.1.1) - Sindre Sorhus
   - path-parse (1.0.7) - Javier Blanco <http://jbgutierrez.info>
-  - path-to-regexp (0.1.12)
   - path-to-regexp (8.2.0)
   - path-type (4.0.0) - Sindre Sorhus
+  - pathe (2.0.3)
   - pe-library (0.4.1) - jet
   - pend (1.2.0) - Andrew Kelley <superjoe30@gmail.com>
   - picomatch (2.3.1) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -424,21 +505,26 @@ The following packages are licensed under the MIT license:
   - pify (2.3.0) - Sindre Sorhus
   - pirates (4.0.7) - Ari Porad
   - pkce-challenge (5.0.0) - crouchcd
+  - pkg-types (1.3.1)
+  - pkg-types (2.2.0)
   - plist (3.1.0) - Nathan Rajlich <nathan@tootallnate.net>
+  - points-on-curve (0.2.0) - Preet Shihn
+  - points-on-path (0.2.1) - Preet Shihn
   - prebuild-install (7.1.3) - Mathias Buus (@mafintosh)
   - prelude-ls (1.2.1) - George Zahariev <z@georgezahariev.com>
   - process-nextick-args (2.0.1)
   - progress (2.0.3) - TJ Holowaychuk <tj@vision-media.ca>
   - promise-retry (2.0.1) - IndigoUnited <hello@indigounited.com> (http://indigounited.com)
   - prop-types (15.8.1)
+  - property-information (7.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - proxy-addr (2.0.7) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - proxy-from-env (1.1.0) - Rob Wu <rob@robwu.nl> (https://robwu.nl/)
   - pump (3.0.2) - Mathias Buus Madsen <mathiasbuus@gmail.com>
   - punycode (2.3.1) - Mathias Bynens
+  - quansync (0.2.10) - Anthony Fu <anthonyfu117@hotmail.com>
   - queue-microtask (1.2.3) - Feross Aboukhadijeh
   - quick-lru (5.1.1) - Sindre Sorhus
   - range-parser (1.2.1) - TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)
-  - raw-body (2.5.2) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - raw-body (3.0.0) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - react (19.1.0)
   - react-diff-viewer-continued (3.4.0)
@@ -453,6 +539,10 @@ The following packages are licensed under the MIT license:
   - readdirp (3.6.0) - Thorsten Lorenz <thlorenz@gmx.de> (thlorenz.com)
   - redis-errors (1.2.0) - Ruben Bridgewater
   - redis-parser (3.0.0) - Ruben Bridgewater
+  - remark-gfm (4.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - remark-parse (11.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - remark-rehype (11.1.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - remark-stringify (11.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - require-directory (2.1.1) - Troy Goode <troygoode@gmail.com> (http://github.com/troygoode/)
   - require-from-string (2.0.2) - Vsevolod Strukchinsky
   - resedit (1.7.2) - jet
@@ -464,6 +554,7 @@ The following packages are licensed under the MIT license:
   - retry (0.12.0) - Tim Koschützki <tim@debuggable.com> (http://debuggable.com/)
   - reusify (1.1.0) - Matteo Collina <hello@matteocollina.com>
   - rollup (4.42.0) - Rich Harris
+  - roughjs (4.6.6) - Preet Shihn <preetshihn@gmail.com>
   - router (2.2.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - run-parallel (1.2.0) - Feross Aboukhadijeh
   - safe-buffer (5.1.2) - Feross Aboukhadijeh
@@ -471,10 +562,8 @@ The following packages are licensed under the MIT license:
   - safer-buffer (2.1.2) - Nikita Skovoroda
   - scheduler (0.26.0)
   - semver-compare (1.0.0) - James Halliday
-  - send (0.19.0) - TJ Holowaychuk <tj@vision-media.ca>
   - send (1.2.0) - TJ Holowaychuk <tj@vision-media.ca>
   - serialize-error (7.0.1) - Sindre Sorhus
-  - serve-static (1.16.2) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - serve-static (2.2.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - shebang-command (2.0.0) - Kevin Mårtensson
   - shebang-regex (3.0.0) - Sindre Sorhus
@@ -491,6 +580,7 @@ The following packages are licensed under the MIT license:
   - socks (2.8.4) - Josh Glazebrook
   - socks-proxy-agent (7.0.0) - Nathan Rajlich
   - source-map-support (0.5.21)
+  - space-separated-tokens (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - standard-as-callback (2.1.0) - luin <i@zihua.li>
   - stat-mode (1.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - state-local (1.0.7) - Suren Atoyan <contact@surenatoyan.com>
@@ -500,11 +590,15 @@ The following packages are licensed under the MIT license:
   - string_decoder (1.3.0)
   - string-width (4.2.3) - Sindre Sorhus
   - string-width (5.1.2) - Sindre Sorhus
+  - stringify-entities (4.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - strip-ansi (6.0.1) - Sindre Sorhus
   - strip-ansi (7.1.0) - Sindre Sorhus
   - strip-json-comments (2.0.1) - Sindre Sorhus
   - strip-json-comments (3.1.1) - Sindre Sorhus
+  - style-to-js (1.1.17) - Mark <mark@remarkablemark.org>
+  - style-to-object (1.0.9) - Mark <mark@remarkablemark.org>
   - stylis (4.2.0) - Sultan Tarimo <sultantarimo@me.com>
+  - stylis (4.3.6) - Sultan Tarimo <sultantarimo@me.com>
   - sucrase (3.35.0) - Alan Pierce <alangpierce@gmail.com>
   - supports-color (7.2.0) - Sindre Sorhus
   - supports-color (8.1.1) - Sindre Sorhus
@@ -516,27 +610,45 @@ The following packages are licensed under the MIT license:
   - thenify (3.3.1) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - thenify-all (1.6.0) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - tiny-typed-emitter (2.1.0) - Zurab Benashvili <zura.benashvili@gmail.com>
+  - tinyexec (1.0.1) - James Garbutt (https://github.com/43081j)
   - tinyglobby (0.2.14) - Superchupu
   - tmp (0.2.3) - KARASZI István <github@spam.raszi.hu> (http://raszi.hu/)
   - tmp-promise (3.0.3) - Benjamin Gruenbaum and Collaborators.
   - to-regex-range (5.0.1) - Jon Schlinkert (https://github.com/jonschlinkert)
   - toidentifier (1.0.1) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - tree-kill (1.2.2) - Peteris Krumins
+  - trim-lines (3.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - trough (2.2.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - ts-api-utils (2.1.0) - JoshuaKGoldberg
+  - ts-dedent (2.2.0) - Tamino Martinius <dev@zaku.eu>
   - type-check (0.4.0) - George Zahariev <z@georgezahariev.com>
-  - type-is (1.6.18)
   - type-is (2.0.1)
+  - ufo (1.6.1)
   - uint8array-extras (1.4.0) - Sindre Sorhus
   - undici-types (6.21.0)
+  - unified (11.0.5) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - unist-util-is (6.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - unist-util-position (5.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - unist-util-stringify-position (4.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - unist-util-visit (5.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - unist-util-visit-parents (6.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - universalify (0.1.2) - Ryan Zimmerman <opensrc@ryanzim.com>
   - universalify (2.0.1) - Ryan Zimmerman <opensrc@ryanzim.com>
   - unpipe (1.0.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - update-browserslist-db (1.1.3) - Andrey Sitnik <andrey@sitnik.ru>
   - util-deprecate (1.0.2) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
-  - utils-merge (1.0.1) - Jared Hanson
+  - uuid (11.1.0)
   - uuid (8.3.2)
   - vary (1.1.2) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - verror (1.10.1)
+  - vfile (6.0.3) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - vfile-message (4.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
+  - vscode-jsonrpc (8.2.0) - Microsoft Corporation
+  - vscode-languageserver (9.0.1) - Microsoft Corporation
+  - vscode-languageserver-protocol (3.17.5) - Microsoft Corporation
+  - vscode-languageserver-textdocument (1.0.12) - Microsoft Corporation
+  - vscode-languageserver-types (3.17.5) - Microsoft Corporation
+  - vscode-uri (3.0.8) - Microsoft
   - wcwidth (1.0.1) - Tim Oxley
   - when-exit (2.1.4)
   - word-wrap (1.2.5) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -548,6 +660,7 @@ The following packages are licensed under the MIT license:
   - yocto-queue (0.1.0) - Sindre Sorhus
   - zip-stream (4.1.1) - Chris Talkington
   - zod (3.25.56) - Colin McDonnell <zod@colinhacks.com>
+  - zwitch (2.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
 
 MIT License
 
@@ -567,6 +680,7 @@ The following packages are licensed under the ISC license:
 
   - @isaacs/cliui (8.0.2) - Ben Coe <ben@npmjs.com>
   - @npmcli/fs (2.1.2) - GitHub Inc.
+  - @ungap/structured-clone (1.3.0) - Andrea Giammarchi
   - abbrev (1.1.1) - Isaac Z. Schlueter <i@izs.me>
   - anymatch (3.1.3) - Elan Shanker
   - aproba (2.0.0) - Rebecca Turner <me@re-becca.org>
@@ -578,6 +692,37 @@ The following packages are licensed under the ISC license:
   - cliui (8.0.1) - Ben Coe <ben@npmjs.com>
   - color-support (1.1.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - console-control-strings (1.1.0) - Rebecca Turner <me@re-becca.org> (http://re-becca.org/)
+  - d3 (7.9.0) - Mike Bostock
+  - d3-array (3.2.4) - Mike Bostock
+  - d3-axis (3.0.0) - Mike Bostock
+  - d3-brush (3.0.0) - Mike Bostock
+  - d3-chord (3.0.1) - Mike Bostock
+  - d3-color (3.1.0) - Mike Bostock
+  - d3-contour (4.0.2) - Mike Bostock
+  - d3-delaunay (6.0.4) - Mike Bostock
+  - d3-dispatch (3.0.1) - Mike Bostock
+  - d3-drag (3.0.0) - Mike Bostock
+  - d3-dsv (3.0.1) - Mike Bostock
+  - d3-fetch (3.0.1) - Mike Bostock
+  - d3-force (3.0.0) - Mike Bostock
+  - d3-format (3.1.0) - Mike Bostock
+  - d3-geo (3.1.1) - Mike Bostock
+  - d3-hierarchy (3.1.2) - Mike Bostock
+  - d3-interpolate (3.0.1) - Mike Bostock
+  - d3-path (3.1.0) - Mike Bostock
+  - d3-polygon (3.0.1) - Mike Bostock
+  - d3-quadtree (3.0.1) - Mike Bostock
+  - d3-random (3.0.1) - Mike Bostock
+  - d3-scale (4.0.2) - Mike Bostock
+  - d3-scale-chromatic (3.1.0) - Mike Bostock
+  - d3-selection (3.0.0) - Mike Bostock
+  - d3-shape (3.2.0) - Mike Bostock
+  - d3-time (3.1.0) - Mike Bostock
+  - d3-time-format (4.1.0) - Mike Bostock
+  - d3-timer (3.0.1) - Mike Bostock
+  - d3-transition (3.0.1) - Mike Bostock
+  - d3-zoom (3.0.0) - Mike Bostock
+  - delaunator (5.0.1) - Vladimir Agafonkin
   - electron-to-chromium (1.5.165) - Kilian Valkhof
   - fastq (1.19.1) - Matteo Collina <hello@matteocollina.com>
   - flatted (3.3.3) - Andrea Giammarchi
@@ -599,6 +744,8 @@ The following packages are licensed under the ISC license:
   - inflight (1.0.6) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - inherits (2.0.4)
   - ini (1.3.8) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - internmap (1.0.1) - Mike Bostock
+  - internmap (2.0.3) - Mike Bostock
   - isexe (2.0.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - json-stringify-safe (5.0.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - lru-cache (10.4.3) - Isaac Z. Schlueter <i@izs.me>
@@ -668,6 +815,11 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 The following packages are licensed under the Apache-2.0 license:
 
   - @ampproject/remapping (2.3.0) - Justin Ridgewell <jridgewell@google.com>
+  - @chevrotain/cst-dts-gen (11.0.3)
+  - @chevrotain/gast (11.0.3)
+  - @chevrotain/regexp-to-ast (11.0.3)
+  - @chevrotain/types (11.0.3) - Shahar Soel
+  - @chevrotain/utils (11.0.3) - Shahar Soel
   - @humanfs/core (0.19.1) - Nicholas C. Zakas
   - @humanfs/node (0.16.6) - Nicholas C. Zakas
   - @humanwhocodes/module-importer (1.0.1) - Nicholas C. Zaks
@@ -675,6 +827,7 @@ The following packages are licensed under the Apache-2.0 license:
   - @humanwhocodes/retry (0.4.3) - Nicholas C. Zaks
   - @img/sharp-darwin-arm64 (0.33.5) - Lovell Fuller <npm@lovell.info>
   - @malept/cross-spawn-promise (2.0.0) - Mark Lee
+  - chevrotain (11.0.3) - Shahar Soel
   - class-variance-authority (0.7.1) - Joe Bell (https://joebell.co.uk)
   - cluster-key-slot (1.1.2) - Mike Diarmid
   - crc-32 (1.2.2) - sheetjs
@@ -983,6 +1136,182 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 --------------------------------------------------------------------------------
 
+Package: d3-array
+Version: 2.12.1
+Author: Mike Bostock
+Homepage: https://d3js.org/d3-array/
+
+Copyright 2010-2020 Mike Bostock
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the author nor the names of contributors may be used to
+  endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+
+Package: d3-ease
+Version: 3.0.1
+Author: Mike Bostock
+Homepage: https://d3js.org/d3-ease/
+
+Copyright 2010-2021 Mike Bostock
+Copyright 2001 Robert Penner
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the author nor the names of contributors may be used to
+  endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+
+Package: d3-path
+Version: 1.0.9
+Author: Mike Bostock
+Homepage: https://d3js.org/d3-path/
+
+Copyright 2015-2016 Mike Bostock
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the author nor the names of contributors may be used to
+  endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+
+Package: d3-sankey
+Version: 0.12.3
+Author: Mike Bostock
+Homepage: https://github.com/d3/d3-sankey
+
+Copyright 2015, Mike Bostock
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the author nor the names of contributors may be used to
+  endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+
+Package: d3-shape
+Version: 1.3.7
+Author: Mike Bostock
+Homepage: https://d3js.org/d3-shape/
+
+Copyright 2010-2015 Mike Bostock
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the author nor the names of contributors may be used to
+  endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+
 Package: diff
 Version: 5.2.0
 Repository: git://github.com/kpdecker/jsdiff.git
@@ -1159,42 +1488,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 --------------------------------------------------------------------------------
 
 Package: qs
-Version: 6.13.0
-Homepage: https://github.com/ljharb/qs
-
-BSD 3-Clause License
-
-Copyright (c) 2014, Nathan LaFreniere and other [contributors](https://github.com/ljharb/qs/graphs/contributors)
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
---------------------------------------------------------------------------------
-
-Package: qs
 Version: 6.14.0
 Homepage: https://github.com/ljharb/qs
 
@@ -1259,6 +1552,40 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+
+Package: rw
+Version: 1.3.3
+Author: Mike Bostock
+Homepage: https://github.com/mbostock/rw
+
+Copyright (c) 2014-2016, Michael Bostock
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* The name Michael Bostock may not be used to endorse or promote products
+  derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL MICHAEL BOSTOCK BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 
@@ -1801,6 +2128,34 @@ DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 
+Package: khroma
+Version: 2.1.0
+Repository: github:fabiospampinato/khroma
+
+The MIT License (MIT)
+
+Copyright (c) 2019-present Fabio Spampinato, Andrew Maney
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+
 Package: stubborn-fs
 Version: 1.2.5
 Repository: github:fabiospampinato/stubborn-fs
@@ -1862,6 +2217,585 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
 ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+================================================================================
+## (MPL-2.0 OR Apache-2.0) LICENSE
+================================================================================
+
+Package: dompurify
+Version: 3.2.6
+Author: Dr.-Ing. Mario Heiderich, Cure53 <mario@cure53.de> (https://cure53.de/)
+Homepage: https://github.com/cure53/DOMPurify
+
+DOMPurify
+Copyright 2025 Dr.-Ing. Mario Heiderich, Cure53
+
+DOMPurify is free software; you can redistribute it and/or modify it under the
+terms of either:
+
+a) the Apache License Version 2.0, or
+b) the Mozilla Public License Version 2.0
+
+-----------------------------------------------------------------------------
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+-----------------------------------------------------------------------------
+Mozilla Public License, version 2.0
+
+1. Definitions
+
+1.1. “Contributor”
+
+     means each individual or legal entity that creates, contributes to the
+     creation of, or owns Covered Software.
+
+1.2. “Contributor Version”
+
+     means the combination of the Contributions of others (if any) used by a
+     Contributor and that particular Contributor’s Contribution.
+
+1.3. “Contribution”
+
+     means Covered Software of a particular Contributor.
+
+1.4. “Covered Software”
+
+     means Source Code Form to which the initial Contributor has attached the
+     notice in Exhibit A, the Executable Form of such Source Code Form, and
+     Modifications of such Source Code Form, in each case including portions
+     thereof.
+
+1.5. “Incompatible With Secondary Licenses”
+     means
+
+     a. that the initial Contributor has attached the notice described in
+        Exhibit B to the Covered Software; or
+
+     b. that the Covered Software was made available under the terms of version
+        1.1 or earlier of the License, but not also under the terms of a
+        Secondary License.
+
+1.6. “Executable Form”
+
+     means any form of the work other than Source Code Form.
+
+1.7. “Larger Work”
+
+     means a work that combines Covered Software with other material, in a separate
+     file or files, that is not Covered Software.
+
+1.8. “License”
+
+     means this document.
+
+1.9. “Licensable”
+
+     means having the right to grant, to the maximum extent possible, whether at the
+     time of the initial grant or subsequently, any and all of the rights conveyed by
+     this License.
+
+1.10. “Modifications”
+
+     means any of the following:
+
+     a. any file in Source Code Form that results from an addition to, deletion
+        from, or modification of the contents of Covered Software; or
+
+     b. any new file in Source Code Form that contains any Covered Software.
+
+1.11. “Patent Claims” of a Contributor
+
+      means any patent claim(s), including without limitation, method, process,
+      and apparatus claims, in any patent Licensable by such Contributor that
+      would be infringed, but for the grant of the License, by the making,
+      using, selling, offering for sale, having made, import, or transfer of
+      either its Contributions or its Contributor Version.
+
+1.12. “Secondary License”
+
+      means either the GNU General Public License, Version 2.0, the GNU Lesser
+      General Public License, Version 2.1, the GNU Affero General Public
+      License, Version 3.0, or any later versions of those licenses.
+
+1.13. “Source Code Form”
+
+      means the form of the work preferred for making modifications.
+
+1.14. “You” (or “Your”)
+
+      means an individual or a legal entity exercising rights under this
+      License. For legal entities, “You” includes any entity that controls, is
+      controlled by, or is under common control with You. For purposes of this
+      definition, “control” means (a) the power, direct or indirect, to cause
+      the direction or management of such entity, whether by contract or
+      otherwise, or (b) ownership of more than fifty percent (50%) of the
+      outstanding shares or beneficial ownership of such entity.
+
+
+2. License Grants and Conditions
+
+2.1. Grants
+
+     Each Contributor hereby grants You a world-wide, royalty-free,
+     non-exclusive license:
+
+     a. under intellectual property rights (other than patent or trademark)
+        Licensable by such Contributor to use, reproduce, make available,
+        modify, display, perform, distribute, and otherwise exploit its
+        Contributions, either on an unmodified basis, with Modifications, or as
+        part of a Larger Work; and
+
+     b. under Patent Claims of such Contributor to make, use, sell, offer for
+        sale, have made, import, and otherwise transfer either its Contributions
+        or its Contributor Version.
+
+2.2. Effective Date
+
+     The licenses granted in Section 2.1 with respect to any Contribution become
+     effective for each Contribution on the date the Contributor first distributes
+     such Contribution.
+
+2.3. Limitations on Grant Scope
+
+     The licenses granted in this Section 2 are the only rights granted under this
+     License. No additional rights or licenses will be implied from the distribution
+     or licensing of Covered Software under this License. Notwithstanding Section
+     2.1(b) above, no patent license is granted by a Contributor:
+
+     a. for any code that a Contributor has removed from Covered Software; or
+
+     b. for infringements caused by: (i) Your and any other third party’s
+        modifications of Covered Software, or (ii) the combination of its
+        Contributions with other software (except as part of its Contributor
+        Version); or
+
+     c. under Patent Claims infringed by Covered Software in the absence of its
+        Contributions.
+
+     This License does not grant any rights in the trademarks, service marks, or
+     logos of any Contributor (except as may be necessary to comply with the
+     notice requirements in Section 3.4).
+
+2.4. Subsequent Licenses
+
+     No Contributor makes additional grants as a result of Your choice to
+     distribute the Covered Software under a subsequent version of this License
+     (see Section 10.2) or under the terms of a Secondary License (if permitted
+     under the terms of Section 3.3).
+
+2.5. Representation
+
+     Each Contributor represents that the Contributor believes its Contributions
+     are its original creation(s) or it has sufficient rights to grant the
+     rights to its Contributions conveyed by this License.
+
+2.6. Fair Use
+
+     This License is not intended to limit any rights You have under applicable
+     copyright doctrines of fair use, fair dealing, or other equivalents.
+
+2.7. Conditions
+
+     Sections 3.1, 3.2, 3.3, and 3.4 are conditions of the licenses granted in
+     Section 2.1.
+
+
+3. Responsibilities
+
+3.1. Distribution of Source Form
+
+     All distribution of Covered Software in Source Code Form, including any
+     Modifications that You create or to which You contribute, must be under the
+     terms of this License. You must inform recipients that the Source Code Form
+     of the Covered Software is governed by the terms of this License, and how
+     they can obtain a copy of this License. You may not attempt to alter or
+     restrict the recipients’ rights in the Source Code Form.
+
+3.2. Distribution of Executable Form
+
+     If You distribute Covered Software in Executable Form then:
+
+     a. such Covered Software must also be made available in Source Code Form,
+        as described in Section 3.1, and You must inform recipients of the
+        Executable Form how they can obtain a copy of such Source Code Form by
+        reasonable means in a timely manner, at a charge no more than the cost
+        of distribution to the recipient; and
+
+     b. You may distribute such Executable Form under the terms of this License,
+        or sublicense it under different terms, provided that the license for
+        the Executable Form does not attempt to limit or alter the recipients’
+        rights in the Source Code Form under this License.
+
+3.3. Distribution of a Larger Work
+
+     You may create and distribute a Larger Work under terms of Your choice,
+     provided that You also comply with the requirements of this License for the
+     Covered Software. If the Larger Work is a combination of Covered Software
+     with a work governed by one or more Secondary Licenses, and the Covered
+     Software is not Incompatible With Secondary Licenses, this License permits
+     You to additionally distribute such Covered Software under the terms of
+     such Secondary License(s), so that the recipient of the Larger Work may, at
+     their option, further distribute the Covered Software under the terms of
+     either this License or such Secondary License(s).
+
+3.4. Notices
+
+     You may not remove or alter the substance of any license notices (including
+     copyright notices, patent notices, disclaimers of warranty, or limitations
+     of liability) contained within the Source Code Form of the Covered
+     Software, except that You may alter any license notices to the extent
+     required to remedy known factual inaccuracies.
+
+3.5. Application of Additional Terms
+
+     You may choose to offer, and to charge a fee for, warranty, support,
+     indemnity or liability obligations to one or more recipients of Covered
+     Software. However, You may do so only on Your own behalf, and not on behalf
+     of any Contributor. You must make it absolutely clear that any such
+     warranty, support, indemnity, or liability obligation is offered by You
+     alone, and You hereby agree to indemnify every Contributor for any
+     liability incurred by such Contributor as a result of warranty, support,
+     indemnity or liability terms You offer. You may include additional
+     disclaimers of warranty and limitations of liability specific to any
+     jurisdiction.
+
+4. Inability to Comply Due to Statute or Regulation
+
+   If it is impossible for You to comply with any of the terms of this License
+   with respect to some or all of the Covered Software due to statute, judicial
+   order, or regulation then You must: (a) comply with the terms of this License
+   to the maximum extent possible; and (b) describe the limitations and the code
+   they affect. Such description must be placed in a text file included with all
+   distributions of the Covered Software under this License. Except to the
+   extent prohibited by statute or regulation, such description must be
+   sufficiently detailed for a recipient of ordinary skill to be able to
+   understand it.
+
+5. Termination
+
+5.1. The rights granted under this License will terminate automatically if You
+     fail to comply with any of its terms. However, if You become compliant,
+     then the rights granted under this License from a particular Contributor
+     are reinstated (a) provisionally, unless and until such Contributor
+     explicitly and finally terminates Your grants, and (b) on an ongoing basis,
+     if such Contributor fails to notify You of the non-compliance by some
+     reasonable means prior to 60 days after You have come back into compliance.
+     Moreover, Your grants from a particular Contributor are reinstated on an
+     ongoing basis if such Contributor notifies You of the non-compliance by
+     some reasonable means, this is the first time You have received notice of
+     non-compliance with this License from such Contributor, and You become
+     compliant prior to 30 days after Your receipt of the notice.
+
+5.2. If You initiate litigation against any entity by asserting a patent
+     infringement claim (excluding declaratory judgment actions, counter-claims,
+     and cross-claims) alleging that a Contributor Version directly or
+     indirectly infringes any patent, then the rights granted to You by any and
+     all Contributors for the Covered Software under Section 2.1 of this License
+     shall terminate.
+
+5.3. In the event of termination under Sections 5.1 or 5.2 above, all end user
+     license agreements (excluding distributors and resellers) which have been
+     validly granted by You or Your distributors under this License prior to
+     termination shall survive termination.
+
+6. Disclaimer of Warranty
+
+   Covered Software is provided under this License on an “as is” basis, without
+   warranty of any kind, either expressed, implied, or statutory, including,
+   without limitation, warranties that the Covered Software is free of defects,
+   merchantable, fit for a particular purpose or non-infringing. The entire
+   risk as to the quality and performance of the Covered Software is with You.
+   Should any Covered Software prove defective in any respect, You (not any
+   Contributor) assume the cost of any necessary servicing, repair, or
+   correction. This disclaimer of warranty constitutes an essential part of this
+   License. No use of  any Covered Software is authorized under this License
+   except under this disclaimer.
+
+7. Limitation of Liability
+
+   Under no circumstances and under no legal theory, whether tort (including
+   negligence), contract, or otherwise, shall any Contributor, or anyone who
+   distributes Covered Software as permitted above, be liable to You for any
+   direct, indirect, special, incidental, or consequential damages of any
+   character including, without limitation, damages for lost profits, loss of
+   goodwill, work stoppage, computer failure or malfunction, or any and all
+   other commercial damages or losses, even if such party shall have been
+   informed of the possibility of such damages. This limitation of liability
+   shall not apply to liability for death or personal injury resulting from such
+   party’s negligence to the extent applicable law prohibits such limitation.
+   Some jurisdictions do not allow the exclusion or limitation of incidental or
+   consequential damages, so this exclusion and limitation may not apply to You.
+
+8. Litigation
+
+   Any litigation relating to this License may be brought only in the courts of
+   a jurisdiction where the defendant maintains its principal place of business
+   and such litigation shall be governed by laws of that jurisdiction, without
+   reference to its conflict-of-law provisions. Nothing in this Section shall
+   prevent a party’s ability to bring cross-claims or counter-claims.
+
+9. Miscellaneous
+
+   This License represents the complete agreement concerning the subject matter
+   hereof. If any provision of this License is held to be unenforceable, such
+   provision shall be reformed only to the extent necessary to make it
+   enforceable. Any law or regulation which provides that the language of a
+   contract shall be construed against the drafter shall not be used to construe
+   this License against a Contributor.
+
+
+10. Versions of the License
+
+10.1. New Versions
+
+      Mozilla Foundation is the license steward. Except as provided in Section
+      10.3, no one other than the license steward has the right to modify or
+      publish new versions of this License. Each version will be given a
+      distinguishing version number.
+
+10.2. Effect of New Versions
+
+      You may distribute the Covered Software under the terms of the version of
+      the License under which You originally received the Covered Software, or
+      under the terms of any subsequent version published by the license
+      steward.
+
+10.3. Modified Versions
+
+      If you create software not governed by this License, and you want to
+      create a new license for such software, you may create and use a modified
+      version of this License if you rename the license and remove any
+      references to the name of the license steward (except to note that such
+      modified license differs from this License).
+
+10.4. Distributing Source Code Form that is Incompatible With Secondary Licenses
+      If You choose to distribute Source Code Form that is Incompatible With
+      Secondary Licenses under the terms of this version of the License, the
+      notice described in Exhibit B of this License must be attached.
+
+Exhibit A - Source Code Form License Notice
+
+      This Source Code Form is subject to the
+      terms of the Mozilla Public License, v.
+      2.0. If a copy of the MPL was not
+      distributed with this file, You can
+      obtain one at
+      http://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a relevant
+directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+Exhibit B - “Incompatible With Secondary Licenses” Notice
+
+      This Source Code Form is “Incompatible
+      With Secondary Licenses”, as defined by
+      the Mozilla Public License, v. 2.0.
 
 --------------------------------------------------------------------------------
 
@@ -2564,11 +3498,47 @@ Homepage: https://github.com/anthropics/claude-code
 --------------------------------------------------------------------------------
 
 ================================================================================
+## Unlicense LICENSE
+================================================================================
+
+Package: robust-predicates
+Version: 3.0.2
+Author: Vladimir Agafonkin
+Repository: https://github.com/mourner/robust-predicates.git
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org>
+
+--------------------------------------------------------------------------------
+
+================================================================================
 ## CRYSTAL LICENSE
 ================================================================================
 
 Package: Crystal
-Version: 0.1.10
+Version: 0.1.16
 Author: [object Object]
 License: MIT
 

@@ -12,6 +12,7 @@ interface VersionInfo {
   workingDirectory?: string;
   buildDate?: string;
   gitCommit?: string;
+  buildTimestamp?: number;
 }
 
 interface AboutDialogProps {
@@ -24,16 +25,11 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-  const [isPackaged, setIsPackaged] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       // Get current version info immediately
       loadCurrentVersion();
-      // Check if app is packaged
-      window.electronAPI.isPackaged().then((packaged) => {
-        setIsPackaged(packaged);
-      });
     }
   }, [isOpen]);
 
@@ -47,7 +43,8 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           hasUpdate: false,
           workingDirectory: result.data.workingDirectory,
           buildDate: result.data.buildDate,
-          gitCommit: result.data.gitCommit
+          gitCommit: result.data.gitCommit,
+          buildTimestamp: result.data.buildTimestamp
         });
       }
     } catch (error) {
@@ -84,6 +81,22 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
       });
     } catch {
       return dateString;
@@ -175,13 +188,13 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               </div>
             )}
 
-            {versionInfo?.buildDate && isPackaged && (
+            {versionInfo?.buildDate && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Build Date
                 </span>
                 <span className="text-sm text-gray-900 dark:text-white">
-                  {formatDate(versionInfo.buildDate)}
+                  {formatDateTime(versionInfo.buildDate)}
                 </span>
               </div>
             )}
