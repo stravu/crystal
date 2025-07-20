@@ -1176,7 +1176,7 @@ export function DraggableProjectTreeView() {
   }
 
   // Recursive function to render a folder and its children
-  const renderFolder = (folder: Folder, project: ProjectWithSessions, level: number = 0) => {
+  const renderFolder = (folder: Folder, project: ProjectWithSessions, level: number = 0, isLastInLevel: boolean = false, parentPath: boolean[] = []) => {
     const isExpanded = expandedFolders.has(folder.id);
     const folderSessions = project.sessions.filter(s => s.folderId === folder.id);
     const isDraggingOverFolder = dragState.overType === 'folder' && dragState.overFolderId === folder.id;
@@ -1326,17 +1326,21 @@ export function DraggableProjectTreeView() {
         {isExpanded && hasChildren && (
           <div className="ml-4 mt-1 space-y-1">
             {/* Render subfolders first */}
-            {folder.children && folder.children.map(childFolder => 
-              renderFolder(childFolder, project, level + 1)
-            )}
+            {folder.children && folder.children.map((childFolder, childIndex) => {
+              const isLastChild = childIndex === folder.children!.length - 1;
+              const hasSessionsBelow = folderSessions.length > 0;
+              const newParentPath = [...parentPath, !isLastInLevel || hasSessionsBelow];
+              return renderFolder(childFolder, project, level + 1, isLastChild && !hasSessionsBelow, newParentPath);
+            })}
             
             {/* Then render sessions in this folder */}
             {folderSessions
               .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-              .map((session) => {
+              .map((session, sessionIndex) => {
                 const isDraggingOverSession = dragState.overType === 'session' && 
                                              dragState.overSessionId === session.id &&
                                              dragState.overProjectId === project.id;
+                const isLastSession = sessionIndex === folderSessions.length - 1;
                 
                 return (
                   <div
@@ -1388,6 +1392,7 @@ export function DraggableProjectTreeView() {
                         session={session}
                         isNested
                       />
+                    </div>
                   </div>
                 );
               })}
@@ -1498,7 +1503,11 @@ export function DraggableProjectTreeView() {
                   {/* Render folders using recursive structure */}
                   {project.folders && (() => {
                     const folderTree = buildFolderTree(project.folders);
-                    return folderTree.map(folder => renderFolder(folder, project));
+                    return folderTree.map((folder, folderIndex) => {
+                      const isLastFolder = folderIndex === folderTree.length - 1;
+                      const hasSessionsAtRoot = project.sessions.some(s => !s.folderId);
+                      return renderFolder(folder, project, 0, isLastFolder && !hasSessionsAtRoot, []);
+                    });
                   })()}
                   
                   {/* Render sessions without folders */}
@@ -1506,10 +1515,11 @@ export function DraggableProjectTreeView() {
                     {project.sessions
                       .filter(s => !s.folderId)
                       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-                      .map((session) => {
+                      .map((session, sessionIndex, sessionsArray) => {
                         const isDraggingOverSession = dragState.overType === 'session' && 
                                                      dragState.overSessionId === session.id &&
                                                      dragState.overProjectId === project.id;
+                        const isLastSession = sessionIndex === sessionsArray.length - 1;
                         
                         return (
                           <div
