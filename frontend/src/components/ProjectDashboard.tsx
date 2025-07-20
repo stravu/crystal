@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, GitBranch, AlertCircle, CheckCircle, Clock, GitPullRequest, Loader2, XCircle, Filter } from 'lucide-react';
+import { RefreshCw, GitBranch, AlertCircle, CheckCircle, GitPullRequest, Loader2, XCircle, Filter } from 'lucide-react';
 import { API } from '../utils/api';
 import type { ProjectDashboardData, SessionBranchInfo } from '../types/projectDashboard';
 import { formatDistanceToNow } from '../utils/timestampUtils';
@@ -89,40 +89,6 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = React.memo(({ p
   //   
   //   return groups;
   // }, [dashboardData?.sessionBranches]);
-
-  const getMainBranchStatusIcon = (status: string) => {
-    switch (status) {
-      case 'up-to-date':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'behind':
-        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
-      case 'ahead':
-        return <Clock className="w-4 h-4 text-blue-500" />;
-      case 'diverged':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return null;
-    }
-  };
-
-  const getMainBranchStatusText = () => {
-    if (!dashboardData) return '';
-    
-    const { status, aheadCount, behindCount } = dashboardData.mainBranchStatus;
-    
-    switch (status) {
-      case 'up-to-date':
-        return 'Up to date with origin';
-      case 'behind':
-        return `Behind origin by ${behindCount} commit${behindCount !== 1 ? 's' : ''}`;
-      case 'ahead':
-        return `Ahead of origin by ${aheadCount} commit${aheadCount !== 1 ? 's' : ''}`;
-      case 'diverged':
-        return `Diverged: ${aheadCount} ahead, ${behindCount} behind`;
-      default:
-        return 'Unknown status';
-    }
-  };
 
   const renderSessionRow = useCallback((session: SessionBranchInfo) => {
     const staleClass = session.isStale ? 'bg-yellow-50 dark:bg-yellow-900/20' : '';
