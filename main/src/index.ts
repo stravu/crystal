@@ -362,7 +362,7 @@ async function initializeServices() {
   // Use the same database path as the original backend
   const dbPath = configManager.getDatabasePath();
   databaseService = new DatabaseService(dbPath);
-  databaseService.initialize();
+  await databaseService.initialize();
 
   sessionManager = new SessionManager(databaseService);
   sessionManager.initializeFromDatabase();
