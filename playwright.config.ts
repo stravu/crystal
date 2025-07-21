@@ -1,46 +1,79 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Environment-based configuration
+const isCI = !!process.env.CI;
+const isMinimal = process.env.PLAYWRIGHT_MINIMAL === 'true';
+
 export default defineConfig({
   testDir: './tests',
-  // Maximum time one test can run for
-  timeout: 60 * 1000,
+  
+  // Test selection based on environment
+  testMatch: isMinimal ? ['smoke.spec.ts', 'health-check.spec.ts'] : undefined,
+  
+  // Timeout configuration
+  timeout: isMinimal ? 20 * 1000 : isCI ? 30 * 1000 : 60 * 1000,
+  
   expect: {
-    // Maximum time expect() should wait for the condition to be met
-    timeout: 10000
+    timeout: isCI ? 5000 : 10000
   },
-  // Run tests in files in parallel
+  
   fullyParallel: true,
-  // Fail the build on CI if you accidentally left test.only in the source code
-  forbidOnly: !!process.env.CI,
-  // Retry on CI only
-  retries: process.env.CI ? 2 : 0,
-  // Opt out of parallel tests on CI
-  workers: process.env.CI ? 1 : undefined,
-  // Reporter to use
-  reporter: 'list',
+  forbidOnly: isCI,
+  
+  // Retry configuration
+  retries: isMinimal ? 0 : isCI ? 1 : 0,
+  
+  // Worker configuration
+  workers: isCI ? 2 : undefined,
+  
+  // Reporter configuration
+  reporter: isCI ? [
+    ['list'],
+    ['github'],
+    ...(isMinimal ? [] : [['html', { open: 'never' }]])
+  ] : 'list',
   
   use: {
-    // Base URL to use in actions like `await page.goto('/')`
     baseURL: 'http://localhost:4521',
-    // Collect trace when retrying the failed test
-    trace: 'on-first-retry',
-    // Take screenshot on failure
+    trace: isCI ? 'retain-on-failure' : 'on-first-retry',
     screenshot: 'only-on-failure',
+    
+    // CI-specific viewport and launch options
+    ...(isCI && {
+      viewport: { width: 1280, height: 720 },
+      launchOptions: {
+        args: ['--disable-gpu', '--disable-dev-shm-usage', '--disable-setuid-sandbox', '--no-sandbox'],
+      },
+    }),
   },
 
-  // Configure projects for major browsers
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        // CI-specific launch options
+        ...(isCI && {
+          launchOptions: {
+            args: ['--disable-gpu', '--disable-dev-shm-usage', '--disable-setuid-sandbox', '--no-sandbox'],
+          },
+        }),
+      },
     },
   ],
 
-  // Run your local dev server before starting the tests
   webServer: {
     command: 'pnpm electron-dev',
     port: 4521,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    reuseExistingServer: !isCI,
+    timeout: isMinimal ? 45 * 1000 : isCI ? 60 * 1000 : 120 * 1000,
+    
+    // CI-specific environment
+    ...(isCI && {
+      env: {
+        DISPLAY: ':99',
+        ELECTRON_DISABLE_SANDBOX: '1',
+      },
+    }),
   },
 });
