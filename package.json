@@ -45,8 +45,8 @@
     "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild",
     "generate-notices": "node scripts/generate-notices.js",
     "test": "playwright test",
-    "test:ci": "playwright test --config=playwright.ci.config.ts",
-    "test:ci:minimal": "playwright test --config=playwright.ci.minimal.config.ts",
+    "test:ci": "CI=true playwright test",
+    "test:ci:minimal": "CI=true PLAYWRIGHT_MINIMAL=true playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed"
   },

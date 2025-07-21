@@ -13,6 +13,7 @@ node_modules/
 dist/
 build/
 !build/entitlements.mac.plist
+!build/linux/
 *.tsbuildinfo
 dist-electron/
 main/dist/

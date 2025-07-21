@@ -29,18 +29,18 @@ echo "Installing Flatpak runtime and SDK..."
 flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.electronjs.Electron2.BaseApp//23.08 || true
 
 # Update the manifest with the actual AppImage path
-sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" com.stravu.crystal.yml
+sed -i "s|path: dist-electron/Crystal-\*.AppImage|path: $APPIMAGE|" build/linux/com.stravu.crystal.yml
 
 # Build the Flatpak
 echo "Building Flatpak..."
-flatpak-builder --force-clean --repo=repo build-dir com.stravu.crystal.yml
+flatpak-builder --force-clean --repo=repo build-dir build/linux/com.stravu.crystal.yml
 
 # Create a single-file bundle
 echo "Creating Flatpak bundle..."
 flatpak build-bundle repo crystal.flatpak com.stravu.crystal
 
 # Restore the manifest
-git checkout com.stravu.crystal.yml
+git checkout build/linux/com.stravu.crystal.yml
 
 echo "Flatpak bundle created: crystal.flatpak"
 echo ""
