@@ -22,7 +22,8 @@
     "dotenv": "^16.4.7",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.6.2",
-    "glob": "^11.0.0"
+    "glob": "^11.0.0",
+    "web-streams-polyfill": "^3.3.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
