@@ -18,7 +18,8 @@
     "db:reset": "ts-node src/database/cli/run-migrations.ts reset",
     "db:validate": "ts-node src/database/utils/migrationValidator.ts",
     "db:test": "jest src/database/test/migration.test.ts",
-    "db:test:ci": "ts-node src/database/test/ci-startup-test.ts"
+    "db:test:ci": "ts-node src/database/test/ci-startup-test.ts",
+    "db:test:all": "../scripts/test-database-migrations.sh"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.33",
