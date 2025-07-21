@@ -2,6 +2,11 @@ import { ipcMain } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { projectDetectionService } from '../services/projectDetection';
 import { commitManager } from '../services/commitManager';
+import {
+  validateCommitModeSettings,
+  validateFinalizeSessionOptions,
+  sanitizeCommitModeSettings,
+} from '../utils/commitModeValidation';
 import type { ProjectCharacteristics, CommitModeSettings, FinalizeSessionOptions } from '../../../shared/types';
 import type { DatabaseService } from '../database/database';
 import type { Logger } from '../utils/logger';
@@ -35,14 +40,25 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
     try {
       logger?.verbose(`Updating commit mode settings for session ${sessionId}`);
       
-      // Store settings as JSON in the database
-      const settingsJson = JSON.stringify(settings);
+      // SECURITY: Validate settings before processing
+      const validation = validateCommitModeSettings(settings);
+      if (!validation.isValid) {
+        const errorMsg = `Invalid commit mode settings: ${validation.errors.join(', ')}`;
+        logger?.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // SECURITY: Sanitize settings to remove any potentially malicious data
+      const sanitizedSettings = sanitizeCommitModeSettings(settings);
+      
+      // Store sanitized settings as JSON in the database
+      const settingsJson = JSON.stringify(sanitizedSettings);
       db.updateSession(sessionId, {
-        commit_mode: settings.mode,
+        commit_mode: sanitizedSettings.mode,
         commit_mode_settings: settingsJson
       });
       
-      logger?.verbose(`Updated session ${sessionId} to mode: ${settings.mode}`);
+      logger?.verbose(`Updated session ${sessionId} to mode: ${sanitizedSettings.mode}`);
     } catch (error) {
       logger?.error('Failed to update session commit mode settings:', error instanceof Error ? error : undefined);
       throw error;
@@ -61,14 +77,32 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
     try {
       logger?.verbose(`Updating default commit mode settings for project ${projectId}`);
       
+      // SECURITY: Validate project settings before storing
+      const settings: CommitModeSettings = {
+        mode: commitMode,
+        structuredPromptTemplate,
+        checkpointPrefix,
+        allowClaudeTools
+      };
+
+      const validation = validateCommitModeSettings(settings);
+      if (!validation.isValid) {
+        const errorMsg = `Invalid project commit mode settings: ${validation.errors.join(', ')}`;
+        logger?.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // SECURITY: Sanitize settings before database storage
+      const sanitizedSettings = sanitizeCommitModeSettings(settings);
+      
       db.updateProject(projectId, {
-        commit_mode: commitMode,
-        commit_structured_prompt_template: structuredPromptTemplate,
-        commit_checkpoint_prefix: checkpointPrefix,
-        commit_allow_claude_tools: allowClaudeTools
+        commit_mode: sanitizedSettings.mode,
+        commit_structured_prompt_template: sanitizedSettings.structuredPromptTemplate,
+        commit_checkpoint_prefix: sanitizedSettings.checkpointPrefix,
+        commit_allow_claude_tools: sanitizedSettings.allowClaudeTools
       });
       
-      logger?.verbose(`Updated project ${projectId} default commit mode to: ${commitMode}`);
+      logger?.verbose(`Updated project ${projectId} default commit mode to: ${sanitizedSettings.mode}`);
     } catch (error) {
       logger?.error('Failed to update project commit mode settings:', error instanceof Error ? error : undefined);
       throw error;
@@ -97,6 +131,17 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
     try {
       logger?.verbose(`Finalizing session ${sessionId}`);
       
+      // SECURITY: Validate finalize options before processing
+      const validation = validateFinalizeSessionOptions(options);
+      if (!validation.isValid) {
+        const errorMsg = `Invalid finalize session options: ${validation.errors.join(', ')}`;
+        logger?.error(errorMsg);
+        return {
+          success: false,
+          error: errorMsg
+        };
+      }
+      
       const session = db.getSession(sessionId);
       if (!session) {
         throw new Error('Session not found');
@@ -107,6 +152,7 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
         throw new Error('Project not found');
       }
       
+      // Options are already validated by validateFinalizeSessionOptions
       const result = await commitManager.finalizeSession(
         sessionId,
         session.worktree_path,
@@ -135,6 +181,14 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
     _event: IpcMainInvokeEvent,
     settings: CommitModeSettings
   ): string => {
-    return commitManager.getPromptEnhancement(settings);
+    // SECURITY: Validate settings before processing
+    const validation = validateCommitModeSettings(settings);
+    if (!validation.isValid) {
+      logger?.error(`Invalid commit mode settings in prompt enhancement: ${validation.errors.join(', ')}`);
+      return ''; // Return empty string for invalid settings
+    }
+
+    const sanitizedSettings = sanitizeCommitModeSettings(settings);
+    return commitManager.getPromptEnhancement(sanitizedSettings);
   });
 }

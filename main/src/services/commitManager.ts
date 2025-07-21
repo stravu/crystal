@@ -1,7 +1,12 @@
 import { EventEmitter } from 'events';
 import type { Logger } from '../utils/logger';
 import { execSync } from '../utils/commandExecutor';
-import { buildGitCommitCommand } from '../utils/shellEscape';
+import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
+import {
+  validateCommitModeSettings,
+  validateFinalizeSessionOptions,
+  sanitizeCommitModeSettings,
+} from '../utils/commitModeValidation';
 import {
   CommitModeSettings,
   CommitResult,
@@ -27,9 +32,22 @@ export class CommitManager extends EventEmitter {
   ): Promise<CommitResult> {
     this.logger?.verbose(`Handling post-prompt commit for session ${sessionId} with mode: ${settings.mode}`);
 
-    switch (settings.mode) {
+    // Validate and sanitize settings first
+    const validation = validateCommitModeSettings(settings);
+    if (!validation.isValid) {
+      this.logger?.error(`Invalid commit mode settings: ${validation.errors.join(', ')}`);
+      return {
+        success: false,
+        error: `Invalid commit mode settings: ${validation.errors.join(', ')}`
+      };
+    }
+
+    // Sanitize settings to ensure they're safe
+    const sanitizedSettings = sanitizeCommitModeSettings(settings);
+
+    switch (sanitizedSettings.mode) {
       case 'checkpoint':
-        return this.handleCheckpointCommit(sessionId, worktreePath, settings, promptText, executionSequence);
+        return this.handleCheckpointCommit(sessionId, worktreePath, sanitizedSettings, promptText, executionSequence);
       
       case 'structured':
         // In structured mode, Claude handles the commit
@@ -42,7 +60,7 @@ export class CommitManager extends EventEmitter {
         return { success: true };
       
       default: {
-        const exhaustiveCheck: never = settings.mode;
+        const exhaustiveCheck: never = sanitizedSettings.mode;
         throw new Error(`Unknown commit mode: ${exhaustiveCheck}`);
       }
     }
@@ -75,7 +93,7 @@ export class CommitManager extends EventEmitter {
       // Stage all changes
       execSync('git add -A', { cwd: worktreePath });
 
-      // Create commit message
+      // Create commit message with safe prefix
       const prefix = settings.checkpointPrefix || DEFAULT_COMMIT_MODE_SETTINGS.checkpointPrefix || 'checkpoint: ';
       let commitMessage = promptText || `execution ${executionSequence || 'unknown'}`;
 
@@ -87,10 +105,9 @@ export class CommitManager extends EventEmitter {
 
       const fullMessage = prefix + commitMessage;
 
-      // For checkpoint mode, use a simple commit without the extra signature
-      // Escape the message properly for the shell
-      const escapedMessage = fullMessage.replace(/'/g, "'\\''");
-      const commitCommand = `git commit -m '${escapedMessage}' --no-verify`;
+      // SECURITY: Use the secure buildGitCommitCommand function instead of manual escaping
+      // This prevents command injection attacks
+      const commitCommand = buildGitCommitCommand(fullMessage) + ' --no-verify';
       const result = execSync(commitCommand, { cwd: worktreePath, encoding: 'utf8' });
 
       // Extract commit hash from output
@@ -178,15 +195,27 @@ export class CommitManager extends EventEmitter {
     try {
       this.logger?.verbose(`Finalizing session ${sessionId}`);
 
+      // SECURITY: Validate finalize options to prevent command injection
+      const validation = validateFinalizeSessionOptions(options);
+      if (!validation.isValid) {
+        this.logger?.error(`Invalid finalize session options: ${validation.errors.join(', ')}`);
+        return {
+          success: false,
+          error: `Invalid finalize session options: ${validation.errors.join(', ')}`
+        };
+      }
+
       if (options.squashCommits) {
-        // Get the merge base with main
-        const mergeBase = execSync(`git merge-base HEAD ${mainBranch}`, {
+        // Get the merge base with main (escape branch name for security)
+        const escapedMainBranch = escapeShellArg(mainBranch);
+        const mergeBase = execSync(`git merge-base HEAD ${escapedMainBranch}`, {
           cwd: worktreePath,
           encoding: 'utf8',
         }).trim();
 
-        // Reset to merge base keeping changes
-        execSync(`git reset --soft ${mergeBase}`, { cwd: worktreePath });
+        // Reset to merge base keeping changes (escape merge base hash)
+        const escapedMergeBase = escapeShellArg(mergeBase);
+        execSync(`git reset --soft ${escapedMergeBase}`, { cwd: worktreePath });
 
         // Commit with final message
         const commitMessage = options.commitMessage || 'Finalized session changes';
@@ -200,11 +229,18 @@ export class CommitManager extends EventEmitter {
 
         this.logger?.verbose(`Created final commit: ${commitHash}`);
 
-        // Run post-processing if requested
+        // Run post-processing if requested (SECURITY: commands already validated above)
         if (options.runPostProcessing && options.postProcessingCommands) {
           for (const cmd of options.postProcessingCommands) {
-            this.logger?.verbose(`Running post-processing command: ${cmd}`);
-            execSync(cmd, { cwd: worktreePath });
+            this.logger?.verbose(`Running validated post-processing command: ${cmd}`);
+            // Commands were already validated in validateFinalizeSessionOptions
+            // But add an extra safety check here
+            try {
+              execSync(cmd, { cwd: worktreePath, timeout: 30000 }); // 30 second timeout
+            } catch (error: any) {
+              this.logger?.error(`Post-processing command failed: ${cmd}`, error);
+              // Continue with other commands even if one fails
+            }
           }
         }
 
@@ -265,7 +301,9 @@ export class CommitManager extends EventEmitter {
 
   private async checkPathExists(path: string): Promise<boolean> {
     try {
-      execSync(`test -e "${path}"`, { encoding: 'utf8' });
+      // SECURITY: Properly escape the path to prevent injection
+      const escapedPath = escapeShellArg(path);
+      execSync(`test -e ${escapedPath}`, { encoding: 'utf8' });
       return true;
     } catch {
       return false;
