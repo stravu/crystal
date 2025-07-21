@@ -15,7 +15,7 @@ cd "$(dirname "$0")/../"
 
 # Build the main process
 echo -e "\n${YELLOW}Building main process...${NC}"
-pnpm run build:main
+pnpm run build
 
 # Run migration validation
 echo -e "\n${YELLOW}Validating migration files...${NC}"
