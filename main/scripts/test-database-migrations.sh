@@ -17,6 +17,12 @@ cd "$(dirname "$0")/../"
 echo -e "\n${YELLOW}Building main process...${NC}"
 pnpm run build
 
+# Rebuild native modules for current Node version
+echo -e "\n${YELLOW}Rebuilding native modules...${NC}"
+cd ../
+pnpm rebuild better-sqlite3
+cd main
+
 # Run migration validation
 echo -e "\n${YELLOW}Validating migration files...${NC}"
 pnpm run db:validate
