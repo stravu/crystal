@@ -1,0 +1,40 @@
+import { Migration } from '../types';
+
+/**
+ * Add Column Migration Template
+ * 
+ * Use this template when adding a new column to an existing table.
+ * Replace:
+ * - MIGRATION_NAME with your migration name
+ * - TABLE_NAME with the target table
+ * - COLUMN_NAME with the new column name
+ * - COLUMN_TYPE with the SQLite type (TEXT, INTEGER, etc.)
+ * - DEFAULT_VALUE with the default value (optional)
+ */
+const migration: Migration = {
+  name: 'MIGRATION_NAME',
+  
+  async up({ adapter, columnExists }) {
+    // Check if column already exists (for idempotency)
+    if (!columnExists('TABLE_NAME', 'COLUMN_NAME')) {
+      adapter.exec(`
+        ALTER TABLE TABLE_NAME 
+        ADD COLUMN COLUMN_NAME COLUMN_TYPE DEFAULT DEFAULT_VALUE
+      `);
+      
+      console.log('[Migration] Added COLUMN_NAME column to TABLE_NAME table');
+    }
+  },
+  
+  async down({ adapter }) {
+    // Note: SQLite doesn't support DROP COLUMN easily
+    // You would need to:
+    // 1. Create a new table without the column
+    // 2. Copy data from old table
+    // 3. Drop old table
+    // 4. Rename new table
+    console.log('[Migration] Note: Removing columns in SQLite requires table recreation');
+  }
+};
+
+export default migration;
