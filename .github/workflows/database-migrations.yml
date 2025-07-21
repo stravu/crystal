@@ -3,18 +3,8 @@ name: Database Migration Tests
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'main/src/database/**'
-      - 'main/package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/database-migrations.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'main/src/database/**'
-      - 'main/package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/database-migrations.yml'
   workflow_dispatch:
 
 jobs:

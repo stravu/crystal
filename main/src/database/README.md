@@ -4,6 +4,8 @@
 
 Crystal uses a modern migration-based database system built on SQLite with the Umzug migration framework. This system provides version control for database schema changes, supports atomic migrations, and works seamlessly in both development and packaged Electron environments.
 
+The migration system includes comprehensive CI checks to ensure database changes are safe and don't break existing installations.
+
 ## Quick Start
 
 ### Running Migrations
