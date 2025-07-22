@@ -12,6 +12,7 @@ import type { VersionChecker } from '../services/versionChecker';
 import type { StravuAuthManager } from '../services/stravuAuthManager';
 import type { StravuNotebookService } from '../services/stravuNotebookService';
 import type { ClaudeCodeManager } from '../services/claudeCodeManager';
+import type { GitStatusManager } from '../services/gitStatusManager';
 import type { Logger } from '../utils/logger';
 
 export interface AppServices {
@@ -22,6 +23,7 @@ export interface AppServices {
   worktreeManager: WorktreeManager;
   claudeCodeManager: ClaudeCodeManager;
   gitDiffManager: GitDiffManager;
+  gitStatusManager: GitStatusManager;
   executionTracker: ExecutionTracker;
   worktreeNameGenerator: WorktreeNameGenerator;
   runCommandManager: RunCommandManager;
