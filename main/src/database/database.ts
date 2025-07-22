@@ -40,7 +40,12 @@ export class DatabaseService {
       });
     } else {
       // Use filesystem migrations for development
-      const migrationsPath = join(__dirname, 'migrations');
+      // Check if running via ts-node (development) or compiled JS
+      const isTypescript = __filename.endsWith('.ts');
+      const migrationsPath = isTypescript 
+        ? join(__dirname, 'migrations')  // src/database/migrations for ts-node
+        : join(__dirname, 'migrations');  // dist/main/src/database/migrations for compiled
+      
       this.migrator = new Migrator({
         adapter: this.adapter,
         migrationsPath,

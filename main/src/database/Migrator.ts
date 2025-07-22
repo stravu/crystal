@@ -46,7 +46,7 @@ export class Migrator {
 
     const umzugOptions: UmzugOptions<MigrationContext> = {
       migrations: {
-        glob: ['[0-9]*.js', { cwd: options.migrationsPath }],
+        glob: ['[0-9]*.{js,ts}', { cwd: options.migrationsPath }],
         resolve: ({ name: migrationName, path: migrationPath }) => {
           if (!migrationPath) {
             throw new Error(`Migration path not found for ${migrationName}`);
