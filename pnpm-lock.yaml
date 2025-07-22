@@ -38,6 +38,9 @@ importers:
       openai:
         specifier: ^5.1.1
         version: 5.10.1(zod@3.25.76)
+      web-streams-polyfill:
+        specifier: ^3.3.3
+        version: 3.3.3
     devDependencies:
       '@playwright/test':
         specifier: ^1.52.0
@@ -244,6 +247,9 @@ importers:
       glob:
         specifier: ^11.0.0
         version: 11.0.3
+      web-streams-polyfill:
+        specifier: ^3.3.3
+        version: 3.3.3
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -4633,6 +4639,10 @@ packages:
 
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
+
+  web-streams-polyfill@3.3.3:
+    resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
+    engines: {node: '>= 8'}
 
   when-exit@2.1.4:
     resolution: {integrity: sha512-4rnvd3A1t16PWzrBUcSDZqcAmsUIy4minDXT/CZ8F2mVDgd65i4Aalimgz1aQkRGU0iH5eT5+6Rx2TK8o443Pg==}
@@ -9677,6 +9687,8 @@ snapshots:
   wcwidth@1.0.1:
     dependencies:
       defaults: 1.0.4
+
+  web-streams-polyfill@3.3.3: {}
 
   when-exit@2.1.4: {}
 

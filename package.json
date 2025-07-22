@@ -60,7 +60,8 @@
     "dotenv": "^16.4.7",
     "electron-updater": "^6.6.2",
     "glob": "^11.0.0",
-    "openai": "^5.1.1"
+    "openai": "^5.1.1",
+    "web-streams-polyfill": "^3.3.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",

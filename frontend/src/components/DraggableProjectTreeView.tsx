@@ -46,7 +46,16 @@ export function DraggableProjectTreeView() {
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
+  const { setActiveSession } = useSessionStore();
+  const { navigateToSessions } = useNavigationStore();
   const [detectedBranchForNewProject, setDetectedBranchForNewProject] = useState<string | null>(null);
+  
+  // Track recent sessions to handle auto-selection for multiple session creation
+  const [pendingAutoSelect, setPendingAutoSelect] = useState<{
+    sessionId: string;
+    timeoutId: NodeJS.Timeout;
+    session: Session;
+  } | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
@@ -91,6 +100,32 @@ export function DraggableProjectTreeView() {
     const folderIds = Array.from(expandedFolders);
     saveUIState(projectIds, folderIds);
   }, [expandedProjects, expandedFolders, saveUIState]);
+
+  // Ensure paths are expanded when active session changes (for auto-selection)
+  useEffect(() => {
+    if (activeSessionId) {
+      // Find the session to get its project and folder IDs
+      const session = projectsWithSessions
+        .flatMap(project => project.sessions)
+        .find(s => s.id === activeSessionId);
+      
+      if (session) {
+        console.log('[DraggableProjectTreeView] Active session changed to:', session.id, 'ensuring paths are expanded');
+        
+        // Ensure project is expanded
+        if (session.projectId && !expandedProjects.has(session.projectId)) {
+          console.log('[DraggableProjectTreeView] Expanding project for active session:', session.projectId);
+          setExpandedProjects(prev => new Set([...prev, session.projectId!]));
+        }
+        
+        // Ensure folder is expanded
+        if (session.folderId && !expandedFolders.has(session.folderId)) {
+          console.log('[DraggableProjectTreeView] Expanding folder for active session:', session.folderId);
+          setExpandedFolders(prev => new Set([...prev, session.folderId!]));
+        }
+      }
+    }
+  }, [activeSessionId, projectsWithSessions, expandedProjects, expandedFolders]);
 
   const handleFolderCreated = (folder: Folder) => {
     // Add the folder to the appropriate project
@@ -171,15 +206,62 @@ export function DraggableProjectTreeView() {
         return updatedProjects;
       });
       
-      // Auto-expand the project that contains the new session
+      // Auto-expand the project that contains the new session (immediate for all sessions)
       if (newSession.projectId) {
-        setExpandedProjects(prev => new Set([...prev, newSession.projectId!]));
+        console.log('[DraggableProjectTreeView] Immediately expanding project:', newSession.projectId);
+        setExpandedProjects(prev => {
+          const newSet = new Set([...prev, newSession.projectId!]);
+          console.log('[DraggableProjectTreeView] Expanded projects now:', Array.from(newSet));
+          return newSet;
+        });
       }
       
-      // If the session has a folderId, auto-expand that folder too
+      // If the session has a folderId, auto-expand that folder too (immediate for all sessions)
       if (newSession.folderId) {
-        setExpandedFolders(prev => new Set([...prev, newSession.folderId!]));
+        console.log('[DraggableProjectTreeView] Immediately expanding folder:', newSession.folderId);
+        setExpandedFolders(prev => {
+          const newSet = new Set([...prev, newSession.folderId!]);
+          console.log('[DraggableProjectTreeView] Expanded folders now:', Array.from(newSet));
+          return newSet;
+        });
       }
+      
+      // Handle auto-selection with delayed logic to handle multiple sessions
+      // When multiple sessions are created, only select the last one
+      console.log('[DraggableProjectTreeView] Session created, handling auto-selection:', newSession.id, newSession.name);
+      
+      // Cancel any pending auto-selection
+      if (pendingAutoSelect) {
+        clearTimeout(pendingAutoSelect.timeoutId);
+        console.log('[DraggableProjectTreeView] Cancelled previous pending auto-selection for:', pendingAutoSelect.sessionId);
+      }
+      
+      // Set up delayed auto-selection for this session
+      const timeoutId = setTimeout(() => {
+        console.log('[DraggableProjectTreeView] Auto-selecting session after delay:', newSession.id, newSession.name);
+        
+        // Ensure all necessary paths are expanded when we auto-select
+        // This is important for the final session in a batch
+        if (newSession.projectId) {
+          console.log('[DraggableProjectTreeView] Ensuring project is expanded:', newSession.projectId);
+          setExpandedProjects(prev => new Set([...prev, newSession.projectId!]));
+        }
+        
+        if (newSession.folderId) {
+          console.log('[DraggableProjectTreeView] Ensuring folder is expanded:', newSession.folderId);
+          setExpandedFolders(prev => new Set([...prev, newSession.folderId!]));
+        }
+        
+        setActiveSession(newSession.id);
+        navigateToSessions();
+        setPendingAutoSelect(null);
+      }, 500); // 500ms delay to allow other sessions in the batch to arrive
+      
+      setPendingAutoSelect({
+        sessionId: newSession.id,
+        timeoutId,
+        session: newSession
+      });
     };
     
     const handleSessionUpdated = (updatedSession: Session) => {
@@ -280,6 +362,11 @@ export function DraggableProjectTreeView() {
         unsubscribeFolderCreated();
         unsubscribeFolderUpdated();
         unsubscribeProjectUpdated();
+        
+        // Clean up pending auto-selection timeout
+        if (pendingAutoSelect) {
+          clearTimeout(pendingAutoSelect.timeoutId);
+        }
       };
     }
   }, []);
@@ -1503,7 +1590,7 @@ export function DraggableProjectTreeView() {
                           <div
                             key={session.id}
                             className="relative"
-                            style={{ marginLeft: '24px' }}
+                            style={{ marginLeft: '8px' }}
                           >
                             {/* Tree lines for root sessions */}
                             <div className="absolute inset-0 pointer-events-none">
