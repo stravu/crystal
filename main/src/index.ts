@@ -113,43 +113,26 @@ async function createWindow() {
       return originalHandle.call(this, channel, wrappedListener);
     };
   } else {
-    // In production/packaged apps, we need to handle the file path differently
-    let indexPath: string;
-    
-    if (app.isPackaged) {
-      // In packaged app, the structure is different
-      // __dirname is /app.asar/main/dist/main/src/
-      // We need to go up to /app.asar/frontend/dist/index.html
-      indexPath = path.join(__dirname, '..', '..', '..', '..', 'frontend', 'dist', 'index.html');
-    } else {
-      // In development build (not packaged), use app path
-      const appPath = app.getAppPath();
-      indexPath = path.join(appPath, 'frontend', 'dist', 'index.html');
-    }
-    
-    console.log('Loading production build...');
-    console.log('App is packaged:', app.isPackaged);
-    console.log('__dirname:', __dirname);
-    console.log('Index path:', indexPath);
+    // In production, use app.getAppPath() to get the root directory
+    // This works correctly whether the app is packaged in ASAR or not
+    const indexPath = path.join(app.getAppPath(), 'frontend/dist/index.html');
+    console.log('Loading index.html from:', indexPath);
 
     try {
       await mainWindow.loadFile(indexPath);
     } catch (error) {
       console.error('Failed to load index.html:', error);
+      console.error('App path:', app.getAppPath());
+      console.error('__dirname:', __dirname);
       
-      // Show detailed error in the window for debugging
-      const appPath = app.getAppPath();
-      mainWindow.loadURL(`data:text/html,<h1>Failed to load application</h1>
-        <p>Could not find index.html at: ${indexPath}</p>
-        <p>Error: ${error}</p>
-        <p>Debug info:</p>
-        <ul>
-          <li>App is packaged: ${app.isPackaged}</li>
-          <li>App path: ${appPath}</li>
-          <li>__dirname: ${__dirname}</li>
-          <li>Expected path: ${indexPath}</li>
-        </ul>
-      `);
+      // Fallback: try relative path (for edge cases)
+      const fallbackPath = path.join(__dirname, '../../../../frontend/dist/index.html');
+      console.error('Trying fallback path:', fallbackPath);
+      try {
+        await mainWindow.loadFile(fallbackPath);
+      } catch (fallbackError) {
+        console.error('Fallback path also failed:', fallbackError);
+      }
     }
   }
 

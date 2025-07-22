@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-electron
+*.min.js
+vite.config.ts
+*.config.js
+*.config.cjs
+frontend/public
+main/dist
+backend

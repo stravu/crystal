@@ -99,5 +99,5 @@ jobs:
     - name: Validate license compatibility
       run: |
         # Use our more sophisticated license compatibility check
-        chmod +x ./scripts/check-license-compatibility.sh
-        ./scripts/check-license-compatibility.sh
+        chmod +x ./check-license-compatibility.sh
+        ./check-license-compatibility.sh

@@ -11,16 +11,16 @@ jobs:
   build:
     strategy:
       matrix:
-        # Build both platforms with -dev suffix to prevent auto-updater cache conflicts
+        # Build both platforms for validation, but use different commands for speed
         os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
-            build_cmd: build:mac:ci:dev
-            artifact_name: crystal-macos-dev
+            build_cmd: build:mac:ci
+            artifact_name: crystal-macos
             artifact_path: dist-electron/*.dmg
           - os: ubuntu-latest
-            build_cmd: build:linux:ci:dev
-            artifact_name: crystal-linux-dev
+            build_cmd: build:linux:ci
+            artifact_name: crystal-linux
             artifact_path: |
               dist-electron/*.deb
               dist-electron/*.AppImage
