@@ -39,7 +39,7 @@ function App() {
   const { sessions, isLoaded } = useSessionStore();
   
   const { width: sidebarWidth, startResize } = useResizable({
-    defaultWidth: 320,  // Increased from 256px (w-64)
+    defaultWidth: 500,  // Increased to show git status labels without truncation
     minWidth: 200,
     maxWidth: 600,
     storageKey: 'crystal-sidebar-width'

@@ -152,6 +152,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectBranch: (path: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:detect-branch', path),
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>): Promise<IPCResponse> => ipcRenderer.invoke('projects:reorder', projectOrders),
     listBranches: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:list-branches', projectId),
+    refreshGitStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('projects:refresh-git-status', projectId),
   },
 
   // Git operations
@@ -243,9 +244,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('sessions:loaded', wrappedCallback);
     },
     onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => {
-      const wrappedCallback = (_event: any, sessionId: string, gitStatus: any) => callback({ sessionId, gitStatus });
+      const wrappedCallback = (_event: any, data: { sessionId: string; gitStatus: any }) => callback(data);
       ipcRenderer.on('git-status-updated', wrappedCallback);
       return () => ipcRenderer.removeListener('git-status-updated', wrappedCallback);
+    },
+    onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => {
+      const wrappedCallback = (_event: any, data: { sessionId: string }) => callback(data);
+      ipcRenderer.on('git-status-loading', wrappedCallback);
+      return () => ipcRenderer.removeListener('git-status-loading', wrappedCallback);
     },
     onSessionOutput: (callback: (output: any) => void) => {
       const wrappedCallback = (_event: any, output: any) => callback(output);

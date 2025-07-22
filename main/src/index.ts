@@ -24,6 +24,8 @@ import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
 import { ClaudeCodeManager } from './services/claudeCodeManager';
+import { GitStatusManager } from './services/gitStatusManager';
+import { setupConsoleWrapper } from './utils/consoleWrapper';
 import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
@@ -45,6 +47,7 @@ let permissionIpcServer: PermissionIpcServer | null;
 let versionChecker: VersionChecker;
 let stravuAuthManager: StravuAuthManager;
 let stravuNotebookService: StravuNotebookService;
+let gitStatusManager: GitStatusManager;
 
 // Store original console methods before overriding
 // These must be captured immediately when the module loads
@@ -54,6 +57,9 @@ const originalWarn: typeof console.warn = console.warn;
 const originalInfo: typeof console.info = console.info;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
+
+// Set up console wrapper to reduce logging in production
+setupConsoleWrapper();
 
 // Parse command-line arguments for custom Crystal directory
 const args = process.argv.slice(2);
@@ -337,6 +343,19 @@ async function createWindow() {
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('Renderer process crashed:', details);
   });
+
+  // Handle window focus/blur for smart git status polling
+  mainWindow.on('focus', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(false); // false = visible/focused
+    }
+  });
+
+  mainWindow.on('blur', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(true); // true = hidden/blurred
+    }
+  });
 }
 
 async function initializeServices() {
@@ -449,6 +468,9 @@ async function initializeServices() {
   
   // Start periodic version checking (only if enabled in settings)
   versionChecker.startPeriodicCheck();
+  
+  // Start git status polling
+  gitStatusManager.startPolling();
 }
 
 app.whenReady().then(async () => {
@@ -494,6 +516,13 @@ app.on('before-quit', async () => {
     console.log('[Main] Stopping all run commands...');
     await runCommandManager.stopAllRunCommands();
     console.log('[Main] Run commands stopped');
+  }
+  
+  // Stop git status polling
+  if (gitStatusManager) {
+    console.log('[Main] Stopping git status polling...');
+    gitStatusManager.stopPolling();
+    console.log('[Main] Git status polling stopped');
   }
 
   // Kill all Claude processes

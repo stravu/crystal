@@ -5,6 +5,7 @@ import type { GitStatus } from '../types/session';
 import type { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import type { GitDiffManager } from './gitDiffManager';
+import { GitStatusLogger } from './gitStatusLogger';
 
 interface GitStatusCache {
   [sessionId: string]: {
@@ -16,9 +17,12 @@ interface GitStatusCache {
 export class GitStatusManager extends EventEmitter {
   private cache: GitStatusCache = {};
   private pollInterval: NodeJS.Timeout | null = null;
-  private readonly POLL_INTERVAL_MS = 10000; // 10 seconds
+  private readonly POLL_INTERVAL_MS = 60000; // 60 seconds - reduced frequency to minimize unnecessary loads
   private readonly CACHE_TTL_MS = 5000; // 5 seconds cache
-  private isPolling = false;
+  private isPolling = true; // Default to true so initial poll works
+  private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly DEBOUNCE_MS = 500; // 500ms debounce for rapid refresh requests
+  private gitLogger: GitStatusLogger;
 
   constructor(
     private sessionManager: SessionManager,
@@ -27,6 +31,7 @@ export class GitStatusManager extends EventEmitter {
     private logger?: Logger
   ) {
     super();
+    this.gitLogger = new GitStatusLogger(logger);
   }
 
   /**
@@ -37,7 +42,7 @@ export class GitStatusManager extends EventEmitter {
       return; // Already polling
     }
 
-    this.logger?.info('Starting git status polling');
+    // Initial poll will log its own start message
     
     // Initial poll
     this.pollAllSessions();
@@ -58,19 +63,24 @@ export class GitStatusManager extends EventEmitter {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
-      this.logger?.info('Stopped git status polling');
+      // Log summary on stop
+      this.gitLogger.logSummary();
     }
+
+    // Clear any pending debounce timers
+    this.refreshDebounceTimers.forEach(timer => clearTimeout(timer));
+    this.refreshDebounceTimers.clear();
 
     // Note: In Electron main process, we don't have access to document
     // Window visibility changes should be handled via IPC from renderer
   }
 
-  // Note: This method can be called via IPC when renderer detects visibility change
+  // Called when window focus changes
   handleVisibilityChange(isHidden: boolean): void {
-    if (isHidden) {
-      this.isPolling = false;
-    } else {
-      this.isPolling = true;
+    this.isPolling = !isHidden;
+    this.gitLogger.logFocusChange(!isHidden);
+    if (!isHidden) {
+      // Immediately poll when window becomes visible again to get fresh status
       this.pollAllSessions();
     }
   }
@@ -82,6 +92,7 @@ export class GitStatusManager extends EventEmitter {
     // Check cache first
     const cached = this.cache[sessionId];
     if (cached && Date.now() - cached.lastChecked < this.CACHE_TTL_MS) {
+      this.gitLogger.logSessionFetch(sessionId, true);
       return cached.status;
     }
 
@@ -94,15 +105,41 @@ export class GitStatusManager extends EventEmitter {
   }
 
   /**
-   * Force refresh git status for a specific session
+   * Force refresh git status for a specific session (with debouncing)
+   * @param sessionId - The session ID to refresh
+   * @param isUserInitiated - Whether this refresh was triggered by user action (shows loading spinner)
    */
-  async refreshSessionGitStatus(sessionId: string): Promise<GitStatus | null> {
-    const status = await this.fetchGitStatus(sessionId);
-    if (status) {
-      this.updateCache(sessionId, status);
-      this.emit('git-status-updated', sessionId, status);
+  async refreshSessionGitStatus(sessionId: string, isUserInitiated = false): Promise<GitStatus | null> {
+    // Clear any existing debounce timer for this session
+    const existingTimer = this.refreshDebounceTimers.get(sessionId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.refreshDebounceTimers.delete(sessionId);
+      this.gitLogger.logDebounce(sessionId, 'cancelled');
     }
-    return status;
+
+    // Create a promise that will be resolved after debounce
+    this.gitLogger.logDebounce(sessionId, 'start');
+    return new Promise((resolve) => {
+      const timer = setTimeout(async () => {
+        this.refreshDebounceTimers.delete(sessionId);
+        this.gitLogger.logDebounce(sessionId, 'complete');
+        
+        // Only emit loading event for user-initiated refreshes
+        if (isUserInitiated) {
+          this.emit('git-status-loading', sessionId);
+        }
+        
+        const status = await this.fetchGitStatus(sessionId);
+        if (status) {
+          this.updateCache(sessionId, status);
+          this.emit('git-status-updated', sessionId, status);
+        }
+        resolve(status);
+      }, this.DEBOUNCE_MS);
+
+      this.refreshDebounceTimers.set(sessionId, timer);
+    });
   }
 
   /**
@@ -119,18 +156,34 @@ export class GitStatusManager extends EventEmitter {
         !s.archived && s.status !== 'error' && s.worktreePath
       );
 
-      this.logger?.verbose(`Polling git status for ${activeSessions.length} active sessions`);
+      this.gitLogger.logPollStart(activeSessions.length);
+
+      // Don't emit loading events during automatic polling
+      // Loading spinners are distracting during background updates
 
       // Process sessions in parallel with a limit
       const batchSize = 3; // Limit concurrent Git operations
+      let successCount = 0;
+      let errorCount = 0;
+      
       for (let i = 0; i < activeSessions.length; i += batchSize) {
         const batch = activeSessions.slice(i, i + batchSize);
-        await Promise.all(
-          batch.map(session => this.refreshSessionGitStatus(session.id))
+        const results = await Promise.allSettled(
+          batch.map(session => this.refreshSessionGitStatus(session.id, false)) // false = not user initiated
         );
+        
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        });
       }
+      
+      this.gitLogger.logPollComplete(successCount, errorCount);
     } catch (error) {
-      this.logger?.error('Error polling git status:', error as Error);
+      this.logger?.error('[GitStatus] Critical error during poll cycle:', error as Error);
     }
   }
 
@@ -143,6 +196,8 @@ export class GitStatusManager extends EventEmitter {
       if (!session || !session.worktreePath) {
         return null;
       }
+      
+      this.gitLogger.logSessionFetch(sessionId, false);
 
       const project = this.sessionManager.getProjectForSession(sessionId);
       if (!project?.path) {
@@ -159,7 +214,7 @@ export class GitStatusManager extends EventEmitter {
         const untrackedOutput = execSync('git ls-files --others --exclude-standard', { cwd: session.worktreePath });
         hasUntrackedFiles = untrackedOutput.toString().trim().length > 0;
       } catch (error) {
-        this.logger?.warn(`Failed to check untracked files for session ${sessionId}:`, error as Error);
+        // Don't log individual git command failures - they're expected sometimes
       }
       
       // Get ahead/behind status
@@ -175,7 +230,7 @@ export class GitStatusManager extends EventEmitter {
         ahead = aheadCount || 0;
         behind = behindCount || 0;
       } catch (error) {
-        this.logger?.warn(`Failed to get ahead/behind status for session ${sessionId}:`, error as Error);
+        // Don't log individual git command failures - they're expected sometimes
       }
 
       // Get total additions/deletions for all commits in the branch (compared to main)
@@ -199,7 +254,7 @@ export class GitStatusManager extends EventEmitter {
           if (additionsMatch) totalCommitAdditions = parseInt(additionsMatch[1], 10);
           if (deletionsMatch) totalCommitDeletions = parseInt(deletionsMatch[1], 10);
         } catch (error) {
-          this.logger?.warn(`Failed to get commit diff stats for session ${sessionId}:`, error as Error);
+          // Don't log individual git command failures - they're expected sometimes
         }
       }
 
@@ -218,7 +273,7 @@ export class GitStatusManager extends EventEmitter {
         const rebaseApplyExists = execSync('test -d .git/rebase-apply && echo 1 || echo 0', { cwd: session.worktreePath }).toString().trim() === '1';
         isRebasing = rebaseMergeExists || rebaseApplyExists;
       } catch (error) {
-        this.logger?.warn(`Failed to check rebase/merge status for session ${sessionId}:`, error as Error);
+        // Don't log individual git command failures - they're expected sometimes
       }
 
       // Determine the overall state and secondary states
@@ -259,7 +314,7 @@ export class GitStatusManager extends EventEmitter {
         const output = execSync(`git rev-list --count ${mainBranch}..HEAD`, { cwd: session.worktreePath });
         totalCommits = parseInt(output.toString().trim(), 10);
       } catch (error) {
-        this.logger?.verbose(`Failed to get total commit count for session ${sessionId}: ${(error as Error).message}`);
+        // Expected for some edge cases, don't log
         // Fallback to just using ahead count if we can't calculate total
         totalCommits = ahead;
       }
@@ -284,9 +339,10 @@ export class GitStatusManager extends EventEmitter {
         totalCommits: totalCommits > 0 ? totalCommits : undefined
       };
       
+      this.gitLogger.logSessionSuccess(sessionId);
       return result;
     } catch (error) {
-      this.logger?.error(`Error fetching git status for session ${sessionId}:`, error as Error);
+      this.gitLogger.logSessionError(sessionId, error as Error);
       return {
         state: 'unknown',
         lastChecked: new Date().toISOString()

@@ -113,7 +113,7 @@ export class Logger {
   }
 
   private writeToFile(logMessage: string) {
-    if (!this.logStream) return;
+    if (!this.logStream || this.logStream.destroyed) return;
 
     try {
       const messageWithNewline = logMessage + '\n';
@@ -124,10 +124,24 @@ export class Logger {
         this.rotateLogIfNeeded();
       }
 
-      this.logStream.write(messageWithNewline);
+      // Use callback to handle write errors
+      this.logStream.write(messageWithNewline, (writeError) => {
+        if (writeError && (writeError as any).code === 'EPIPE') {
+          // Stream was closed, reinitialize
+          this.logStream = null;
+          this.initializeLogger();
+        }
+      });
       this.currentLogSize += messageSize;
-    } catch (error) {
-      this.originalConsole.error('[Logger] Failed to write to log file:', error);
+    } catch (error: any) {
+      // Only log non-EPIPE errors to avoid infinite recursion
+      if (error.code !== 'EPIPE') {
+        try {
+          this.originalConsole.error('[Logger] Failed to write to log file:', error);
+        } catch {
+          // Silently fail if console is also broken
+        }
+      }
     }
   }
 
@@ -136,8 +150,17 @@ export class Logger {
     const errorInfo = error ? ` Error: ${error.message}\nStack: ${error.stack}` : '';
     const fullMessage = `[${timestamp}] ${level}: ${message}${errorInfo}`;
     
-    // Always log to console using the original console method to avoid recursion
-    this.originalConsole.log(fullMessage);
+    // Try to log to console, but handle EPIPE errors gracefully
+    try {
+      // Always log to console using the original console method to avoid recursion
+      this.originalConsole.log(fullMessage);
+    } catch (consoleError: any) {
+      // If console logging fails (e.g., EPIPE), just write to file
+      if (consoleError.code !== 'EPIPE') {
+        // For non-EPIPE errors, try to at least write the error to file
+        this.writeToFile(`[${timestamp}] ERROR: Failed to write to console: ${consoleError.message}`);
+      }
+    }
     
     // Also write to file
     this.writeToFile(fullMessage);

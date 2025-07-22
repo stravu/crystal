@@ -13,7 +13,7 @@ interface SessionListItemProps {
 }
 
 export function SessionListItem({ session, isNested = false }: SessionListItemProps) {
-  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId } = useSessionStore();
+  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId, isGitStatusLoading } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
   const isActive = activeSessionId === session.id;
   const isDeleting = deletingSessionIds.has(session.id);
@@ -25,6 +25,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
+  const gitStatusLoading = isGitStatusLoading(session.id);
   
   // Force re-render when session status changes
   const [, forceUpdate] = useState({});
@@ -127,6 +128,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     // Fetch Git status for this session
     const fetchGitStatus = async () => {
       try {
+        // Don't set loading state here anymore - it's handled by backend events
         const response = await window.electronAPI.invoke('sessions:get-git-status', session.id);
         if (response.success && response.gitStatus) {
           setGitStatus(response.gitStatus);
@@ -136,8 +138,8 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
       }
     };
 
-    // Initial fetch
-    if (!session.archived && session.status !== 'error') {
+    // Initial fetch only if we don't already have git status
+    if (!session.archived && session.status !== 'error' && !gitStatus) {
       fetchGitStatus();
     }
 
@@ -368,7 +370,6 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
           }}
           className="flex items-center justify-start space-x-3 flex-1 min-w-0"
         >
-          <StatusIndicator session={session} size="small" />
           {isEditing ? (
             <input
               type="text"
@@ -382,14 +383,15 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
             />
           ) : (
             <span className="flex-1 truncate text-sm text-left flex items-center gap-1">
-              <span>{session.name}</span>
+              <span className="inline-flex justify-center items-center mr-1" style={{ minWidth: '55px' }}>
+                {(gitStatus || gitStatusLoading) && !session.archived && (
+                  <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
+                )}
+              </span>
+              <StatusIndicator session={session} size="small" />
+              <span className="ml-2">{session.name}</span>
               {!!session.isMainRepo && (
                 <span className="text-xs text-blue-600 dark:text-blue-400">(main)</span>
-              )}
-              {gitStatus && !session.archived && (
-                <span className="ml-auto mr-2">
-                  <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} />
-                </span>
               )}
             </span>
           )}

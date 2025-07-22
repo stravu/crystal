@@ -15,6 +15,7 @@ interface SessionStore {
   isLoaded: boolean;
   scriptOutput: Record<string, string[]>; // sessionId -> script output lines
   deletingSessionIds: Set<string>; // Track sessions currently being deleted
+  gitStatusLoading: Set<string>; // Track sessions currently loading git status
   
   setSessions: (sessions: Session[]) => void;
   loadSessions: (sessions: Session[]) => void;
@@ -39,6 +40,8 @@ interface SessionStore {
   
   getActiveSession: () => Session | undefined;
   updateSessionGitStatus: (sessionId: string, gitStatus: GitStatus) => void;
+  setGitStatusLoading: (sessionId: string, loading: boolean) => void;
+  isGitStatusLoading: (sessionId: string) => boolean;
 }
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
@@ -48,6 +51,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   isLoaded: false,
   scriptOutput: {},
   deletingSessionIds: new Set(),
+  gitStatusLoading: new Set(),
   
   setSessions: (sessions) => set({ sessions }),
   
@@ -405,6 +409,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   updateSessionGitStatus: (sessionId, gitStatus) => {
     set((state) => {
+      // Remove from loading set when git status is updated
+      const newLoadingSet = new Set(state.gitStatusLoading);
+      newLoadingSet.delete(sessionId);
+      
       const sessions = state.sessions.map(session => 
         session.id === sessionId 
           ? { ...session, gitStatus }
@@ -416,8 +424,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         ? { ...state.activeMainRepoSession, gitStatus }
         : state.activeMainRepoSession;
       
-      return { sessions, activeMainRepoSession };
+      return { sessions, activeMainRepoSession, gitStatusLoading: newLoadingSet };
     });
+  },
+  
+  setGitStatusLoading: (sessionId, loading) => {
+    set((state) => {
+      const newLoadingSet = new Set(state.gitStatusLoading);
+      if (loading) {
+        newLoadingSet.add(sessionId);
+      } else {
+        newLoadingSet.delete(sessionId);
+      }
+      return { gitStatusLoading: newLoadingSet };
+    });
+  },
+  
+  isGitStatusLoading: (sessionId) => {
+    return get().gitStatusLoading.has(sessionId);
   },
 
   setDeletingSessionIds: (ids) => set({ deletingSessionIds: new Set(ids) }),

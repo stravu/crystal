@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Edit, FileText, Upload, Download, GitBranch, AlertTriangle, HelpCircle, GitMerge, Circle } from 'lucide-react';
+import { Check, Edit, FileText, Upload, Download, GitBranch, AlertTriangle, HelpCircle, GitMerge, Circle, Loader2 } from 'lucide-react';
 import type { GitStatus } from '../types/session';
 
 interface GitStatusIndicatorProps {
@@ -7,6 +7,7 @@ interface GitStatusIndicatorProps {
   size?: 'small' | 'medium' | 'large';
   sessionId?: string;
   onClick?: () => void;
+  isLoading?: boolean;
 }
 
 interface GitStatusConfig {
@@ -137,34 +138,50 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
   }
 }
 
-const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitStatus, size = 'small', sessionId, onClick }) => {
-  if (!gitStatus) {
-    return null;
-  }
-
-  const config = getGitStatusConfig(gitStatus);
-  
+const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitStatus, size = 'small', sessionId, onClick, isLoading }) => {
   // Size configurations
   const sizeConfig = {
     small: {
       dot: 'w-2 h-2',
       text: 'text-xs',
       padding: 'px-1.5 py-0.5',
-      gap: 'gap-0.5'
+      gap: 'gap-0.5',
+      loader: 'w-3 h-3'
     },
     medium: {
       dot: 'w-3 h-3',
       text: 'text-sm',
       padding: 'px-2 py-1',
-      gap: 'gap-1'
+      gap: 'gap-1',
+      loader: 'w-4 h-4'
     },
     large: {
       dot: 'w-4 h-4',
       text: 'text-base',
       padding: 'px-3 py-1.5',
-      gap: 'gap-1.5'
+      gap: 'gap-1.5',
+      loader: 'w-5 h-5'
     }
   }[size];
+
+  // Show loading state
+  if (isLoading || (!gitStatus && isLoading !== false)) {
+    return (
+      <span 
+        className={`inline-flex items-center ${sizeConfig.gap} ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
+        title="Checking git status..."
+      >
+        <Loader2 className={`${sizeConfig.loader} animate-spin`} />
+      </span>
+    );
+  }
+
+  // No git status and not loading
+  if (!gitStatus) {
+    return null;
+  }
+
+  const config = getGitStatusConfig(gitStatus);
 
   // Build comprehensive tooltip content
   let tooltipContent = '';
