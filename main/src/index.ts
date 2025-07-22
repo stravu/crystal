@@ -24,7 +24,6 @@ import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
 import { ClaudeCodeManager } from './services/claudeCodeManager';
-import { GitStatusManager } from './services/gitStatusManager';
 import { setupConsoleWrapper } from './utils/consoleWrapper';
 import * as fs from 'fs';
 
@@ -47,7 +46,6 @@ let permissionIpcServer: PermissionIpcServer | null;
 let versionChecker: VersionChecker;
 let stravuAuthManager: StravuAuthManager;
 let stravuNotebookService: StravuNotebookService;
-let gitStatusManager: GitStatusManager;
 
 // Store original console methods before overriding
 // These must be captured immediately when the module loads
