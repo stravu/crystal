@@ -440,7 +440,7 @@ EOF
                 size: entry.isFile() ? stats.size : undefined,
                 modified: stats.mtime
               };
-            } catch (error) {
+            } catch {
               // Handle broken symlinks or inaccessible files
               return {
                 name: entry.name,

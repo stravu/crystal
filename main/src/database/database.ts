@@ -196,7 +196,7 @@ export class DatabaseService {
             `).run(result.lastInsertRowid);
           }
         }
-      } catch (error) {
+      } catch {
         // Config manager not available during initial setup
         console.log('Skipping default project creation during initial setup');
       }
