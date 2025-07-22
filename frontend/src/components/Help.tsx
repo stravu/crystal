@@ -1,4 +1,4 @@
-import { X, GitBranch, Terminal, Folder, Zap, MessageSquare, Settings, Bell, History } from 'lucide-react';
+import { X, GitBranch, Terminal, Folder, Zap, MessageSquare, Settings, Bell, History, Check, Edit, FileText, Upload, Download, AlertTriangle, HelpCircle, GitMerge } from 'lucide-react';
 
 interface HelpProps {
   isOpen: boolean;
@@ -99,6 +99,95 @@ export default function Help({ isOpen, onClose }: HelpProps) {
                     <li>Click on a stopped session to resume it</li>
                     <li>Use <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm">Cmd/Ctrl + Enter</kbd> to send input</li>
                     <li>Full conversation history is preserved</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            {/* Git Status Indicators */}
+            <section>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
+                <GitBranch className="h-5 w-5 mr-2" />
+                Git Status Indicators
+              </h3>
+              <div className="space-y-3">
+                <p className="text-gray-700 dark:text-gray-300">
+                  Each session displays a git status badge showing the current state of its worktree relative to the main branch. Click any indicator to view detailed diff information.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-gray-300 dark:border-gray-600">
+                        <Check className="w-3 h-3" />
+                        Synced
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Fully synced with main</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-gray-300 dark:border-gray-600">
+                        <GitMerge className="w-3 h-3" />
+                        <span className="font-medium">3</span>
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Ready to merge (commits ahead)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-gray-300 dark:border-gray-600">
+                        <Edit className="w-3 h-3" />
+                        <span className="font-medium">2</span>
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Active changes (uncommitted files)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600">
+                        <Upload className="w-3 h-3" />
+                        <span className="font-medium">1</span>
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Ahead of main (commits to push)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600">
+                        <FileText className="w-3 h-3" />
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Untracked files present</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-gray-300 dark:border-gray-600">
+                        <Download className="w-3 h-3" />
+                        <span className="font-medium">↓2</span>
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Behind main (needs pull)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-600">
+                        <GitBranch className="w-3 h-3" />
+                        <span className="font-medium">2</span>
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Diverged from main</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-gray-300 dark:border-gray-600">
+                        <AlertTriangle className="w-3 h-3" />
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Merge conflicts</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600">
+                        <HelpCircle className="w-3 h-3" />
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Unknown status</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="font-medium text-blue-900 dark:text-blue-200 mb-2">Status Indicator Features</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-blue-800 dark:text-blue-300">
+                    <li><strong>Numbers:</strong> Show commit count or file changes</li>
+                    <li><strong>Tooltips:</strong> Hover for detailed status information</li>
+                    <li><strong>Clickable:</strong> Click to switch to View Diff tab for detailed changes</li>
+                    <li><strong>Real-time:</strong> Updates automatically as you work</li>
+                    <li><strong>Multiple indicators:</strong> Sessions can show commits + uncommitted changes</li>
                   </ul>
                 </div>
               </div>
@@ -245,6 +334,8 @@ export default function Help({ isOpen, onClose }: HelpProps) {
                 <li>Use descriptive worktree names to organize your experiments</li>
                 <li>Check the View Diff tab to review what Claude modified</li>
                 <li>Use the Terminal tab to run tests after Claude makes changes</li>
+                <li>Click git status indicators to quickly view what changed in each session</li>
+                <li>Look for green "Synced" indicators - those sessions are safe to remove</li>
                 <li>Archive sessions you no longer need to keep your list clean</li>
                 <li>Set up project-specific system prompts for consistent behavior</li>
                 <li>Enable notifications to know when Claude needs your input</li>
