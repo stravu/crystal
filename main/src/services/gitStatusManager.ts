@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
 import { execSync } from '../utils/commandExecutor';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import type { Logger } from '../utils/logger';
 import type { GitStatus } from '../types/session';
 import type { SessionManager } from './sessionManager';
@@ -12,6 +14,32 @@ interface GitStatusCache {
     status: GitStatus;
     lastChecked: number;
   };
+}
+
+/**
+ * Result of a git command execution
+ */
+interface GitCommandResult<T = string> {
+  success: boolean;
+  output?: T;
+  error?: Error;
+}
+
+/**
+ * Git diff statistics
+ */
+interface GitDiffStats {
+  filesChanged: number;
+  additions: number;
+  deletions: number;
+}
+
+/**
+ * Git rev-list count result
+ */
+interface RevListCount {
+  ahead: number;
+  behind: number;
 }
 
 export class GitStatusManager extends EventEmitter {
@@ -32,6 +60,130 @@ export class GitStatusManager extends EventEmitter {
   ) {
     super();
     this.gitLogger = new GitStatusLogger(logger);
+  }
+
+  /**
+   * Execute a git command with proper error handling
+   * @param command The git command to execute
+   * @param cwd The working directory
+   * @returns GitCommandResult with success status and output
+   */
+  private executeGitCommand(command: string, cwd: string): GitCommandResult<string> {
+    try {
+      const output = execSync(command, { cwd });
+      return {
+        success: true,
+        output: output.toString().trim()
+      };
+    } catch (error) {
+      // Log unexpected errors (non-git command failures)
+      if (error instanceof Error && !error.message.includes('Command failed')) {
+        this.logger?.error(`[GitStatus] Unexpected error executing git command: ${command}`, error);
+      }
+      return {
+        success: false,
+        error: error as Error
+      };
+    }
+  }
+
+  /**
+   * Get untracked files in the repository
+   */
+  private getUntrackedFiles(cwd: string): GitCommandResult<boolean> {
+    const result = this.executeGitCommand('git ls-files --others --exclude-standard', cwd);
+    return {
+      success: result.success,
+      output: result.success && result.output ? result.output.length > 0 : false,
+      error: result.error
+    };
+  }
+
+  /**
+   * Get ahead/behind count compared to a branch
+   */
+  private getRevListCount(cwd: string, baseBranch: string): GitCommandResult<RevListCount> {
+    const result = this.executeGitCommand(`git rev-list --left-right --count ${baseBranch}...HEAD`, cwd);
+    if (result.success && result.output) {
+      const [behind, ahead] = result.output.split('\t').map(n => parseInt(n, 10));
+      return {
+        success: true,
+        output: {
+          ahead: ahead || 0,
+          behind: behind || 0
+        }
+      };
+    }
+    return {
+      success: false,
+      error: result.error
+    };
+  }
+
+  /**
+   * Get diff statistics between branches
+   */
+  private getDiffStats(cwd: string, baseBranch: string): GitCommandResult<GitDiffStats> {
+    const result = this.executeGitCommand(`git diff --shortstat ${baseBranch}...HEAD`, cwd);
+    if (result.success && result.output) {
+      const statLine = result.output;
+      
+      // Parse the stat line: "X files changed, Y insertions(+), Z deletions(-)"
+      const filesMatch = statLine.match(/(\d+) files? changed/);
+      const additionsMatch = statLine.match(/(\d+) insertions?\(\+\)/);
+      const deletionsMatch = statLine.match(/(\d+) deletions?\(-\)/);
+      
+      return {
+        success: true,
+        output: {
+          filesChanged: filesMatch ? parseInt(filesMatch[1], 10) : 0,
+          additions: additionsMatch ? parseInt(additionsMatch[1], 10) : 0,
+          deletions: deletionsMatch ? parseInt(deletionsMatch[1], 10) : 0
+        }
+      };
+    }
+    return {
+      success: false,
+      error: result.error
+    };
+  }
+
+  /**
+   * Check for merge conflicts in the repository
+   */
+  private checkMergeConflicts(cwd: string): GitCommandResult<boolean> {
+    const result = this.executeGitCommand('git status --porcelain=v1', cwd);
+    if (result.success && result.output) {
+      const hasConflicts = result.output.includes('UU ') || result.output.includes('AA ') || 
+                          result.output.includes('DD ') || result.output.includes('AU ') || 
+                          result.output.includes('UA ') || result.output.includes('UD ') || 
+                          result.output.includes('DU ');
+      return {
+        success: true,
+        output: hasConflicts
+      };
+    }
+    return {
+      success: false,
+      error: result.error
+    };
+  }
+
+  /**
+   * Get total commit count ahead of a branch
+   */
+  private getTotalCommitCount(cwd: string, baseBranch: string): GitCommandResult<number> {
+    const result = this.executeGitCommand(`git rev-list --count ${baseBranch}..HEAD`, cwd);
+    if (result.success && result.output) {
+      return {
+        success: true,
+        output: parseInt(result.output, 10)
+      };
+    }
+    return {
+      success: false,
+      error: result.error
+    };
   }
 
   /**
@@ -209,72 +361,38 @@ export class GitStatusManager extends EventEmitter {
       const hasUncommittedChanges = uncommittedDiff.stats.filesChanged > 0;
       
       // Check for untracked files
-      let hasUntrackedFiles = false;
-      try {
-        const untrackedOutput = execSync('git ls-files --others --exclude-standard', { cwd: session.worktreePath });
-        hasUntrackedFiles = untrackedOutput.toString().trim().length > 0;
-      } catch (error) {
-        // Don't log individual git command failures - they're expected sometimes
-      }
+      const untrackedResult = this.getUntrackedFiles(session.worktreePath);
+      const hasUntrackedFiles = untrackedResult.success ? untrackedResult.output! : false;
       
       // Get ahead/behind status
       const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
       
-      let ahead = 0;
-      let behind = 0;
-      try {
-        const revListOutput = execSync(`git rev-list --left-right --count ${mainBranch}...HEAD`, {
-          cwd: session.worktreePath
-        });
-        const [behindCount, aheadCount] = revListOutput.toString().trim().split('\t').map((n: string) => parseInt(n, 10));
-        ahead = aheadCount || 0;
-        behind = behindCount || 0;
-      } catch (error) {
-        // Don't log individual git command failures - they're expected sometimes
-      }
+      const revListResult = this.getRevListCount(session.worktreePath, mainBranch);
+      const ahead = revListResult.success ? revListResult.output!.ahead : 0;
+      const behind = revListResult.success ? revListResult.output!.behind : 0;
 
       // Get total additions/deletions for all commits in the branch (compared to main)
       let totalCommitAdditions = 0;
       let totalCommitDeletions = 0;
       let totalCommitFilesChanged = 0;
       if (ahead > 0) {
-        try {
-          // Get diff stats for all commits ahead of main
-          const diffStatOutput = execSync(`git diff --shortstat ${mainBranch}...HEAD`, {
-            cwd: session.worktreePath
-          });
-          const statLine = diffStatOutput.toString().trim();
-          
-          // Parse the stat line: "X files changed, Y insertions(+), Z deletions(-)"
-          const filesMatch = statLine.match(/(\d+) files? changed/);
-          const additionsMatch = statLine.match(/(\d+) insertions?\(\+\)/);
-          const deletionsMatch = statLine.match(/(\d+) deletions?\(-\)/);
-          
-          if (filesMatch) totalCommitFilesChanged = parseInt(filesMatch[1], 10);
-          if (additionsMatch) totalCommitAdditions = parseInt(additionsMatch[1], 10);
-          if (deletionsMatch) totalCommitDeletions = parseInt(deletionsMatch[1], 10);
-        } catch (error) {
-          // Don't log individual git command failures - they're expected sometimes
+        const diffStatsResult = this.getDiffStats(session.worktreePath, mainBranch);
+        if (diffStatsResult.success && diffStatsResult.output) {
+          totalCommitFilesChanged = diffStatsResult.output.filesChanged;
+          totalCommitAdditions = diffStatsResult.output.additions;
+          totalCommitDeletions = diffStatsResult.output.deletions;
         }
       }
 
       // Check for rebase or merge conflicts
       let isRebasing = false;
-      let hasMergeConflicts = false;
-      try {
-        const gitStatus = execSync('git status --porcelain=v1', { cwd: session.worktreePath });
-        hasMergeConflicts = gitStatus.includes('UU ') || gitStatus.includes('AA ') || 
-                          gitStatus.includes('DD ') || gitStatus.includes('AU ') || 
-                          gitStatus.includes('UA ') || gitStatus.includes('UD ') || 
-                          gitStatus.includes('DU ');
-        
-        // Check for rebase in progress
-        const rebaseMergeExists = execSync('test -d .git/rebase-merge && echo 1 || echo 0', { cwd: session.worktreePath }).toString().trim() === '1';
-        const rebaseApplyExists = execSync('test -d .git/rebase-apply && echo 1 || echo 0', { cwd: session.worktreePath }).toString().trim() === '1';
-        isRebasing = rebaseMergeExists || rebaseApplyExists;
-      } catch (error) {
-        // Don't log individual git command failures - they're expected sometimes
-      }
+      const conflictResult = this.checkMergeConflicts(session.worktreePath);
+      const hasMergeConflicts = conflictResult.success ? conflictResult.output! : false;
+      
+      // Check for rebase in progress using filesystem APIs
+      const rebaseMergeExists = existsSync(join(session.worktreePath, '.git', 'rebase-merge'));
+      const rebaseApplyExists = existsSync(join(session.worktreePath, '.git', 'rebase-apply'));
+      isRebasing = rebaseMergeExists || rebaseApplyExists;
 
       // Determine the overall state and secondary states
       let state: GitStatus['state'] = 'clean';
@@ -307,17 +425,8 @@ export class GitStatusManager extends EventEmitter {
       const isReadyToMerge = ahead > 0 && !hasUncommittedChanges && !hasUntrackedFiles && behind === 0;
 
       // Get total number of commits in the branch
-      let totalCommits = 0;
-      try {
-        // Get all commits that are unique to this branch (not in main)
-        // This matches how the View Diff tab counts commits
-        const output = execSync(`git rev-list --count ${mainBranch}..HEAD`, { cwd: session.worktreePath });
-        totalCommits = parseInt(output.toString().trim(), 10);
-      } catch (error) {
-        // Expected for some edge cases, don't log
-        // Fallback to just using ahead count if we can't calculate total
-        totalCommits = ahead;
-      }
+      const commitCountResult = this.getTotalCommitCount(session.worktreePath, mainBranch);
+      const totalCommits = commitCountResult.success ? commitCountResult.output! : ahead;
 
       const result = {
         state,

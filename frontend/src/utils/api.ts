@@ -221,7 +221,7 @@ export class API {
 
     async getGitStatus(sessionId: string) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.invoke('sessions:get-git-status', sessionId);
+      return window.electronAPI.sessions.getGitStatus(sessionId);
     },
 
     async getLastCommits(sessionId: string, count: number = 20) {

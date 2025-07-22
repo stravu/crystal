@@ -159,7 +159,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
         unsubscribeGitStatus();
       }
     };
-  }, [session.id, session.archived, session.status]);
+  }, [session.id, session.archived, session.status, gitStatus]);
 
   const handleRunScript = async (e: React.MouseEvent) => {
     e.stopPropagation();

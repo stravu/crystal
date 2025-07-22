@@ -267,11 +267,19 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('projects:refresh-git-status', async (_event, projectId: number) => {
+  ipcMain.handle('projects:refresh-git-status', async (_event, projectId: string) => {
     try {
+      const projectIdNum = parseInt(projectId);
+      
+      // Check if the project exists
+      const project = databaseService.getProject(projectIdNum);
+      if (!project) {
+        return { success: false, error: 'Project not found' };
+      }
+      
       // Get all sessions for this project
       const sessions = await sessionManager.getAllSessions();
-      const projectSessions = sessions.filter(s => s.projectId === projectId && !s.archived && s.status !== 'error');
+      const projectSessions = sessions.filter(s => s.projectId === projectIdNum && !s.archived && s.status !== 'error');
       
       // Use gitStatusManager from services
       const { gitStatusManager } = services;

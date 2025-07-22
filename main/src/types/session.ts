@@ -38,7 +38,7 @@ export interface GitStatus {
   filesChanged?: number; // Uncommitted files changed
   lastChecked?: string;
   // Enhanced status information
-  isReadyToMerge?: boolean; // True when ahead with no uncommitted changes
+  isReadyToMerge?: boolean; // True when ahead of base branch with no uncommitted changes and not diverged (not behind)
   hasUncommittedChanges?: boolean;
   hasUntrackedFiles?: boolean;
   // Allow tracking multiple states for better clarity

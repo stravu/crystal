@@ -18,14 +18,114 @@ interface GitStatusConfig {
   description: string;
 }
 
+/**
+ * Checks if the git status indicates the branch is fully synced with main
+ */
+function isGitStatusFullySynced(gitStatus: GitStatus): boolean {
+  return (!gitStatus.ahead || gitStatus.ahead === 0) && 
+         (!gitStatus.behind || gitStatus.behind === 0) && 
+         (!gitStatus.hasUncommittedChanges) &&
+         (!gitStatus.hasUntrackedFiles);
+}
+
+/**
+ * Builds the comprehensive tooltip content for the git status indicator
+ */
+function buildTooltipContent(gitStatus: GitStatus, config: GitStatusConfig): string {
+  let tooltipContent = '';
+  
+  // Show total commits in branch if available
+  if (gitStatus.totalCommits && gitStatus.totalCommits > 0) {
+    tooltipContent = `${gitStatus.totalCommits} commit${gitStatus.totalCommits !== 1 ? 's' : ''} in branch`;
+    
+    // Add ahead/behind info if relevant
+    if (gitStatus.ahead && gitStatus.ahead > 0) {
+      tooltipContent += ` (${gitStatus.ahead} ahead of main)`;
+    } else if (gitStatus.behind && gitStatus.behind > 0) {
+      tooltipContent += ` (${gitStatus.behind} behind main)`;
+    } else if (gitStatus.state === 'diverged') {
+      tooltipContent += ` (${gitStatus.ahead || 0} ahead, ${gitStatus.behind || 0} behind)`;
+    }
+    
+    // Add file change statistics for commits
+    if (gitStatus.commitFilesChanged) {
+      tooltipContent += `\n${gitStatus.commitFilesChanged} files changed (+${gitStatus.commitAdditions || 0}/-${gitStatus.commitDeletions || 0})`;
+    }
+  } else if (gitStatus.ahead && gitStatus.ahead > 0) {
+    // Fallback to old behavior if totalCommits not available
+    tooltipContent = `${gitStatus.ahead} commit${gitStatus.ahead !== 1 ? 's' : ''} ahead of main`;
+    if (gitStatus.commitFilesChanged) {
+      tooltipContent += `\n${gitStatus.commitFilesChanged} files changed (+${gitStatus.commitAdditions || 0}/-${gitStatus.commitDeletions || 0})`;
+    }
+  } else if (gitStatus.behind && gitStatus.behind > 0) {
+    tooltipContent = `${gitStatus.behind} commit${gitStatus.behind !== 1 ? 's' : ''} behind main`;
+  } else if (gitStatus.state === 'diverged') {
+    tooltipContent = `${gitStatus.ahead || 0} ahead, ${gitStatus.behind || 0} behind main`;
+  }
+  
+  // Add uncommitted changes info
+  if (gitStatus.hasUncommittedChanges && gitStatus.filesChanged) {
+    if (tooltipContent) tooltipContent += '\n\n';
+    tooltipContent += `Uncommitted changes:\n${gitStatus.filesChanged} file${gitStatus.filesChanged !== 1 ? 's' : ''} modified`;
+    if (gitStatus.additions || gitStatus.deletions) {
+      tooltipContent += ` (+${gitStatus.additions || 0}/-${gitStatus.deletions || 0})`;
+    }
+  }
+  
+  // If still no content (e.g., clean state with no commits ahead), be more descriptive
+  if (!tooltipContent) {
+    if (gitStatus.state === 'clean') {
+      tooltipContent = 'Branch is up to date with main\nNo uncommitted changes';
+    } else if (gitStatus.state === 'modified' && gitStatus.filesChanged) {
+      tooltipContent = `${gitStatus.filesChanged} uncommitted file${gitStatus.filesChanged !== 1 ? 's' : ''}`;
+      if (gitStatus.additions || gitStatus.deletions) {
+        tooltipContent += ` (+${gitStatus.additions || 0}/-${gitStatus.deletions || 0})`;
+      }
+    } else {
+      tooltipContent = config.description;
+    }
+  }
+  
+  // Add untracked files note
+  if (gitStatus.hasUntrackedFiles) {
+    tooltipContent += '\n+ untracked files';
+  }
+  
+  // Add actionable information
+  let actionableInfo = '';
+  
+  // Check sync status
+  const isFullySynced = isGitStatusFullySynced(gitStatus);
+  
+  if (isFullySynced) {
+    actionableInfo = '✅ Fully synced with main - safe to remove worktree';
+  } else if (gitStatus.isReadyToMerge) {
+    actionableInfo = '🔀 Has commits not in main - needs merge';
+  } else if (gitStatus.hasUncommittedChanges) {
+    actionableInfo = '⚠️ Commit changes before merging';
+  } else if (gitStatus.behind && gitStatus.behind > 0) {
+    actionableInfo = '⬇️ Behind main - pull latest changes';
+  } else if (gitStatus.state === 'diverged') {
+    actionableInfo = '🔄 Diverged - rebase or merge with main';
+  } else if (gitStatus.ahead && gitStatus.ahead > 0) {
+    actionableInfo = '⬆️ Ahead of main - needs merge';
+  }
+  
+  if (actionableInfo) {
+    tooltipContent += '\n\n' + actionableInfo;
+  }
+  
+  // Add click hint
+  tooltipContent += '\n\nClick to view diff details';
+  
+  return tooltipContent;
+}
+
 function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
   const iconSize = 'w-3 h-3';
   
   // Check if truly synced with main
-  const isFullySynced = (!gitStatus.ahead || gitStatus.ahead === 0) && 
-                       (!gitStatus.behind || gitStatus.behind === 0) && 
-                       (!gitStatus.hasUncommittedChanges) &&
-                       (!gitStatus.hasUntrackedFiles);
+  const isFullySynced = isGitStatusFullySynced(gitStatus);
   
   // Special case: Fully synced with main
   if (isFullySynced) {
@@ -40,12 +140,13 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
   
   // Special case: Ready to merge (ahead but clean)
   if (gitStatus.isReadyToMerge) {
+    const commitCount = gitStatus.totalCommits || 0;
     return {
       color: 'text-emerald-600 dark:text-emerald-400',
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
       icon: <GitMerge className={iconSize} />,
       label: 'Ready to Merge',
-      description: `${gitStatus.totalCommits || gitStatus.ahead || 0} commit${(gitStatus.totalCommits || gitStatus.ahead) !== 1 ? 's' : ''} ready to push to main`
+      description: `${commitCount} commit${commitCount !== 1 ? 's' : ''} ready to push to main`
     };
   }
   
@@ -165,7 +266,7 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
   }[size];
 
   // Show loading state
-  if (isLoading || (!gitStatus && isLoading !== false)) {
+  if (isLoading === true) {
     return (
       <span 
         className={`inline-flex items-center ${sizeConfig.gap} ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
@@ -183,95 +284,8 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
 
   const config = getGitStatusConfig(gitStatus);
 
-  // Build comprehensive tooltip content
-  let tooltipContent = '';
-  
-  // Show total commits in branch if available
-  if (gitStatus.totalCommits && gitStatus.totalCommits > 0) {
-    tooltipContent = `${gitStatus.totalCommits} commit${gitStatus.totalCommits !== 1 ? 's' : ''} in branch`;
-    
-    // Add ahead/behind info if relevant
-    if (gitStatus.ahead && gitStatus.ahead > 0) {
-      tooltipContent += ` (${gitStatus.ahead} ahead of main)`;
-    } else if (gitStatus.behind && gitStatus.behind > 0) {
-      tooltipContent += ` (${gitStatus.behind} behind main)`;
-    } else if (gitStatus.state === 'diverged') {
-      tooltipContent += ` (${gitStatus.ahead || 0} ahead, ${gitStatus.behind || 0} behind)`;
-    }
-    
-    // Add file change statistics for commits
-    if (gitStatus.commitFilesChanged) {
-      tooltipContent += `\n${gitStatus.commitFilesChanged} files changed (+${gitStatus.commitAdditions || 0}/-${gitStatus.commitDeletions || 0})`;
-    }
-  } else if (gitStatus.ahead && gitStatus.ahead > 0) {
-    // Fallback to old behavior if totalCommits not available
-    tooltipContent = `${gitStatus.ahead} commit${gitStatus.ahead !== 1 ? 's' : ''} ahead of main`;
-    if (gitStatus.commitFilesChanged) {
-      tooltipContent += `\n${gitStatus.commitFilesChanged} files changed (+${gitStatus.commitAdditions || 0}/-${gitStatus.commitDeletions || 0})`;
-    }
-  } else if (gitStatus.behind && gitStatus.behind > 0) {
-    tooltipContent = `${gitStatus.behind} commit${gitStatus.behind !== 1 ? 's' : ''} behind main`;
-  } else if (gitStatus.state === 'diverged') {
-    tooltipContent = `${gitStatus.ahead || 0} ahead, ${gitStatus.behind || 0} behind main`;
-  }
-  
-  // Add uncommitted changes info
-  if (gitStatus.hasUncommittedChanges && gitStatus.filesChanged) {
-    if (tooltipContent) tooltipContent += '\n\n';
-    tooltipContent += `Uncommitted changes:\n${gitStatus.filesChanged} file${gitStatus.filesChanged !== 1 ? 's' : ''} modified`;
-    if (gitStatus.additions || gitStatus.deletions) {
-      tooltipContent += ` (+${gitStatus.additions || 0}/-${gitStatus.deletions || 0})`;
-    }
-  }
-  
-  // If still no content (e.g., clean state with no commits ahead), be more descriptive
-  if (!tooltipContent) {
-    if (gitStatus.state === 'clean') {
-      tooltipContent = 'Branch is up to date with main\nNo uncommitted changes';
-    } else if (gitStatus.state === 'modified' && gitStatus.filesChanged) {
-      tooltipContent = `${gitStatus.filesChanged} uncommitted file${gitStatus.filesChanged !== 1 ? 's' : ''}`;
-      if (gitStatus.additions || gitStatus.deletions) {
-        tooltipContent += ` (+${gitStatus.additions || 0}/-${gitStatus.deletions || 0})`;
-      }
-    } else {
-      tooltipContent = config.description;
-    }
-  }
-  
-  // Add untracked files note
-  if (gitStatus.hasUntrackedFiles) {
-    tooltipContent += '\n+ untracked files';
-  }
-  
-  // Add actionable information
-  let actionableInfo = '';
-  
-  // Check sync status
-  const isFullySynced = (!gitStatus.ahead || gitStatus.ahead === 0) && 
-                       (!gitStatus.behind || gitStatus.behind === 0) && 
-                       (!gitStatus.hasUncommittedChanges) &&
-                       (!gitStatus.hasUntrackedFiles);
-  
-  if (isFullySynced) {
-    actionableInfo = '✅ Fully synced with main - safe to remove worktree';
-  } else if (gitStatus.isReadyToMerge) {
-    actionableInfo = '🔀 Has commits not in main - needs merge';
-  } else if (gitStatus.hasUncommittedChanges) {
-    actionableInfo = '⚠️ Commit changes before merging';
-  } else if (gitStatus.behind && gitStatus.behind > 0) {
-    actionableInfo = '⬇️ Behind main - pull latest changes';
-  } else if (gitStatus.state === 'diverged') {
-    actionableInfo = '🔄 Diverged - rebase or merge with main';
-  } else if (gitStatus.ahead && gitStatus.ahead > 0) {
-    actionableInfo = '⬆️ Ahead of main - needs merge';
-  }
-  
-  if (actionableInfo) {
-    tooltipContent += '\n\n' + actionableInfo;
-  }
-  
-  // Add click hint
-  tooltipContent += '\n\nClick to view diff details';
+  // Build comprehensive tooltip content using helper function
+  const tooltipContent = buildTooltipContent(gitStatus, config);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

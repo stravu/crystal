@@ -14,6 +14,7 @@ const originalConsole = {
 
 // Helper to check if a message should be logged
 function shouldLog(level: 'log' | 'info' | 'debug', args: any[]): boolean {
+  if (args.length === 0) return false;
   const firstArg = args[0];
   if (typeof firstArg === 'string') {
     // Always log [Main] messages as they're important startup info
