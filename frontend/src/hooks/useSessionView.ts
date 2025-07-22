@@ -7,7 +7,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'planning';
+export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -31,7 +31,7 @@ export const useSessionView = (
     changes: false,
     terminal: false,
     editor: false,
-    planning: false,
+    dashboard: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -332,7 +332,7 @@ export const useSessionView = (
       changes: false,
       terminal: false,
       editor: false,
-      planning: false,
+      dashboard: false,
     });
     
     // Clear terminal immediately when session changes
@@ -988,7 +988,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, planning: false });
+    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, dashboard: false });
   }, [activeSessionId]);
 
 
