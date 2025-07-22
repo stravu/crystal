@@ -88,6 +88,7 @@ interface ElectronAPI {
     // Git pull/push operations
     gitPull: (sessionId: string) => Promise<IPCResponse>;
     gitPush: (sessionId: string) => Promise<IPCResponse>;
+    getGitStatus: (sessionId: string) => Promise<IPCResponse>;
     getLastCommits: (sessionId: string, count: number) => Promise<IPCResponse>;
 
     // IDE operations

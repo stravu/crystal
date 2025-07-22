@@ -271,6 +271,8 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
       <span 
         className={`inline-flex items-center ${sizeConfig.gap} ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
         title="Checking git status..."
+        data-testid={sessionId ? `session-${sessionId}-git-status` : 'git-status'}
+        data-git-loading="true"
       >
         <Loader2 className={`${sizeConfig.loader} animate-spin`} />
       </span>
@@ -305,6 +307,10 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
       className={`inline-flex items-center ${sizeConfig.gap} ${sizeConfig.padding} ${sizeConfig.text} rounded-md border ${config.bgColor} ${config.color} border-gray-300 dark:border-gray-600 ${(onClick || sessionId) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
       title={tooltipContent}
       onClick={handleClick}
+      data-testid={sessionId ? `session-${sessionId}-git-status` : 'git-status'}
+      data-git-state={gitStatus.state}
+      data-git-ahead={gitStatus.ahead}
+      data-git-behind={gitStatus.behind}
     >
       {config.icon}
       {/* Display logic: Show numbers for branches with commits or changes */}
