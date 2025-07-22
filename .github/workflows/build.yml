@@ -17,7 +17,9 @@ jobs:
           - os: macos-latest
             build_cmd: build:mac:ci:dev
             artifact_name: crystal-macos-dev
-            artifact_path: dist-electron/*.dmg
+            artifact_path: |
+              dist-electron/*.dmg
+              dist-electron/*.zip
           - os: ubuntu-latest
             build_cmd: build:linux:ci:dev
             artifact_name: crystal-linux-dev
