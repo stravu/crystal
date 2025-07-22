@@ -171,6 +171,11 @@ interface ElectronAPI {
     searchNotebooks: (query: string, limit?: number) => Promise<IPCResponse>;
   };
 
+  // Dashboard
+  dashboard: {
+    getProjectStatus: (projectId: number) => Promise<IPCResponse>;
+  };
+
   // UI State management
   uiState: {
     getExpanded: () => Promise<IPCResponse<{ expandedProjects: number[]; expandedFolders: string[] }>>;

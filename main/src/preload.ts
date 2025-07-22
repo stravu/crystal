@@ -213,6 +213,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     searchNotebooks: (query: string, limit?: number): Promise<IPCResponse> => ipcRenderer.invoke('stravu:search-notebooks', query, limit),
   },
 
+  // Dashboard
+  dashboard: {
+    getProjectStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('dashboard:get-project-status', projectId),
+  },
+
   // UI State management
   uiState: {
     getExpanded: (): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:get-expanded'),

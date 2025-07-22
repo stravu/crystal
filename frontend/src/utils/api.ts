@@ -426,6 +426,14 @@ export class API {
       return window.electronAPI.stravu.searchNotebooks(query, limit);
     },
   };
+
+  // Dashboard
+  static dashboard = {
+    async getProjectStatus(projectId: number) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.dashboard.getProjectStatus(projectId);
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete
