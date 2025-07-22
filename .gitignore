@@ -13,6 +13,7 @@ node_modules/
 dist/
 build/
 !build/entitlements.mac.plist
+!build/linux/
 *.tsbuildinfo
 dist-electron/
 main/dist/
@@ -99,3 +100,8 @@ test-file.txt
 frontend/vite.config.d.ts
 
 # Generated files
+# Shared build artifacts
+shared/*.js
+shared/*.js.map
+shared/*.d.ts
+shared/*.d.ts.map

@@ -9,6 +9,7 @@ jobs:
   release:
     strategy:
       matrix:
+        # Official release builds (no version suffix) - triggered by version tags
         os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest

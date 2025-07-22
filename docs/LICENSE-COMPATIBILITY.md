@@ -35,7 +35,7 @@ The following licenses are **not** compatible with MIT distribution:
 
 ## How We Check
 
-The `check-license-compatibility.sh` script automatically validates that all dependencies use compatible licenses. It:
+The `scripts/check-license-compatibility.sh` script automatically validates that all dependencies use compatible licenses. It:
 
 1. Checks for truly incompatible licenses (GPL, AGPL, SSPL)
 2. Notes LGPL dependencies (compatible but worth tracking)

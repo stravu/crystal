@@ -6,6 +6,8 @@ import type { CreateExecutionDiffData } from '../database/models';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand } from '../utils/shellEscape';
 import { formatForDisplay } from '../utils/timestampUtils';
+import { commitManager } from './commitManager';
+import type { CommitModeSettings } from '../../../shared/types';
 
 interface ExecutionContext {
   sessionId: string;
@@ -72,62 +74,57 @@ export class ExecutionTracker extends EventEmitter {
 
       this.logger?.verbose(`Ending execution tracking for session ${sessionId}`);
       
-      // Check if auto-commit is enabled for this session
-      const session = await this.sessionManager.getSession(sessionId);
-      const autoCommitEnabled = session?.autoCommit ?? true; // Default to true if not set
+      // Get session details for commit mode
+      const session = this.sessionManager.getSession(sessionId);
+      this.logger?.verbose(`Retrieved session for ${sessionId}: ${session ? 'found' : 'not found'}`);
       
-      this.logger?.verbose(`Session ${sessionId} auto-commit setting: ${session?.autoCommit} (enabled: ${autoCommitEnabled})`);
+      // Determine commit mode - default to checkpoint for backwards compatibility
+      let commitMode: 'structured' | 'checkpoint' | 'disabled' = 'checkpoint';
+      let commitModeSettings: CommitModeSettings = {
+        mode: 'checkpoint',
+        checkpointPrefix: 'checkpoint: '
+      };
       
-      // Auto-commit any uncommitted changes if enabled
-      if (autoCommitEnabled) {
-        try {
-          // Check if there are uncommitted changes
-          const statusOutput = execSync('git status --porcelain', { 
-            cwd: context.worktreePath, 
-            encoding: 'utf8' 
-          }).trim();
-          
-          if (statusOutput) {
-            this.logger?.verbose(`Found uncommitted changes, auto-committing...`);
-            
-            // Stage all changes
-            execSync('git add -A', { cwd: context.worktreePath });
-            
-            // Create commit message from prompt or use default
-            let commitMessage = context.prompt || `Claude Code execution ${context.executionSequence}`;
-            
-            // Truncate long prompts for commit messages
-            const MAX_COMMIT_MESSAGE_LENGTH = 50; // Limit to 50 characters as requested
-            if (commitMessage.length > MAX_COMMIT_MESSAGE_LENGTH) {
-              // Truncate to fit within the limit, leaving room for ellipsis
-              commitMessage = commitMessage.substring(0, MAX_COMMIT_MESSAGE_LENGTH - 3) + '...';
-            }
-            
-            // Commit with the prompt as the message using safe escaping
-            const commitCommand = buildGitCommitCommand(commitMessage);
-            execSync(commitCommand, { cwd: context.worktreePath });
-            
-            this.logger?.verbose(`Auto-committed changes with message: ${commitMessage}`);
+      if (session?.commitMode) {
+        commitMode = session.commitMode;
+        this.logger?.verbose(`Using session.commitMode: ${commitMode}`);
+        
+        // Update the commitModeSettings.mode to match the actual mode
+        commitModeSettings.mode = commitMode;
+        
+        if (session.commitModeSettings) {
+          try {
+            const parsedSettings = JSON.parse(session.commitModeSettings);
+            commitModeSettings = { ...commitModeSettings, ...parsedSettings, mode: commitMode };
+            this.logger?.verbose(`Parsed commit mode settings: ${JSON.stringify(commitModeSettings)}`);
+          } catch (e) {
+            this.logger?.error(`Failed to parse commit mode settings: ${e}`);
           }
-        } catch (commitError: any) {
-        this.logger?.error(`Failed to auto-commit changes:`, commitError instanceof Error ? commitError : undefined);
-        
-        // Add error to session output so users can see what went wrong
-        const errorDetails = commitError.stderr || commitError.stdout || commitError.message || 'Unknown error';
-        const timestamp = formatForDisplay(new Date());
-        
-        // Use the same truncation logic for the error message display
-        let displayMessage = context.prompt || `Claude Code execution ${context.executionSequence}`;
-        const MAX_COMMIT_MESSAGE_LENGTH = 50;
-        if (displayMessage.length > MAX_COMMIT_MESSAGE_LENGTH) {
-          displayMessage = displayMessage.substring(0, MAX_COMMIT_MESSAGE_LENGTH - 3) + '...';
         }
-        
+      } else if (session?.autoCommit !== undefined) {
+        // Backwards compatibility: convert autoCommit boolean to commit mode
+        commitMode = session.autoCommit ? 'checkpoint' : 'disabled';
+        commitModeSettings.mode = commitMode;
+        this.logger?.verbose(`Using legacy autoCommit (${session.autoCommit}) -> commit mode: ${commitMode}`);
+      }
+      
+      this.logger?.verbose(`Final commit mode for session ${sessionId}: ${commitMode}`);
+      
+      // Handle post-prompt commit based on mode
+      const commitResult = await commitManager.handlePostPromptCommit(
+        sessionId,
+        context.worktreePath,
+        commitModeSettings,
+        context.prompt,
+        context.executionSequence
+      );
+      
+      if (!commitResult.success && commitResult.error) {
+        // Add error to session output so users can see what went wrong
+        const timestamp = formatForDisplay(new Date());
         const errorMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[41m\x1b[37m ❌ GIT COMMIT FAILED \x1b[0m\r\n` +
-                           `\x1b[91mFailed to auto-commit changes during Claude Code execution.\x1b[0m\r\n` +
-                           `\x1b[91mThis usually means a pre-commit hook failed.\x1b[0m\r\n\r\n` +
-                           `\x1b[90mCommand: git commit -m "${displayMessage}"\x1b[0m\r\n\r\n` +
-                           `\x1b[91mError output:\x1b[0m\r\n${errorDetails}\r\n\r\n` +
+                           `\x1b[91mFailed to create commit during Claude Code execution.\x1b[0m\r\n` +
+                           `\x1b[91mError: ${commitResult.error}\x1b[0m\r\n\r\n` +
                            `\x1b[93m⚠️  Changes remain uncommitted. You may need to fix the issues and commit manually.\x1b[0m\r\n\r\n`;
         
         this.sessionManager.addSessionOutput(sessionId, {
@@ -135,11 +132,20 @@ export class ExecutionTracker extends EventEmitter {
           data: errorMessage,
           timestamp: new Date()
         });
+      }
+      
+      // For structured mode, we may need to wait for Claude to create the commit
+      if (commitMode === 'structured') {
+        this.logger?.verbose(`Waiting for structured commit from Claude...`);
+        const structuredCommitResult = await commitManager.waitForStructuredCommit(
+          sessionId,
+          context.worktreePath,
+          5000 // 5 second timeout for now, can be adjusted
+        );
         
-        // Continue with diff capture even if commit fails
+        if (!structuredCommitResult.success) {
+          this.logger?.warn(`Structured commit not detected: ${structuredCommitResult.error}`);
         }
-      } else {
-        this.logger?.verbose(`Auto-commit is disabled for session ${sessionId}, skipping commit`);
       }
       
       // Get the current commit hash after auto-commit

@@ -20,6 +20,7 @@ import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
 import { ClaudeCodeManager } from './services/claudeCodeManager';
+import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
 let taskQueue: TaskQueue | null = null;
@@ -112,14 +113,43 @@ async function createWindow() {
       return originalHandle.call(this, channel, wrappedListener);
     };
   } else {
-    // Log the path we're trying to load
-    const indexPath = path.join(__dirname, '../../frontend/dist/index.html');
-    console.log('Loading index.html from:', indexPath);
+    // In production/packaged apps, we need to handle the file path differently
+    let indexPath: string;
+    
+    if (app.isPackaged) {
+      // In packaged app, the structure is different
+      // __dirname is /app.asar/main/dist/main/src/
+      // We need to go up to /app.asar/frontend/dist/index.html
+      indexPath = path.join(__dirname, '..', '..', '..', '..', 'frontend', 'dist', 'index.html');
+    } else {
+      // In development build (not packaged), use app path
+      const appPath = app.getAppPath();
+      indexPath = path.join(appPath, 'frontend', 'dist', 'index.html');
+    }
+    
+    console.log('Loading production build...');
+    console.log('App is packaged:', app.isPackaged);
+    console.log('__dirname:', __dirname);
+    console.log('Index path:', indexPath);
 
     try {
       await mainWindow.loadFile(indexPath);
     } catch (error) {
       console.error('Failed to load index.html:', error);
+      
+      // Show detailed error in the window for debugging
+      const appPath = app.getAppPath();
+      mainWindow.loadURL(`data:text/html,<h1>Failed to load application</h1>
+        <p>Could not find index.html at: ${indexPath}</p>
+        <p>Error: ${error}</p>
+        <p>Debug info:</p>
+        <ul>
+          <li>App is packaged: ${app.isPackaged}</li>
+          <li>App path: ${appPath}</li>
+          <li>__dirname: ${__dirname}</li>
+          <li>Expected path: ${indexPath}</li>
+        </ul>
+      `);
     }
   }
 
@@ -142,9 +172,32 @@ async function createWindow() {
     if (message.includes('Electron Security Warning') || sourceId.includes('electron/js2c')) {
       return;
     }
-    // Only log errors and warnings from renderer, not all messages
-    if (level >= 2) { // 2 = warning, 3 = error
-      console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+    
+    // In development, log ALL console messages to help with debugging
+    if (isDevelopment) {
+      const levelNames = ['verbose', 'info', 'warning', 'error'];
+      const levelName = levelNames[level] || 'unknown';
+      const timestamp = new Date().toISOString();
+      const logMessage = `[${timestamp}] [FRONTEND ${levelName.toUpperCase()}] ${message}`;
+      
+      // Always log to main console
+      console.log(`[Renderer ${levelName}] ${message} (${sourceId}:${line})`);
+      
+      // Also write to debug log file for Claude Code to read
+      const debugLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
+      const logLine = `${logMessage} (${path.basename(sourceId)}:${line})\n`;
+      
+      try {
+        fs.appendFileSync(debugLogPath, logLine);
+      } catch (error) {
+        // Don't crash if we can't write to the log file
+        console.error('Failed to write to debug log:', error);
+      }
+    } else {
+      // In production, only log errors and warnings from renderer
+      if (level >= 2) { // 2 = warning, 3 = error
+        console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+      }
     }
   });
 
@@ -377,11 +430,32 @@ async function initializeServices() {
     stravuNotebookService,
     taskQueue,
     getMainWindow: () => mainWindow,
+    logger,
   };
 
   // Set up IPC event listeners for real-time updates
   setupEventListeners(services, () => mainWindow);
   registerIpcHandlers(services);
+  
+  // Register console logging IPC handler for development
+  if (isDevelopment) {
+    ipcMain.handle('console:log', (event, logData) => {
+      const { level, args, timestamp, source } = logData;
+      const message = args.join(' ');
+      const logLine = `[${timestamp}] [${source.toUpperCase()} ${level.toUpperCase()}] ${message}\n`;
+      
+      // Write to debug log file
+      const debugLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
+      try {
+        fs.appendFileSync(debugLogPath, logLine);
+      } catch (error) {
+        console.error('Failed to write console log to debug file:', error);
+      }
+      
+      // Also log to main console with prefix
+      console.log(`[Frontend ${level}] ${message}`);
+    });
+  }
   
   // Start periodic version checking (only if enabled in settings)
   versionChecker.startPeriodicCheck();

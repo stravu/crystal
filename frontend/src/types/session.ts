@@ -23,6 +23,10 @@ export interface Session {
   model?: string;
   archived?: boolean;
   gitStatus?: GitStatus;
+  baseCommit?: string;
+  baseBranch?: string;
+  commitMode?: 'structured' | 'checkpoint' | 'disabled';
+  commitModeSettings?: string; // JSON string of CommitModeSettings
 }
 
 export interface GitStatus {
@@ -57,6 +61,8 @@ export interface CreateSessionRequest {
   baseBranch?: string;
   autoCommit?: boolean;
   model?: string;
+  commitMode?: 'structured' | 'checkpoint' | 'disabled';
+  commitModeSettings?: string; // JSON string of CommitModeSettings
 }
 
 export interface SessionOutput {

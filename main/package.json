@@ -2,13 +2,13 @@
   "name": "main",
   "version": "0.1.16",
   "description": "Electron main process for Claude Code Commander",
-  "main": "dist/index.js",
+  "main": "dist/main/src/index.js",
   "type": "commonjs",
   "scripts": {
     "dev": "tsc -w",
     "build": "rimraf dist && tsc && npm run copy:assets && npm run bundle:mcp",
     "bundle:mcp": "node build-mcp-bridge.js",
-    "copy:assets": "mkdirp dist/database/migrations && cp src/database/*.sql dist/database/ && cp src/database/migrations/*.sql dist/database/migrations/",
+    "copy:assets": "mkdirp dist/main/src/database/migrations && cp src/database/*.sql dist/main/src/database/ && cp src/database/migrations/*.sql dist/main/src/database/migrations/",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },

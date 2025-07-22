@@ -1270,7 +1270,7 @@ export function DraggableProjectTreeView() {
                   ({folderSessions.length})
                 </span>
                 {folderUnviewedCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full animate-pulse">
+                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full">
                     {folderUnviewedCount}
                   </span>
                 )}
@@ -1444,7 +1444,7 @@ export function DraggableProjectTreeView() {
                     {project.name}
                   </span>
                   {unviewedCount > 0 && (
-                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full animate-pulse">
+                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full">
                       {unviewedCount}
                     </span>
                   )}

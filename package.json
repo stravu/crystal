@@ -8,7 +8,7 @@
     "email": "jordan@stravu.com"
   },
   "license": "MIT",
-  "main": "main/dist/index.js",
+  "main": "main/dist/main/src/index.js",
   "engines": {
     "node": ">=22.14.0",
     "pnpm": ">=8.0.0"
@@ -30,9 +30,14 @@
     "build:mac:universal": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --universal --publish never",
     "build:mac:x64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --x64 --publish never",
     "build:mac:arm64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --arm64 --publish never",
+    "build:mac:dev": "BUILD_TYPE=dev pnpm run build:frontend && pnpm run build:main && BUILD_TYPE=dev pnpm run inject-build-info && pnpm run generate-notices && npm version --no-git-tag-version \"$(node -p 'require(\"./package.json\").version + \"-dev\"')\" && electron-builder --mac --publish never && git checkout -- package.json",
+    "build:mac:test": "BUILD_TYPE=test pnpm run build:frontend && pnpm run build:main && BUILD_TYPE=test pnpm run inject-build-info && pnpm run generate-notices && npm version --no-git-tag-version \"$(node -p 'require(\"./package.json\").version + \"-test\"')\" && electron-builder --mac --publish never && git checkout -- package.json",
+    "build:mac:nightly": "BUILD_TYPE=nightly pnpm run build:frontend && pnpm run build:main && BUILD_TYPE=nightly pnpm run inject-build-info && pnpm run generate-notices && npm version --no-git-tag-version \"$(node -p 'require(\"./package.json\").version + \"-nightly\"')\" && electron-builder --mac --publish never && git checkout -- package.json",
     "build:linux": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
     "build:linux:ci": "pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
     "build:mac:ci": "pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish never",
+    "build:mac:ci:dev": "BUILD_TYPE=dev pnpm run inject-build-info && pnpm run generate-notices && npm version --no-git-tag-version \"$(node -p 'require(\"./package.json\").version + \"-dev\"')\" && electron-builder --mac --publish never && git checkout -- package.json",
+    "build:linux:ci:dev": "BUILD_TYPE=dev pnpm run inject-build-info && pnpm run generate-notices && npm version --no-git-tag-version \"$(node -p 'require(\"./package.json\").version + \"-dev\"')\" && electron-builder --linux --publish never && git checkout -- package.json",
     "inject-build-info": "node scripts/inject-build-info.js",
     "release:mac": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --publish always",
     "release:mac:universal": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --universal --publish always",
@@ -45,8 +50,8 @@
     "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild",
     "generate-notices": "node scripts/generate-notices.js",
     "test": "playwright test",
-    "test:ci": "playwright test --config=playwright.ci.config.ts",
-    "test:ci:minimal": "playwright test --config=playwright.ci.minimal.config.ts",
+    "test:ci": "CI=true playwright test",
+    "test:ci:minimal": "CI=true PLAYWRIGHT_MINIMAL=true playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed"
   },

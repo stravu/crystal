@@ -2,9 +2,18 @@ import { app, BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
 export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): void {
+  // Skip auto-updater for development builds (versions with suffixes like -dev, -test, -nightly)
+  const appVersion = app.getVersion();
+  const isDevelopmentBuild = /-dev$|-test$|-nightly$/.test(appVersion);
+  
   // Only setup auto-updater for packaged apps (not development)
   if (!app.isPackaged && !process.env.TEST_UPDATES) {
     console.log('[AutoUpdater] App is not packaged, skipping auto-updater setup');
+    return;
+  }
+
+  if (isDevelopmentBuild && !process.env.TEST_UPDATES) {
+    console.log('[AutoUpdater] Development build detected (version:', appVersion, '), skipping auto-updater setup');
     return;
   }
 
