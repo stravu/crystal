@@ -88,6 +88,7 @@ interface ElectronAPI {
     // Git pull/push operations
     gitPull: (sessionId: string) => Promise<IPCResponse>;
     gitPush: (sessionId: string) => Promise<IPCResponse>;
+    getGitStatus: (sessionId: string) => Promise<IPCResponse>;
     getLastCommits: (sessionId: string, count: number) => Promise<IPCResponse>;
 
     // IDE operations
@@ -145,6 +146,12 @@ interface ElectronAPI {
     getByPromptId: (promptId: string) => Promise<IPCResponse>;
   };
 
+  // File operations
+  file: {
+    listProject: (projectId: number, path?: string) => Promise<IPCResponse>;
+    readProject: (projectId: number, filePath: string) => Promise<IPCResponse>;
+  };
+
   // Dialog
   dialog: {
     openFile: (options?: any) => Promise<IPCResponse<string | null>>;
@@ -168,6 +175,11 @@ interface ElectronAPI {
     searchNotebooks: (query: string, limit?: number) => Promise<IPCResponse>;
   };
 
+  // Dashboard
+  dashboard: {
+    getProjectStatus: (projectId: number) => Promise<IPCResponse>;
+  };
+
   // UI State management
   uiState: {
     getExpanded: () => Promise<IPCResponse<{ expandedProjects: number[]; expandedFolders: string[] }>>;
@@ -184,6 +196,8 @@ interface ElectronAPI {
     onSessionsLoaded: (callback: (sessions: any[]) => void) => () => void;
     onSessionOutput: (callback: (output: any) => void) => () => void;
     onSessionOutputAvailable: (callback: (info: any) => void) => () => void;
+    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => () => void;
+    onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => () => void;
     
     // Project events
     onProjectUpdated: (callback: (project: any) => void) => () => void;

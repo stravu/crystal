@@ -21,6 +21,10 @@ export class Logger {
   private readonly MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
   private readonly MAX_LOG_FILES = 5;
   private originalConsole = ORIGINAL_CONSOLE;
+  private isReinitializing = false;
+  private writeQueue: Array<{ message: string; callback?: (error?: Error) => void }> = [];
+  private isProcessingQueue = false;
+  private isInErrorHandler = false; // Prevent recursion in error handling
 
   constructor(private configManager: ConfigManager) {
     // Use the centralized Crystal directory
@@ -31,6 +35,12 @@ export class Logger {
   }
 
   private initializeLogger() {
+    if (this.isReinitializing) {
+      return; // Prevent multiple simultaneous reinitializations
+    }
+    
+    this.isReinitializing = true;
+    
     try {
       // Create logs directory if it doesn't exist
       if (!fs.existsSync(this.logDir)) {
@@ -48,8 +58,13 @@ export class Logger {
       
       // Clean up old log files
       this.cleanupOldLogs();
+      
+      // Process any queued writes
+      this.processWriteQueue();
     } catch (error) {
       this.originalConsole.error('[Logger] Failed to initialize file logging:', error);
+    } finally {
+      this.isReinitializing = false;
     }
   }
 
@@ -113,21 +128,87 @@ export class Logger {
   }
 
   private writeToFile(logMessage: string) {
-    if (!this.logStream) return;
-
-    try {
-      const messageWithNewline = logMessage + '\n';
-      const messageSize = Buffer.byteLength(messageWithNewline);
+    const messageWithNewline = logMessage + '\n';
+    
+    // Add to queue
+    this.writeQueue.push({
+      message: messageWithNewline,
+      callback: (error) => {
+        if (error) {
+          this.handleWriteError(error);
+        }
+      }
+    });
+    
+    // Process queue if not already processing
+    if (!this.isProcessingQueue) {
+      this.processWriteQueue();
+    }
+  }
+  
+  private processWriteQueue() {
+    if (this.isProcessingQueue || this.writeQueue.length === 0) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    
+    const processNext = () => {
+      if (this.writeQueue.length === 0) {
+        this.isProcessingQueue = false;
+        return;
+      }
+      
+      const { message, callback } = this.writeQueue.shift()!;
+      
+      if (!this.logStream || this.logStream.destroyed) {
+        // Queue the write for after reinitialization
+        this.writeQueue.unshift({ message, callback });
+        this.isProcessingQueue = false;
+        if (!this.isReinitializing) {
+          this.initializeLogger();
+        }
+        return;
+      }
+      
+      const messageSize = Buffer.byteLength(message);
       
       // Check if we need to rotate before writing
       if (this.currentLogSize + messageSize >= this.MAX_LOG_SIZE) {
         this.rotateLogIfNeeded();
       }
-
-      this.logStream.write(messageWithNewline);
-      this.currentLogSize += messageSize;
-    } catch (error) {
-      this.originalConsole.error('[Logger] Failed to write to log file:', error);
+      
+      // Write with callback
+      this.logStream.write(message, (writeError) => {
+        if (writeError) {
+          if (callback) callback(writeError);
+        } else {
+          // Only increment size on successful write
+          this.currentLogSize += messageSize;
+        }
+        
+        // Process next item in queue
+        processNext();
+      });
+    };
+    
+    processNext();
+  }
+  
+  private handleWriteError(error: any) {
+    if (error.code === 'EPIPE') {
+      // Stream was closed, reinitialize
+      this.logStream = null;
+      if (!this.isReinitializing) {
+        this.initializeLogger();
+      }
+    } else {
+      // Only log non-EPIPE errors to avoid infinite recursion
+      try {
+        this.originalConsole.error('[Logger] Failed to write to log file:', error);
+      } catch {
+        // Silently fail if console is also broken
+      }
     }
   }
 
@@ -136,11 +217,34 @@ export class Logger {
     const errorInfo = error ? ` Error: ${error.message}\nStack: ${error.stack}` : '';
     const fullMessage = `[${timestamp}] ${level}: ${message}${errorInfo}`;
     
-    // Always log to console using the original console method to avoid recursion
-    this.originalConsole.log(fullMessage);
+    // Try to log to console, but handle EPIPE errors gracefully
+    try {
+      // Always log to console using the original console method to avoid recursion
+      this.originalConsole.log(fullMessage);
+    } catch (consoleError: any) {
+      // If console logging fails (e.g., EPIPE), just write to file
+      if (consoleError.code !== 'EPIPE' && !this.isInErrorHandler) {
+        // Prevent recursion by setting flag
+        this.isInErrorHandler = true;
+        try {
+          // For non-EPIPE errors, try to at least write the error to file
+          // Use a direct write to avoid potential recursion through writeToFile
+          const errorMessage = `[${timestamp}] ERROR: Failed to write to console: ${consoleError.message}\n`;
+          if (this.logStream && !this.logStream.destroyed) {
+            this.logStream.write(errorMessage);
+          }
+        } catch {
+          // Silently fail - we've done our best
+        } finally {
+          this.isInErrorHandler = false;
+        }
+      }
+    }
     
-    // Also write to file
-    this.writeToFile(fullMessage);
+    // Also write to file (unless we're in error handler to prevent recursion)
+    if (!this.isInErrorHandler) {
+      this.writeToFile(fullMessage);
+    }
   }
 
   verbose(message: string) {
@@ -163,6 +267,10 @@ export class Logger {
 
   // Close the log stream when shutting down
   close() {
+    // Clear the write queue
+    this.writeQueue = [];
+    this.isProcessingQueue = false;
+    
     if (this.logStream) {
       this.logStream.end();
       this.logStream = null;

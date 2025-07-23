@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Git pull/push operations
     gitPull: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:git-pull', sessionId),
     gitPush: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:git-push', sessionId),
+    getGitStatus: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-git-status', sessionId),
     getLastCommits: (sessionId: string, count: number): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-last-commits', sessionId, count),
     
     // Git operation helpers
@@ -156,6 +157,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectBranch: (path: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:detect-branch', path),
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>): Promise<IPCResponse> => ipcRenderer.invoke('projects:reorder', projectOrders),
     listBranches: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:list-branches', projectId),
+    refreshGitStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('projects:refresh-git-status', projectId),
   },
 
   // Git operations
@@ -186,6 +188,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getByPromptId: (promptId: string): Promise<IPCResponse> => ipcRenderer.invoke('prompts:get-by-id', promptId),
   },
 
+  // File operations
+  file: {
+    listProject: (projectId: number, path?: string): Promise<IPCResponse> => ipcRenderer.invoke('file:list-project', { projectId, path }),
+    readProject: (projectId: number, filePath: string): Promise<IPCResponse> => ipcRenderer.invoke('file:read-project', { projectId, filePath }),
+  },
+
   // Dialog
   dialog: {
     openFile: (options?: any): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-file', options),
@@ -207,6 +215,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getNotebooks: (): Promise<IPCResponse> => ipcRenderer.invoke('stravu:get-notebooks'),
     getNotebook: (notebookId: string): Promise<IPCResponse> => ipcRenderer.invoke('stravu:get-notebook', notebookId),
     searchNotebooks: (query: string, limit?: number): Promise<IPCResponse> => ipcRenderer.invoke('stravu:search-notebooks', query, limit),
+  },
+
+  // Dashboard
+  dashboard: {
+    getProjectStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('dashboard:get-project-status', projectId),
   },
 
   // UI State management
@@ -239,6 +252,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const wrappedCallback = (_event: any, sessions: any[]) => callback(sessions);
       ipcRenderer.on('sessions:loaded', wrappedCallback);
       return () => ipcRenderer.removeListener('sessions:loaded', wrappedCallback);
+    },
+    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => {
+      const wrappedCallback = (_event: any, data: { sessionId: string; gitStatus: any }) => callback(data);
+      ipcRenderer.on('git-status-updated', wrappedCallback);
+      return () => ipcRenderer.removeListener('git-status-updated', wrappedCallback);
+    },
+    onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => {
+      const wrappedCallback = (_event: any, data: { sessionId: string }) => callback(data);
+      ipcRenderer.on('git-status-loading', wrappedCallback);
+      return () => ipcRenderer.removeListener('git-status-loading', wrappedCallback);
     },
     onSessionOutput: (callback: (output: any) => void) => {
       const wrappedCallback = (_event: any, output: any) => callback(output);

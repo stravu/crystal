@@ -219,6 +219,11 @@ export class API {
       return window.electronAPI.sessions.gitPush(sessionId);
     },
 
+    async getGitStatus(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getGitStatus(sessionId);
+    },
+
     async getLastCommits(sessionId: string, count: number = 20) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.getLastCommits(sessionId, count);

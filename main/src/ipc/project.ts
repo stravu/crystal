@@ -265,4 +265,39 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       return { success: false, error: 'Failed to list branches' };
     }
   });
+
+  ipcMain.handle('projects:refresh-git-status', async (_event, projectId: string) => {
+    try {
+      const projectIdNum = parseInt(projectId);
+      
+      // Check if the project exists
+      const project = databaseService.getProject(projectIdNum);
+      if (!project) {
+        return { success: false, error: 'Project not found' };
+      }
+      
+      // Get all sessions for this project
+      const sessions = await sessionManager.getAllSessions();
+      const projectSessions = sessions.filter(s => s.projectId === projectIdNum && !s.archived && s.status !== 'error');
+      
+      // Use gitStatusManager from services
+      const { gitStatusManager } = services;
+      
+      // Refresh git status for each session
+      let refreshedCount = 0;
+      for (const session of projectSessions) {
+        if (session.worktreePath) {
+          await gitStatusManager.refreshSessionGitStatus(session.id, true); // true = user initiated
+          refreshedCount++;
+        }
+      }
+      
+      console.log(`[Main] Refreshed git status for ${refreshedCount} sessions`);
+      
+      return { success: true, data: { count: refreshedCount } };
+    } catch (error) {
+      console.error('[Main] Failed to refresh project git status:', error);
+      return { success: false, error: 'Failed to refresh git status' };
+    }
+  });
 } 

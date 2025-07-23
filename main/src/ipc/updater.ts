@@ -4,6 +4,7 @@ import type { AppServices } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
 import { commandExecutor } from '../utils/commandExecutor';
+import { getCurrentWorktreeName } from '../utils/worktreeUtils';
 
 export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker }: AppServices): void {
   // Version checking handlers
@@ -19,9 +20,14 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
 
   ipcMain.handle('version:get-info', () => {
     try {
+      console.log('🚀 [WORKTREE DEBUG] version:get-info called - NEW BUILD!');
+      console.log('🚀 [WORKTREE DEBUG] app.isPackaged:', app.isPackaged);
+      console.log('🚀 [WORKTREE DEBUG] process.cwd():', process.cwd());
+      
       let buildDate: string | undefined;
       let gitCommit: string | undefined;
       let buildTimestamp: number | undefined;
+      let worktreeName: string | undefined;
       
       // Try to read build info if in packaged app
       if (app.isPackaged) {
@@ -40,6 +46,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
 
       // For development builds, try to get git commit hash dynamically
       if (!app.isPackaged) {
+        console.log('[Version Debug] Development mode detected, getting git info...');
         try {
           const gitHash = commandExecutor.execSync('git rev-parse --short HEAD', { 
             encoding: 'utf8',
@@ -57,22 +64,38 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
             // Working directory has uncommitted changes
             gitCommit = `${gitHash} (modified)`;
           }
+          console.log('[Version Debug] Git commit:', gitCommit);
         } catch (err) {
           console.log('Could not get git commit:', err);
           gitCommit = 'unknown';
         }
+
+        // Detect current worktree name for development builds only
+        worktreeName = getCurrentWorktreeName(process.cwd());
+        console.log('[Version Debug] Worktree name:', worktreeName);
       }
 
+      const responseData: any = {
+        current: app.getVersion(),
+        name: app.getName(),
+        workingDirectory: process.cwd(),
+        buildDate,
+        gitCommit,
+        buildTimestamp
+      };
+
+      // Only include worktreeName in development builds and when defined
+      if (!app.isPackaged && worktreeName) {
+        responseData.worktreeName = worktreeName;
+        console.log('[Version Debug] Adding worktreeName to response:', worktreeName);
+      } else {
+        console.log('[Version Debug] Not adding worktreeName. isPackaged:', app.isPackaged, 'worktreeName:', worktreeName);
+      }
+
+      console.log('[Version Debug] Final response data:', responseData);
       return {
         success: true,
-        data: {
-          current: app.getVersion(),
-          name: app.getName(),
-          workingDirectory: process.cwd(),
-          buildDate,
-          gitCommit,
-          buildTimestamp
-        }
+        data: responseData
       };
     } catch (error) {
       console.error('Failed to get version info:', error);

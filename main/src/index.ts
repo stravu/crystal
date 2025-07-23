@@ -9,6 +9,7 @@ import { ConfigManager } from './services/configManager';
 import { WorktreeManager } from './services/worktreeManager';
 import { WorktreeNameGenerator } from './services/worktreeNameGenerator';
 import { GitDiffManager } from './services/gitDiffManager';
+import { GitStatusManager } from './services/gitStatusManager';
 import { ExecutionTracker } from './services/executionTracker';
 import { DatabaseService } from './database/database';
 import { RunCommandManager } from './services/runCommandManager';
@@ -18,14 +19,40 @@ import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
 import { setCrystalDirectory } from './utils/crystalDirectory';
+import { getCurrentWorktreeName } from './utils/worktreeUtils';
 import { registerIpcHandlers } from './ipc';
 import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
 import { ClaudeCodeManager } from './services/claudeCodeManager';
+import { setupConsoleWrapper } from './utils/consoleWrapper';
 import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * Set the application title based on development mode and worktree
+ */
+function setAppTitle() {
+  if (!app.isPackaged) {
+    const worktreeName = getCurrentWorktreeName(process.cwd());
+    if (worktreeName) {
+      const title = `Crystal [${worktreeName}]`;
+      console.log('🎯 [APP TITLE] Setting development title:', title);
+      if (mainWindow) {
+        mainWindow.setTitle(title);
+      }
+      return title;
+    }
+  }
+  
+  // Default title
+  const title = 'Crystal';
+  if (mainWindow) {
+    mainWindow.setTitle(title);
+  }
+  return title;
+}
 let taskQueue: TaskQueue | null = null;
 
 // Service instances
@@ -35,6 +62,7 @@ let sessionManager: SessionManager;
 let worktreeManager: WorktreeManager;
 let claudeCodeManager: ClaudeCodeManager;
 let gitDiffManager: GitDiffManager;
+let gitStatusManager: GitStatusManager;
 let executionTracker: ExecutionTracker;
 let worktreeNameGenerator: WorktreeNameGenerator;
 let databaseService: DatabaseService;
@@ -52,6 +80,9 @@ const originalWarn: typeof console.warn = console.warn;
 const originalInfo: typeof console.info = console.info;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
+
+// Set up console wrapper to reduce logging in production
+setupConsoleWrapper();
 
 // Parse command-line arguments for custom Crystal directory
 const args = process.argv.slice(2);
@@ -138,6 +169,9 @@ async function createWindow() {
       }
     }
   }
+
+  // Set the app title based on development mode and worktree
+  setAppTitle();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -335,6 +369,19 @@ async function createWindow() {
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('Renderer process crashed:', details);
   });
+
+  // Handle window focus/blur for smart git status polling
+  mainWindow.on('focus', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(false); // false = visible/focused
+    }
+  });
+
+  mainWindow.on('blur', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(true); // true = hidden/blurred
+    }
+  });
 }
 
 async function initializeServices() {
@@ -381,6 +428,7 @@ async function initializeServices() {
 
   claudeCodeManager = new ClaudeCodeManager(sessionManager, logger, configManager, permissionIpcPath);
   gitDiffManager = new GitDiffManager();
+  gitStatusManager = new GitStatusManager(sessionManager, worktreeManager, gitDiffManager, logger);
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
   runCommandManager = new RunCommandManager(databaseService);
@@ -408,6 +456,7 @@ async function initializeServices() {
     worktreeManager,
     claudeCodeManager,
     gitDiffManager,
+    gitStatusManager,
     executionTracker,
     worktreeNameGenerator,
     runCommandManager,
@@ -445,6 +494,9 @@ async function initializeServices() {
   
   // Start periodic version checking (only if enabled in settings)
   versionChecker.startPeriodicCheck();
+  
+  // Start git status polling
+  gitStatusManager.startPolling();
 }
 
 app.whenReady().then(async () => {
@@ -490,6 +542,13 @@ app.on('before-quit', async () => {
     console.log('[Main] Stopping all run commands...');
     await runCommandManager.stopAllRunCommands();
     console.log('[Main] Run commands stopped');
+  }
+  
+  // Stop git status polling
+  if (gitStatusManager) {
+    console.log('[Main] Stopping git status polling...');
+    gitStatusManager.stopPolling();
+    console.log('[Main] Git status polling stopped');
   }
 
   // Kill all Claude processes
