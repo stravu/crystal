@@ -5,6 +5,23 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { commandExecutor } from '../utils/commandExecutor';
 
+/**
+ * Extract worktree name from the current working directory path
+ * Returns the worktree name if running in a worktree, undefined if in main repository
+ */
+function getCurrentWorktreeName(cwd: string): string | undefined {
+  try {
+    // Match worktrees directory followed by worktree name
+    // Handles both Unix (/) and Windows (\) path separators
+    // For paths like "worktrees/feature/dev-mode-worktree-label", captures "feature/dev-mode-worktree-label"
+    const worktreeMatch = cwd.match(/worktrees[\/\\](.+)/);
+    return worktreeMatch ? worktreeMatch[1] : undefined;
+  } catch (error) {
+    console.log('Could not extract worktree name:', error);
+    return undefined;
+  }
+}
+
 export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker }: AppServices): void {
   // Version checking handlers
   ipcMain.handle('version:check-for-updates', async () => {
@@ -22,6 +39,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
       let buildDate: string | undefined;
       let gitCommit: string | undefined;
       let buildTimestamp: number | undefined;
+      let worktreeName: string | undefined;
       
       // Try to read build info if in packaged app
       if (app.isPackaged) {
@@ -61,18 +79,28 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
           console.log('Could not get git commit:', err);
           gitCommit = 'unknown';
         }
+
+        // Detect current worktree name for development builds only
+        worktreeName = getCurrentWorktreeName(process.cwd());
+      }
+
+      const responseData: any = {
+        current: app.getVersion(),
+        name: app.getName(),
+        workingDirectory: process.cwd(),
+        buildDate,
+        gitCommit,
+        buildTimestamp
+      };
+
+      // Only include worktreeName in development builds and when defined
+      if (!app.isPackaged && worktreeName) {
+        responseData.worktreeName = worktreeName;
       }
 
       return {
         success: true,
-        data: {
-          current: app.getVersion(),
-          name: app.getName(),
-          workingDirectory: process.cwd(),
-          buildDate,
-          gitCommit,
-          buildTimestamp
-        }
+        data: responseData
       };
     } catch (error) {
       console.error('Failed to get version info:', error);

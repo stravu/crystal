@@ -13,6 +13,7 @@ interface VersionInfo {
   buildDate?: string;
   gitCommit?: string;
   buildTimestamp?: number;
+  worktreeName?: string;
 }
 
 interface AboutDialogProps {
@@ -44,7 +45,8 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           workingDirectory: result.data.workingDirectory,
           buildDate: result.data.buildDate,
           gitCommit: result.data.gitCommit,
-          buildTimestamp: result.data.buildTimestamp
+          buildTimestamp: result.data.buildTimestamp,
+          worktreeName: result.data.worktreeName
         });
       }
     } catch (error) {
@@ -173,6 +175,17 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 </span>
                 <span className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={versionInfo.workingDirectory}>
                   {versionInfo.workingDirectory.split('/').pop() || versionInfo.workingDirectory}
+                </span>
+              </div>
+            )}
+
+            {versionInfo?.worktreeName && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Worktree
+                </span>
+                <span className="text-sm text-gray-900 dark:text-white font-mono">
+                  {versionInfo.worktreeName}
                 </span>
               </div>
             )}
