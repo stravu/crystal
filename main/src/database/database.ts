@@ -687,7 +687,6 @@ export class DatabaseService {
     const hasCommitModeColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
     const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_structured_prompt_template');
     const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_checkpoint_prefix');
-    const hasCommitAllowClaudeToolsColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_allow_claude_tools');
     
     if (!hasCommitModeColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN commit_mode TEXT DEFAULT 'checkpoint'").run();
@@ -702,11 +701,6 @@ export class DatabaseService {
     if (!hasCommitCheckpointPrefixColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN commit_checkpoint_prefix TEXT DEFAULT 'checkpoint: '").run();
       console.log('[Database] Added commit_checkpoint_prefix column to projects table');
-    }
-    
-    if (!hasCommitAllowClaudeToolsColumn) {
-      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_allow_claude_tools BOOLEAN DEFAULT 0").run();
-      console.log('[Database] Added commit_allow_claude_tools column to projects table');
     }
 
     // Add commit mode settings columns to sessions table if they don't exist
@@ -746,7 +740,7 @@ export class DatabaseService {
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitStructuredPromptTemplate?: string, commitCheckpointPrefix?: string, commitAllowClaudeTools?: boolean): Project {
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitStructuredPromptTemplate?: string, commitCheckpointPrefix?: string): Project {
     // Get the max display_order for projects
     const maxOrderResult = this.db.prepare(`
       SELECT MAX(display_order) as max_order 
@@ -756,9 +750,9 @@ export class DatabaseService {
     const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
     
     const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order, commit_mode, commit_structured_prompt_template, commit_checkpoint_prefix, commit_allow_claude_tools)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder, commitMode || 'checkpoint', commitStructuredPromptTemplate || null, commitCheckpointPrefix || 'checkpoint: ', commitAllowClaudeTools ? 1 : 0);
+      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order, commit_mode, commit_structured_prompt_template, commit_checkpoint_prefix)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder, commitMode || 'checkpoint', commitStructuredPromptTemplate || null, commitCheckpointPrefix || 'checkpoint: ');
     
     const project = this.getProject(result.lastInsertRowid as number);
     if (!project) {
@@ -847,10 +841,6 @@ export class DatabaseService {
     if (updates.commit_checkpoint_prefix !== undefined) {
       fields.push('commit_checkpoint_prefix = ?');
       values.push(updates.commit_checkpoint_prefix);
-    }
-    if (updates.commit_allow_claude_tools !== undefined) {
-      fields.push('commit_allow_claude_tools = ?');
-      values.push(updates.commit_allow_claude_tools ? 1 : 0);
     }
 
     if (fields.length === 0) {
