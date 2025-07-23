@@ -31,6 +31,9 @@ const migration: Migration = {
           active BOOLEAN NOT NULL DEFAULT 0,
           main_branch TEXT,
           display_order INTEGER,
+          commit_mode TEXT DEFAULT 'checkpoint',
+          commit_structured_prompt_template TEXT,
+          commit_checkpoint_prefix TEXT DEFAULT 'checkpoint: ',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -63,7 +66,9 @@ const migration: Migration = {
           is_favorite BOOLEAN DEFAULT 0,
           auto_commit BOOLEAN DEFAULT 1,
           model TEXT DEFAULT 'claude-sonnet-4-20250514',
-          folder_id TEXT -- Will be foreign key when folders table is created
+          folder_id TEXT, -- Will be foreign key when folders table is created
+          commit_mode TEXT,
+          commit_mode_settings TEXT
         )
       `);
     }

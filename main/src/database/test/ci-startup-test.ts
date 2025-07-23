@@ -136,8 +136,8 @@ async function testMigrationLocking(): Promise<void> {
     'SELECT COUNT(*) as count FROM _migrations'
   ).get() as { count: number };
   
-  if (migrationCount.count !== 7) {
-    throw new Error(`Expected 7 migrations, found ${migrationCount.count}`);
+  if (migrationCount.count !== 8) {
+    throw new Error(`Expected 8 migrations, found ${migrationCount.count}`);
   }
   
   db1.close();

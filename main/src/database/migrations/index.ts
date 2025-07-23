@@ -11,6 +11,7 @@ import projectManagement from './004-project-management';
 import uiPersistence from './005-ui-persistence';
 import indexesAndConstraints from './006-indexes-and-constraints';
 import sessionGitTracking from './007-session-git-tracking';
+import legacyColumns from './008-legacy-columns';
 
 // Register all migrations here
 export const migrations: Record<string, Migration> = {
@@ -21,6 +22,7 @@ export const migrations: Record<string, Migration> = {
   '005-ui-persistence.ts': uiPersistence,
   '006-indexes-and-constraints.ts': indexesAndConstraints,
   '007-session-git-tracking.ts': sessionGitTracking,
+  '008-legacy-columns.ts': legacyColumns,
 };
 
 // Export migrations as an array sorted by name
