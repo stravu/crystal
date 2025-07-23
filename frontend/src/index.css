@@ -257,35 +257,56 @@ body.light {
 }
 
 /* Markdown list styling fixes */
-.markdown-preview ol {
+.markdown-preview ol,
+.rich-output-markdown ol {
   list-style-type: decimal;
   list-style-position: outside;
 }
 
-.markdown-preview ul {
+.markdown-preview ul,
+.rich-output-markdown ul {
   list-style-type: disc;
   list-style-position: outside;
 }
 
-.markdown-preview ol ol {
+.markdown-preview ol ol,
+.rich-output-markdown ol ol {
   list-style-type: lower-alpha;
 }
 
-.markdown-preview ul ul {
+.markdown-preview ul ul,
+.rich-output-markdown ul ul {
   list-style-type: circle;
 }
 
-.markdown-preview li > p {
-  display: inline-block;
+.markdown-preview li > p,
+.rich-output-markdown li > p {
+  display: inline;
+  margin-bottom: 0;
+}
+
+.markdown-preview li > p:only-child,
+.rich-output-markdown li > p:only-child {
+  display: block;
   margin-bottom: 0.5rem;
 }
 
-.markdown-preview li > *:first-child {
-  display: inline-block;
+/* Keep list items as block-level but allow inline content flow */
+.markdown-preview li,
+.rich-output-markdown li {
+  display: list-item;
+}
+
+/* Ensure strong/bold text flows inline */
+.markdown-preview li strong,
+.rich-output-markdown li strong {
+  display: inline;
 }
 
 .markdown-preview li > ol,
-.markdown-preview li > ul {
+.markdown-preview li > ul,
+.rich-output-markdown li > ol,
+.rich-output-markdown li > ul {
   display: block;
   margin-top: 0.5rem;
 }
