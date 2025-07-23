@@ -37,7 +37,7 @@ export const ThinkingPlaceholder: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center p-8">
-      <div className="max-w-md w-full">
+      <div className="max-w-lg w-full">
         {/* Main container with subtle glow effect */}
         <div className="relative">
           {/* Glow background */}
@@ -146,18 +146,23 @@ export const wackyStatusMessages = [
 // Inline working indicator component
 export const InlineWorkingIndicator: React.FC = () => {
   const [messageIndex, setMessageIndex] = useState(0);
+  const [nextChangeTime, setNextChangeTime] = useState(3000);
 
   useEffect(() => {
     // Start with a random message
     setMessageIndex(Math.floor(Math.random() * wackyStatusMessages.length));
-    
-    // Change message every 2 seconds
-    const interval = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % wackyStatusMessages.length);
-    }, 2000);
-    
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    // Change message with variable timing (jitter)
+    const timeout = setTimeout(() => {
+      setMessageIndex((prev) => (prev + 1) % wackyStatusMessages.length);
+      // Random interval between 3 and 5 seconds
+      setNextChangeTime(3000 + Math.random() * 2000);
+    }, nextChangeTime);
+    
+    return () => clearTimeout(timeout);
+  }, [messageIndex, nextChangeTime]);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-surface-secondary/50 rounded-lg border border-border-primary animate-fadeIn">

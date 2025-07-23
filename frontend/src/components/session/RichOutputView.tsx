@@ -928,7 +928,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
           scrollbarColor: 'var(--color-border-secondary) transparent'
         }}
       >
-        <div className={`mx-auto ${settings.compactMode ? 'max-w-4xl' : 'max-w-3xl'} py-4`}>
+        <div className={`mx-auto ${settings.compactMode ? 'max-w-6xl' : 'max-w-5xl'} py-4`}>
           {messages.length === 0 ? (
             <div className="text-center text-text-tertiary py-8">
               No messages to display
