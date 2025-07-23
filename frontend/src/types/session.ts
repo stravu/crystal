@@ -89,3 +89,18 @@ export interface GitErrorDetails {
   projectPath?: string;
   isRebaseConflict?: boolean;
 }
+
+export interface RenameWorktreeRequest {
+  sessionId: string;
+  newName: string;
+}
+
+export interface RenameWorktreeResponse {
+  success: boolean;
+  data?: {
+    session: Session;
+    worktreePath: string;
+    branchName: string;
+  };
+  error?: string;
+}

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
-import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Edit } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { API } from '../../utils/api';
 import { CommitModeToggle } from '../CommitModeToggle';
@@ -56,6 +56,9 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const [isFocused, setIsFocused] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
+  const [isEditingBranch, setIsEditingBranch] = useState(false);
+  const [editBranchName, setEditBranchName] = useState('');
+  const [isRenamingBranch, setIsRenamingBranch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -268,16 +271,82 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
               
               {/* Branch Badge */}
               {gitCommands?.currentBranch && (
-                <div className="px-2.5 py-1 rounded-full text-xs font-medium
+                <div className="group px-2.5 py-1 rounded-full text-xs font-medium
                   bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 
                   border border-green-200 dark:border-green-800
                   flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12a3 3 0 003 3h6m-6-6l3-3-3-3m6 0a3 3 0 100 6 3 3 0 000-6z" />
                   </svg>
-                  <span className="leading-none font-mono">
-                    {gitCommands.currentBranch}
-                  </span>
+                  {isEditingBranch ? (
+                    <input
+                      type="text"
+                      value={editBranchName}
+                      onChange={(e) => setEditBranchName(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (editBranchName.trim() && editBranchName !== gitCommands.currentBranch) {
+                            setIsRenamingBranch(true);
+                            try {
+                              const response = await window.electronAPI.sessions.renameWorktree(activeSession.id, editBranchName.trim());
+                              if (response.success) {
+                                // Refresh git status to update the branch name
+                                await API.sessions.getGitStatus(activeSession.id);
+                                setIsEditingBranch(false);
+                              } else {
+                                console.error('Failed to rename worktree:', response.error);
+                                alert(`Failed to rename worktree: ${response.error}`);
+                              }
+                            } catch (error) {
+                              console.error('Error renaming worktree:', error);
+                              alert('Failed to rename worktree');
+                            } finally {
+                              setIsRenamingBranch(false);
+                            }
+                          } else {
+                            setIsEditingBranch(false);
+                          }
+                        } else if (e.key === 'Escape') {
+                          setIsEditingBranch(false);
+                          setEditBranchName(gitCommands.currentBranch || '');
+                        }
+                      }}
+                      onBlur={() => {
+                        setIsEditingBranch(false);
+                        setEditBranchName(gitCommands.currentBranch || '');
+                      }}
+                      className="bg-transparent border-none outline-none text-green-700 dark:text-green-300 font-mono w-32"
+                      autoFocus
+                      disabled={isRenamingBranch}
+                    />
+                  ) : (
+                    <>
+                      <span className="leading-none font-mono">
+                        {gitCommands.currentBranch}
+                      </span>
+                      {!activeSession.archived && (
+                        <button
+                          onClick={() => {
+                            setEditBranchName(gitCommands.currentBranch || '');
+                            setIsEditingBranch(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-green-600 dark:hover:text-green-400"
+                          title="Rename worktree"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {isRenamingBranch && (
+                    <div className="ml-1">
+                      <svg className="animate-spin h-3 w-3 text-green-600" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

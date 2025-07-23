@@ -1061,4 +1061,60 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('sessions:rename-worktree', async (_event, sessionId: string, newName: string) => {
+    try {
+      // Get the session
+      const session = await sessionManager.getSession(sessionId);
+      if (!session || !session.worktreePath) {
+        return { success: false, error: 'Session or worktree path not found' };
+      }
+
+      if (session.archived) {
+        return { success: false, error: 'Cannot rename worktree for archived session' };
+      }
+
+      // Get the project for this session
+      const project = sessionManager.getProjectForSession(sessionId);
+      if (!project) {
+        return { success: false, error: 'Project not found for session' };
+      }
+
+      // Extract current worktree name from path
+      const currentWorktreeName = session.worktreePath.split(/[\\/]/).pop() || '';
+      if (!currentWorktreeName) {
+        return { success: false, error: 'Could not determine current worktree name' };
+      }
+
+      console.log(`[IPC:git] Renaming worktree from ${currentWorktreeName} to ${newName} for session ${sessionId}`);
+
+      // Call the WorktreeManager to rename the worktree
+      const result = await worktreeManager.renameWorktree(project.path, currentWorktreeName, newName);
+
+      // Update the session in the database with new name and paths
+      await sessionManager.updateSession(sessionId, {
+        name: newName,
+        worktreePath: result.worktreePath
+      });
+
+      // Refresh git status for the renamed session
+      await refreshGitStatusForSession(sessionId);
+
+      // Return updated session data
+      const updatedSession = await sessionManager.getSession(sessionId);
+
+      return { 
+        success: true, 
+        data: {
+          session: updatedSession,
+          worktreePath: result.worktreePath,
+          branchName: result.branchName
+        }
+      };
+    } catch (error) {
+      console.error('Failed to rename worktree:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to rename worktree';
+      return { success: false, error: errorMessage };
+    }
+  });
 } 

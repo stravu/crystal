@@ -289,6 +289,16 @@ export class SessionManager extends EventEmitter {
       console.log(`[SessionManager] Updating model to ${update.model}`);
     }
     
+    if (update.name !== undefined) {
+      dbUpdate.name = update.name;
+      console.log(`[SessionManager] Updating name to ${update.name}`);
+    }
+    
+    if (update.worktreePath !== undefined) {
+      dbUpdate.worktree_path = update.worktreePath;
+      console.log(`[SessionManager] Updating worktree_path to ${update.worktreePath}`);
+    }
+    
     const updatedDbSession = this.db.updateSession(id, dbUpdate);
     if (!updatedDbSession) {
       console.error(`[SessionManager] Session ${id} not found in database`);

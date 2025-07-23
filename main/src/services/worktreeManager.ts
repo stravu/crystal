@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { join } from 'path';
-import { mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { mkdir, rename as fsRename } from 'fs/promises';
 import { getShellPath } from '../utils/shellPath';
 
 const execAsync = promisify(exec);
@@ -186,11 +186,11 @@ export class WorktreeManager {
     }
   }
 
-  async listWorktrees(projectPath: string): Promise<Array<{ path: string; branch: string }>> {
+  async listWorktrees(projectPath: string): Promise<Array<{ path: string; branch: string; name?: string }>> {
     try {
       const { stdout } = await execWithShellPath(`git worktree list --porcelain`, { cwd: projectPath });
       
-      const worktrees: Array<{ path: string; branch: string }> = [];
+      const worktrees: Array<{ path: string; branch: string; name?: string }> = [];
       const lines = stdout.split('\n');
       
       let currentWorktree: { path?: string; branch?: string } = {};
@@ -198,9 +198,12 @@ export class WorktreeManager {
       for (const line of lines) {
         if (line.startsWith('worktree ')) {
           if (currentWorktree.path && currentWorktree.branch) {
+            // Extract name from path
+            const name = currentWorktree.path.split(/[\\\/]/).pop();
             worktrees.push({ 
               path: currentWorktree.path, 
-              branch: currentWorktree.branch 
+              branch: currentWorktree.branch,
+              name
             });
           }
           currentWorktree = { path: line.substring(9) };
@@ -210,9 +213,12 @@ export class WorktreeManager {
       }
       
       if (currentWorktree.path && currentWorktree.branch) {
+        // Extract name from path
+        const name = currentWorktree.path.split(/[\\\/]/).pop();
         worktrees.push({ 
           path: currentWorktree.path, 
-          branch: currentWorktree.branch 
+          branch: currentWorktree.branch,
+          name
         });
       }
       
@@ -613,6 +619,84 @@ export class WorktreeManager {
       throw gitError;
     } finally {
       process.chdir(currentDir);
+    }
+  }
+
+  async renameWorktree(projectPath: string, oldWorktreeName: string, newWorktreeName: string): Promise<{ worktreePath: string; branchName: string }> {
+    try {
+      console.log(`[WorktreeManager] Renaming worktree from ${oldWorktreeName} to ${newWorktreeName} for project ${projectPath}`);
+      
+      // Validate new name doesn't conflict
+      const worktrees = await this.listWorktrees(projectPath);
+      const existingWorktree = worktrees.find(w => w.name === newWorktreeName);
+      if (existingWorktree) {
+        throw new Error(`Worktree with name '${newWorktreeName}' already exists`);
+      }
+      
+      // Get current worktree info
+      const currentWorktree = worktrees.find(w => w.name === oldWorktreeName);
+      if (!currentWorktree) {
+        throw new Error(`Worktree '${oldWorktreeName}' not found`);
+      }
+      
+      const oldPath = currentWorktree.path;
+      const newPath = join(dirname(oldPath), newWorktreeName);
+      const oldBranchName = currentWorktree.branch || oldWorktreeName;
+      const newBranchName = newWorktreeName;
+      
+      // Move the worktree directory
+      try {
+        // Try using git worktree move (available in git >= 2.17)
+        const moveResult = await execWithShellPath(
+          `git worktree move "${oldPath}" "${newPath}"`,
+          { cwd: projectPath }
+        );
+        console.log('[WorktreeManager] Worktree moved successfully:', moveResult.stdout);
+      } catch (moveError) {
+        // Fallback for older git versions - manual move
+        console.log('[WorktreeManager] git worktree move failed, trying manual move:', moveError);
+        
+        // First, prune any broken worktrees
+        await execWithShellPath('git worktree prune', { cwd: projectPath });
+        
+        // Move the directory
+        await fsRename(oldPath, newPath);
+        
+        // Remove the old worktree reference
+        await execWithShellPath(`git worktree remove --force "${oldPath}"`, { cwd: projectPath }).catch(() => {
+          // Ignore errors if already removed
+        });
+        
+        // Re-add the worktree at the new location
+        await execWithShellPath(`git worktree add "${newPath}" "${oldBranchName}"`, { cwd: projectPath });
+      }
+      
+      // Rename the branch
+      try {
+        // Change to the worktree directory to rename the branch
+        const renameBranchResult = await execWithShellPath(
+          `git branch -m "${oldBranchName}" "${newBranchName}"`,
+          { cwd: newPath }
+        );
+        console.log('[WorktreeManager] Branch renamed successfully:', renameBranchResult.stdout);
+      } catch (branchError) {
+        console.error('[WorktreeManager] Failed to rename branch:', branchError);
+        // Try from the main repository
+        await execWithShellPath(
+          `git branch -m "${oldBranchName}" "${newBranchName}"`,
+          { cwd: projectPath }
+        );
+      }
+      
+      console.log(`[WorktreeManager] Successfully renamed worktree from ${oldWorktreeName} to ${newWorktreeName}`);
+      
+      return {
+        worktreePath: newPath,
+        branchName: newBranchName
+      };
+    } catch (error) {
+      console.error('[WorktreeManager] Error renaming worktree:', error);
+      throw error;
     }
   }
 }

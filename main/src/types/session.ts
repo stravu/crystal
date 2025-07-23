@@ -71,6 +71,8 @@ export interface SessionUpdate {
   run_started_at?: string | null;
   model?: string;
   gitStatus?: GitStatus;
+  name?: string;
+  worktreePath?: string;
 }
 
 export interface SessionOutput {
