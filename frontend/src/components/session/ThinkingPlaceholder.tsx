@@ -157,8 +157,8 @@ export const InlineWorkingIndicator: React.FC = () => {
     // Change message with variable timing (jitter)
     const timeout = setTimeout(() => {
       setMessageIndex((prev) => (prev + 1) % wackyStatusMessages.length);
-      // Random interval between 3 and 5 seconds
-      setNextChangeTime(3000 + Math.random() * 2000);
+      // Random interval between 2.5 and 6 seconds (more jitter)
+      setNextChangeTime(2500 + Math.random() * 3500);
     }, nextChangeTime);
     
     return () => clearTimeout(timeout);

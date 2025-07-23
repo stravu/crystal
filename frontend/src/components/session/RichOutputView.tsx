@@ -751,12 +751,14 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
             .map((seg, idx) => {
               if (seg.type === 'thinking') {
                 return (
-                  <div key={`${message.id}-thinking-${idx}`} className="bg-surface-tertiary/50 rounded-lg px-3 py-2 border-l-2 border-interactive/30">
-                    <div className="mb-2">
-                      <span className="text-xs text-text-tertiary font-medium">💭 Thinking...</span>
+                  <div key={`${message.id}-thinking-${idx}`} className="relative">
+                    <div className="absolute -left-6 top-0 text-interactive/50">
+                      <div className="animate-pulse">💭</div>
                     </div>
-                    <div className="text-sm thinking-content">
-                      <MarkdownPreview content={seg.content} />
+                    <div className="pl-2 pr-4 py-2 bg-gradient-to-r from-interactive/5 to-transparent rounded-l-md">
+                      <div className="text-sm thinking-content italic opacity-85">
+                        <MarkdownPreview content={seg.content} />
+                      </div>
                     </div>
                   </div>
                 );

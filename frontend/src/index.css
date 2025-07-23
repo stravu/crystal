@@ -222,7 +222,8 @@ body.light {
 
 /* Rich Output thinking content styling */
 .thinking-content p {
-  @apply mb-2 text-text-secondary;
+  @apply mb-2;
+  color: inherit;
 }
 
 .thinking-content p:last-child {
@@ -231,7 +232,8 @@ body.light {
 
 .thinking-content ul,
 .thinking-content ol {
-  @apply mb-2 text-text-secondary;
+  @apply mb-2;
+  color: inherit;
 }
 
 .thinking-content li {
@@ -239,16 +241,17 @@ body.light {
 }
 
 .thinking-content code {
-  @apply text-xs;
+  @apply text-xs opacity-90;
 }
 
 .thinking-content pre {
-  @apply text-xs mb-2;
+  @apply text-xs mb-2 opacity-90;
 }
 
 .thinking-content blockquote {
-  @apply text-text-secondary;
-  border-color: rgba(var(--color-interactive-rgb), 0.3);
+  color: inherit;
+  border-color: rgba(var(--color-interactive-rgb), 0.2);
+  @apply opacity-80;
 }
 
 /* Markdown list styling fixes */
