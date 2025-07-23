@@ -17,6 +17,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
   const [showStatusGuide, setShowStatusGuide] = useState(false);
   const [version, setVersion] = useState<string>('');
   const [gitCommit, setGitCommit] = useState<string>('');
+  const [worktreeName, setWorktreeName] = useState<string>('');
 
   useEffect(() => {
     // Fetch version info on component mount
@@ -29,6 +30,9 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
           }
           if (result.data.gitCommit) {
             setGitCommit(result.data.gitCommit);
+          }
+          if (result.data.worktreeName) {
+            setWorktreeName(result.data.worktreeName);
           }
         }
       } catch (error) {
@@ -121,11 +125,11 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
         {version && (
           <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
             <div 
-              className="text-xs text-gray-500 dark:text-gray-500 text-center cursor-pointer hover:text-gray-700 dark:hover:text-gray-400 transition-colors"
+              className="text-xs text-gray-500 dark:text-gray-500 text-center cursor-pointer hover:text-gray-700 dark:hover:text-gray-400 transition-colors truncate"
               onClick={onAboutClick}
               title="Click to view version details"
             >
-              v{version}{gitCommit && ` • ${gitCommit}`}
+              v{version}{worktreeName && ` • ${worktreeName}`}{gitCommit && ` • ${gitCommit}`}
             </div>
           </div>
         )}
