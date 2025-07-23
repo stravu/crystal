@@ -218,19 +218,6 @@ export function CommitModeSettings({
             </p>
           </div>
 
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={localSettings.allowClaudeTools || false}
-                onChange={(e) => handleSettingChange('allowClaudeTools', e.target.checked)}
-                className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Allow Claude to run tools (e.g., pnpm changeset)
-              </span>
-            </label>
-          </div>
         </div>
       )}
 

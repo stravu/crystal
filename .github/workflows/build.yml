@@ -128,6 +128,8 @@ jobs:
         APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         # Only enable signing when certificates are available
         CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'true' || 'false' }}
+        # Disable signing entirely when no certificates are present
+        CSC_DISABLE: ${{ (matrix.os == 'macos-latest' && !secrets.APPLE_CERTIFICATE) && 'true' || 'false' }}
 
     - name: List build artifacts
       run: ls -la dist-electron/

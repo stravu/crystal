@@ -6,7 +6,6 @@ export interface CommitModeSettings {
   mode: CommitMode;
   structuredPromptTemplate?: string;
   checkpointPrefix?: string;
-  allowClaudeTools?: boolean;
 }
 
 export interface ProjectCharacteristics {
@@ -33,7 +32,6 @@ export interface FinalizeSessionOptions {
 export const DEFAULT_COMMIT_MODE_SETTINGS: CommitModeSettings = {
   mode: 'checkpoint',
   checkpointPrefix: 'checkpoint: ',
-  allowClaudeTools: false,
 };
 
 // Default structured prompt template

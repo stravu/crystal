@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 
 interface NavigationState {
-  activeView: 'sessions' | 'dashboard';
+  activeView: 'sessions' | 'project';
   activeProjectId: number | null;
   
   // Actions
-  setActiveView: (view: 'sessions' | 'dashboard') => void;
+  setActiveView: (view: 'sessions' | 'project') => void;
   setActiveProjectId: (projectId: number | null) => void;
-  navigateToProjectDashboard: (projectId: number) => void;
+  navigateToProject: (projectId: number) => void;
   navigateToSessions: () => void;
 }
 
@@ -19,8 +19,8 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   
   setActiveProjectId: (projectId) => set({ activeProjectId: projectId }),
   
-  navigateToProjectDashboard: (projectId) => set({ 
-    activeView: 'dashboard', 
+  navigateToProject: (projectId) => set({ 
+    activeView: 'project', 
     activeProjectId: projectId 
   }),
   

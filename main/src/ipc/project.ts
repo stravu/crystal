@@ -92,8 +92,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         projectData.openIdeCommand,
         projectData.commitMode,
         projectData.commitStructuredPromptTemplate,
-        projectData.commitCheckpointPrefix,
-        projectData.commitAllowClaudeTools
+        projectData.commitCheckpointPrefix
       );
 
       // If run_script was provided, also create run commands
