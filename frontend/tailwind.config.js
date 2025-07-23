@@ -103,6 +103,28 @@ export default {
         'modal': {
           'overlay': 'var(--color-modal-overlay)',
         },
+        // Navigation-specific colors
+        'surface-navigation': {
+          'DEFAULT': 'var(--color-surface-navigation)',
+          'hover': 'var(--color-surface-navigation-hover)',
+          'active': 'var(--color-surface-navigation-active)',
+          'selected': 'var(--color-surface-navigation-selected)',
+          'selected-hover': 'var(--color-surface-navigation-selected-hover)',
+        },
+        'navigation': {
+          'primary': 'var(--color-text-navigation-primary)',
+          'secondary': 'var(--color-text-navigation-secondary)',
+          'muted': 'var(--color-text-navigation-muted)',
+          'selected': 'var(--color-text-navigation-selected)',
+          'hover': 'var(--color-text-navigation-hover)',
+          'section': 'var(--color-text-navigation-section)',
+          'brand': 'var(--color-text-navigation-brand)',
+        },
+        'border-navigation': 'var(--color-border-navigation)',
+        'divider-navigation': {
+          'DEFAULT': 'var(--color-divider-navigation)',
+          'subtle': 'var(--color-divider-navigation-subtle)',
+        },
       },
       spacing: {
         // Component spacing
@@ -156,6 +178,13 @@ export default {
         'modal': 'var(--z-modal)',
         'popover': 'var(--z-popover)',
         'tooltip': 'var(--z-tooltip)',
+      },
+      borderColor: {
+        'navigation': 'var(--color-border-navigation)',
+        'divider-navigation': {
+          'DEFAULT': 'var(--color-divider-navigation)',
+          'subtle': 'var(--color-divider-navigation-subtle)',
+        },
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',

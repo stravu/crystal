@@ -338,7 +338,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
           isNested ? 'px-2 py-1.5 text-sm' : 'px-3 py-2',
           isActive 
             ? 'bg-interactive/20 text-text-primary shadow-sm ring-1 ring-interactive/30' 
-            : 'hover:bg-bg-hover text-text-secondary hover:shadow-sm'
+            : 'hover:bg-surface-hover text-text-secondary hover:shadow-sm'
         )}
         onContextMenu={handleContextMenu}
       >
@@ -420,7 +420,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
                       ? 'hover:bg-status-error/10 text-status-error hover:text-status-error' 
                       : hasRunScript
                         ? 'hover:bg-status-success/10 text-status-success hover:text-status-success'
-                        : 'hover:bg-bg-hover text-text-tertiary hover:text-text-secondary'
+                        : 'hover:bg-surface-hover text-text-tertiary hover:text-text-secondary'
                   )}
                   title={isClosing ? 'Closing script...' : isRunning ? 'Stop script' : (hasRunScript ? 'Run script' : 'No run script configured - Click to configure')}
                   disabled={isClosing}
@@ -463,7 +463,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
         >
           <button
             onClick={handleRename}
-            className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+            className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
           >
             Rename
           </button>
@@ -481,7 +481,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
               'w-full text-left px-4 py-2 text-sm',
               isClosing 
                 ? 'text-text-tertiary cursor-wait' 
-                : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+                : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
             )}
           >
             {isClosing ? 'Closing Script...' : isRunning ? 'Stop Script' : 'Run Script'}
@@ -489,7 +489,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
           <div className="border-t border-border-primary my-1" />
           <button
             onClick={handleDeleteFromMenu}
-            className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-bg-hover hover:text-status-error"
+            className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-surface-hover hover:text-status-error"
           >
             Archive
           </button>
