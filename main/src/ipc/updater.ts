@@ -36,9 +36,9 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
 
   ipcMain.handle('version:get-info', () => {
     try {
-      console.log('[Version Debug] version:get-info called');
-      console.log('[Version Debug] app.isPackaged:', app.isPackaged);
-      console.log('[Version Debug] process.cwd():', process.cwd());
+      console.log('🚀 [WORKTREE DEBUG] version:get-info called - NEW BUILD!');
+      console.log('🚀 [WORKTREE DEBUG] app.isPackaged:', app.isPackaged);
+      console.log('🚀 [WORKTREE DEBUG] process.cwd():', process.cwd());
       
       let buildDate: string | undefined;
       let gitCommit: string | undefined;

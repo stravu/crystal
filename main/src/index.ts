@@ -28,6 +28,47 @@ import { setupConsoleWrapper } from './utils/consoleWrapper';
 import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * Extract worktree name from the current working directory path
+ * Returns the worktree name if running in a worktree, undefined if in main repository
+ */
+function getCurrentWorktreeName(cwd: string): string | undefined {
+  try {
+    // Match worktrees directory followed by worktree name
+    // Handles both Unix (/) and Windows (\) path separators
+    // For paths like "worktrees/feature/dev-mode-worktree-label", captures "feature/dev-mode-worktree-label"
+    const worktreeMatch = cwd.match(/worktrees[\/\\](.+)/);
+    return worktreeMatch ? worktreeMatch[1] : undefined;
+  } catch (error) {
+    console.log('Could not extract worktree name:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Set the application title based on development mode and worktree
+ */
+function setAppTitle() {
+  if (!app.isPackaged) {
+    const worktreeName = getCurrentWorktreeName(process.cwd());
+    if (worktreeName) {
+      const title = `Crystal [${worktreeName}]`;
+      console.log('🎯 [APP TITLE] Setting development title:', title);
+      if (mainWindow) {
+        mainWindow.setTitle(title);
+      }
+      return title;
+    }
+  }
+  
+  // Default title
+  const title = 'Crystal';
+  if (mainWindow) {
+    mainWindow.setTitle(title);
+  }
+  return title;
+}
 let taskQueue: TaskQueue | null = null;
 
 // Service instances
@@ -144,6 +185,9 @@ async function createWindow() {
       }
     }
   }
+
+  // Set the app title based on development mode and worktree
+  setAppTitle();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
