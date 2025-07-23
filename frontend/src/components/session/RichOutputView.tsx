@@ -199,7 +199,10 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
       } else if (msg.type === 'assistant') {
         const segments: MessageSegment[] = [];
         
-        if (msg.message?.content && Array.isArray(msg.message.content)) {
+        // Check for direct text field first (some messages come this way)
+        if (msg.text && typeof msg.text === 'string') {
+          segments.push({ type: 'text', content: msg.text.trim() });
+        } else if (msg.message?.content && Array.isArray(msg.message.content)) {
           // Process each content block
           msg.message.content.forEach((block: any) => {
             if (block.type === 'text' && block.text?.trim()) {
@@ -787,7 +790,9 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
               {isUser ? (
                 <div className="text-text-primary whitespace-pre-wrap font-medium">{textContent}</div>
               ) : (
-                <MarkdownPreview content={textContent} />
+                <div className="rich-output-markdown">
+                  <MarkdownPreview content={textContent} />
+                </div>
               )}
               {isCollapsed && (
                 <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-surface-secondary to-transparent pointer-events-none" />
