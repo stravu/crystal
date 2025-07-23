@@ -75,61 +75,8 @@ export class DatabaseService {
       throw error;
     }
 
-    // Add commit mode settings columns to projects table if they don't exist
-    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasCommitModeColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
-    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_structured_prompt_template');
-    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_checkpoint_prefix');
-    
-    if (!hasCommitModeColumn) {
-      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_mode TEXT DEFAULT 'checkpoint'").run();
-      console.log('[Database] Added commit_mode column to projects table');
-    }
-    
-    if (!hasCommitStructuredPromptTemplateColumn) {
-      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_structured_prompt_template TEXT").run();
-      console.log('[Database] Added commit_structured_prompt_template column to projects table');
-    }
-    
-    if (!hasCommitCheckpointPrefixColumn) {
-      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_checkpoint_prefix TEXT DEFAULT 'checkpoint: '").run();
-      console.log('[Database] Added commit_checkpoint_prefix column to projects table');
-    }
-
-    // Add commit mode settings columns to sessions table if they don't exist
-    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
-    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode_settings');
-    
-    if (!hasSessionCommitModeColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode TEXT").run();
-      console.log('[Database] Added commit_mode column to sessions table');
-    }
-    
-    if (!hasSessionCommitModeSettingsColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode_settings TEXT").run();
-      console.log('[Database] Added commit_mode_settings column to sessions table');
-    }
-
-    // Migrate existing auto_commit boolean to commit_mode
-    const hasAutoCommitMigrated = this.db.prepare("SELECT value FROM user_preferences WHERE key = 'auto_commit_migrated'").get();
-    if (!hasAutoCommitMigrated) {
-      console.log('[Database] Migrating auto_commit boolean to commit_mode...');
-      
-      // Update sessions: auto_commit=true -> commit_mode='checkpoint', auto_commit=false -> commit_mode='disabled'
-      this.db.prepare(`
-        UPDATE sessions 
-        SET commit_mode = CASE 
-          WHEN auto_commit = 1 THEN 'checkpoint'
-          ELSE 'disabled'
-        END
-        WHERE commit_mode IS NULL
-      `).run();
-      
-      // Mark migration as complete
-      this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('auto_commit_migrated', 'true')").run();
-      console.log('[Database] Completed auto_commit migration');
-    }
+    // All database migrations are now handled by the migration system above.
+    // No additional manual schema changes should be added here.
   }
 
   // Project operations
