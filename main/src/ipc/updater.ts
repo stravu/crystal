@@ -36,6 +36,10 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
 
   ipcMain.handle('version:get-info', () => {
     try {
+      console.log('[Version Debug] version:get-info called');
+      console.log('[Version Debug] app.isPackaged:', app.isPackaged);
+      console.log('[Version Debug] process.cwd():', process.cwd());
+      
       let buildDate: string | undefined;
       let gitCommit: string | undefined;
       let buildTimestamp: number | undefined;
@@ -58,6 +62,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
 
       // For development builds, try to get git commit hash dynamically
       if (!app.isPackaged) {
+        console.log('[Version Debug] Development mode detected, getting git info...');
         try {
           const gitHash = commandExecutor.execSync('git rev-parse --short HEAD', { 
             encoding: 'utf8',
@@ -75,6 +80,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
             // Working directory has uncommitted changes
             gitCommit = `${gitHash} (modified)`;
           }
+          console.log('[Version Debug] Git commit:', gitCommit);
         } catch (err) {
           console.log('Could not get git commit:', err);
           gitCommit = 'unknown';
@@ -82,6 +88,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
 
         // Detect current worktree name for development builds only
         worktreeName = getCurrentWorktreeName(process.cwd());
+        console.log('[Version Debug] Worktree name:', worktreeName);
       }
 
       const responseData: any = {
@@ -96,8 +103,12 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
       // Only include worktreeName in development builds and when defined
       if (!app.isPackaged && worktreeName) {
         responseData.worktreeName = worktreeName;
+        console.log('[Version Debug] Adding worktreeName to response:', worktreeName);
+      } else {
+        console.log('[Version Debug] Not adding worktreeName. isPackaged:', app.isPackaged, 'worktreeName:', worktreeName);
       }
 
+      console.log('[Version Debug] Final response data:', responseData);
       return {
         success: true,
         data: responseData
