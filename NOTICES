@@ -16,21 +16,22 @@ The following packages are licensed under the MIT license:
   - @antfu/utils (8.1.1) - Anthony Fu <anthonyfu117@hotmail.com>
   - @anthropic-ai/sdk (0.53.0) - Anthropic <support@anthropic.com>
   - @babel/code-frame (7.27.1) - The Babel Team (https://babel.dev/team)
-  - @babel/compat-data (7.27.5) - The Babel Team (https://babel.dev/team)
-  - @babel/core (7.27.4) - The Babel Team (https://babel.dev/team)
-  - @babel/generator (7.27.5) - The Babel Team (https://babel.dev/team)
+  - @babel/compat-data (7.28.0) - The Babel Team (https://babel.dev/team)
+  - @babel/core (7.28.0) - The Babel Team (https://babel.dev/team)
+  - @babel/generator (7.28.0) - The Babel Team (https://babel.dev/team)
   - @babel/helper-compilation-targets (7.27.2) - The Babel Team (https://babel.dev/team)
+  - @babel/helper-globals (7.28.0) - The Babel Team (https://babel.dev/team)
   - @babel/helper-module-imports (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/helper-plugin-utils (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/helper-string-parser (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/helper-validator-identifier (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/helper-validator-option (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/helpers (7.27.6) - The Babel Team (https://babel.dev/team)
-  - @babel/parser (7.27.5) - The Babel Team (https://babel.dev/team)
+  - @babel/parser (7.28.0) - The Babel Team (https://babel.dev/team)
   - @babel/runtime (7.27.6) - The Babel Team (https://babel.dev/team)
   - @babel/template (7.27.2) - The Babel Team (https://babel.dev/team)
-  - @babel/traverse (7.27.4) - The Babel Team (https://babel.dev/team)
-  - @babel/types (7.27.6) - The Babel Team (https://babel.dev/team)
+  - @babel/traverse (7.28.0) - The Babel Team (https://babel.dev/team)
+  - @babel/types (7.28.1) - The Babel Team (https://babel.dev/team)
   - @braintree/sanitize-url (7.1.1)
   - @develar/schema-utils (2.6.5) - webpack Contrib (https://github.com/webpack-contrib)
   - @electron/asar (3.4.1)
@@ -48,24 +49,25 @@ The following packages are licensed under the MIT license:
   - @emotion/unitless (0.10.0)
   - @emotion/utils (1.4.2)
   - @emotion/weak-memoize (0.4.0)
-  - @esbuild/darwin-arm64 (0.25.5)
+  - @esbuild/darwin-arm64 (0.25.7)
   - @eslint-community/regexpp (4.12.1) - Toru Nagashima
-  - @floating-ui/core (1.7.1) - atomiks
-  - @floating-ui/dom (1.7.1) - atomiks
-  - @floating-ui/utils (0.2.9) - atomiks
+  - @floating-ui/core (1.7.2) - atomiks
+  - @floating-ui/dom (1.7.2) - atomiks
+  - @floating-ui/utils (0.2.10) - atomiks
   - @gar/promisify (1.1.3) - Gar <gar+npm@danger.computer>
   - @homebridge/node-pty-prebuilt-multiarch (0.12.0) - Microsoft Corporation
   - @iconify/types (2.0.0) - Vjacheslav Trushkin
   - @iconify/utils (2.3.0) - Vjacheslav Trushkin
   - @ioredis/commands (1.2.0) - Zihua Li <i@zihua.li> (http://zihua.li)
-  - @jridgewell/gen-mapping (0.3.8) - Justin Ridgewell <justin@ridgewell.name>
+  - @isaacs/balanced-match (4.0.1)
+  - @isaacs/brace-expansion (5.0.0)
+  - @jridgewell/gen-mapping (0.3.12) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/resolve-uri (3.1.2) - Justin Ridgewell <justin@ridgewell.name>
-  - @jridgewell/set-array (1.2.1) - Justin Ridgewell <justin@ridgewell.name>
-  - @jridgewell/sourcemap-codec (1.5.0) - Rich Harris
-  - @jridgewell/trace-mapping (0.3.25) - Justin Ridgewell <justin@ridgewell.name>
+  - @jridgewell/sourcemap-codec (1.5.4) - Justin Ridgewell <justin@ridgewell.name>
+  - @jridgewell/trace-mapping (0.3.29) - Justin Ridgewell <justin@ridgewell.name>
   - @malept/flatpak-bundler (0.4.0) - Matt Watson <mattdangerw@gmail.com>
-  - @mermaid-js/parser (0.6.1) - Yokozuna59
-  - @modelcontextprotocol/sdk (1.12.1) - Anthropic, PBC (https://anthropic.com)
+  - @mermaid-js/parser (0.6.2) - Yokozuna59
+  - @modelcontextprotocol/sdk (1.16.0) - Anthropic, PBC (https://anthropic.com)
   - @monaco-editor/loader (1.5.0) - Suren Atoyan <contact@surenatoyan.com>
   - @msgpackr-extract/msgpackr-extract-darwin-arm64 (3.0.3) - Kris Zyp
   - @nodelib/fs.scandir (2.1.5)
@@ -76,8 +78,8 @@ The following packages are licensed under the MIT license:
   - @radix-ui/number (1.1.1)
   - @radix-ui/primitive (1.1.2)
   - @radix-ui/rect (1.1.1)
-  - @rolldown/pluginutils (1.0.0-beta.9)
-  - @rollup/rollup-darwin-arm64 (4.42.0) - Lukas Taegert-Atkinson
+  - @rolldown/pluginutils (1.0.0-beta.27)
+  - @rollup/rollup-darwin-arm64 (4.45.1) - Lukas Taegert-Atkinson
   - @sindresorhus/is (4.6.0) - Sindre Sorhus
   - @szmarczak/http-timer (4.0.6) - Szymon Marczak
   - @tootallnate/once (2.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
@@ -85,10 +87,10 @@ The following packages are licensed under the MIT license:
   - @xterm/xterm (5.5.0)
   - 7zip-bin (5.2.0)
   - accepts (2.0.0)
-  - acorn (8.14.1)
+  - acorn (8.15.0)
   - acorn-jsx (5.3.2)
   - agent-base (6.0.2) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
-  - agent-base (7.1.3) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
+  - agent-base (7.1.4) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - agentkeepalive (4.6.0) - fengmk2 <fengmk2@gmail.com> (https://github.com/fengmk2)
   - aggregate-error (3.1.0) - Sindre Sorhus
   - ajv (6.12.6) - Evgeny Poberezkin
@@ -112,7 +114,7 @@ The following packages are licensed under the MIT license:
   - async (3.2.6) - Caolan McMahon
   - async-exit-hook (2.0.1) - Tapani Moilanen
   - asynckit (0.4.0) - Alex Indigo <iam@alexindigo.com>
-  - axios (1.9.0) - Matt Zabriskie
+  - axios (1.10.0) - Matt Zabriskie
   - babel-plugin-macros (3.1.0) - Kent C. Dodds <me@kentcdodds.com> (https://kentcdodds.com)
   - bail (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - balanced-match (1.0.2) - Julian Gruber
@@ -125,10 +127,10 @@ The following packages are licensed under the MIT license:
   - bluebird-lst (1.0.9) - Vladimir Krivosheev
   - body-parser (2.2.0)
   - boolean (3.2.0)
-  - brace-expansion (1.1.11) - Julian Gruber
-  - brace-expansion (2.0.1) - Julian Gruber
+  - brace-expansion (1.1.12) - Julian Gruber
+  - brace-expansion (2.0.2) - Julian Gruber
   - braces (3.0.3) - Jon Schlinkert (https://github.com/jonschlinkert)
-  - browserslist (4.25.0) - Andrey Sitnik <andrey@sitnik.ru>
+  - browserslist (4.25.1) - Andrey Sitnik <andrey@sitnik.ru>
   - buffer (5.7.1) - Feross Aboukhadijeh
   - buffer-crc32 (0.2.13) - Brian J. Brennan <brianloveswords@gmail.com>
   - buffer-from (1.1.2)
@@ -172,7 +174,7 @@ The following packages are licensed under the MIT license:
   - compare-version (0.1.2) - Kevin Mårtensson
   - compress-commons (4.1.2) - Chris Talkington
   - concat-map (0.0.1) - James Halliday
-  - conf (13.1.0) - Sindre Sorhus
+  - conf (14.0.0) - Sindre Sorhus
   - confbox (0.1.8)
   - confbox (0.2.2)
   - config-file-ts (0.2.8-rc1) - lee mighdoll
@@ -225,15 +227,15 @@ The following packages are licensed under the MIT license:
   - dunder-proto (1.0.1) - Jordan Harband <ljharb@gmail.com>
   - eastasianwidth (0.2.0) - Masaki Komagata
   - ee-first (1.1.1) - Jonathan Ong
-  - electron (36.4.0) - Electron Community
+  - electron (36.7.1) - Electron Community
   - electron-publish (25.1.7) - Vladimir Krivosheev
-  - electron-store (10.0.1) - Sindre Sorhus
+  - electron-store (10.1.0) - Sindre Sorhus
   - electron-updater (6.6.2) - Vladimir Krivosheev
   - emoji-regex (8.0.0) - Mathias Bynens
   - emoji-regex (9.2.2) - Mathias Bynens
   - encodeurl (2.0.0)
   - encoding (0.1.13) - Andris Reinman
-  - end-of-stream (1.4.4) - Mathias Buus <mathiasbuus@gmail.com>
+  - end-of-stream (1.4.5) - Mathias Buus <mathiasbuus@gmail.com>
   - env-paths (2.2.1) - Sindre Sorhus
   - env-paths (3.0.0) - Sindre Sorhus
   - err-code (2.0.3) - IndigoUnited <hello@indigounited.com> (http://indigounited.com)
@@ -243,7 +245,7 @@ The following packages are licensed under the MIT license:
   - es-object-atoms (1.1.1) - Jordan Harband <ljharb@gmail.com>
   - es-set-tostringtag (2.1.0) - Jordan Harband <ljharb@gmail.com>
   - es6-error (4.1.1) - Ben Youngblood
-  - esbuild (0.25.5)
+  - esbuild (0.25.7)
   - escalade (3.2.0) - Luke Edwards
   - escape-html (1.0.3)
   - escape-string-regexp (4.0.0) - Sindre Sorhus
@@ -251,9 +253,9 @@ The following packages are licensed under the MIT license:
   - estree-util-is-identifier-name (3.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - etag (1.8.1)
   - eventsource (3.0.7) - Espen Hovlandsdal <espen@hovlandsdal.com>
-  - eventsource-parser (3.0.2) - Espen Hovlandsdal <espen@hovlandsdal.com>
+  - eventsource-parser (3.0.3) - Espen Hovlandsdal <espen@hovlandsdal.com>
   - express (5.1.0) - TJ Holowaychuk <tj@vision-media.ca>
-  - express-rate-limit (7.5.0) - Nathan Friedly
+  - express-rate-limit (7.5.1) - Nathan Friedly
   - exsolve (1.0.7)
   - extend (3.0.2) - Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)
   - extsprintf (1.4.1)
@@ -262,7 +264,7 @@ The following packages are licensed under the MIT license:
   - fast-json-stable-stringify (2.1.0) - James Halliday
   - fast-levenshtein (2.0.6) - Ramesh Nair <ram@hiddentao.com> (http://www.hiddentao.com/)
   - fd-slicer (1.1.0) - Andrew Kelley <superjoe30@gmail.com>
-  - fdir (6.4.5) - thecodrr <thecodrr@protonmail.com>
+  - fdir (6.4.6) - thecodrr <thecodrr@protonmail.com>
   - file-entry-cache (8.0.0) - Jared Wray
   - file-uri-to-path (1.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
   - fill-range (7.1.1) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -271,7 +273,7 @@ The following packages are licensed under the MIT license:
   - find-up (5.0.0) - Sindre Sorhus
   - flat-cache (4.0.1) - Jared Wray
   - follow-redirects (1.15.9) - Ruben Verborgh <ruben@verborgh.org> (https://ruben.verborgh.org/)
-  - form-data (4.0.3) - Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)
+  - form-data (4.0.4) - Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)
   - forwarded (0.2.0)
   - fraction.js (4.3.7) - Robert Eisele
   - fresh (2.0.0) - TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)
@@ -382,10 +384,10 @@ The following packages are licensed under the MIT license:
   - longest-streak (3.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - loose-envify (1.4.0) - Andres Suarez <zertosh@gmail.com>
   - lowercase-keys (2.0.0) - Sindre Sorhus
-  - luxon (3.6.1) - Isaac Cambron
+  - luxon (3.7.1) - Isaac Cambron
   - lzma-native (8.0.6) - Anna Henningsen
   - markdown-table (3.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
-  - marked (15.0.12) - Christopher Jeffrey
+  - marked (16.1.1) - Christopher Jeffrey
   - matcher (3.0.0) - Sindre Sorhus
   - math-intrinsics (1.1.0) - Jordan Harband <ljharb@gmail.com>
   - mdast-util-find-and-replace (3.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -407,7 +409,7 @@ The following packages are licensed under the MIT license:
   - memoize-one (6.0.0) - Alex Reardon <alexreardon@gmail.com>
   - merge-descriptors (2.0.0)
   - merge2 (1.4.1)
-  - mermaid (11.8.1) - Knut Sveidqvist
+  - mermaid (11.9.0) - Knut Sveidqvist
   - micromark (4.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - micromark-core-commonmark (2.0.3) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - micromark-extension-gfm (3.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -452,7 +454,7 @@ The following packages are licensed under the MIT license:
   - mlly (1.7.4)
   - monaco-editor (0.52.2) - Microsoft Corporation
   - ms (2.1.3)
-  - msgpackr (1.11.4) - Kris Zyp
+  - msgpackr (1.11.5) - Kris Zyp
   - msgpackr-extract (3.0.3) - Kris Zyp
   - mz (2.7.0) - Jonathan Ong
   - nanoid (3.3.11) - Andrey Sitnik <andrey@sitnik.ru>
@@ -501,7 +503,7 @@ The following packages are licensed under the MIT license:
   - pe-library (0.4.1) - jet
   - pend (1.2.0) - Andrew Kelley <superjoe30@gmail.com>
   - picomatch (2.3.1) - Jon Schlinkert (https://github.com/jonschlinkert)
-  - picomatch (4.0.2) - Jon Schlinkert (https://github.com/jonschlinkert)
+  - picomatch (4.0.3) - Jon Schlinkert (https://github.com/jonschlinkert)
   - pify (2.3.0) - Sindre Sorhus
   - pirates (4.0.7) - Ari Porad
   - pkce-challenge (5.0.0) - crouchcd
@@ -519,7 +521,7 @@ The following packages are licensed under the MIT license:
   - property-information (7.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - proxy-addr (2.0.7) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - proxy-from-env (1.1.0) - Rob Wu <rob@robwu.nl> (https://robwu.nl/)
-  - pump (3.0.2) - Mathias Buus Madsen <mathiasbuus@gmail.com>
+  - pump (3.0.3) - Mathias Buus Madsen <mathiasbuus@gmail.com>
   - punycode (2.3.1) - Mathias Bynens
   - quansync (0.2.10) - Anthony Fu <anthonyfu117@hotmail.com>
   - queue-microtask (1.2.3) - Feross Aboukhadijeh
@@ -553,7 +555,7 @@ The following packages are licensed under the MIT license:
   - restore-cursor (3.1.0) - Sindre Sorhus
   - retry (0.12.0) - Tim Koschützki <tim@debuggable.com> (http://debuggable.com/)
   - reusify (1.1.0) - Matteo Collina <hello@matteocollina.com>
-  - rollup (4.42.0) - Rich Harris
+  - rollup (4.45.1) - Rich Harris
   - roughjs (4.6.6) - Preet Shihn <preetshihn@gmail.com>
   - router (2.2.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - run-parallel (1.2.0) - Feross Aboukhadijeh
@@ -577,7 +579,7 @@ The following packages are licensed under the MIT license:
   - simple-update-notifier (2.0.0) - alexbrazier
   - slice-ansi (3.0.0)
   - smart-buffer (4.2.0) - Josh Glazebrook
-  - socks (2.8.4) - Josh Glazebrook
+  - socks (2.8.6) - Josh Glazebrook
   - socks-proxy-agent (7.0.0) - Nathan Rajlich
   - source-map-support (0.5.21)
   - space-separated-tokens (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -659,7 +661,7 @@ The following packages are licensed under the MIT license:
   - yauzl (2.10.0) - Josh Wolfe <thejoshwolfe@gmail.com>
   - yocto-queue (0.1.0) - Sindre Sorhus
   - zip-stream (4.1.1) - Chris Talkington
-  - zod (3.25.56) - Colin McDonnell <zod@colinhacks.com>
+  - zod (3.25.76) - Colin McDonnell <zod@colinhacks.com>
   - zwitch (2.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
 
 MIT License
@@ -683,7 +685,7 @@ The following packages are licensed under the ISC license:
   - @ungap/structured-clone (1.3.0) - Andrea Giammarchi
   - abbrev (1.1.1) - Isaac Z. Schlueter <i@izs.me>
   - anymatch (3.1.3) - Elan Shanker
-  - aproba (2.0.0) - Rebecca Turner <me@re-becca.org>
+  - aproba (2.1.0) - Rebecca Turner <me@re-becca.org>
   - are-we-there-yet (3.0.1) - GitHub Inc.
   - at-least-node (1.0.0) - Ryan Zimmerman <opensrc@ryanzim.com>
   - cacache (16.1.3) - GitHub Inc.
@@ -723,7 +725,7 @@ The following packages are licensed under the ISC license:
   - d3-transition (3.0.1) - Mike Bostock
   - d3-zoom (3.0.0) - Mike Bostock
   - delaunator (5.0.1) - Vladimir Agafonkin
-  - electron-to-chromium (1.5.165) - Kilian Valkhof
+  - electron-to-chromium (1.5.187) - Kilian Valkhof
   - fastq (1.19.1) - Matteo Collina <hello@matteocollina.com>
   - flatted (3.3.3) - Andrea Giammarchi
   - foreground-child (3.3.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
@@ -732,7 +734,7 @@ The following packages are licensed under the ISC license:
   - gauge (4.0.4) - GitHub Inc.
   - get-caller-file (2.0.5) - Stefan Penner
   - glob (10.4.5) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
-  - glob (11.0.2) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
+  - glob (11.0.3) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
   - glob (7.2.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - glob (8.1.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - glob-parent (5.1.2) - Gulp Team <team@gulpjs.com> (https://gulpjs.com/)
@@ -755,7 +757,7 @@ The following packages are licensed under the ISC license:
   - lru-cache (7.18.3) - Isaac Z. Schlueter <i@izs.me>
   - lucide-react (0.468.0) - Eric Fennis
   - make-fetch-happen (10.2.1) - GitHub Inc.
-  - minimatch (10.0.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
+  - minimatch (10.0.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (3.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (5.1.6) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (9.0.5) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
@@ -791,7 +793,7 @@ The following packages are licensed under the ISC license:
   - yaml (1.10.2) - Eemeli Aro <eemeli@gmail.com>
   - yaml (2.8.0) - Eemeli Aro <eemeli@gmail.com>
   - yargs-parser (21.1.1) - Ben Coe <ben@npmjs.com>
-  - zod-to-json-schema (3.24.5) - Stefan Terdell
+  - zod-to-json-schema (3.24.6) - Stefan Terdell
 
 Copyright (c) 2015, Contributors
 
@@ -838,7 +840,7 @@ The following packages are licensed under the Apache-2.0 license:
   - exponential-backoff (3.1.2) - Sami Sayegh
   - filelist (1.0.4) - Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)
   - jake (10.9.2) - Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)
-  - openai (5.1.1) - OpenAI <support@openai.com>
+  - openai (5.10.1) - OpenAI <support@openai.com>
   - readdir-glob (1.1.3) - Yann Armelin
   - rxjs (7.8.2) - Ben Lesh <ben@benlesh.com>
   - sumchecker (3.0.1) - Mark Lee
@@ -1733,9 +1735,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 The following packages are licensed under the BSD-2-Clause license:
 
   - @electron/osx-sign (1.3.1) - electron
-  - dotenv (16.5.0)
+  - dotenv (16.6.1)
   - dotenv-expand (11.0.7) - motdotla
-  - espree (10.3.0) - Nicholas C. Zakas <nicholas+npm@nczconsulting.com>
+  - espree (10.4.0) - Nicholas C. Zakas <nicholas+npm@nczconsulting.com>
   - esrecurse (4.3.0)
   - estraverse (5.3.0)
   - esutils (2.0.3)
@@ -2804,7 +2806,7 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 ================================================================================
 
 Package: caniuse-lite
-Version: 1.0.30001721
+Version: 1.0.30001727
 Author: Ben Briggs
 Repository: browserslist/caniuse-lite
 
@@ -3489,8 +3491,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ================================================================================
 
 Package: @anthropic-ai/claude-code
-Version: 1.0.33
-Author: Boris Cherny <boris@anthropic.com>
+Version: 1.0.56
+Author: Anthropic <support@anthropic.com>
 Homepage: https://github.com/anthropics/claude-code
 
 © Anthropic PBC. All rights reserved. Use is subject to Anthropic's [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms).

@@ -1,6 +1,31 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.1.17] - 2025-07-23
+
+### Added
+- Project Dashboard view
+- Multi-mode auto-commit system
+- Visual refinements to Projects & Sessions sidebar with tree lines
+- Slider to select session count when creating multiple sessions
+
+### Changed
+- Improved indentation levels in UI
+
+### Fixed
+- ReferenceError: ReadableStream is not defined
+- Bug where navigation away from dashboard was blocked
+- Index issue with session navigation
+- Messages tab functionality restored for debugging Claude Code JSON output
+- Subfolder creation issues
+
+### Internal/Development
+- Multiple code refactoring attempts (some reverted for stability)
+- Build artifacts now show commit hash
+- Added strict port checking for Vite dev server
+- CI/CD improvements including GitHub Actions for testing and building
+- Frontend console debugging for developing Crystal on Crystal
+
 ## [0.1.16] - 2025-07-18
 
 Special thanks to eshaffer321 who contributed almost all the code in this release.

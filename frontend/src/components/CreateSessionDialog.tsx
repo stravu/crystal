@@ -35,8 +35,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     checkpointPrefix: 'checkpoint: '
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [mainBranch, setMainBranch] = useState<string>('main');
-  const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
   const { showError } = useErrorStore();
   
   // Fetch project details to get last used model
@@ -105,12 +103,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           }
           
           if (mainBranchResponse.success && mainBranchResponse.data) {
-            setMainBranch(mainBranchResponse.data);
-            // Check if the current base branch is the main branch
-            if (formData.baseBranch === mainBranchResponse.data || 
-                (!formData.baseBranch && branchesResponse.data?.find((b: any) => b.isCurrent)?.name === mainBranchResponse.data)) {
-              setShowMainBranchWarning(true);
-            }
+            // Main branch detected but not currently used in UI
           }
         }).catch((err: any) => {
           console.error('Failed to fetch branches:', err);
@@ -445,23 +438,21 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 )}
               </div>
               
-              {/* Sessions Count - Only show if > 1 */}
-              {(formData.count ?? 1) > 1 && (
-                <div>
-                  <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Number of Sessions: {formData.count}
-                  </label>
-                  <input
-                    id="count"
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={formData.count}
-                    onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-                    className="w-full"
-                  />
-                </div>
-              )}
+              {/* Sessions Count - Always visible */}
+              <div>
+                <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Number of Sessions: {formData.count}
+                </label>
+                <input
+                  id="count"
+                  type="range"
+                  min="1"
+                  max="5"
+                  value={formData.count}
+                  onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
+                  className="w-full"
+                />
+              </div>
             </div>
             
             {/* Advanced Options Toggle */}
@@ -494,8 +485,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       onChange={(e) => {
                         const selectedBranch = e.target.value;
                         setFormData({ ...formData, baseBranch: selectedBranch });
-                        // Check if the selected branch is the main branch
-                        setShowMainBranchWarning(selectedBranch === mainBranch);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
                       disabled={isLoadingBranches}
@@ -524,45 +513,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       Create the new session branch from this existing branch
                     </p>
                     
-                    {/* Main Branch Warning */}
-                    {showMainBranchWarning && (
-                      <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md">
-                        <div className="flex items-start gap-2">
-                          <span className="text-amber-600 dark:text-amber-400 text-sm">⚠️</span>
-                          <div className="flex-1">
-                            <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
-                              Creating from {mainBranch} branch
-                            </p>
-                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                              You're creating a session from the {mainBranch} branch. For better workflow management, 
-                              consider creating from a feature branch instead. This helps keep your main branch 
-                              clean and allows you to manage multiple approaches in parallel.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
                 
-                {/* Number of Sessions */}
-                <div>
-                  <label htmlFor="count-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Number of Sessions
-                  </label>
-                  <input
-                    id="count-input"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={formData.count}
-                    onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Creates multiple sessions with numbered suffixes
-                  </p>
-                </div>
                 
                 {/* Commit Mode Settings */}
                 <CommitModeSettings

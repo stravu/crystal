@@ -1,6 +1,6 @@
 {
   "name": "main",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Electron main process for Claude Code Commander",
   "main": "dist/main/src/index.js",
   "type": "commonjs",
@@ -32,7 +32,8 @@
     "electron-store": "^10.0.0",
     "electron-updater": "^6.6.2",
     "glob": "^11.0.0",
-    "umzug": "^3.8.1"
+    "umzug": "^3.8.1",
+    "web-streams-polyfill": "^3.3.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

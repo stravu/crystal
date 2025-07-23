@@ -55,8 +55,7 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
     projectId: number,
     commitMode: 'structured' | 'checkpoint' | 'disabled',
     structuredPromptTemplate?: string,
-    checkpointPrefix?: string,
-    allowClaudeTools?: boolean
+    checkpointPrefix?: string
   ): Promise<void> => {
     try {
       logger?.verbose(`Updating default commit mode settings for project ${projectId}`);
@@ -64,8 +63,7 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
       db.updateProject(projectId, {
         commit_mode: commitMode,
         commit_structured_prompt_template: structuredPromptTemplate,
-        commit_checkpoint_prefix: checkpointPrefix,
-        commit_allow_claude_tools: allowClaudeTools
+        commit_checkpoint_prefix: checkpointPrefix
       });
       
       logger?.verbose(`Updated project ${projectId} default commit mode to: ${commitMode}`);

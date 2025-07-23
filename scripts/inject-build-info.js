@@ -31,13 +31,9 @@ try {
   gitCommit = 'unknown';
 }
 
-// Get build type from environment
-const buildType = process.env.BUILD_TYPE || 'release';
-
 // Create build info
 const buildInfo = {
   version: packageJson.version,
-  buildType: buildType,
   buildDate: buildDate,
   gitCommit: gitCommit,
   buildTimestamp: Date.now(),
