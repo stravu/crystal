@@ -137,7 +137,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
               onClick={onAboutClick}
               title="Click to view version details"
             >
-              v{version}{worktreeName && ` • ${worktreeName}`}{gitCommit && ` • ${gitCommit}`}{worktreeName ? '' : ' [NO-WT]'}
+              v{version}{worktreeName && ` • ${worktreeName}`}{gitCommit && ` • ${gitCommit}`}
             </div>
           </div>
         )}
