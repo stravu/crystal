@@ -68,6 +68,7 @@ interface RichOutputSettings {
   collapseTools: boolean;
   showThinking: boolean;
   autoScroll: boolean;
+  showSessionInit: boolean;
 }
 
 const defaultSettings: RichOutputSettings = {
@@ -76,6 +77,7 @@ const defaultSettings: RichOutputSettings = {
   collapseTools: false,
   showThinking: true,
   autoScroll: true,
+  showSessionInit: false, // Hide by default - it's developer info
 };
 
 export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessionId, sessionStatus }) => {
@@ -637,7 +639,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
     const hasThinking = message.segments.some(seg => seg.type === 'thinking');
     
     // Determine if we need extra spacing before this message
-    const prevMessage = index > 0 ? messages[index - 1] : null;
+    const prevMessage = index > 0 ? filteredMessages[index - 1] : null;
     const needsExtraSpacing = prevMessage && (
       (prevMessage.role !== message.role) || 
       (hasThinking && !prevMessage.segments.some(seg => seg.type === 'thinking'))
@@ -839,10 +841,19 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
     return false;
   }, [messages, sessionStatus]);
 
+  // Filter messages based on settings
+  const filteredMessages = useMemo(() => {
+    if (settings.showSessionInit) {
+      return messages;
+    }
+    // Filter out session init messages
+    return messages.filter(msg => !(msg.role === 'system' && msg.metadata?.systemSubtype === 'init'));
+  }, [messages, settings.showSessionInit]);
+
   // Memoize the rendered messages to prevent unnecessary re-renders
   const renderedMessages = useMemo(
-    () => messages.map((msg, idx) => renderMessage(msg, idx)),
-    [messages, collapsedMessages, expandedTools, settings]
+    () => filteredMessages.map((msg, idx) => renderMessage(msg, idx)),
+    [filteredMessages, collapsedMessages, expandedTools, settings]
   );
 
   if (loading) {
@@ -929,6 +940,15 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
               />
               <span className="text-text-secondary">Auto-scroll to Bottom</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.showSessionInit}
+                onChange={() => toggleSetting('showSessionInit')}
+                className="rounded border-border-primary"
+              />
+              <span className="text-text-secondary">Show Session Info</span>
+            </label>
           </div>
         </div>
       )}
@@ -943,7 +963,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
         }}
       >
         <div className={`mx-auto ${settings.compactMode ? 'max-w-6xl' : 'max-w-5xl'} py-4`}>
-          {messages.length === 0 ? (
+          {filteredMessages.length === 0 && !isWaitingForResponse ? (
             <div className="text-center text-text-tertiary py-8">
               No messages to display
             </div>
@@ -951,7 +971,8 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
             <div className="space-y-4 px-4">
               {renderedMessages}
               {isWaitingForResponse && (
-                messages.length === 0 || messages[messages.length - 1].role === 'user' ? (
+                filteredMessages.length === 0 || 
+                (filteredMessages.length > 0 && filteredMessages[filteredMessages.length - 1].role === 'user') ? (
                   <ThinkingPlaceholder />
                 ) : (
                   <InlineWorkingIndicator />
