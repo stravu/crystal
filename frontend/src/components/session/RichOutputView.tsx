@@ -452,38 +452,38 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
     const isExpanded = !settings.collapseTools || expandedTools.has(tool.id);
     
     return (
-      <div className="border border-border-primary rounded-lg bg-surface-secondary overflow-hidden">
+      <div className="rounded-md bg-surface-tertiary/50 overflow-hidden border border-border-primary/50">
         <button
           onClick={() => toggleToolExpand(tool.id)}
-          className="w-full px-3 py-2 bg-surface-tertiary border-b border-border-primary flex items-center gap-2 hover:bg-bg-hover transition-colors text-left"
+          className="w-full px-3 py-2 bg-surface-tertiary/30 flex items-center gap-2 hover:bg-surface-tertiary/50 transition-colors text-left"
         >
-          <Wrench className="w-4 h-4 text-interactive flex-shrink-0" />
-          <span className="font-mono text-sm text-text-primary flex-1">{tool.name}</span>
-          {tool.status === 'success' && <CheckCircle className="w-4 h-4 text-status-success flex-shrink-0" />}
-          {tool.status === 'error' && <XCircle className="w-4 h-4 text-status-error flex-shrink-0" />}
-          {tool.status === 'pending' && <Clock className="w-4 h-4 text-text-tertiary flex-shrink-0 animate-pulse" />}
+          <Wrench className="w-3.5 h-3.5 text-interactive flex-shrink-0" />
+          <span className="font-mono text-xs text-text-primary flex-1">{tool.name}</span>
+          {tool.status === 'success' && <CheckCircle className="w-3.5 h-3.5 text-status-success flex-shrink-0" />}
+          {tool.status === 'error' && <XCircle className="w-3.5 h-3.5 text-status-error flex-shrink-0" />}
+          {tool.status === 'pending' && <Clock className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0 animate-pulse" />}
           {settings.collapseTools && (
             isExpanded ? <ChevronDown className="w-3 h-3 text-text-tertiary" /> : <ChevronRight className="w-3 h-3 text-text-tertiary" />
           )}
         </button>
         
         {isExpanded && (
-          <>
+          <div className="px-3 py-2 text-xs">
             {/* Tool Parameters */}
             {tool.input && Object.keys(tool.input).length > 0 && (
-              <div className="px-3 py-2 border-b border-border-primary">
-                <div className="text-xs text-text-secondary mb-1">Parameters:</div>
+              <div className="mb-2">
+                <div className="text-text-tertiary mb-1">Parameters:</div>
                 {formatToolInput(tool.name, tool.input)}
               </div>
             )}
             
             {/* Tool Result */}
             {tool.result && (
-              <div className="px-3 py-2">
-                <div className="text-xs text-text-secondary mb-1">
+              <div>
+                <div className="text-text-tertiary mb-1">
                   {tool.result.isError ? 'Error:' : 'Result:'}
                 </div>
-                <div className={`text-sm ${tool.result.isError ? 'text-status-error' : 'text-text-primary'}`}>
+                <div className={`${tool.result.isError ? 'text-status-error' : 'text-text-primary'}`}>
                   {formatToolResult(tool.name, tool.result.content)}
                 </div>
               </div>
@@ -491,11 +491,9 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
             
             {/* Pending state */}
             {tool.status === 'pending' && (
-              <div className="px-3 py-2">
-                <div className="text-sm text-text-tertiary italic">Waiting for result...</div>
-              </div>
+              <div className="text-text-tertiary italic">Waiting for result...</div>
             )}
-          </>
+          </div>
         )}
       </div>
     );
@@ -506,9 +504,14 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
     switch (toolName) {
       case 'Read':
         return (
-          <div className="font-mono text-sm space-y-1">
-            {input.file_path && <div>File: <span className="text-interactive">{input.file_path}</span></div>}
-            {input.offset && <div>Lines: {input.offset}-{input.offset + (input.limit || 2000)}</div>}
+          <div className="font-mono text-xs space-y-0.5">
+            {input.file_path && (
+              <div className="flex items-center gap-1">
+                <span className="text-text-tertiary">File:</span>
+                <span className="text-interactive truncate">{input.file_path}</span>
+              </div>
+            )}
+            {input.offset && <div className="text-text-tertiary">Lines: {input.offset}-{input.offset + (input.limit || 2000)}</div>}
           </div>
         );
       
@@ -619,7 +622,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
   };
 
   // Render a complete message
-  const renderMessage = (message: ConversationMessage) => {
+  const renderMessage = (message: ConversationMessage, index: number) => {
     const isCollapsed = collapsedMessages.has(message.id);
     const isUser = message.role === 'user';
     const isSystem = message.role === 'system';
@@ -628,6 +631,17 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
       .filter(seg => seg.type === 'text')
       .map(seg => seg.type === 'text' ? seg.content : '')
       .join('\n\n');
+    
+    // Check if message has tool calls or thinking
+    const hasToolCalls = message.segments.some(seg => seg.type === 'tool_call');
+    const hasThinking = message.segments.some(seg => seg.type === 'thinking');
+    
+    // Determine if we need extra spacing before this message
+    const prevMessage = index > 0 ? messages[index - 1] : null;
+    const needsExtraSpacing = prevMessage && (
+      (prevMessage.role !== message.role) || 
+      (hasThinking && !prevMessage.segments.some(seg => seg.type === 'thinking'))
+    );
     
     // Special rendering for system messages
     if (isSystem) {
@@ -706,32 +720,32 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
         key={message.id}
         className={`
           rounded-lg transition-all
-          ${isUser ? 'bg-surface-secondary' : 'bg-surface-primary'}
+          ${isUser ? 'bg-surface-secondary' : hasThinking ? 'bg-surface-primary/50' : 'bg-surface-primary'}
+          ${hasToolCalls ? 'bg-surface-tertiary/30' : ''}
           ${settings.compactMode ? 'p-3' : 'p-4'}
+          ${needsExtraSpacing ? 'mt-4' : ''}
         `}
       >
         {/* Message Header */}
-        <div className="flex items-start gap-3 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <div className={`
-            rounded-full p-2
+            rounded-full p-1.5 flex-shrink-0
             ${isUser ? 'bg-status-success/20 text-status-success' : 'bg-interactive/20 text-interactive'}
           `}>
-            {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+            {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-text-primary">
-                {isUser ? 'You' : getAgentName(message.metadata?.agent)}
+          <div className="flex-1 flex items-baseline gap-2">
+            <span className="font-medium text-text-primary text-sm">
+              {isUser ? 'You' : getAgentName(message.metadata?.agent)}
+            </span>
+            <span className="text-xs text-text-tertiary">
+              {formatDistanceToNow(parseTimestamp(message.timestamp))}
+            </span>
+            {message.metadata?.duration && (
+              <span className="text-xs text-text-tertiary">
+                · {(message.metadata.duration / 1000).toFixed(1)}s
               </span>
-              <span className="text-sm text-text-tertiary">
-                {formatDistanceToNow(parseTimestamp(message.timestamp))}
-              </span>
-              {message.metadata?.duration && (
-                <span className="text-xs text-text-tertiary">
-                  · {(message.metadata.duration / 1000).toFixed(1)}s
-                </span>
-              )}
-            </div>
+            )}
           </div>
           {hasTextContent && textContent.length > 200 && (
             <button
@@ -744,7 +758,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
         </div>
 
         {/* Message Content */}
-        <div className="ml-11 space-y-3">
+        <div className="ml-7 space-y-2">
           {/* Thinking segments */}
           {settings.showThinking && message.segments
             .filter(seg => seg.type === 'thinking')
@@ -752,11 +766,9 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
               if (seg.type === 'thinking') {
                 return (
                   <div key={`${message.id}-thinking-${idx}`} className="relative">
-                    <div className="absolute -left-6 top-0 text-interactive/50">
-                      <div className="animate-pulse">💭</div>
-                    </div>
-                    <div className="pl-2 pr-4 py-2 bg-gradient-to-r from-interactive/5 to-transparent rounded-l-md">
-                      <div className="text-sm thinking-content italic opacity-85">
+                    <div className="absolute -left-7 top-0 w-1 h-full bg-interactive/20 rounded-full" />
+                    <div className="pl-4 pr-2 py-2">
+                      <div className="text-sm thinking-content italic text-text-secondary">
                         <MarkdownPreview content={seg.content} />
                       </div>
                     </div>
@@ -829,7 +841,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
 
   // Memoize the rendered messages to prevent unnecessary re-renders
   const renderedMessages = useMemo(
-    () => messages.map(renderMessage),
+    () => messages.map((msg, idx) => renderMessage(msg, idx)),
     [messages, collapsedMessages, expandedTools, settings]
   );
 
