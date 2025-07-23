@@ -383,7 +383,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
             />
           ) : (
             <span className="flex-1 truncate text-sm text-left flex items-center gap-1">
-              <span className="inline-flex justify-center items-center mr-1" style={{ minWidth: '55px' }}>
+              <span className="inline-flex justify-center items-center mr-1">
                 {(gitStatus || gitStatusLoading) && !session.archived && (
                   <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
                 )}

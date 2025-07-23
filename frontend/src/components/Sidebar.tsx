@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings } from './Settings';
 import { DraggableProjectTreeView } from './DraggableProjectTreeView';
-import { Info, Clock, Check, Edit, FileText, Upload, Download, AlertTriangle, HelpCircle, GitMerge, GitBranch } from 'lucide-react';
+import { Info, Clock, Check, Edit, FileText, CircleArrowUp, CircleArrowDown, AlertTriangle, HelpCircle, GitMerge, GitBranch } from 'lucide-react';
 import crystalLogo from '../assets/crystal-logo.svg';
 
 interface SidebarProps {
@@ -269,7 +269,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
                     
                     <div className="flex items-center gap-3 p-2 rounded">
                       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600">
-                        <Upload className="w-3 h-3" />
+                        <CircleArrowUp className="w-3 h-3" />
                         <span className="font-medium">1</span>
                       </span>
                       <span className="text-xs text-gray-700 dark:text-gray-300">Ahead of main (commits to push)</span>
@@ -284,7 +284,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
                     
                     <div className="flex items-center gap-3 p-2 rounded">
                       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-gray-300 dark:border-gray-600">
-                        <Download className="w-3 h-3" />
+                        <CircleArrowDown className="w-3 h-3" />
                         <span className="font-medium">↓2</span>
                       </span>
                       <span className="text-xs text-gray-700 dark:text-gray-300">Behind main (needs pull)</span>
