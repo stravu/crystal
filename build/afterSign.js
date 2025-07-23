@@ -9,6 +9,12 @@ exports.default = async function(context) {
     return;
   }
 
+  // Check if we have signing certificates - if not, skip signing-related operations
+  const hasSigningCredentials = process.env.CSC_LINK || process.env.CSC_KEY_PASSWORD;
+  if (!hasSigningCredentials) {
+    console.log('AfterSign: No signing credentials found, skipping certificate-dependent operations');
+  }
+
   console.log('AfterSign: Starting JAR cleanup process...');
   console.log('AfterSign: appOutDir =', appOutDir);
   console.log('AfterSign: productName =', packager.appInfo.productName);

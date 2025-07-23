@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Edit, FileText, Upload, Download, GitBranch, AlertTriangle, HelpCircle, GitMerge, Circle, Loader2 } from 'lucide-react';
+import { Check, Edit, FileText, CircleArrowUp, CircleArrowDown, GitBranch, AlertTriangle, HelpCircle, GitMerge, Loader2 } from 'lucide-react';
 import type { GitStatus } from '../types/session';
 
 interface GitStatusIndicatorProps {
@@ -122,7 +122,7 @@ function buildTooltipContent(gitStatus: GitStatus, config: GitStatusConfig): str
 }
 
 function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
-  const iconSize = 'w-3 h-3';
+  const iconProps = { size: 14, strokeWidth: 2 };
   
   // Check if truly synced with main
   const isFullySynced = isGitStatusFullySynced(gitStatus);
@@ -130,9 +130,9 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
   // Special case: Fully synced with main
   if (isFullySynced) {
     return {
-      color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-100 dark:bg-green-900/30',
-      icon: <Check className={iconSize} />,
+      color: 'text-git-synced dark:text-git-synced-dark',
+      bgColor: 'bg-git-synced/20 dark:bg-git-synced-dark/20',
+      icon: <Check {...iconProps} />,
       label: 'Synced',
       description: 'Fully synced with main branch'
     };
@@ -142,9 +142,9 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
   if (gitStatus.isReadyToMerge) {
     const commitCount = gitStatus.totalCommits || 0;
     return {
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
-      icon: <GitMerge className={iconSize} />,
+      color: 'text-git-merge dark:text-git-merge-dark',
+      bgColor: 'bg-git-merge/20 dark:bg-git-merge-dark/20',
+      icon: <GitMerge {...iconProps} />,
       label: 'Ready to Merge',
       description: `${commitCount} commit${commitCount !== 1 ? 's' : ''} ready to push to main`
     };
@@ -155,27 +155,27 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
       // This is clean but has commits - show it needs to be merged
       if (gitStatus.totalCommits && gitStatus.totalCommits > 0) {
         return {
-          color: 'text-blue-600 dark:text-blue-400',
-          bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-          icon: <Upload className={iconSize} />,
+          color: 'text-git-ahead dark:text-git-ahead-dark',
+          bgColor: 'bg-git-ahead/20 dark:bg-git-ahead-dark/20',
+          icon: <CircleArrowUp {...iconProps} />,
           label: 'Clean with Commits',
           description: `${gitStatus.totalCommits} commit${gitStatus.totalCommits !== 1 ? 's' : ''} to merge`
         };
       }
       // Truly clean with no commits
       return {
-        color: 'text-gray-600 dark:text-gray-400',
-        bgColor: 'bg-gray-100 dark:bg-gray-900/30',
-        icon: <Check className={iconSize} />,
+        color: 'text-git-unknown dark:text-git-unknown-dark',
+        bgColor: 'bg-git-unknown/20 dark:bg-git-unknown-dark/20',
+        icon: <Check {...iconProps} />,
         label: 'Clean',
         description: 'No uncommitted changes'
       };
     
     case 'modified':
       return {
-        color: 'text-yellow-600 dark:text-yellow-400',
-        bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
-        icon: <Edit className={iconSize} />,
+        color: 'text-git-active dark:text-git-active-dark',
+        bgColor: 'bg-git-active/20 dark:bg-git-active-dark/20',
+        icon: <Edit {...iconProps} />,
         label: 'Active Changes',
         description: gitStatus.ahead && gitStatus.ahead > 0 
           ? `${gitStatus.ahead} commit${gitStatus.ahead !== 1 ? 's' : ''} + ${gitStatus.filesChanged || 0} uncommitted file${gitStatus.filesChanged !== 1 ? 's' : ''}`
@@ -184,45 +184,45 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
     
     case 'untracked':
       return {
-        color: 'text-blue-600 dark:text-blue-400',
-        bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-        icon: <FileText className={iconSize} />,
+        color: 'text-git-untracked dark:text-git-untracked-dark',
+        bgColor: 'bg-git-untracked/20 dark:bg-git-untracked-dark/20',
+        icon: <FileText {...iconProps} />,
         label: 'Untracked',
         description: 'Contains untracked files'
       };
     
     case 'ahead':
       return {
-        color: 'text-blue-600 dark:text-blue-400',
-        bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-        icon: <Upload className={iconSize} />,
+        color: 'text-git-ahead dark:text-git-ahead-dark',
+        bgColor: 'bg-git-ahead/20 dark:bg-git-ahead-dark/20',
+        icon: <CircleArrowUp {...iconProps} />,
         label: 'Ahead',
         description: `${gitStatus.ahead || 0} commit${gitStatus.ahead !== 1 ? 's' : ''} ahead of main`
       };
     
     case 'behind':
       return {
-        color: 'text-orange-600 dark:text-orange-400',
-        bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-        icon: <Download className={iconSize} />,
+        color: 'text-git-behind dark:text-git-behind-dark',
+        bgColor: 'bg-git-behind/20 dark:bg-git-behind-dark/20',
+        icon: <CircleArrowDown {...iconProps} />,
         label: 'Behind',
         description: `${gitStatus.behind || 0} commit${gitStatus.behind !== 1 ? 's' : ''} behind main`
       };
     
     case 'diverged':
       return {
-        color: 'text-purple-600 dark:text-purple-400',
-        bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-        icon: <GitBranch className={iconSize} />,
+        color: 'text-git-diverged dark:text-git-diverged-dark',
+        bgColor: 'bg-git-diverged/20 dark:bg-git-diverged-dark/20',
+        icon: <GitBranch {...iconProps} />,
         label: 'Diverged',
         description: `${gitStatus.ahead || 0} ahead, ${gitStatus.behind || 0} behind main`
       };
     
     case 'conflict':
       return {
-        color: 'text-red-600 dark:text-red-400',
-        bgColor: 'bg-red-100 dark:bg-red-900/30',
-        icon: <AlertTriangle className={iconSize} />,
+        color: 'text-git-conflict dark:text-git-conflict-dark',
+        bgColor: 'bg-git-conflict/20 dark:bg-git-conflict-dark/20',
+        icon: <AlertTriangle {...iconProps} />,
         label: 'Conflict',
         description: 'Has merge conflicts - resolve before continuing'
       };
@@ -230,9 +230,9 @@ function getGitStatusConfig(gitStatus: GitStatus): GitStatusConfig {
     case 'unknown':
     default:
       return {
-        color: 'text-gray-600 dark:text-gray-400',
-        bgColor: 'bg-gray-100 dark:bg-gray-900/30',
-        icon: <HelpCircle className={iconSize} />,
+        color: 'text-git-unknown dark:text-git-unknown-dark',
+        bgColor: 'bg-git-unknown/20 dark:bg-git-unknown-dark/20',
+        icon: <HelpCircle {...iconProps} />,
         label: 'Unknown',
         description: 'Unable to determine git status'
       };
@@ -269,7 +269,7 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
   if (isLoading === true) {
     return (
       <span 
-        className={`inline-flex items-center ${sizeConfig.gap} ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
+        className={`inline-flex items-center justify-center w-[5.5ch] ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
         title="Checking git status..."
         data-testid={sessionId ? `session-${sessionId}-git-status` : 'git-status'}
         data-git-loading="true"
@@ -302,59 +302,43 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
     }
   };
 
+  // Determine the primary count to display
+  let primaryCount = 0;
+  let ariaLabel = config.label;
+  
+  if (gitStatus.totalCommits && gitStatus.totalCommits > 0) {
+    primaryCount = gitStatus.totalCommits;
+    ariaLabel = `${primaryCount} commit${primaryCount !== 1 ? 's' : ''} in branch`;
+  } else if (gitStatus.filesChanged && gitStatus.filesChanged > 0) {
+    primaryCount = gitStatus.filesChanged;
+    ariaLabel = `${primaryCount} file${primaryCount !== 1 ? 's' : ''} changed`;
+  } else if (gitStatus.ahead && gitStatus.ahead > 0) {
+    primaryCount = gitStatus.ahead;
+    ariaLabel = `Ahead by ${primaryCount} commit${primaryCount !== 1 ? 's' : ''}`;
+  } else if (gitStatus.behind && gitStatus.behind > 0) {
+    primaryCount = gitStatus.behind;
+    ariaLabel = `Behind by ${primaryCount} commit${primaryCount !== 1 ? 's' : ''}`;
+  }
+
   return (
     <span 
-      className={`inline-flex items-center ${sizeConfig.gap} ${sizeConfig.padding} ${sizeConfig.text} rounded-md border ${config.bgColor} ${config.color} border-gray-300 dark:border-gray-600 ${(onClick || sessionId) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+      className={`inline-flex items-center ${primaryCount > 0 ? 'justify-center gap-0.5' : 'justify-center'} w-[5.5ch] ${sizeConfig.padding} ${sizeConfig.text} rounded-md border ${config.bgColor} ${config.color} border-gray-300 dark:border-gray-600 ${(onClick || sessionId) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
       title={tooltipContent}
       onClick={handleClick}
+      aria-label={ariaLabel}
       data-testid={sessionId ? `session-${sessionId}-git-status` : 'git-status'}
       data-git-state={gitStatus.state}
       data-git-ahead={gitStatus.ahead}
       data-git-behind={gitStatus.behind}
     >
-      {config.icon}
-      {/* Display logic: Show numbers for branches with commits or changes */}
-      <span className="flex items-center gap-1">
-        {/* Always show total commits if > 0 */}
-        {gitStatus.totalCommits && gitStatus.totalCommits > 0 && (
-          <span className="font-medium">{gitStatus.totalCommits}</span>
-        )}
-        
-        {/* Show file changes as secondary when there are both commits and uncommitted changes */}
-        {gitStatus.totalCommits && gitStatus.totalCommits > 0 && gitStatus.hasUncommittedChanges && gitStatus.filesChanged && (
-          <>
-            <Circle className="w-1 h-1 fill-current opacity-50" />
-            <span className="text-xs opacity-75">{gitStatus.filesChanged}</span>
-          </>
-        )}
-        
-        {/* For branches with only uncommitted changes (no commits) */}
-        {(!gitStatus.totalCommits || gitStatus.totalCommits === 0) && gitStatus.filesChanged && (
-          <span className="font-medium">{gitStatus.filesChanged}</span>
-        )}
-        
-        {/* For behind state, show behind count */}
-        {gitStatus.state === 'behind' && gitStatus.behind && gitStatus.behind > 0 && (
-          <span className="font-medium">↓{gitStatus.behind}</span>
-        )}
-        
-        {/* For diverged state */}
-        {gitStatus.state === 'diverged' && (
-          <>
-            {/* Only show ahead/behind if we haven't already shown totalCommits */}
-            {(!gitStatus.totalCommits || gitStatus.totalCommits === 0) && (
-              <>
-                {gitStatus.ahead && gitStatus.ahead > 0 && (
-                  <span className="font-medium">↑{gitStatus.ahead}</span>
-                )}
-                {gitStatus.behind && gitStatus.behind > 0 && (
-                  <span className="font-medium">↓{gitStatus.behind}</span>
-                )}
-              </>
-            )}
-          </>
-        )}
+      <span className="flex-shrink-0">
+        {config.icon}
       </span>
+      {primaryCount > 0 && (
+        <span className="font-bold">
+          {primaryCount > 9 ? '★' : primaryCount}
+        </span>
+      )}
     </span>
   );
 });

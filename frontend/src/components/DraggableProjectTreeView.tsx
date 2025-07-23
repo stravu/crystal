@@ -718,8 +718,8 @@ export function DraggableProjectTreeView() {
 
   const handleProjectClick = async (project: Project) => {
     // Navigate to the project dashboard
-    const { navigateToProjectDashboard } = useNavigationStore.getState();
-    navigateToProjectDashboard(project.id);
+    const { navigateToProject } = useNavigationStore.getState();
+    navigateToProject(project.id);
   };
 
   const handleRefreshProjectGitStatus = async (project: Project, e: React.MouseEvent) => {
@@ -1282,7 +1282,7 @@ export function DraggableProjectTreeView() {
     const folderUnviewedCount = folderSessions.filter(s => s.status === 'completed_unviewed').length;
     
     return (
-      <div key={folder.id} className="relative" style={{ marginLeft: `${Math.min(level, 1) * 8}px` }}>        
+      <div key={folder.id} className="relative" style={{ marginLeft: `${level * 16}px` }}>        
         {/* Tree lines for this folder */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Vertical lines for parent levels */}
@@ -1291,7 +1291,7 @@ export function DraggableProjectTreeView() {
               <div
                 key={parentLevel}
                 className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                style={{ left: `${Math.min(parentLevel, 1) * 8 + 4}px` }}
+                style={{ left: `${parentLevel * 16 + 8}px` }}
               />
             )
           ))}
@@ -1301,7 +1301,7 @@ export function DraggableProjectTreeView() {
           {level > 0 && !isLastInLevel && (
             <div
               className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-              style={{ left: `${Math.min(level - 1, 1) * 8 + 4}px` }}
+              style={{ left: `${(level - 1) * 16 + 8}px` }}
             />
           )}
           
@@ -1310,9 +1310,21 @@ export function DraggableProjectTreeView() {
             <div
               className="absolute w-px bg-black/[0.06] dark:bg-white/[0.06]"
               style={{ 
-                left: `${Math.min(level, 1) * 8 + 4}px`,
+                left: `${level * 16 + 8}px`,
                 top: '24px',
                 bottom: '0px'
+              }}
+            />
+          )}
+          
+          {/* Horizontal connector line for this folder */}
+          {level > 0 && (
+            <div
+              className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+              style={{ 
+                left: `${(level - 1) * 16 + 8}px`,
+                right: `calc(100% - ${level * 16}px)`,
+                top: '12px'
               }}
             />
           )}
@@ -1459,11 +1471,20 @@ export function DraggableProjectTreeView() {
                           <div
                             key={parentLevel}
                             className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                            style={{ left: `${Math.min(parentLevel, 1) * 8 + 4}px` }}
+                            style={{ left: `${parentLevel * 16 + 8}px` }}
                           />
                         )
                       ))}
                       
+                      {/* Horizontal connector line for this session */}
+                      <div
+                        className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+                        style={{ 
+                          left: `${level * 16 + 8}px`,
+                          right: `calc(100% - ${(level + 1) * 16}px)`,
+                          top: '16px'
+                        }}
+                      />
                     </div>
                     
                     <div
@@ -1612,7 +1633,7 @@ export function DraggableProjectTreeView() {
               {isExpanded && (sessionCount > 0 || (project.folders && project.folders.length > 0)) && (
                 <div className="relative mt-1 space-y-1">
                   {/* Main vertical line from project to all children */}
-                  <div className="absolute left-2 top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]" />
+                  <div className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]" style={{ left: '8px' }} />
                   {/* Render folders using recursive structure */}
                   {project.folders && (() => {
                     const folderTree = buildFolderTree(project.folders);
@@ -1638,7 +1659,7 @@ export function DraggableProjectTreeView() {
                           <div
                             key={session.id}
                             className="relative"
-                            style={{ marginLeft: '8px' }}
+                            style={{ marginLeft: '16px' }}
                           >
                             {/* Tree lines for root sessions */}
                             <div className="absolute inset-0 pointer-events-none">
@@ -1646,10 +1667,19 @@ export function DraggableProjectTreeView() {
                               {!isLastSession && (
                                 <div
                                   className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                                  style={{ left: '10px' }}
+                                  style={{ left: '8px' }}
                                 />
                               )}
                               
+                              {/* Horizontal connector line for root session */}
+                              <div
+                                className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+                                style={{ 
+                                  left: '8px',
+                                  right: 'calc(100% - 16px)',
+                                  top: '16px'
+                                }}
+                              />
                             </div>
                             
                             <div
