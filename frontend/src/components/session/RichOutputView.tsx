@@ -3,7 +3,7 @@ import { API } from '../../utils/api';
 import { MarkdownPreview } from '../MarkdownPreview';
 import { User, Bot, ChevronDown, ChevronRight, Eye, EyeOff, Settings2, Wrench, CheckCircle, XCircle, Clock, ArrowDown } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../utils/timestampUtils';
-import { ThinkingPlaceholder } from './ThinkingPlaceholder';
+import { ThinkingPlaceholder, InlineWorkingIndicator } from './ThinkingPlaceholder';
 
 // Agent-agnostic message types for flexibility
 interface RawMessage {
@@ -940,22 +940,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
                 messages.length === 0 || messages[messages.length - 1].role === 'user' ? (
                   <ThinkingPlaceholder />
                 ) : (
-                  // Inline indicator when messages are already showing
-                  <div className="flex items-center gap-3 px-4 py-3 bg-surface-secondary/50 rounded-lg border border-border-primary animate-fadeIn">
-                    <div className="flex space-x-1">
-                      {[...Array(3)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="w-2 h-2 bg-interactive rounded-full"
-                          style={{
-                            animation: 'bounce 1.4s ease-in-out infinite',
-                            animationDelay: `${i * 0.16}s`
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-text-secondary">Claude is working on your request...</span>
-                  </div>
+                  <InlineWorkingIndicator />
                 )
               )}
               <div ref={messagesEndRef} />
