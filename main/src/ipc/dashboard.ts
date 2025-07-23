@@ -264,7 +264,7 @@ async function getRemoteStatuses(projectPath: string, mainBranch: string): Promi
           isUpstream,
           isFork
         });
-      } catch (error) {
+      } catch {
         // Remote branch doesn't exist
         console.warn(`Remote branch ${remoteName}/${mainBranch} not found`);
       }

@@ -68,11 +68,6 @@ export class API {
       return window.electronAPI.sessions.getConversation(sessionId);
     },
 
-    async getJsonMessages(sessionId: string) {
-      if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.sessions.getJsonMessages(sessionId);
-    },
-
     async markViewed(sessionId: string) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.markViewed(sessionId);
@@ -224,6 +219,11 @@ export class API {
       return window.electronAPI.sessions.gitPush(sessionId);
     },
 
+    async getGitStatus(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getGitStatus(sessionId);
+    },
+
     async getLastCommits(sessionId: string, count: number = 20) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.getLastCommits(sessionId, count);
@@ -285,14 +285,6 @@ export class API {
     async listBranches(projectId: string) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.projects.listBranches(projectId);
-    },
-  };
-
-  // Dashboard
-  static dashboard = {
-    async getProjectStatus(projectId: number) {
-      if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.dashboard.getProjectStatus(projectId);
     },
   };
 
@@ -432,6 +424,14 @@ export class API {
     async searchNotebooks(query: string, limit?: number) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.stravu.searchNotebooks(query, limit);
+    },
+  };
+
+  // Dashboard
+  static dashboard = {
+    async getProjectStatus(projectId: number) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.dashboard.getProjectStatus(projectId);
     },
   };
 }

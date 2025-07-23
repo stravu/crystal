@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { StatusIndicator } from './StatusIndicator';
+import { GitStatusIndicator } from './GitStatusIndicator';
 import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
-import type { Session } from '../types/session';
+import type { Session, GitStatus } from '../types/session';
 
 interface SessionListItemProps {
   session: Session;
@@ -12,7 +13,7 @@ interface SessionListItemProps {
 }
 
 export function SessionListItem({ session, isNested = false }: SessionListItemProps) {
-  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId } = useSessionStore();
+  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId, isGitStatusLoading } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
   const isActive = activeSessionId === session.id;
   const isDeleting = deletingSessionIds.has(session.id);
@@ -23,6 +24,8 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   const [editName, setEditName] = useState(session.name);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
+  const gitStatusLoading = isGitStatusLoading(session.id);
   
   // Force re-render when session status changes
   const [, forceUpdate] = useState({});
@@ -120,6 +123,43 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
       window.removeEventListener('script-closing', handleScriptClosing as EventListener);
     };
   }, [session.id]);
+
+  useEffect(() => {
+    // Fetch Git status for this session
+    const fetchGitStatus = async () => {
+      try {
+        // Don't set loading state here anymore - it's handled by backend events
+        const response = await window.electronAPI.invoke('sessions:get-git-status', session.id);
+        if (response.success && response.gitStatus) {
+          setGitStatus(response.gitStatus);
+        }
+      } catch (error) {
+        console.error('Error fetching git status:', error);
+      }
+    };
+
+    // Initial fetch only if we don't already have git status
+    if (!session.archived && session.status !== 'error' && !gitStatus) {
+      fetchGitStatus();
+    }
+
+    // Listen for git status updates
+    let unsubscribeGitStatus: (() => void) | undefined;
+    
+    if (window.electronAPI?.events?.onGitStatusUpdated) {
+      unsubscribeGitStatus = window.electronAPI.events.onGitStatusUpdated((data) => {
+        if (data.sessionId === session.id) {
+          setGitStatus(data.gitStatus);
+        }
+      });
+    }
+
+    return () => {
+      if (unsubscribeGitStatus) {
+        unsubscribeGitStatus();
+      }
+    };
+  }, [session.id, session.archived, session.status, gitStatus]);
 
   const handleRunScript = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -299,17 +339,14 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[SessionListItem] Toggling favorite for session:', session.id, 'Current status:', session.isFavorite);
     
     try {
       const response = await API.sessions.toggleFavorite(session.id);
-      console.log('[SessionListItem] Toggle favorite response:', response);
       
       if (!response.success) {
         throw new Error(response.error || 'Failed to toggle favorite status');
       }
       
-      console.log('[SessionListItem] Successfully toggled favorite status to:', response.data?.isFavorite);
     } catch (error) {
       console.error('Error toggling favorite status:', error);
       alert('Failed to toggle favorite status');
@@ -319,22 +356,20 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   return (
     <>
       <div
-        className={`w-full text-left ${isNested ? 'px-2 py-1.5' : 'px-3 py-2'} rounded-md flex items-center space-x-2 transition-all group ${
+        className={`w-full text-left ${isNested ? 'px-2 py-1.5' : 'px-3 py-2'} rounded-md flex items-center space-x-2 transition-colors group ${
           isActive 
-            ? 'bg-blue-100 dark:bg-blue-600/20 text-gray-900 dark:text-white shadow-sm ring-1 ring-blue-200 dark:ring-blue-600/30' 
-            : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:shadow-sm'
+            ? 'bg-blue-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
+            : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
         } ${isNested ? 'text-sm' : ''}`}
         onContextMenu={handleContextMenu}
       >
         <button
           onClick={() => {
-            console.log('[SessionListItem] Clicking session:', session.id, session.name);
             setActiveSession(session.id);
             navigateToSessions();
           }}
           className="flex items-center justify-start space-x-3 flex-1 min-w-0"
         >
-          <StatusIndicator session={session} size="small" />
           {isEditing ? (
             <input
               type="text"
@@ -347,10 +382,14 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
               autoFocus
             />
           ) : (
-            <span className={`flex-1 truncate text-sm text-left ${isActive || session.status === 'completed_unviewed' ? 'font-semibold' : ''} ${session.status === 'completed_unviewed' ? 'text-blue-700 dark:text-blue-300' : ''}`} title={session.name}>
-              {session.name}
+            <span className="flex-1 truncate text-sm text-left flex items-center gap-2">
+              {(gitStatus || gitStatusLoading) && !session.archived && (
+                <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
+              )}
+              <StatusIndicator session={session} size="small" />
+              <span className="ml-1">{session.name}</span>
               {!!session.isMainRepo && (
-                <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">(main)</span>
+                <span className="text-xs text-blue-600 dark:text-blue-400 ml-1">(main)</span>
               )}
             </span>
           )}

@@ -4,7 +4,33 @@ import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager } = services;
+  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager } = services;
+
+  // Helper function to refresh git status after operations that only affect one session
+  const refreshGitStatusForSession = async (sessionId: string, isUserInitiated = false) => {
+    try {
+      await gitStatusManager.refreshSessionGitStatus(sessionId, isUserInitiated);
+    } catch (error) {
+      // Git status refresh failures are logged by GitStatusManager
+    }
+  };
+
+  // Helper function to refresh git status for all sessions in a project (e.g. after updating main)
+  const refreshGitStatusForProject = async (projectId: number) => {
+    try {
+      const sessions = await sessionManager.getAllSessions();
+      const projectSessions = sessions.filter(s => s.projectId === projectId && !s.archived && s.status !== 'error');
+      
+      // Refresh all sessions in parallel
+      await Promise.all(projectSessions.map(session => 
+        gitStatusManager.refreshSessionGitStatus(session.id, false).catch(() => {
+          // Individual failures are logged by GitStatusManager
+        })
+      ));
+    } catch (error) {
+      // Project-level refresh failures are rare and will be logged by GitStatusManager
+    }
+  };
 
   ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
     try {
@@ -134,8 +160,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           cwd: session.worktreePath
         });
         
-        // TODO: Emit event to update UI when event manager is available
-        // For now, just return success
+        // Refresh git status for this session after commit
+        await refreshGitStatusForSession(sessionId);
         
         return { success: true };
       } catch (commitError: any) {
@@ -490,6 +516,9 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         timestamp: new Date()
       });
 
+      // Refresh git status for this session after rebasing from main
+      await refreshGitStatusForSession(sessionId);
+
       return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
     } catch (error: any) {
       console.error('Failed to rebase main into worktree:', error);
@@ -651,6 +680,11 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         timestamp: new Date()
       });
 
+      // Refresh git status for ALL sessions in the project since main was updated
+      if (session.projectId !== undefined) {
+        await refreshGitStatusForProject(session.projectId);
+      }
+      
       return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
     } catch (error: any) {
       console.error('Failed to squash and rebase worktree to main:', error);
@@ -782,6 +816,15 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         timestamp: new Date()
       });
 
+      // Check if this is a main repo session pulling main branch updates
+      if (session.isMainRepo && session.projectId !== undefined) {
+        // If pulling to main repo, all worktrees might be affected
+        await refreshGitStatusForProject(session.projectId);
+      } else {
+        // If pulling to a worktree, only this session is affected
+        await refreshGitStatusForSession(sessionId);
+      }
+
       return { success: true, data: result };
     } catch (error: any) {
       console.error('Failed to pull from remote:', error);
@@ -853,6 +896,15 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         data: successMessage,
         timestamp: new Date()
       });
+
+      // Check if this is a main repo session pushing to main branch
+      if (session.isMainRepo && session.projectId !== undefined) {
+        // If pushing from main repo, all worktrees might be affected
+        await refreshGitStatusForProject(session.projectId);
+      } else {
+        // If pushing from a worktree, only this session is affected
+        await refreshGitStatusForSession(sessionId);
+      }
 
       return { success: true, data: result };
     } catch (error: any) {
@@ -985,6 +1037,28 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         console.error('Failed to get git commands:', error);
       }
       return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('sessions:get-git-status', async (_event, sessionId: string) => {
+    try {
+      const session = await sessionManager.getSession(sessionId);
+      if (!session || !session.worktreePath) {
+        return { success: false, error: 'Session or worktree path not found' };
+      }
+
+      if (session.archived) {
+        return { success: false, error: 'Cannot get git status for archived session' };
+      }
+
+      // Use refreshSessionGitStatus with user-initiated flag
+      // This is called when user clicks on a session, so show loading state
+      const gitStatus = await gitStatusManager.refreshSessionGitStatus(sessionId, true);
+
+      return { success: true, gitStatus };
+    } catch (error) {
+      console.error('Error getting git status:', error);
+      return { success: false, error: (error as Error).message };
     }
   });
 } 

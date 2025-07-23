@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -57,6 +57,7 @@ export function DraggableProjectTreeView() {
     session: Session;
   } | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
+  const [refreshingProjects, setRefreshingProjects] = useState<Set<number>>(new Set());
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [parentFolderForCreate, setParentFolderForCreate] = useState<Folder | null>(null);
@@ -719,6 +720,40 @@ export function DraggableProjectTreeView() {
     // Navigate to the project dashboard
     const { navigateToProject } = useNavigationStore.getState();
     navigateToProject(project.id);
+  };
+
+  const handleRefreshProjectGitStatus = async (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Add to refreshing set
+    setRefreshingProjects(prev => new Set([...prev, project.id]));
+    
+    try {
+      // Refresh git status for all sessions in this project
+      const response = await window.electronAPI.invoke('projects:refresh-git-status', project.id);
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to refresh git status');
+      }
+      
+      // Log summary only if there were sessions to refresh
+      if (response.data.count > 0) {
+        console.log(`[GitStatus] Refreshed ${response.data.count} sessions in ${project.name}`);
+      }
+    } catch (error: any) {
+      console.error('Failed to refresh git status:', error);
+      showError({
+        title: 'Failed to refresh git status',
+        error: error.message || 'Unknown error occurred'
+      });
+    } finally {
+      // Remove from refreshing set
+      setRefreshingProjects(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(project.id);
+        return newSet;
+      });
+    }
   };
   
 
@@ -1567,6 +1602,19 @@ export function DraggableProjectTreeView() {
                 >
                   <Plus className="w-3 h-3" />
                   <span>New Session</span>
+                </button>
+
+                <button
+                  onClick={(e) => handleRefreshProjectGitStatus(project, e)}
+                  disabled={refreshingProjects.has(project.id)}
+                  className={`p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-all opacity-0 group-hover:opacity-100 ${
+                    refreshingProjects.has(project.id) ? 'cursor-wait' : ''
+                  }`}
+                  title="Refresh git status for all sessions"
+                >
+                  <RefreshCw className={`w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 ${
+                    refreshingProjects.has(project.id) ? 'animate-spin' : ''
+                  }`} />
                 </button>
                 
                 <button

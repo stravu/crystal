@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
-import type { Session, SessionOutput } from '../types/session';
+import type { Session, SessionOutput, GitStatus } from '../types/session';
 
 export function useIPCEvents() {
   const { setSessions, loadSessions, addSession, updateSession, deleteSession } = useSessionStore();
@@ -22,6 +22,8 @@ export function useIPCEvents() {
     const unsubscribeSessionCreated = window.electronAPI.events.onSessionCreated((session: Session) => {
       console.log('[useIPCEvents] Session created:', session.id);
       addSession({...session, output: session.output || [], jsonMessages: session.jsonMessages || []});
+      // Set git status as loading for new sessions
+      useSessionStore.getState().setGitStatusLoading(session.id, true);
     });
     unsubscribeFunctions.push(unsubscribeSessionCreated);
 
@@ -75,12 +77,26 @@ export function useIPCEvents() {
     unsubscribeFunctions.push(unsubscribeSessionDeleted);
 
     const unsubscribeSessionsLoaded = window.electronAPI.events.onSessionsLoaded((sessions: Session[]) => {
-      console.log('[useIPCEvents] Sessions loaded:', sessions.length);
+      // Group logging for session loading
+      const withStatus = sessions.filter(s => s.gitStatus).length;
+      const withoutStatus = sessions.filter(s => !s.gitStatus).length;
+      if (withoutStatus > 0) {
+        console.log(`[useIPCEvents] Sessions: ${sessions.length} total (${withStatus} with status, ${withoutStatus} pending)`);
+      } else {
+        console.log(`[useIPCEvents] Sessions: ${sessions.length} loaded`);
+      }
+      
       const sessionsWithJsonMessages = sessions.map(session => ({
         ...session,
         jsonMessages: session.jsonMessages || []
       }));
       loadSessions(sessionsWithJsonMessages);
+      // Set git status as loading for sessions without git status
+      sessions.forEach(session => {
+        if (!session.gitStatus && !session.archived) {
+          useSessionStore.getState().setGitStatusLoading(session.id, true);
+        }
+      });
     });
     unsubscribeFunctions.push(unsubscribeSessionsLoaded);
 
@@ -138,6 +154,24 @@ export function useIPCEvents() {
       }
     });
     unsubscribeFunctions.push(unsubscribeZombieProcesses);
+
+    // Listen for git status updates
+    const unsubscribeGitStatusUpdated = window.electronAPI.events.onGitStatusUpdated((data: { sessionId: string; gitStatus: GitStatus }) => {
+      // Only log significant status changes in production
+      if (data.gitStatus.state !== 'clean' || process.env.NODE_ENV === 'development') {
+        console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
+      }
+      useSessionStore.getState().updateSessionGitStatus(data.sessionId, data.gitStatus);
+    });
+    unsubscribeFunctions.push(unsubscribeGitStatusUpdated);
+
+    // Listen for git status loading events
+    const unsubscribeGitStatusLoading = window.electronAPI.events.onGitStatusLoading?.((data: { sessionId: string }) => {
+      useSessionStore.getState().setGitStatusLoading(data.sessionId, true);
+    });
+    if (unsubscribeGitStatusLoading) {
+      unsubscribeFunctions.push(unsubscribeGitStatusLoading);
+    }
 
     // Load initial sessions
     API.sessions.getAll()

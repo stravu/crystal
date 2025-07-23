@@ -10,6 +10,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     executionTracker,
     runCommandManager,
     gitDiffManager,
+    gitStatusManager,
     worktreeManager
   } = services;
 
@@ -239,22 +240,19 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         }
         const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
         
-        console.log(`[Events] Getting commits for session summary`);
-        console.log(`[Events] Project path: ${project?.path || 'not found'}`);
-        console.log(`[Events] Using main branch: ${mainBranch}`);
+        // Verbose commit logging removed - details are in error cases if needed
         
         let commits: any[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
-          console.log(`[Events] getCommitHistory returned ${commits.length} commits`);
+          // Commit count logging removed - shown in session summary
         } catch (error) {
           console.error(`[Events] Error getting commit history:`, error);
           // If there's an error, try without specifying main branch (get all commits)
           try {
             const fallbackCommand = `git log --format="%H|%s|%ai|%an" --numstat -n 10`;
-            console.log(`[Events] Trying fallback command: ${fallbackCommand}`);
             const logOutput = execSync(fallbackCommand, { cwd: session.worktreePath, encoding: 'utf8' });
-            console.log(`[Events] Fallback command output: ${logOutput.substring(0, 200)}...`);
+            // Fallback output logging removed - only errors are logged
           } catch (fallbackError) {
             console.error(`[Events] Fallback also failed:`, fallbackError);
           }
@@ -287,6 +285,13 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       }
     } catch (error) {
       console.error(`Failed to generate session summary for ${sessionId}:`, error);
+    }
+
+    // Refresh git status after Claude exits, as it may have made commits
+    try {
+      await gitStatusManager.refreshSessionGitStatus(sessionId);
+    } catch (error) {
+      console.error(`Failed to refresh git status for session ${sessionId} after exit:`, error);
     }
   });
 
@@ -348,22 +353,19 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         }
         const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
         
-        console.log(`[Events] Getting commits for session summary`);
-        console.log(`[Events] Project path: ${project?.path || 'not found'}`);
-        console.log(`[Events] Using main branch: ${mainBranch}`);
+        // Verbose commit logging removed - details are in error cases if needed
         
         let commits: any[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
-          console.log(`[Events] getCommitHistory returned ${commits.length} commits`);
+          // Commit count logging removed - shown in session summary
         } catch (error) {
           console.error(`[Events] Error getting commit history:`, error);
           // If there's an error, try without specifying main branch (get all commits)
           try {
             const fallbackCommand = `git log --format="%H|%s|%ai|%an" --numstat -n 10`;
-            console.log(`[Events] Trying fallback command: ${fallbackCommand}`);
             const logOutput = execSync(fallbackCommand, { cwd: session.worktreePath, encoding: 'utf8' });
-            console.log(`[Events] Fallback command output: ${logOutput.substring(0, 200)}...`);
+            // Fallback output logging removed - only errors are logged
           } catch (fallbackError) {
             console.error(`[Events] Fallback also failed:`, fallbackError);
           }
@@ -446,6 +448,30 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     if (mw && !mw.isDestroyed()) {
       // Only send to renderer for custom dialog - no native dialogs
       mw.webContents.send('version:update-available', versionInfo);
+    }
+  });
+
+  // Listen to gitStatusManager events and broadcast to renderer
+  gitStatusManager.on('git-status-updated', (sessionId: string, gitStatus: any) => {
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) {
+      try {
+        mw.webContents.send('git-status-updated', { sessionId, gitStatus });
+      } catch (error) {
+        console.error('[Main] Failed to send git-status-updated event:', error);
+      }
+    }
+  });
+
+  // Listen for git status loading events
+  gitStatusManager.on('git-status-loading', (sessionId: string) => {
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) {
+      try {
+        mw.webContents.send('git-status-loading', { sessionId });
+      } catch (error) {
+        console.error('[Main] Failed to send git-status-loading event:', error);
+      }
     }
   });
 } 

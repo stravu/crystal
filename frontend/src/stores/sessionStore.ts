@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, SessionOutput } from '../types/session';
+import type { Session, SessionOutput, GitStatus } from '../types/session';
 import { API } from '../utils/api';
 
 interface CreateSessionRequest {
@@ -15,6 +15,7 @@ interface SessionStore {
   isLoaded: boolean;
   scriptOutput: Record<string, string[]>; // sessionId -> script output lines
   deletingSessionIds: Set<string>; // Track sessions currently being deleted
+  gitStatusLoading: Set<string>; // Track sessions currently loading git status
   
   setSessions: (sessions: Session[]) => void;
   loadSessions: (sessions: Session[]) => void;
@@ -25,7 +26,6 @@ interface SessionStore {
   addSessionOutput: (output: SessionOutput) => void;
   setSessionOutput: (sessionId: string, output: string) => void;
   setSessionOutputs: (sessionId: string, outputs: SessionOutput[]) => void;
-  setSessionJsonMessages: (sessionId: string, jsonMessages: any[]) => void;
   clearSessionOutput: (sessionId: string) => void;
   addScriptOutput: (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => void;
   clearScriptOutput: (sessionId: string) => void;
@@ -39,6 +39,9 @@ interface SessionStore {
   clearDeletingSessionIds: () => void;
   
   getActiveSession: () => Session | undefined;
+  updateSessionGitStatus: (sessionId: string, gitStatus: GitStatus) => void;
+  setGitStatusLoading: (sessionId: string, loading: boolean) => void;
+  isGitStatusLoading: (sessionId: string) => boolean;
 }
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
@@ -48,6 +51,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   isLoaded: false,
   scriptOutput: {},
   deletingSessionIds: new Set(),
+  gitStatusLoading: new Set(),
   
   setSessions: (sessions) => set({ sessions }),
   
@@ -329,32 +333,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     };
   }),
   
-  setSessionJsonMessages: (sessionId, jsonMessages) => set((state) => {
-    console.log(`[SessionStore] Setting ${jsonMessages.length} JSON messages for session ${sessionId}`);
-    
-    // Update the sessions array
-    const updatedSessions = state.sessions.map(session => {
-      if (session.id === sessionId) {
-        console.log(`[SessionStore] Updating session ${sessionId} with JSON messages`);
-        return { ...session, jsonMessages };
-      }
-      return session;
-    });
-    
-    // Also update activeMainRepoSession if it matches
-    let updatedActiveMainRepoSession = state.activeMainRepoSession;
-    if (state.activeMainRepoSession && state.activeMainRepoSession.id === sessionId) {
-      console.log(`[SessionStore] Also updating activeMainRepoSession with JSON messages`);
-      updatedActiveMainRepoSession = { ...state.activeMainRepoSession, jsonMessages };
-    }
-    
-    return {
-      ...state,
-      sessions: updatedSessions,
-      activeMainRepoSession: updatedActiveMainRepoSession
-    };
-  }),
-  
   clearSessionOutput: (sessionId) => set((state) => {
     // Update sessions array
     const updatedSessions = state.sessions.map(session => 
@@ -427,6 +405,43 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const found = state.sessions.find(session => session.id === state.activeSessionId);
     console.log('[SessionStore] Found session in sessions array:', found?.id, found?.name);
     return found;
+  },
+
+  updateSessionGitStatus: (sessionId, gitStatus) => {
+    set((state) => {
+      // Remove from loading set when git status is updated
+      const newLoadingSet = new Set(state.gitStatusLoading);
+      newLoadingSet.delete(sessionId);
+      
+      const sessions = state.sessions.map(session => 
+        session.id === sessionId 
+          ? { ...session, gitStatus }
+          : session
+      );
+      
+      // Also update main repo session if it matches
+      const activeMainRepoSession = state.activeMainRepoSession?.id === sessionId
+        ? { ...state.activeMainRepoSession, gitStatus }
+        : state.activeMainRepoSession;
+      
+      return { sessions, activeMainRepoSession, gitStatusLoading: newLoadingSet };
+    });
+  },
+  
+  setGitStatusLoading: (sessionId, loading) => {
+    set((state) => {
+      const newLoadingSet = new Set(state.gitStatusLoading);
+      if (loading) {
+        newLoadingSet.add(sessionId);
+      } else {
+        newLoadingSet.delete(sessionId);
+      }
+      return { gitStatusLoading: newLoadingSet };
+    });
+  },
+  
+  isGitStatusLoading: (sessionId) => {
+    return get().gitStatusLoading.has(sessionId);
   },
 
   setDeletingSessionIds: (ids) => set({ deletingSessionIds: new Set(ids) }),

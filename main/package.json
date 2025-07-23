@@ -19,7 +19,10 @@
     "db:validate": "ts-node src/database/utils/migrationValidator.ts",
     "db:test": "jest src/database/test/migration.test.ts",
     "db:test:ci": "ts-node src/database/test/ci-startup-test.ts",
-    "db:test:all": "scripts/test-database-migrations.sh"
+    "db:test:all": "scripts/test-database-migrations.sh",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.33",
@@ -42,12 +45,14 @@
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
+    "@vitest/coverage-v8": "^2.1.8",
     "electron": "^36.4.0",
     "electron-rebuild": "^3.2.9",
     "eslint": "^9.17.0",
     "mkdirp": "^3.0.1",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }

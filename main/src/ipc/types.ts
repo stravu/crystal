@@ -5,6 +5,7 @@ import type { ConfigManager } from '../services/configManager';
 import type { WorktreeManager } from '../services/worktreeManager';
 import type { WorktreeNameGenerator } from '../services/worktreeNameGenerator';
 import type { GitDiffManager } from '../services/gitDiffManager';
+import type { GitStatusManager } from '../services/gitStatusManager';
 import type { ExecutionTracker } from '../services/executionTracker';
 import type { DatabaseService } from '../database/database';
 import type { RunCommandManager } from '../services/runCommandManager';
@@ -22,6 +23,7 @@ export interface AppServices {
   worktreeManager: WorktreeManager;
   claudeCodeManager: ClaudeCodeManager;
   gitDiffManager: GitDiffManager;
+  gitStatusManager: GitStatusManager;
   executionTracker: ExecutionTracker;
   worktreeNameGenerator: WorktreeNameGenerator;
   runCommandManager: RunCommandManager;
