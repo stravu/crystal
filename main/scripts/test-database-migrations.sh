@@ -66,8 +66,8 @@ pnpm run db:migrate
 
 # Check migration count
 MIGRATION_COUNT=$(sqlite3 ~/.crystal-test-ci/crystal.db "SELECT COUNT(*) FROM _migrations;" 2>/dev/null || echo "0")
-if [ "$MIGRATION_COUNT" -ne "7" ]; then
-  echo -e "${RED}❌ Expected 7 migrations, found $MIGRATION_COUNT${NC}"
+if [ "$MIGRATION_COUNT" -ne "8" ]; then
+  echo -e "${RED}❌ Expected 8 migrations, found $MIGRATION_COUNT${NC}"
   exit 1
 fi
 echo -e "${GREEN}✅ Idempotency test passed${NC}"

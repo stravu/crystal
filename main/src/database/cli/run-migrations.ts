@@ -17,7 +17,7 @@ async function main() {
   }
 
   // Determine database path
-  const crystalDir = path.join(os.homedir(), '.crystal');
+  const crystalDir = process.env.CRYSTAL_DIR || path.join(os.homedir(), '.crystal');
   const dbPath = path.join(crystalDir, 'crystal.db');
   const migrationsPath = path.join(__dirname, '..', 'migrations');
 
