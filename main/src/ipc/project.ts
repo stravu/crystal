@@ -89,7 +89,10 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         projectData.runScript,
         projectData.buildScript,
         undefined, // default_permission_mode
-        projectData.openIdeCommand
+        projectData.openIdeCommand,
+        projectData.commitMode,
+        projectData.commitStructuredPromptTemplate,
+        projectData.commitCheckpointPrefix
       );
 
       // If run_script was provided, also create run commands

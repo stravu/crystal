@@ -46,10 +46,18 @@ export function DraggableProjectTreeView() {
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
+  const { setActiveSession } = useSessionStore();
   const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
   const [pendingMainBranchProject, setPendingMainBranchProject] = useState<Project | null>(null);
   const [detectedMainBranch, setDetectedMainBranch] = useState<string>('main');
   const [detectedBranchForNewProject, setDetectedBranchForNewProject] = useState<string | null>(null);
+  
+  // Track recent sessions to handle auto-selection for multiple session creation
+  const [pendingAutoSelect, setPendingAutoSelect] = useState<{
+    sessionId: string;
+    timeoutId: NodeJS.Timeout;
+    session: Session;
+  } | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
@@ -91,6 +99,32 @@ export function DraggableProjectTreeView() {
     const folderIds = Array.from(expandedFolders);
     saveUIState(projectIds, folderIds);
   }, [expandedProjects, expandedFolders, saveUIState]);
+
+  // Ensure paths are expanded when active session changes (for auto-selection)
+  useEffect(() => {
+    if (activeSessionId) {
+      // Find the session to get its project and folder IDs
+      const session = projectsWithSessions
+        .flatMap(project => project.sessions)
+        .find(s => s.id === activeSessionId);
+      
+      if (session) {
+        console.log('[DraggableProjectTreeView] Active session changed to:', session.id, 'ensuring paths are expanded');
+        
+        // Ensure project is expanded
+        if (session.projectId && !expandedProjects.has(session.projectId)) {
+          console.log('[DraggableProjectTreeView] Expanding project for active session:', session.projectId);
+          setExpandedProjects(prev => new Set([...prev, session.projectId!]));
+        }
+        
+        // Ensure folder is expanded
+        if (session.folderId && !expandedFolders.has(session.folderId)) {
+          console.log('[DraggableProjectTreeView] Expanding folder for active session:', session.folderId);
+          setExpandedFolders(prev => new Set([...prev, session.folderId!]));
+        }
+      }
+    }
+  }, [activeSessionId, projectsWithSessions, expandedProjects, expandedFolders]);
 
   const handleFolderCreated = (folder: Folder) => {
     // Add the folder to the appropriate project
@@ -171,15 +205,62 @@ export function DraggableProjectTreeView() {
         return updatedProjects;
       });
       
-      // Auto-expand the project that contains the new session
+      // Auto-expand the project that contains the new session (immediate for all sessions)
       if (newSession.projectId) {
-        setExpandedProjects(prev => new Set([...prev, newSession.projectId!]));
+        console.log('[DraggableProjectTreeView] Immediately expanding project:', newSession.projectId);
+        setExpandedProjects(prev => {
+          const newSet = new Set([...prev, newSession.projectId!]);
+          console.log('[DraggableProjectTreeView] Expanded projects now:', Array.from(newSet));
+          return newSet;
+        });
       }
       
-      // If the session has a folderId, auto-expand that folder too
+      // If the session has a folderId, auto-expand that folder too (immediate for all sessions)
       if (newSession.folderId) {
-        setExpandedFolders(prev => new Set([...prev, newSession.folderId!]));
+        console.log('[DraggableProjectTreeView] Immediately expanding folder:', newSession.folderId);
+        setExpandedFolders(prev => {
+          const newSet = new Set([...prev, newSession.folderId!]);
+          console.log('[DraggableProjectTreeView] Expanded folders now:', Array.from(newSet));
+          return newSet;
+        });
       }
+      
+      // Handle auto-selection with delayed logic to handle multiple sessions
+      // When multiple sessions are created, only select the last one
+      console.log('[DraggableProjectTreeView] Session created, handling auto-selection:', newSession.id, newSession.name);
+      
+      // Cancel any pending auto-selection
+      if (pendingAutoSelect) {
+        clearTimeout(pendingAutoSelect.timeoutId);
+        console.log('[DraggableProjectTreeView] Cancelled previous pending auto-selection for:', pendingAutoSelect.sessionId);
+      }
+      
+      // Set up delayed auto-selection for this session
+      const timeoutId = setTimeout(() => {
+        console.log('[DraggableProjectTreeView] Auto-selecting session after delay:', newSession.id, newSession.name);
+        
+        // Ensure all necessary paths are expanded when we auto-select
+        // This is important for the final session in a batch
+        if (newSession.projectId) {
+          console.log('[DraggableProjectTreeView] Ensuring project is expanded:', newSession.projectId);
+          setExpandedProjects(prev => new Set([...prev, newSession.projectId!]));
+        }
+        
+        if (newSession.folderId) {
+          console.log('[DraggableProjectTreeView] Ensuring folder is expanded:', newSession.folderId);
+          setExpandedFolders(prev => new Set([...prev, newSession.folderId!]));
+        }
+        
+        setActiveSession(newSession.id);
+        navigateToSessions();
+        setPendingAutoSelect(null);
+      }, 500); // 500ms delay to allow other sessions in the batch to arrive
+      
+      setPendingAutoSelect({
+        sessionId: newSession.id,
+        timeoutId,
+        session: newSession
+      });
     };
     
     const handleSessionUpdated = (updatedSession: Session) => {
@@ -280,6 +361,11 @@ export function DraggableProjectTreeView() {
         unsubscribeFolderCreated();
         unsubscribeFolderUpdated();
         unsubscribeProjectUpdated();
+        
+        // Clean up pending auto-selection timeout
+        if (pendingAutoSelect) {
+          clearTimeout(pendingAutoSelect.timeoutId);
+        }
       };
     }
   }, []);
@@ -1183,7 +1269,7 @@ export function DraggableProjectTreeView() {
     const hasChildren = (folder.children && folder.children.length > 0) || folderSessions.length > 0;
     
     return (
-      <div key={folder.id} className="relative" style={{ marginLeft: `${Math.min(level, 1) * 8}px` }}>        
+      <div key={folder.id} className="relative" style={{ marginLeft: `${level * 16}px` }}>        
         {/* Tree lines for this folder */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Vertical lines for parent levels */}
@@ -1192,7 +1278,7 @@ export function DraggableProjectTreeView() {
               <div
                 key={parentLevel}
                 className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                style={{ left: `${Math.min(parentLevel, 1) * 8 + 4}px` }}
+                style={{ left: `${parentLevel * 16 + 8}px` }}
               />
             )
           ))}
@@ -1202,7 +1288,7 @@ export function DraggableProjectTreeView() {
           {level > 0 && !isLastInLevel && (
             <div
               className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-              style={{ left: `${Math.min(level - 1, 1) * 8 + 4}px` }}
+              style={{ left: `${(level - 1) * 16 + 8}px` }}
             />
           )}
           
@@ -1211,9 +1297,21 @@ export function DraggableProjectTreeView() {
             <div
               className="absolute w-px bg-black/[0.06] dark:bg-white/[0.06]"
               style={{ 
-                left: `${Math.min(level, 1) * 8 + 4}px`,
+                left: `${level * 16 + 8}px`,
                 top: '24px',
                 bottom: '0px'
+              }}
+            />
+          )}
+          
+          {/* Horizontal connector line for this folder */}
+          {level > 0 && (
+            <div
+              className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+              style={{ 
+                left: `${(level - 1) * 16 + 8}px`,
+                right: `calc(100% - ${level * 16}px)`,
+                top: '12px'
               }}
             />
           )}
@@ -1291,6 +1389,11 @@ export function DraggableProjectTreeView() {
                 <span className="text-xs text-gray-500 dark:text-gray-500">
                   ({folderSessions.length})
                 </span>
+                {folderUnviewedCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full">
+                    {folderUnviewedCount}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -1364,11 +1467,20 @@ export function DraggableProjectTreeView() {
                           <div
                             key={parentLevel}
                             className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                            style={{ left: `${Math.min(parentLevel, 1) * 8 + 4}px` }}
+                            style={{ left: `${parentLevel * 16 + 8}px` }}
                           />
                         )
                       ))}
                       
+                      {/* Horizontal connector line for this session */}
+                      <div
+                        className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+                        style={{ 
+                          left: `${level * 16 + 8}px`,
+                          right: `calc(100% - ${(level + 1) * 16}px)`,
+                          top: '16px'
+                        }}
+                      />
                     </div>
                     
                     <div
@@ -1472,6 +1584,11 @@ export function DraggableProjectTreeView() {
                   <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate text-left">
                     {project.name}
                   </span>
+                  {unviewedCount > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full">
+                      {unviewedCount}
+                    </span>
+                  )}
                 </div>
                 
                 <button
@@ -1499,7 +1616,9 @@ export function DraggableProjectTreeView() {
               </div>
               
               {isExpanded && (sessionCount > 0 || (project.folders && project.folders.length > 0)) && (
-                <div className="mt-1 space-y-1">
+                <div className="relative mt-1 space-y-1">
+                  {/* Main vertical line from project to all children */}
+                  <div className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]" style={{ left: '8px' }} />
                   {/* Render folders using recursive structure */}
                   {project.folders && (() => {
                     const folderTree = buildFolderTree(project.folders);
@@ -1524,9 +1643,10 @@ export function DraggableProjectTreeView() {
                         return (
                           <div
                             key={session.id}
-                            className={`group flex items-center ${
+                            className={`relative group flex items-center ${
                               isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
                             }`}
+                            style={{ marginLeft: '16px' }}
                             draggable
                             onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
                             onDragEnd={handleDragEnd}
@@ -1541,10 +1661,19 @@ export function DraggableProjectTreeView() {
                               {!isLastSession && (
                                 <div
                                   className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
-                                  style={{ left: '10px' }}
+                                  style={{ left: '8px' }}
                                 />
                               )}
                               
+                              {/* Horizontal connector line for root session */}
+                              <div
+                                className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+                                style={{ 
+                                  left: '8px',
+                                  right: 'calc(100% - 16px)',
+                                  top: '16px'
+                                }}
+                              />
                             </div>
                             
                             <div

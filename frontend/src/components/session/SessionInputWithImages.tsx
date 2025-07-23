@@ -4,6 +4,7 @@ import { ViewMode } from '../../hooks/useSessionView';
 import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { API } from '../../utils/api';
+import { CommitModeToggle } from '../CommitModeToggle';
 
 interface AttachedImage {
   id: string;
@@ -451,31 +452,18 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 </svg>
               </div>
 
-              {/* Auto-commit Toggle */}
-              <button
-                onClick={handleToggleAutoCommit}
-                className={`
-                  px-3.5 py-1.5 rounded-full text-xs font-medium
-                  transition-all duration-200 flex items-center gap-1.5
-                  hover:scale-105 active:scale-95
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950
-                  ${activeSession.autoCommit ?? true
-                    ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-950/30 focus:ring-green-500 border border-green-200 dark:border-green-800' 
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500'
-                  }
-                `}
-              >
-                <div className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-xs
-                  ${activeSession.autoCommit ?? true
-                    ? 'bg-green-500 border-green-500 text-white' 
-                    : 'border-gray-400 dark:border-gray-500'
-                  }`}>
-                  {(activeSession.autoCommit ?? true) && (
-                    <span className="font-bold leading-none">✓</span>
-                  )}
-                </div>
-                <span className="leading-none">Auto-commit</span>
-              </button>
+              {/* Commit Mode Toggle */}
+              <CommitModeToggle
+                sessionId={activeSession.id}
+                currentMode={activeSession.commitMode}
+                currentSettings={activeSession.commitModeSettings}
+                autoCommit={activeSession.autoCommit}
+                projectId={activeSession.projectId}
+                onModeChange={() => {
+                  // Trigger a refresh of the session data
+                  handleToggleAutoCommit();
+                }}
+              />
               
               {/* Deep Analysis Toggle */}
               <button

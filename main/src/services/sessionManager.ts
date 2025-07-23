@@ -113,7 +113,11 @@ export class SessionManager extends EventEmitter {
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
       model: dbSession.model,
-      archived: dbSession.archived || false
+      archived: dbSession.archived || false,
+      baseCommit: dbSession.base_commit,
+      baseBranch: dbSession.base_branch,
+      commitMode: dbSession.commit_mode,
+      commitModeSettings: dbSession.commit_mode_settings
     };
   }
 
@@ -163,11 +167,11 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
-    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model);
+  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Session {
+    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model, baseCommit, baseBranch, commitMode, commitModeSettings);
   }
 
-  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string): Session {
+  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
     let targetProject;
@@ -198,7 +202,11 @@ export class SessionManager extends EventEmitter {
       permission_mode: permissionMode,
       is_main_repo: isMainRepo,
       auto_commit: autoCommit,
-      model: model
+      model: model,
+      base_commit: baseCommit,
+      base_branch: baseBranch,
+      commit_mode: commitMode,
+      commit_mode_settings: commitModeSettings
     };
     console.log(`[SessionManager] Session data:`, sessionData);
 
@@ -252,7 +260,9 @@ export class SessionManager extends EventEmitter {
       true, // isMainRepo = true
       true, // autoCommit = true (default for main repo sessions)
       undefined, // folderId
-      'claude-sonnet-4-20250514' // default model for main repo sessions
+      'claude-sonnet-4-20250514', // default model for main repo sessions
+      project.commit_mode, // Use project's commit mode
+      undefined // commit_mode_settings - let it use project defaults
     );
     
     console.log(`[SessionManager] Created main repo session: ${session.id}`);

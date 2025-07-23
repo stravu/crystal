@@ -3,6 +3,47 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Increase max listeners for ipcRenderer to prevent warnings when many components listen to events
 ipcRenderer.setMaxListeners(50);
 
+// In development mode, capture console logs and send them to main process for Claude Code debugging
+if (process.env.NODE_ENV !== 'production') {
+  const originalConsole = {
+    log: console.log,
+    warn: console.warn,
+    error: console.error,
+    info: console.info,
+    debug: console.debug
+  };
+
+  // Override console methods to capture frontend logs
+  ['log', 'warn', 'error', 'info', 'debug'].forEach(level => {
+    (console as any)[level] = (...args: any[]) => {
+      // Call original console first so they still appear in DevTools
+      (originalConsole as any)[level](...args);
+      
+      // Send to main process for file logging
+      try {
+        ipcRenderer.invoke('console:log', {
+          level,
+          args: args.map(arg => {
+            if (typeof arg === 'object') {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch (e) {
+                return String(arg);
+              }
+            }
+            return String(arg);
+          }),
+          timestamp: new Date().toISOString(),
+          source: 'renderer'
+        });
+      } catch (error) {
+        // Don't break if IPC fails
+        originalConsole.error('Failed to send console log to main process:', error);
+      }
+    };
+  });
+}
+
 // Response type for IPC calls
 interface IPCResponse<T = any> {
   success: boolean;

@@ -13,6 +13,9 @@ export interface Project {
   display_order?: number;
   worktree_folder?: string;
   lastUsedModel?: string;
+  commit_mode?: 'structured' | 'checkpoint' | 'disabled';
+  commit_structured_prompt_template?: string;
+  commit_checkpoint_prefix?: string;
 }
 
 export interface ProjectRunCommand {
@@ -58,6 +61,10 @@ export interface Session {
   is_favorite?: boolean;
   auto_commit?: boolean;
   model?: string;
+  base_commit?: string;
+  base_branch?: string;
+  commit_mode?: 'structured' | 'checkpoint' | 'disabled';
+  commit_mode_settings?: string; // JSON string of CommitModeSettings
 }
 
 export interface SessionOutput {
@@ -89,6 +96,10 @@ export interface CreateSessionData {
   display_order?: number;
   auto_commit?: boolean;
   model?: string;
+  base_commit?: string;
+  base_branch?: string;
+  commit_mode?: 'structured' | 'checkpoint' | 'disabled';
+  commit_mode_settings?: string; // JSON string of CommitModeSettings
 }
 
 export interface UpdateSessionData {
@@ -103,6 +114,8 @@ export interface UpdateSessionData {
   is_favorite?: boolean;
   auto_commit?: boolean;
   model?: string;
+  commit_mode?: 'structured' | 'checkpoint' | 'disabled';
+  commit_mode_settings?: string; // JSON string of CommitModeSettings
 }
 
 export interface PromptMarker {

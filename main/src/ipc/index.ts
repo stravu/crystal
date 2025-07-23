@@ -13,6 +13,8 @@ import { registerStravuHandlers } from './stravu';
 import { registerFileHandlers } from './file';
 import { registerFolderHandlers } from './folders';
 import { registerUIStateHandlers } from './uiState';
+import { registerDashboardHandlers } from './dashboard';
+import { registerCommitModeHandlers } from './commitMode';
 
 
 export function registerIpcHandlers(services: AppServices): void {
@@ -29,4 +31,6 @@ export function registerIpcHandlers(services: AppServices): void {
   registerFileHandlers(ipcMain, services);
   registerFolderHandlers(ipcMain, services);
   registerUIStateHandlers(services);
+  registerDashboardHandlers(ipcMain, services);
+  registerCommitModeHandlers(services.databaseService, services.logger);
 } 

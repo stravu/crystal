@@ -20,6 +20,13 @@ export const SessionView = memo(() => {
   const sessions = useSessionStore((state) => state.sessions);
   const activeMainRepoSession = useSessionStore((state) => state.activeMainRepoSession);
   const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
+  
+  // Stub variables for project view functionality (navigationStore was removed)
+  const activeView = 'session'; // Always show session view
+  const activeProjectId = null; // No active project
+  const [projectData, setProjectData] = useState<any>(null);
+  const [isProjectLoading, setIsProjectLoading] = useState(false);
+  const [isMergingProject, setIsMergingProject] = useState(false);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -29,6 +36,70 @@ export const SessionView = memo(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
+
+  // Load project data when activeProjectId changes
+  useEffect(() => {
+    if (activeView === 'project' && activeProjectId) {
+      const loadProjectData = async () => {
+        setIsProjectLoading(true);
+        try {
+          // Get all projects and find the one we need
+          const response = await API.projects.getAll();
+          if (response.success && response.data) {
+            const project = response.data.find((p: any) => p.id === activeProjectId);
+            if (project) {
+              setProjectData(project);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load project data:', error);
+        } finally {
+          setIsProjectLoading(false);
+        }
+      };
+      loadProjectData();
+    } else {
+      setProjectData(null);
+    }
+  }, [activeView, activeProjectId]);
+
+  const handleProjectGitPull = async () => {
+    if (!activeProjectId || !projectData) return;
+    setIsMergingProject(true);
+    try {
+      // Get or create main repo session for this project
+      const sessionResponse = await API.sessions.getOrCreateMainRepoSession(activeProjectId);
+      if (sessionResponse.success && sessionResponse.data) {
+        const response = await API.sessions.gitPull(sessionResponse.data.id);
+        if (!response.success) {
+          console.error('Git pull failed:', response.error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to perform git pull:', error);
+    } finally {
+      setIsMergingProject(false);
+    }
+  };
+
+  const handleProjectGitPush = async () => {
+    if (!activeProjectId || !projectData) return;
+    setIsMergingProject(true);
+    try {
+      // Get or create main repo session for this project
+      const sessionResponse = await API.sessions.getOrCreateMainRepoSession(activeProjectId);
+      if (sessionResponse.success && sessionResponse.data) {
+        const response = await API.sessions.gitPush(sessionResponse.data.id);
+        if (!response.success) {
+          console.error('Git push failed:', response.error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to perform git push:', error);
+    } finally {
+      setIsMergingProject(false);
+    }
+  };
   
   const activeSession = activeSessionId 
     ? (activeMainRepoSession && activeMainRepoSession.id === activeSessionId 

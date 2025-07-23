@@ -4,6 +4,8 @@ import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
 import { Shield, ShieldOff, Sparkles, GitBranch, ChevronRight, ChevronDown, Zap, Brain, Target } from 'lucide-react';
 import FilePathAutocomplete from './FilePathAutocomplete';
+import { CommitModeSettings } from './CommitModeSettings';
+import type { CommitModeSettings as CommitModeSettingsType } from '../../../shared/types';
 
 interface CreateSessionDialogProps {
   isOpen: boolean;
@@ -27,7 +29,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [branches, setBranches] = useState<Array<{ name: string; isCurrent: boolean; hasWorktree: boolean }>>([]);
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const [ultrathink, setUltrathink] = useState(false);
-  const [autoCommit, setAutoCommit] = useState(true); // Default to true
+  const [autoCommit, setAutoCommit] = useState(true); // Default to true - kept for backwards compatibility
+  const [commitModeSettings, setCommitModeSettings] = useState<CommitModeSettingsType>({ 
+    mode: 'checkpoint',
+    checkpointPrefix: 'checkpoint: '
+  });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { showError } = useErrorStore();
   
@@ -175,7 +181,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         ...formData,
         prompt: finalPrompt,
         projectId,
-        autoCommit
+        autoCommit, // Keep for backwards compatibility
+        commitMode: commitModeSettings.mode,
+        commitModeSettings: JSON.stringify(commitModeSettings)
       });
       
       if (!response.success) {
@@ -411,23 +419,21 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 )}
               </div>
               
-              {/* Sessions Count - Only show if > 1 */}
-              {(formData.count ?? 1) > 1 && (
-                <div>
-                  <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Number of Sessions: {formData.count}
-                  </label>
-                  <input
-                    id="count"
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={formData.count}
-                    onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-                    className="w-full"
-                  />
-                </div>
-              )}
+              {/* Sessions Count - Always visible */}
+              <div>
+                <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Number of Sessions: {formData.count}
+                </label>
+                <input
+                  id="count"
+                  type="range"
+                  min="1"
+                  max="5"
+                  value={formData.count}
+                  onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
+                  className="w-full"
+                />
+              </div>
             </div>
             
             {/* Advanced Options Toggle */}
@@ -457,7 +463,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     <select
                       id="baseBranch"
                       value={formData.baseBranch || ''}
-                      onChange={(e) => setFormData({ ...formData, baseBranch: e.target.value })}
+                      onChange={(e) => {
+                        const selectedBranch = e.target.value;
+                        setFormData({ ...formData, baseBranch: selectedBranch });
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
                       disabled={isLoadingBranches}
                     >
@@ -487,39 +496,21 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   </div>
                 )}
                 
-                {/* Number of Sessions */}
-                <div>
-                  <label htmlFor="count-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Number of Sessions
-                  </label>
-                  <input
-                    id="count-input"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={formData.count}
-                    onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Creates multiple sessions with numbered suffixes
-                  </p>
-                </div>
                 
-                {/* Checkboxes */}
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoCommit}
-                      onChange={(e) => setAutoCommit(e.target.checked)}
-                      className="h-4 w-4 text-green-600 rounded border-gray-300 dark:border-gray-600 focus:ring-green-500"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Auto-commit after each prompt
-                    </span>
-                  </label>
-                  
+                {/* Commit Mode Settings */}
+                <CommitModeSettings
+                  projectId={projectId}
+                  mode={commitModeSettings.mode}
+                  settings={commitModeSettings}
+                  onChange={(mode, settings) => {
+                    setCommitModeSettings(settings);
+                    // Update autoCommit for backwards compatibility
+                    setAutoCommit(mode !== 'disabled');
+                  }}
+                />
+                
+                {/* Ultrathink checkbox */}
+                <div className="pt-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
