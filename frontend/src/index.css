@@ -104,6 +104,17 @@ body.light {
   }
 }
 
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .animate-slide-progress {
   animation: slide-progress 2s ease-in-out infinite;
 }

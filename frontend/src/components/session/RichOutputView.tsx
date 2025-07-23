@@ -3,6 +3,7 @@ import { API } from '../../utils/api';
 import { MarkdownPreview } from '../MarkdownPreview';
 import { User, Bot, ChevronDown, ChevronRight, Eye, EyeOff, Settings2, Wrench, CheckCircle, XCircle, Clock, ArrowDown } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../utils/timestampUtils';
+import { ThinkingPlaceholder } from './ThinkingPlaceholder';
 
 // Agent-agnostic message types for flexibility
 interface RawMessage {
@@ -57,6 +58,7 @@ interface ToolResult {
 
 interface RichOutputViewProps {
   sessionId: string;
+  sessionStatus?: string;
 }
 
 // Settings stored in localStorage for persistence
@@ -76,7 +78,7 @@ const defaultSettings: RichOutputSettings = {
   autoScroll: true,
 };
 
-export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessionId }) => {
+export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessionId, sessionStatus }) => {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -807,6 +809,21 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
     }
   };
 
+  // Check if we're waiting for Claude's response
+  const isWaitingForResponse = useMemo(() => {
+    // Check session status first
+    if (sessionStatus === 'running' || sessionStatus === 'waiting') {
+      // If we have messages, check if the last one is from the user
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        return lastMessage.role === 'user';
+      }
+      // If no messages yet but session is running, show placeholder
+      return sessionStatus === 'running';
+    }
+    return false;
+  }, [messages, sessionStatus]);
+
   // Memoize the rendered messages to prevent unnecessary re-renders
   const renderedMessages = useMemo(
     () => messages.map(renderMessage),
@@ -918,6 +935,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
           ) : (
             <div className="space-y-4 px-4">
               {renderedMessages}
+              {isWaitingForResponse && <ThinkingPlaceholder />}
               <div ref={messagesEndRef} />
             </div>
           )}

@@ -261,7 +261,7 @@ export const SessionView = memo(() => {
             <JsonMessageView messages={activeSession.jsonMessages || []} />
           </div>
           <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
-            <RichOutputView sessionId={activeSession.id} />
+            <RichOutputView sessionId={activeSession.id} sessionStatus={activeSession.status} />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>
             <CombinedDiffView 
