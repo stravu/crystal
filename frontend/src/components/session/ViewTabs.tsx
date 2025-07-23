@@ -10,7 +10,6 @@ interface ViewTabsProps {
     changes: boolean;
     terminal: boolean;
     editor: boolean;
-    dashboard: boolean;
   };
   setUnreadActivity: (activity: any) => void;
   jsonMessagesCount: number;
@@ -31,7 +30,6 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
     { mode: 'changes', label: 'View Diff', activity: unreadActivity.changes },
     { mode: 'terminal', label: 'Terminal', activity: unreadActivity.terminal, status: isTerminalRunning },
     { mode: 'editor', label: 'File Editor', activity: unreadActivity.editor },
-    { mode: 'dashboard', label: 'Dashboard', activity: unreadActivity.dashboard },
   ];
 
   return (

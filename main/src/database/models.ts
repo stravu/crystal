@@ -16,7 +16,6 @@ export interface Project {
   commit_mode?: 'structured' | 'checkpoint' | 'disabled';
   commit_structured_prompt_template?: string;
   commit_checkpoint_prefix?: string;
-  commit_allow_claude_tools?: boolean;
 }
 
 export interface ProjectRunCommand {
