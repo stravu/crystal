@@ -382,16 +382,14 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
               autoFocus
             />
           ) : (
-            <span className="flex-1 truncate text-sm text-left flex items-center gap-1">
-              <span className="inline-flex justify-center items-center mr-1">
-                {(gitStatus || gitStatusLoading) && !session.archived && (
-                  <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
-                )}
-              </span>
+            <span className="flex-1 truncate text-sm text-left flex items-center gap-2">
+              {(gitStatus || gitStatusLoading) && !session.archived && (
+                <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
+              )}
               <StatusIndicator session={session} size="small" />
-              <span className="ml-2">{session.name}</span>
+              <span className="ml-1">{session.name}</span>
               {!!session.isMainRepo && (
-                <span className="text-xs text-blue-600 dark:text-blue-400">(main)</span>
+                <span className="text-xs text-blue-600 dark:text-blue-400 ml-1">(main)</span>
               )}
             </span>
           )}

@@ -269,7 +269,7 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
   if (isLoading === true) {
     return (
       <span 
-        className={`inline-flex items-center justify-center w-[8.5ch] ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
+        className={`inline-flex items-center justify-center w-[5.5ch] ${sizeConfig.padding} ${sizeConfig.text} rounded-md border bg-gray-100 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600`}
         title="Checking git status..."
         data-testid={sessionId ? `session-${sessionId}-git-status` : 'git-status'}
         data-git-loading="true"
@@ -322,7 +322,7 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
 
   return (
     <span 
-      className={`inline-flex items-center justify-between w-[8.5ch] ${sizeConfig.padding} ${sizeConfig.text} rounded-md border ${config.bgColor} ${config.color} border-gray-300 dark:border-gray-600 ${(onClick || sessionId) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+      className={`inline-flex items-center ${primaryCount > 0 ? 'justify-center gap-0.5' : 'justify-center'} w-[5.5ch] ${sizeConfig.padding} ${sizeConfig.text} rounded-md border ${config.bgColor} ${config.color} border-gray-300 dark:border-gray-600 ${(onClick || sessionId) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
       title={tooltipContent}
       onClick={handleClick}
       aria-label={ariaLabel}
@@ -335,8 +335,8 @@ const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = React.memo(({ gitS
         {config.icon}
       </span>
       {primaryCount > 0 && (
-        <span className="font-bold ml-1">
-          {primaryCount}
+        <span className="font-bold">
+          {primaryCount > 9 ? '★' : primaryCount}
         </span>
       )}
     </span>
