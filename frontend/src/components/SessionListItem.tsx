@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
+import { useContextMenuStore, type ContextMenuItem } from '../stores/contextMenuStore';
 import { StatusIndicator } from './StatusIndicator';
 import { GitStatusIndicator } from './GitStatusIndicator';
 import { API } from '../utils/api';
-import { Star, Archive } from 'lucide-react';
+import { Star, Archive, Edit2, Play, Square, Pause } from 'lucide-react';
 import type { Session, GitStatus } from '../types/session';
 
 interface SessionListItemProps {
@@ -15,6 +16,7 @@ interface SessionListItemProps {
 export function SessionListItem({ session, isNested = false }: SessionListItemProps) {
   const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId, isGitStatusLoading } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
+  const { openContextMenu } = useContextMenuStore();
   const isActive = activeSessionId === session.id;
   const isDeleting = deletingSessionIds.has(session.id);
   const [hasRunScript, setHasRunScript] = useState(false);
@@ -22,8 +24,6 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   const [isClosing, setIsClosing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(session.name);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
   const gitStatusLoading = isGitStatusLoading(session.id);
   
@@ -309,33 +309,59 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
-    setShowContextMenu(true);
-  };
 
-  const closeContextMenu = () => {
-    setShowContextMenu(false);
-  };
+    // Build context menu items
+    const menuItems: ContextMenuItem[] = [
+      {
+        id: 'rename',
+        label: 'Rename',
+        onClick: handleRename,
+        icon: <Edit2 className="w-4 h-4" />,
+      },
+      {
+        id: 'run-script',
+        label: isClosing ? 'Closing Script...' : isRunning ? 'Stop Script' : 'Run Script',
+        onClick: () => {
+          if (isRunning) {
+            handleStopScript({ stopPropagation: () => {} } as React.MouseEvent);
+          } else {
+            handleRunScript({ stopPropagation: () => {} } as React.MouseEvent);
+          }
+        },
+        disabled: isClosing,
+        className: isClosing 
+          ? 'w-full text-left px-4 py-2 text-sm text-gray-400 dark:text-gray-600 cursor-wait'
+          : 'w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
+        icon: isClosing ? <Pause className="w-4 h-4" /> : isRunning ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />,
+      },
+      {
+        id: 'divider',
+        label: '',
+        onClick: () => {},
+        isDivider: true,
+      },
+      {
+        id: 'archive',
+        label: 'Archive',
+        onClick: handleDeleteFromMenu,
+        className: 'w-full text-left px-4 py-2 text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-600/20 hover:text-amber-700 dark:hover:text-amber-300',
+        icon: <Archive className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+      },
+    ];
 
-  // Close context menu when clicking outside
-  useEffect(() => {
-    if (showContextMenu) {
-      const handleClick = () => closeContextMenu();
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
-    }
-  }, [showContextMenu]);
+    openContextMenu(session.id, { x: e.clientX, y: e.clientY }, menuItems);
+  };
 
   const handleRename = () => {
-    closeContextMenu();
     setEditName(session.name);
     setIsEditing(true);
   };
 
   const handleDeleteFromMenu = () => {
-    closeContextMenu();
     handleDelete({ stopPropagation: () => {} } as React.MouseEvent);
   };
+
+
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -460,46 +486,6 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
         </div>
       </div>
 
-      {/* Context Menu */}
-      {showContextMenu && (
-        <div
-          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50 min-w-[150px]"
-          style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={handleRename}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
-          >
-            Rename
-          </button>
-          <button
-            onClick={() => {
-              closeContextMenu();
-              if (isRunning) {
-                handleStopScript({ stopPropagation: () => {} } as React.MouseEvent);
-              } else {
-                handleRunScript({ stopPropagation: () => {} } as React.MouseEvent);
-              }
-            }}
-            disabled={isClosing}
-            className={`w-full text-left px-4 py-2 text-sm ${
-              isClosing 
-                ? 'text-gray-400 dark:text-gray-600 cursor-wait' 
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            {isClosing ? 'Closing Script...' : isRunning ? 'Stop Script' : 'Run Script'}
-          </button>
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-          <button
-            onClick={handleDeleteFromMenu}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-300"
-          >
-            {session.isMainRepo ? 'Archive' : 'Delete'}
-          </button>
-        </div>
-      )}
     </>
   );
 }

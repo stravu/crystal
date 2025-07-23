@@ -5,6 +5,7 @@ import { useResizable } from './hooks/useResizable';
 import { Sidebar } from './components/Sidebar';
 import { SessionView } from './components/SessionView';
 import { PromptHistoryModal } from './components/PromptHistoryModal';
+import { GlobalContextMenu } from './components/GlobalContextMenu';
 import Help from './components/Help';
 import Welcome from './components/Welcome';
 import { AboutDialog } from './components/AboutDialog';
@@ -226,6 +227,26 @@ function App() {
       }
     };
   }, [showNotification]);
+
+  useEffect(() => {
+    // Set up session update listener for worktree rename updates
+    if (!window.electronAPI?.events) return;
+    
+    const handleSessionUpdated = (updatedSession: any) => {
+      console.log('[App] Session updated:', updatedSession);
+      // Update the session in the store with the new data from worktree rename
+      useSessionStore.getState().updateSession(updatedSession);
+    };
+    
+    // Set up the listener using the events API
+    const removeListener = window.electronAPI.events.onSessionUpdated(handleSessionUpdated);
+    
+    return () => {
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, []);
   
   const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: any, message?: string) => {
     try {
@@ -286,6 +307,7 @@ function App() {
         isOpen={isPromptHistoryOpen}
         onClose={() => setIsPromptHistoryOpen(false)}
       />
+      <GlobalContextMenu />
     </div>
   );
 }

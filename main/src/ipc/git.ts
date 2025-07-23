@@ -2,9 +2,22 @@ import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
+import { resolveNewWorktreeName } from '../utils/worktreeName';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager } = services;
+  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, configManager } = services;
+  
+  // Helper function for conditional debug logging
+  const debugLog = (message: string, data?: any) => {
+    const isVerbose = configManager.getConfig().verbose;
+    if (isVerbose) {
+      if (data !== undefined) {
+        console.log(message, data);
+      } else {
+        console.log(message);
+      }
+    }
+  };
 
   // Helper function to refresh git status after operations that only affect one session
   const refreshGitStatusForSession = async (sessionId: string, isUserInitiated = false) => {
@@ -1081,19 +1094,49 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }
 
       // Extract current worktree name from path
+      debugLog(`[IPC:git] Session worktreePath: ${session.worktreePath}`);
+      debugLog(`[IPC:git] Session name: ${session.name}`);
+      debugLog(`[IPC:git] Requested newName: ${newName}`);
+      
       const currentWorktreeName = session.worktreePath.split(/[\\/]/).pop() || '';
       if (!currentWorktreeName) {
         return { success: false, error: 'Could not determine current worktree name' };
       }
 
-      console.log(`[IPC:git] Renaming worktree from ${currentWorktreeName} to ${newName} for session ${sessionId}`);
+      debugLog(`[IPC:git] Extracted worktree name: ${currentWorktreeName}`);
+      
+      // Use utility to resolve the new worktree name
+      debugLog(`[IPC:git] === WORKTREE NAME RESOLUTION ===`);
+      debugLog(`[IPC:git] Current worktree name: "${currentWorktreeName}"`);
+      debugLog(`[IPC:git] User input (newName): "${newName}"`);
+      
+      const resolveResult = resolveNewWorktreeName(currentWorktreeName, newName);
+      debugLog(`[IPC:git] Utility result:`, resolveResult);
+      
+      if (!resolveResult.success) {
+        console.error(`[IPC:git] ERROR: Name resolution failed: ${resolveResult.error}`);
+        return { success: false, error: resolveResult.error };
+      }
+      
+      const finalNewName = resolveResult.name;
+      debugLog(`[IPC:git] === FINAL RESOLVED NAME ===`);
+      debugLog(`[IPC:git] finalNewName: "${finalNewName}"`);
+      debugLog(`[IPC:git] === END RESOLUTION ===`);
+      
+      debugLog(`[IPC:git] Renaming worktree from ${currentWorktreeName} to ${finalNewName} for session ${sessionId}`);
 
       // Call the WorktreeManager to rename the worktree
-      const result = await worktreeManager.renameWorktree(project.path, currentWorktreeName, newName);
+      debugLog(`[IPC:git] Calling worktreeManager.renameWorktree with:`, {
+        projectPath: project.path,
+        oldName: currentWorktreeName,
+        newName: finalNewName
+      });
+      const result = await worktreeManager.renameWorktree(project.path, currentWorktreeName, finalNewName);
+      debugLog(`[IPC:git] WorktreeManager result:`, result);
 
       // Update the session in the database with new name and paths
       await sessionManager.updateSession(sessionId, {
-        name: newName,
+        name: finalNewName,
         worktreePath: result.worktreePath
       });
 

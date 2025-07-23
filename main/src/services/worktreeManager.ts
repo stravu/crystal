@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join, dirname } from 'path';
 import { mkdir, rename as fsRename } from 'fs/promises';
+import { existsSync } from 'fs';
 import { getShellPath } from '../utils/shellPath';
 
 const execAsync = promisify(exec);
@@ -198,8 +199,8 @@ export class WorktreeManager {
       for (const line of lines) {
         if (line.startsWith('worktree ')) {
           if (currentWorktree.path && currentWorktree.branch) {
-            // Extract name from path
-            const name = currentWorktree.path.split(/[\\\/]/).pop();
+            // Extract name from path (remove trailing slashes first)
+            const name = currentWorktree.path.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop();
             worktrees.push({ 
               path: currentWorktree.path, 
               branch: currentWorktree.branch,
@@ -213,8 +214,8 @@ export class WorktreeManager {
       }
       
       if (currentWorktree.path && currentWorktree.branch) {
-        // Extract name from path
-        const name = currentWorktree.path.split(/[\\\/]/).pop();
+        // Extract name from path (remove trailing slashes first)
+        const name = currentWorktree.path.replace(/[\\\/]+$/, '').split(/[\\\/]/).pop();
         worktrees.push({ 
           path: currentWorktree.path, 
           branch: currentWorktree.branch,
@@ -640,7 +641,44 @@ export class WorktreeManager {
       }
       
       const oldPath = currentWorktree.path;
-      const newPath = join(dirname(oldPath), newWorktreeName);
+      
+      // Calculate the worktrees base directory
+      // We need to find the base worktrees directory, not just use dirname
+      // If oldPath is /path/to/worktrees/@feature/name, we want /path/to/worktrees
+      let worktreesBaseDir;
+      
+      // Check if this is a nested structure (like @feature/name)
+      if (oldWorktreeName.includes('/')) {
+        // For nested structures, go up two levels from the old path
+        worktreesBaseDir = dirname(dirname(oldPath));
+      } else {
+        // For flat structures, go up one level
+        worktreesBaseDir = dirname(oldPath);
+      }
+      
+      const newPath = join(worktreesBaseDir, newWorktreeName);
+      
+      console.log(`[WorktreeManager] Path calculation:`, {
+        oldPath,
+        worktreesBaseDir,
+        newWorktreeName,
+        newPath
+      });
+      
+      // Validate paths
+      if (!worktreesBaseDir || worktreesBaseDir === oldPath) {
+        throw new Error(`Invalid worktrees base directory calculation: ${worktreesBaseDir}`);
+      }
+      
+      if (newPath === oldPath) {
+        throw new Error(`New path is the same as old path: ${newPath}`);
+      }
+      
+      // Check if new path would conflict with existing directories
+      if (existsSync(newPath)) {
+        throw new Error(`Target directory already exists: ${newPath}`);
+      }
+      
       const oldBranchName = currentWorktree.branch || oldWorktreeName;
       const newBranchName = newWorktreeName;
       
@@ -663,8 +701,10 @@ export class WorktreeManager {
         await fsRename(oldPath, newPath);
         
         // Remove the old worktree reference
-        await execWithShellPath(`git worktree remove --force "${oldPath}"`, { cwd: projectPath }).catch(() => {
-          // Ignore errors if already removed
+        await execWithShellPath(`git worktree remove --force "${oldPath}"`, { cwd: projectPath }).catch((removeError) => {
+          // Log removal errors for debugging, but don't fail the operation
+          console.error(`[WorktreeManager] Failed to remove old worktree path "${oldPath}":`, removeError);
+          // Ignore errors if already removed - the rename succeeded which is the main goal
         });
         
         // Re-add the worktree at the new location
