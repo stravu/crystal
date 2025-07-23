@@ -1,0 +1,228 @@
+/* Color Design Tokens for Crystal */
+
+:root {
+  /* Primitive Colors - Based on Tailwind's Default Palette */
+  --gray-50: rgb(249 250 251);
+  --gray-100: rgb(243 244 246);
+  --gray-200: rgb(229 231 235);
+  --gray-300: rgb(209 213 219);
+  --gray-400: rgb(156 163 175);
+  --gray-500: rgb(107 114 128);
+  --gray-600: rgb(75 85 99);
+  --gray-700: rgb(55 65 81);
+  --gray-800: rgb(31 41 55);
+  --gray-900: rgb(17 24 39);
+  
+  --blue-400: rgb(96 165 250);
+  --blue-500: rgb(59 130 246);
+  --blue-600: rgb(37 99 235);
+  --blue-700: rgb(29 78 216);
+  
+  --green-500: rgb(34 197 94);
+  --amber-500: rgb(245 158 11);
+  --red-500: rgb(239 68 68);
+  --red-600: rgb(220 38 38);
+  
+  /* Brand Colors */
+  --discord-primary: #5865F2;
+  --discord-hover: #4752C4;
+  --discord-secondary: #7289DA;
+}
+
+/* Dark Theme - Current Default */
+:root {
+  /* Semantic Tokens - Backgrounds */
+  --color-bg-primary: var(--gray-900);
+  --color-bg-secondary: var(--gray-800);
+  --color-bg-tertiary: var(--gray-700);
+  --color-bg-hover: var(--gray-700);
+  --color-bg-active: var(--gray-600);
+  
+  /* Semantic Tokens - Surface Colors */
+  --color-surface-primary: var(--gray-800);
+  --color-surface-secondary: var(--gray-700);
+  --color-surface-hover: var(--gray-700);
+  
+  /* Semantic Tokens - Text */
+  --color-text-primary: rgb(255 255 255);
+  --color-text-secondary: var(--gray-100);
+  --color-text-tertiary: var(--gray-300);
+  --color-text-muted: var(--gray-400);
+  --color-text-disabled: var(--gray-500);
+  
+  /* Semantic Tokens - Borders */
+  --color-border-primary: var(--gray-700);
+  --color-border-secondary: var(--gray-600);
+  --color-border-hover: var(--gray-500);
+  --color-border-focus: var(--blue-500);
+  
+  /* Semantic Tokens - Interactive */
+  --color-interactive-primary: var(--blue-600);
+  --color-interactive-hover: var(--blue-700);
+  --color-interactive-active: var(--blue-500);
+  --color-interactive-text: var(--blue-400);
+  --color-focus-ring: var(--blue-500);
+  
+  /* Semantic Tokens - Status */
+  --color-status-success: var(--green-500);
+  --color-status-success-hover: var(--green-600);
+  --color-status-warning: var(--amber-500);
+  --color-status-warning-hover: var(--amber-600);
+  --color-status-error: var(--red-500);
+  --color-status-error-hover: var(--red-600);
+  --color-status-info: var(--blue-500);
+  --color-status-neutral: var(--gray-400);
+  
+  /* Component-Specific Tokens - Buttons */
+  --color-button-primary-bg: var(--color-interactive-primary);
+  --color-button-primary-hover: var(--color-interactive-hover);
+  --color-button-primary-text: rgb(255 255 255);
+  
+  --color-button-secondary-bg: var(--gray-700);
+  --color-button-secondary-hover: var(--gray-600);
+  --color-button-secondary-text: var(--gray-100);
+  
+  --color-button-ghost-hover: var(--gray-700);
+  --color-button-ghost-text: var(--gray-300);
+  
+  /* Component-Specific Tokens - Cards/Panels */
+  --color-card-bg: var(--color-surface-primary);
+  --color-card-border: var(--color-border-primary);
+  --color-card-nested-bg: var(--gray-700);
+  
+  /* Component-Specific Tokens - Forms */
+  --color-input-bg: var(--gray-900);
+  --color-input-border: var(--color-border-primary);
+  --color-input-focus: var(--color-focus-ring);
+  --color-input-text: var(--color-text-primary);
+  --color-input-placeholder: var(--gray-500);
+  
+  /* Component-Specific Tokens - Modal/Dialog */
+  --color-modal-overlay: rgba(0, 0, 0, 0.5);
+  --color-modal-bg: var(--color-surface-primary);
+  
+  /* Scrollbar Colors */
+  --color-scrollbar-track: var(--gray-800);
+  --color-scrollbar-thumb: var(--gray-600);
+  --color-scrollbar-thumb-hover: var(--gray-500);
+  
+  /* Terminal Colors - Dark Theme */
+  --color-terminal-bg: var(--gray-900);
+  --color-terminal-fg: var(--gray-100);
+  --color-terminal-cursor: var(--blue-400);
+  --color-terminal-black: var(--gray-900);
+  --color-terminal-red: #ef4444;
+  --color-terminal-green: #22c55e;
+  --color-terminal-yellow: #eab308;
+  --color-terminal-blue: #3b82f6;
+  --color-terminal-magenta: #a855f7;
+  --color-terminal-cyan: #06b6d4;
+  --color-terminal-white: var(--gray-100);
+  --color-terminal-bright-black: var(--gray-600);
+  --color-terminal-bright-red: #f87171;
+  --color-terminal-bright-green: #4ade80;
+  --color-terminal-bright-yellow: #facc15;
+  --color-terminal-bright-blue: #60a5fa;
+  --color-terminal-bright-magenta: #c084fc;
+  --color-terminal-bright-cyan: #22d3ee;
+  --color-terminal-bright-white: #ffffff;
+}
+
+/* Light Theme */
+:root.light {
+  /* Semantic Tokens - Backgrounds */
+  --color-bg-primary: rgb(255 255 255);
+  --color-bg-secondary: var(--gray-50);
+  --color-bg-tertiary: var(--gray-100);
+  --color-bg-hover: var(--gray-100);
+  --color-bg-active: var(--gray-200);
+  
+  /* Semantic Tokens - Surface Colors */
+  --color-surface-primary: rgb(255 255 255);
+  --color-surface-secondary: var(--gray-50);
+  --color-surface-tertiary: var(--gray-100);
+  --color-surface-hover: var(--gray-100);
+  
+  /* Semantic Tokens - Text */
+  --color-text-primary: var(--gray-900);
+  --color-text-secondary: var(--gray-700);
+  --color-text-tertiary: var(--gray-500);
+  --color-text-muted: var(--gray-400);
+  
+  /* Semantic Tokens - Borders */
+  --color-border-primary: var(--gray-200);
+  --color-border-secondary: var(--gray-300);
+  --color-border-tertiary: var(--gray-100);
+  
+  /* Semantic Tokens - Interactive Elements */
+  --color-interactive: var(--blue-600);
+  --color-interactive-hover: var(--blue-700);
+  --color-interactive-active: var(--blue-500);
+  --color-interactive-text: rgb(255 255 255);
+  
+  /* Semantic Tokens - Status Colors */
+  --color-status-success: var(--green-500);
+  --color-status-success-hover: var(--green-600);
+  --color-status-warning: var(--amber-500);
+  --color-status-warning-hover: var(--amber-600);
+  --color-status-error: var(--red-500);
+  --color-status-error-hover: var(--red-600);
+  
+  /* Semantic Tokens - Special UI States */
+  --color-modal-overlay: rgba(0, 0, 0, 0.3);
+  --color-focus-ring: var(--blue-500);
+  
+  /* Component-Specific Tokens - Buttons */
+  --color-button-primary-bg: var(--color-interactive);
+  --color-button-primary-hover: var(--color-interactive-hover);
+  --color-button-primary-text: var(--color-interactive-text);
+  
+  --color-button-secondary-bg: var(--gray-100);
+  --color-button-secondary-hover: var(--gray-200);
+  --color-button-secondary-text: var(--gray-700);
+  
+  --color-button-ghost-hover: var(--gray-100);
+  --color-button-ghost-text: var(--gray-600);
+  
+  /* Component-Specific Tokens - Cards/Panels */
+  --color-card-bg: var(--color-surface-primary);
+  --color-card-border: var(--color-border-primary);
+  --color-card-nested-bg: var(--gray-50);
+  
+  /* Component-Specific Tokens - Forms */
+  --color-input-bg: rgb(255 255 255);
+  --color-input-border: var(--color-border-primary);
+  --color-input-focus: var(--color-focus-ring);
+  --color-input-text: var(--color-text-primary);
+  --color-input-placeholder: var(--gray-400);
+  
+  /* Component-Specific Tokens - Modal/Dialog */
+  --color-modal-overlay: rgba(0, 0, 0, 0.3);
+  --color-modal-bg: var(--color-surface-primary);
+  
+  /* Scrollbar Colors */
+  --color-scrollbar-track: var(--gray-100);
+  --color-scrollbar-thumb: var(--gray-300);
+  --color-scrollbar-thumb-hover: var(--gray-400);
+  
+  /* Terminal Colors - Light Theme */
+  --color-terminal-bg: var(--gray-50);
+  --color-terminal-fg: var(--gray-900);
+  --color-terminal-cursor: var(--blue-600);
+  --color-terminal-black: var(--gray-900);
+  --color-terminal-red: #dc2626;
+  --color-terminal-green: #16a34a;
+  --color-terminal-yellow: #d97706;
+  --color-terminal-blue: #2563eb;
+  --color-terminal-magenta: #9333ea;
+  --color-terminal-cyan: #0891b2;
+  --color-terminal-white: var(--gray-700);
+  --color-terminal-bright-black: var(--gray-600);
+  --color-terminal-bright-red: #ef4444;
+  --color-terminal-bright-green: #22c55e;
+  --color-terminal-bright-yellow: #f59e0b;
+  --color-terminal-bright-blue: #3b82f6;
+  --color-terminal-bright-magenta: #a855f7;
+  --color-terminal-bright-cyan: #06b6d4;
+  --color-terminal-bright-white: var(--gray-900);
+}

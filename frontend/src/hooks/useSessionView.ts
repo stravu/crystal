@@ -6,9 +6,10 @@ import { API } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Session, GitCommands, GitErrorDetails } from '../types/session';
+import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor';
+export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard' | 'richOutput';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -32,6 +33,8 @@ export const useSessionView = (
     changes: false,
     terminal: false,
     editor: false,
+    dashboard: false,
+    richOutput: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -336,6 +339,8 @@ export const useSessionView = (
       changes: false,
       terminal: false,
       editor: false,
+      dashboard: false,
+      richOutput: false,
     });
     
     // Reset context compaction state when switching sessions
@@ -569,7 +574,11 @@ export const useSessionView = (
         fastScrollModifier: 'ctrl',
         fastScrollSensitivity: 5,
         scrollSensitivity: 1,
-        theme: theme === 'light' ? lightTheme : (isScript ? scriptDarkTheme : darkTheme)
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontSize: 13,
+        lineHeight: 1.2,
+        theme: isScript ? getScriptTerminalTheme() : getTerminalTheme(),
+        allowTransparency: false
     });
 
     const addon = new FitAddon();
@@ -958,8 +967,8 @@ export const useSessionView = (
   }, [activeSession?.status, viewMode]);
 
   useEffect(() => {
-    if (terminalInstance.current) terminalInstance.current.options.theme = theme === 'light' ? lightTheme : darkTheme;
-    if (scriptTerminalInstance.current) scriptTerminalInstance.current.options.theme = theme === 'light' ? lightTheme : scriptDarkTheme;
+    if (terminalInstance.current) terminalInstance.current.options.theme = getTerminalTheme();
+    if (scriptTerminalInstance.current) scriptTerminalInstance.current.options.theme = getScriptTerminalTheme();
   }, [theme]);
 
   useEffect(() => {
@@ -982,8 +991,13 @@ export const useSessionView = (
   useEffect(() => {
     if (!activeSession) return;
     const currentMessageCount = activeSession.jsonMessages?.length || 0;
-    if (currentMessageCount > previousMessageCountRef.current && viewMode !== 'messages') {
-      setUnreadActivity(prev => ({ ...prev, messages: true }));
+    if (currentMessageCount > previousMessageCountRef.current) {
+      if (viewMode !== 'messages') {
+        setUnreadActivity(prev => ({ ...prev, messages: true }));
+      }
+      if (viewMode !== 'richOutput') {
+        setUnreadActivity(prev => ({ ...prev, richOutput: true }));
+      }
     }
     previousMessageCountRef.current = currentMessageCount;
   }, [activeSession?.jsonMessages?.length, viewMode]);
@@ -1009,7 +1023,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false });
+    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, dashboard: false, richOutput: false });
   }, [activeSessionId]);
 
 
@@ -1686,70 +1700,4 @@ export const useSessionView = (
     hasConversationHistory,
     compactedContext,
   };
-};
-
-const lightTheme = {
-  background: '#f9fafb',
-  foreground: '#1f2937',
-  cursor: '#1f2937',
-  black: '#1f2937',
-  red: '#dc2626',
-  green: '#16a34a',
-  yellow: '#ca8a04',
-  blue: '#2563eb',
-  magenta: '#9333ea',
-  cyan: '#0891b2',
-  white: '#f3f4f6',
-  brightBlack: '#6b7280',
-  brightRed: '#ef4444',
-  brightGreen: '#22c55e',
-  brightYellow: '#eab308',
-  brightBlue: '#3b82f6',
-  brightMagenta: '#a855f7',
-  brightCyan: '#06b6d4',
-  brightWhite: '#ffffff'
-};
-
-const darkTheme = {
-  background: '#000000',
-  foreground: '#d4d4d4',
-  cursor: '#d4d4d4',
-  black: '#000000',
-  red: '#cd3131',
-  green: '#0dbc79',
-  yellow: '#e5e510',
-  blue: '#2472c8',
-  magenta: '#bc3fbc',
-  cyan: '#11a8cd',
-  white: '#e5e5e5',
-  brightBlack: '#666666',
-  brightRed: '#f14c4c',
-  brightGreen: '#23d18b',
-  brightYellow: '#f5f543',
-  brightBlue: '#3b8eea',
-  brightMagenta: '#d670d6',
-  brightCyan: '#29b8db',
-  brightWhite: '#e5e5e5'
-};
-
-const scriptDarkTheme = {
-  background: '#0f172a',
-  foreground: '#e2e8f0',
-  cursor: '#e2e8f0',
-  black: '#1e293b',
-  red: '#ef4444',
-  green: '#22c55e',
-  yellow: '#eab308',
-  blue: '#3b82f6',
-  magenta: '#a855f7',
-  cyan: '#06b6d4',
-  white: '#f1f5f9',
-  brightBlack: '#475569',
-  brightRed: '#f87171',
-  brightGreen: '#4ade80',
-  brightYellow: '#facc15',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#c084fc',
-  brightCyan: '#22d3ee',
-  brightWhite: '#ffffff'
 };

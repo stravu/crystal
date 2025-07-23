@@ -462,14 +462,14 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   if (loading && executions.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-gray-600 dark:text-gray-400">Loading executions...</div>
+        <div className="text-text-secondary">Loading executions...</div>
       </div>
     );
   }
 
   if (error && executions.length === 0) {
     return (
-      <div className="p-4 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+      <div className="p-4 text-status-error bg-status-error/10 border border-status-error/30 rounded">
         <h3 className="font-medium mb-2">Error</h3>
         <p>{error}</p>
       </div>
@@ -477,13 +477,13 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   }
 
   return (
-    <div className={`combined-diff-view flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'}`}>
+    <div className={`combined-diff-view flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-bg-primary' : 'h-full'}`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">File Changes</h2>
+      <div className="flex items-center justify-between p-4 border-b border-border-primary bg-surface-secondary">
+        <h2 className="text-xl font-semibold text-text-primary">File Changes</h2>
         <div className="flex items-center space-x-4">
           {isGitOperationRunning && (
-            <div className="flex items-center space-x-2 text-sm text-blue-600">
+            <div className="flex items-center space-x-2 text-sm text-interactive">
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -493,28 +493,28 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
           )}
           {combinedDiff && (
             <div className="flex items-center space-x-4 text-sm">
-              <span className="text-green-600">+{combinedDiff.stats.additions}</span>
-              <span className="text-red-600">-{combinedDiff.stats.deletions}</span>
-              <span className="text-gray-400">{combinedDiff.stats.filesChanged} {combinedDiff.stats.filesChanged === 1 ? 'file' : 'files'}</span>
+              <span className="text-status-success">+{combinedDiff.stats.additions}</span>
+              <span className="text-status-error">-{combinedDiff.stats.deletions}</span>
+              <span className="text-text-tertiary">{combinedDiff.stats.filesChanged} {combinedDiff.stats.filesChanged === 1 ? 'file' : 'files'}</span>
             </div>
           )}
           <button
             onClick={handleManualRefresh}
-            className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="p-2 rounded hover:bg-surface-hover transition-colors"
             title="Refresh git data"
             disabled={loading}
           >
-            <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 text-text-secondary ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="p-2 rounded hover:bg-surface-hover transition-colors"
             title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           >
             {isFullscreen ? (
-              <Minimize2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <Minimize2 className="w-5 h-5 text-text-secondary" />
             ) : (
-              <Maximize2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <Maximize2 className="w-5 h-5 text-text-secondary" />
             )}
           </button>
         </div>
@@ -523,10 +523,10 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       <div className="flex-1 flex min-h-0">
         {/* Commits selection sidebar */}
         {!isFullscreen && (
-          <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-hidden flex flex-col">
+          <div className="w-1/3 border-r border-border-primary bg-surface-secondary overflow-hidden flex flex-col">
             {/* File list - show only when we have a diff */}
             {filesFromDiff.length > 0 && (
-              <div className="h-1/3 border-b border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="h-1/3 border-b border-border-primary overflow-hidden">
                 <FileList
                   files={filesFromDiff}
                   onFileClick={handleFileClick}
@@ -552,24 +552,24 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
         )}
 
         {/* Diff preview */}
-        <div className={`${isFullscreen ? 'w-full' : 'flex-1'} overflow-auto bg-white dark:bg-gray-900 min-w-0 flex flex-col`}>
+        <div className={`${isFullscreen ? 'w-full' : 'flex-1'} overflow-auto bg-bg-primary min-w-0 flex flex-col`}>
           {isGitOperationRunning ? (
             <div className="flex flex-col items-center justify-center h-full p-8">
-              <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-12 w-12 text-interactive mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <div className="text-gray-600 dark:text-gray-400 text-center">
+              <div className="text-text-secondary text-center">
                 <p className="font-medium">Git operation in progress</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Please wait while the operation completes...</p>
+                <p className="text-sm text-text-tertiary mt-1">Please wait while the operation completes...</p>
               </div>
             </div>
           ) : loading && combinedDiff === null ? (
             <div className="flex items-center justify-center h-32">
-              <div className="text-gray-600 dark:text-gray-400">Loading diff...</div>
+              <div className="text-text-secondary">Loading diff...</div>
             </div>
           ) : error ? (
-            <div className="p-4 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded m-4">
+            <div className="p-4 text-status-error bg-status-error/10 border border-status-error/30 rounded m-4">
               <h3 className="font-medium mb-2">Error loading diff</h3>
               <p>{error}</p>
             </div>
@@ -604,14 +604,14 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
               mainBranch={mainBranch}
             />
           ) : isMainRepo ? (
-            <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center h-full text-text-secondary">
               <div className="text-center">
                 <p className="mb-2">Showing last 20 commits from the main repository</p>
                 <p className="text-sm">Select commits to view details</p>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-32 text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center h-32 text-text-secondary">
               Select commits to view changes
             </div>
           )}

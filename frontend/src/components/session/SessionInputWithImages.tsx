@@ -206,21 +206,21 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const getSessionStatus = () => {
     switch (activeSession.status) {
       case 'initializing':
-        return { color: 'bg-yellow-500', pulse: true };
+        return { color: 'bg-status-warning', pulse: true };
       case 'ready':
-        return { color: 'bg-green-500', pulse: false };
+        return { color: 'bg-status-success', pulse: false };
       case 'running':
-        return { color: 'bg-blue-500', pulse: true };
+        return { color: 'bg-interactive', pulse: true };
       case 'waiting':
-        return { color: 'bg-orange-500', pulse: true };
+        return { color: 'bg-status-warning', pulse: true };
       case 'stopped':
-        return { color: 'bg-gray-500', pulse: false };
+        return { color: 'bg-text-tertiary', pulse: false };
       case 'completed_unviewed':
-        return { color: 'bg-green-500', pulse: true };
+        return { color: 'bg-status-success', pulse: true };
       case 'error':
-        return { color: 'bg-red-500', pulse: false };
+        return { color: 'bg-status-error', pulse: false };
       default:
-        return { color: 'bg-gray-500', pulse: false };
+        return { color: 'bg-text-tertiary', pulse: false };
     }
   };
 
@@ -248,10 +248,10 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   }, [onBlur]);
 
   return (
-    <div className="border-t-2 border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
-      <div className="bg-gray-50 dark:bg-gray-900">
+    <div className="border-t-2 border-border-primary flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+      <div className="bg-surface-secondary">
         {/* Context Bar */}
-        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800">
+        <div className="px-4 py-2 border-b border-border-primary bg-surface-primary">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-3">
               {/* Session status indicator */}
@@ -261,8 +261,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
               
               {/* Project Badge */}
               <div className="px-2.5 py-1 rounded-full text-xs font-medium
-                bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 
-                border border-purple-200 dark:border-purple-800
+                bg-interactive/10 text-interactive 
+                border border-interactive/30
                 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -275,8 +275,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
               {/* Branch Badge */}
               {gitCommands?.currentBranch && (
                 <div className="px-2.5 py-1 rounded-full text-xs font-medium
-                  bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 
-                  border border-green-200 dark:border-green-800
+                  bg-status-success/10 text-status-success 
+                  border border-status-success/30
                   flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12a3 3 0 003 3h6m-6-6l3-3-3-3m6 0a3 3 0 100 6 3 3 0 000-6z" />
@@ -289,7 +289,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             </div>
             {/* Mode indicator */}
             {viewMode === 'terminal' && (
-              <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-1 text-text-secondary">
                 <Terminal className="w-3 h-3" />
                 <span>Terminal Mode</span>
               </div>
@@ -298,7 +298,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         </div>
 
         {/* Command Input Area */}
-        <div className="p-4 bg-white dark:bg-gray-800"
+        <div className="p-4 bg-surface-primary"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -311,13 +311,13 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   <img
                     src={image.dataUrl}
                     alt={image.name}
-                    className="h-12 w-12 object-cover rounded border border-gray-200 dark:border-gray-700"
+                    className="h-12 w-12 object-cover rounded border border-border-primary"
                   />
                   <button
                     onClick={() => removeImage(image.id)}
-                    className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                    className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                   >
-                    <X className="w-2.5 h-2.5 text-gray-500" />
+                    <X className="w-2.5 h-2.5 text-text-secondary" />
                   </button>
                 </div>
               ))}
@@ -326,15 +326,15 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
           {/* Clean Input Container */}
           <div className={`
-            bg-white dark:bg-gray-800 
-            rounded-lg border border-gray-200 dark:border-gray-700 
+            bg-surface-primary 
+            rounded-lg border border-border-primary 
             shadow-[0_4px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)]
             transition-all duration-200 backdrop-blur-sm
             ${isFocused ? (buttonConfig.color === 'green' ? 'command-bar-focus-green' : 'command-bar-focus') : ''}
           `}>
             {/* Command prompt field */}
             <div className="relative">
-              <div className="absolute left-4 top-[50%] -translate-y-[50%] text-gray-500 dark:text-gray-400 select-none pointer-events-none font-mono text-sm">
+              <div className="absolute left-4 top-[50%] -translate-y-[50%] text-text-secondary select-none pointer-events-none font-mono text-sm">
                 &gt;
               </div>
               <FilePathAutocomplete
@@ -347,8 +347,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   bg-transparent
                   border-0 focus:outline-none
                   resize-none font-mono text-sm
-                  text-gray-900 dark:text-gray-100
-                  placeholder-gray-500 dark:placeholder-gray-500
+                  text-text-primary
+                  placeholder-text-tertiary
                   transition-colors
                 `}
                 textareaRef={textareaRef}
@@ -395,11 +395,11 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="px-3.5 py-1.5 rounded-full text-xs font-medium
-                  bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                  hover:bg-gray-300 dark:hover:bg-gray-600 
+                  bg-surface-tertiary text-text-secondary 
+                  hover:bg-surface-hover 
                   flex items-center gap-1.5 transition-all duration-200 
                   hover:scale-105 active:scale-95
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950 focus:ring-gray-500"
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary focus:ring-border-primary"
                 title="Attach images"
               >
                 <Paperclip className="w-3.5 h-3.5" />
@@ -411,11 +411,11 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 <button 
                   onClick={() => setShowStravuSearch(true)}
                   className="px-3.5 py-1.5 rounded-full text-xs font-medium
-                    bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                    hover:bg-gray-300 dark:hover:bg-gray-600 
+                    bg-surface-tertiary text-text-secondary 
+                    hover:bg-surface-hover 
                     flex items-center gap-1.5 transition-all duration-200 
                     hover:scale-105 active:scale-95
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950 focus:ring-gray-500"
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary focus:ring-interactive"
                   title="Reference files (@)"
                 >
                   <AtSign className="w-3.5 h-3.5" />
@@ -424,7 +424,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
               )}
 
               {/* Divider */}
-              <div className="h-6 w-px bg-gray-600 dark:bg-gray-500 mx-1" />
+              <div className="h-6 w-px bg-border-primary mx-1" />
 
               {/* Model Selector */}
               <div className="relative inline-flex items-center">
@@ -440,19 +440,19 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                       console.error('Failed to save default model:', err);
                     }
                   }}
-                  className="appearance-none bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                    hover:bg-gray-300 dark:hover:bg-gray-600 
+                  className="appearance-none bg-surface-tertiary text-text-secondary 
+                    hover:bg-surface-hover 
                     px-3.5 py-1.5 pr-8 rounded-full text-xs font-medium leading-none
                     transition-all duration-200 cursor-pointer
                     focus:outline-none focus:ring-2 focus:ring-offset-2 
-                    focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950 focus:ring-purple-500
+                    focus:ring-offset-bg-primary focus:ring-interactive
                     hover:scale-105 active:scale-95"
                 >
                   <option value="claude-sonnet-4-20250514">Sonnet 4</option>
                   <option value="claude-opus-4-20250514">Opus 4</option>
                   <option value="claude-3-5-haiku-20241022">Haiku 3.5</option>
                 </select>
-                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 dark:text-gray-400 pointer-events-none" 
+                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none" 
                   fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -478,17 +478,17 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   px-3.5 py-1.5 rounded-full text-xs font-medium
                   transition-all duration-200 flex items-center gap-1.5
                   hover:scale-105 active:scale-95
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary
                   ${ultrathink 
-                    ? 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/30 focus:ring-blue-500 border border-blue-200 dark:border-blue-800' 
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500'
+                    ? 'bg-interactive/10 text-interactive hover:bg-interactive/20 focus:ring-interactive border border-interactive/30' 
+                    : 'bg-surface-tertiary text-text-secondary hover:bg-surface-hover focus:ring-interactive'
                   }
                 `}
               >
                 <div className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 flex items-center justify-center
                   ${ultrathink
-                    ? 'bg-blue-500 border-blue-500' 
-                    : 'border-gray-400 dark:border-gray-500'
+                    ? 'bg-interactive border-interactive' 
+                    : 'border-border-primary'
                   }`}>
                   {ultrathink && (
                     <Cpu className="w-2 h-2 text-white" />
@@ -543,12 +543,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   active:scale-[0.98]
                   focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
                   ${buttonConfig.isPrimary 
-                    ? `bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 
-                       text-white border-blue-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
-                       focus:ring-blue-400 hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
+                    ? `bg-gradient-to-r from-interactive to-interactive-hover hover:from-interactive-hover hover:to-interactive 
+                       text-white border-interactive shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
+                       focus:ring-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
                     : buttonConfig.color === 'green' 
-                      ? 'bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600 text-green-400 hover:text-green-300 border-gray-600 dark:border-gray-500 focus:ring-green-500' 
-                      : 'bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600 text-blue-400 hover:text-blue-300 border-gray-600 dark:border-gray-500 focus:ring-blue-500'
+                      ? 'bg-surface-secondary hover:bg-surface-hover text-status-success hover:text-status-success/90 border-border-primary focus:ring-status-success' 
+                      : 'bg-surface-secondary hover:bg-surface-hover text-interactive hover:text-interactive-hover border-border-primary focus:ring-interactive'
                   }
                 `}
               >

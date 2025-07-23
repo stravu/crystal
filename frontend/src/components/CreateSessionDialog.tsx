@@ -6,6 +6,11 @@ import { Shield, ShieldOff, Sparkles, GitBranch, ChevronRight, ChevronDown, Zap,
 import FilePathAutocomplete from './FilePathAutocomplete';
 import { CommitModeSettings } from './CommitModeSettings';
 import type { CommitModeSettings as CommitModeSettingsType } from '../../../shared/types';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Checkbox } from './ui/Input';
+import { Card } from './ui/Card';
 
 interface CreateSessionDialogProps {
   isOpen: boolean;
@@ -252,35 +257,27 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   };
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div data-testid="create-session-dialog" className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-xl border border-gray-200 dark:border-gray-700">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Create New Session{projectName && ` in ${projectName}`}
-          </h2>
-          <button
-            onClick={() => {
-              setWorktreeError(null);
-              onClose();
-            }}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-            title="Close"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        {/* Content */}
+    <Modal 
+      isOpen={isOpen} 
+      onClose={() => {
+        setWorktreeError(null);
+        onClose();
+      }}
+      size="lg"
+      closeOnOverlayClick={false}
+    >
+      <ModalHeader>
+        Create New Session{projectName && ` in ${projectName}`}
+      </ModalHeader>
+      
+      <ModalBody className="p-0">
         <div className="flex-1 overflow-y-auto">
           <form id="create-session-form" onSubmit={handleSubmit}>
             {/* Primary Section - Always Visible */}
             <div className="p-6 space-y-5">
               {/* Prompt Field */}
               <div>
-                <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="prompt" className="block text-sm font-medium text-text-secondary mb-2">
                   What would you like to work on?
                 </label>
                 <FilePathAutocomplete
@@ -288,7 +285,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   onChange={(value) => setFormData({ ...formData, prompt: value })}
                   projectId={projectId?.toString()}
                   placeholder="Describe your task... (use @ to reference files)"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
                   isTextarea={true}
                   rows={3}
                 />
@@ -296,68 +293,71 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               
               {/* Model Selection - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   Model
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, model: 'claude-sonnet-4-20250514' })}
-                    className={`relative p-3 rounded-lg border transition-all ${
+                  <Card
+                    variant={formData.model === 'claude-sonnet-4-20250514' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
                       formData.model === 'claude-sonnet-4-20250514'
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        ? 'border-interactive bg-interactive/10'
+                        : ''
                     }`}
+                    onClick={() => setFormData({ ...formData, model: 'claude-sonnet-4-20250514' })}
                   >
-                    <div className="flex flex-col items-center gap-1">
-                      <Target className="w-5 h-5" />
-                      <span className="text-sm font-medium">Sonnet 4</span>
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Target className={`w-5 h-5 ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`}>Sonnet 4</span>
                       <span className="text-xs opacity-75">Balanced</span>
                     </div>
                     {formData.model === 'claude-sonnet-4-20250514' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
                     )}
-                  </button>
+                  </Card>
                   
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, model: 'claude-opus-4-20250514' })}
-                    className={`relative p-3 rounded-lg border transition-all ${
+                  <Card
+                    variant={formData.model === 'claude-opus-4-20250514' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
                       formData.model === 'claude-opus-4-20250514'
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        ? 'border-interactive bg-interactive/10'
+                        : ''
                     }`}
+                    onClick={() => setFormData({ ...formData, model: 'claude-opus-4-20250514' })}
                   >
-                    <div className="flex flex-col items-center gap-1">
-                      <Brain className="w-5 h-5" />
-                      <span className="text-sm font-medium">Opus 4</span>
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Brain className={`w-5 h-5 ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`}>Opus 4</span>
                       <span className="text-xs opacity-75">Maximum</span>
                     </div>
                     {formData.model === 'claude-opus-4-20250514' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-purple-500 rounded-full" />
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
                     )}
-                  </button>
+                  </Card>
                   
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, model: 'claude-3-5-haiku-20241022' })}
-                    className={`relative p-3 rounded-lg border transition-all ${
+                  <Card
+                    variant={formData.model === 'claude-3-5-haiku-20241022' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
                       formData.model === 'claude-3-5-haiku-20241022'
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        ? 'border-status-success bg-status-success/10'
+                        : ''
                     }`}
+                    onClick={() => setFormData({ ...formData, model: 'claude-3-5-haiku-20241022' })}
                   >
-                    <div className="flex flex-col items-center gap-1">
-                      <Zap className="w-5 h-5" />
-                      <span className="text-sm font-medium">Haiku 3.5</span>
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Zap className={`w-5 h-5 ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`}>Haiku 3.5</span>
                       <span className="text-xs opacity-75">Fast</span>
                     </div>
                     {formData.model === 'claude-3-5-haiku-20241022' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full" />
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-status-success rounded-full" />
                     )}
-                  </button>
+                  </Card>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <p className="text-xs text-text-tertiary mt-2">
                   {formData.model?.includes('opus') && 'Best for complex architecture and challenging problems'}
                   {formData.model?.includes('haiku') && 'Fast and cost-effective for simple tasks'}
                   {formData.model?.includes('sonnet') && 'Excellent balance of speed and capability for most tasks'}
@@ -366,11 +366,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               
               {/* Session Name */}
               <div>
-                <label htmlFor="worktreeTemplate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-text-primary mb-1">
                   Session Name {hasApiKey ? '(Optional)' : '(Required)'}
                 </label>
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     id="worktreeTemplate"
                     type="text"
                     value={formData.worktreeTemplate}
@@ -381,16 +381,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       const error = validateWorktreeName(value);
                       setWorktreeError(error);
                     }}
-                    className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 ${
-                      worktreeError 
-                        ? 'border-red-400 focus:ring-red-500' 
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-                    }`}
+                    error={worktreeError || undefined}
                     placeholder={hasApiKey ? "Leave empty for AI-generated name" : "Enter a name for your session"}
                     disabled={isGeneratingName}
+                    className="flex-1"
                   />
                   {hasApiKey && formData.prompt.trim() && (
-                    <button
+                    <Button
                       type="button"
                       onClick={async () => {
                         setIsGeneratingName(true);
@@ -414,25 +411,24 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                           setIsGeneratingName(false);
                         }
                       }}
-                      className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border border-gray-300 dark:border-gray-600"
-                      disabled={isGeneratingName || !formData.prompt.trim()}
+                      variant="secondary"
+                      loading={isGeneratingName}
+                      disabled={!formData.prompt.trim()}
                       title="Generate name from prompt"
+                      size="md"
                     >
-                      <Sparkles className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4 mr-1" />
                       {isGeneratingName ? 'Generating...' : 'Generate'}
-                    </button>
+                    </Button>
                   )}
                 </div>
-                {worktreeError && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">{worktreeError}</p>
-                )}
                 {!hasApiKey && !formData.worktreeTemplate && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  <p className="text-xs text-status-warning mt-1">
                     Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
                   </p>
                 )}
                 {!worktreeError && !(!hasApiKey && !formData.worktreeTemplate) && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-text-tertiary mt-1">
                     The name for your session and worktree folder.
                   </p>
                 )}
@@ -440,7 +436,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               
               {/* Sessions Count - Always visible */}
               <div>
-                <label htmlFor="count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="count" className="block text-sm font-medium text-text-secondary mb-1">
                   Number of Sessions: {formData.count}
                 </label>
                 <input
@@ -457,25 +453,27 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             
             {/* Advanced Options Toggle */}
             <div className="px-6 pb-4">
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="text-text-secondary hover:text-text-primary"
               >
-                {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {showAdvanced ? <ChevronDown className="w-4 h-4 mr-1" /> : <ChevronRight className="w-4 h-4 mr-1" />}
                 More options
-              </button>
+              </Button>
             </div>
             
             {/* Advanced Options - Collapsible */}
             {showAdvanced && (
-              <div className="px-6 pb-6 space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="px-6 pb-6 space-y-4 border-t border-border-primary pt-4">
                 {/* Base Branch */}
                 {branches.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <GitBranch className="w-4 h-4 text-gray-400" />
-                      <label htmlFor="baseBranch" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <GitBranch className="w-4 h-4 text-text-tertiary" />
+                      <label htmlFor="baseBranch" className="text-sm font-medium text-text-secondary">
                         Base Branch
                       </label>
                     </div>
@@ -486,7 +484,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         const selectedBranch = e.target.value;
                         setFormData({ ...formData, baseBranch: selectedBranch });
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                      className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary"
                       disabled={isLoadingBranches}
                     >
                       {branches.map((branch, index) => {
@@ -509,13 +507,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         );
                       })}
                     </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-text-tertiary mt-1">
                       Create the new session branch from this existing branch
                     </p>
-                    
                   </div>
                 )}
-                
                 
                 {/* Commit Mode Settings */}
                 <CommitModeSettings
@@ -529,24 +525,26 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   }}
                 />
                 
-                {/* Ultrathink checkbox */}
-                <div className="pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ultrathink}
-                      onChange={(e) => setUltrathink(e.target.checked)}
-                      className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Enable ultrathink mode
-                    </span>
-                  </label>
+                {/* Checkboxes */}
+                <div className="space-y-3">
+                  <Checkbox
+                    id="autoCommit"
+                    label="Auto-commit after each prompt"
+                    checked={autoCommit}
+                    onChange={(e) => setAutoCommit(e.target.checked)}
+                  />
+                  
+                  <Checkbox
+                    id="ultrathink"
+                    label="Enable ultrathink mode"
+                    checked={ultrathink}
+                    onChange={(e) => setUltrathink(e.target.checked)}
+                  />
                 </div>
                 
                 {/* Permission Mode */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
                     Permission Mode
                   </label>
                   <div className="space-y-2">
@@ -557,11 +555,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         value="ignore"
                         checked={formData.permissionMode === 'ignore' || !formData.permissionMode}
                         onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
-                        className="text-blue-600"
+                        className="text-interactive"
                       />
-                      <ShieldOff className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                      <span className="text-sm text-gray-700 dark:text-gray-200">Skip Permissions</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">(default)</span>
+                      <ShieldOff className="w-4 h-4 text-text-tertiary" />
+                      <span className="text-sm text-text-secondary">Skip Permissions</span>
+                      <span className="text-xs text-text-tertiary">(default)</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -570,10 +568,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         value="approve"
                         checked={formData.permissionMode === 'approve'}
                         onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
-                        className="text-blue-600"
+                        className="text-interactive"
                       />
-                      <Shield className="w-4 h-4 text-green-600 dark:text-green-500" />
-                      <span className="text-sm text-gray-700 dark:text-gray-200">Manual Approval</span>
+                      <Shield className="w-4 h-4 text-status-success" />
+                      <span className="text-sm text-text-secondary">Manual Approval</span>
                     </label>
                   </div>
                 </div>
@@ -581,49 +579,41 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             )}
           </form>
         </div>
-        
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            <span className="font-medium">Tip:</span> Press {navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Enter to create
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setWorktreeError(null);
-                onClose();
-              }}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium transition-colors"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="create-session-form"
-              disabled={isSubmitting || !formData.prompt || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate)}
-              className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow"
-              title={
-                isSubmitting ? 'Creating session...' :
-                !formData.prompt ? 'Please enter a prompt' :
-                worktreeError ? 'Please fix the session name error' :
-                (!hasApiKey && !formData.worktreeTemplate) ? 'Please enter a session name (required without API key)' :
-                undefined
-              }
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Creating...
-                </span>
-              ) : (
-                `Create ${(formData.count || 1) > 1 ? (formData.count || 1) + ' Sessions' : 'Session'}`
-              )}
-            </button>
-          </div>
+      </ModalBody>
+      
+      <ModalFooter className="flex items-center justify-between">
+        <div className="text-xs text-text-tertiary">
+          <span className="font-medium">Tip:</span> Press {navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Enter to create
         </div>
-      </div>
-    </div>
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            onClick={() => {
+              setWorktreeError(null);
+              onClose();
+            }}
+            variant="ghost"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="create-session-form"
+            disabled={isSubmitting || !formData.prompt || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate)}
+            loading={isSubmitting}
+            title={
+              isSubmitting ? 'Creating session...' :
+              !formData.prompt ? 'Please enter a prompt' :
+              worktreeError ? 'Please fix the session name error' :
+              (!hasApiKey && !formData.worktreeTemplate) ? 'Please enter a session name (required without API key)' :
+              undefined
+            }
+          >
+            {isSubmitting ? 'Creating...' : `Create ${(formData.count || 1) > 1 ? (formData.count || 1) + ' Sessions' : 'Session'}`}
+          </Button>
+        </div>
+      </ModalFooter>
+    </Modal>
   );
 }

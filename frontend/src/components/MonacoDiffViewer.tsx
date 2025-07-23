@@ -528,23 +528,23 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     switch (saveStatus) {
       case 'saving':
       case 'pending':
-        return 'text-yellow-600 dark:text-yellow-400';
+        return 'text-status-warning';
       case 'saved':
-        return 'text-green-600 dark:text-green-400';
+        return 'text-status-success';
       case 'error':
-        return 'text-red-600 dark:text-red-400';
+        return 'text-status-error';
       default:
-        return 'text-gray-500';
+        return 'text-text-tertiary';
     }
   };
 
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-primary">
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <FileText className="w-4 h-4 text-text-tertiary" />
+          <span className="text-sm font-medium text-text-primary">
             {file.path}
           </span>
         </div>
@@ -552,13 +552,13 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
         <div className="flex items-center gap-2">
           {/* Preview Toggle for Markdown Files */}
           {isMarkdownFile && (
-            <div className="flex items-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+            <div className="flex items-center rounded-lg border border-border-primary bg-surface-primary">
               <button
                 onClick={() => setViewMode('diff')}
                 className={`px-2 py-1 text-xs font-medium rounded-l-lg transition-colors flex items-center gap-1 ${
                   viewMode === 'diff'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
                 title="Show diff view"
               >
@@ -569,8 +569,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
                 onClick={() => setViewMode('split')}
                 className={`px-2 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${
                   viewMode === 'split'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
                 title="Show split view"
               >
@@ -583,8 +583,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
                 onClick={() => setViewMode('preview')}
                 className={`px-2 py-1 text-xs font-medium rounded-r-lg transition-colors flex items-center gap-1 ${
                   viewMode === 'preview'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
                 title="Show markdown preview"
               >
@@ -596,7 +596,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
           
           {/* Save Status or Read-only indicator */}
           {isReadOnly ? (
-            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-1 text-xs text-text-tertiary">
               <AlertCircle className="w-3 h-3" />
               <span>Read-only (select all commits to edit)</span>
             </div>
@@ -621,10 +621,10 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       ) : viewMode === 'split' && isMarkdownFile ? (
         <div className="flex" style={{ height: `${Math.max(editorHeight, previewHeight)}px` }}>
           {/* Diff Editor */}
-          <div className="w-1/2 border-r border-gray-200 dark:border-gray-700" ref={containerRef} style={{ overflow: 'hidden' }}>
+          <div className="w-1/2 border-r border-border-primary" ref={containerRef} style={{ overflow: 'hidden' }}>
             {(!isEditorReady || !canMountEditor) && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 z-10">
-                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+              <div className="absolute inset-0 flex items-center justify-center bg-bg-primary z-10">
+                <div className="flex items-center gap-2 text-text-secondary">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>Loading editor...</span>
                 </div>
@@ -656,8 +656,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       ) : (
         <div className="relative" ref={containerRef} style={{ height: `${editorHeight}px`, overflow: 'hidden' }}>
           {(!isEditorReady || !canMountEditor) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 z-10">
-              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <div className="absolute inset-0 flex items-center justify-center bg-bg-primary z-10">
+              <div className="flex items-center gap-2 text-text-secondary">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Loading editor...</span>
               </div>

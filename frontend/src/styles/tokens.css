@@ -1,0 +1,36 @@
+/* 
+ * Crystal Design Tokens
+ * Central import file for all design tokens
+ */
+
+/* Import all token categories */
+@import './tokens/colors.css';
+@import './tokens/spacing.css';
+@import './tokens/typography.css';
+@import './tokens/effects.css';
+
+/* 
+ * Token Categories:
+ * 
+ * 1. Colors (./tokens/colors.css)
+ *    - Primitive color values
+ *    - Semantic color tokens
+ *    - Component-specific colors
+ * 
+ * 2. Spacing (./tokens/spacing.css)
+ *    - Base spacing scale
+ *    - Component-specific spacing
+ *    - Layout dimensions
+ * 
+ * 3. Typography (./tokens/typography.css)
+ *    - Font families, sizes, weights
+ *    - Line heights, letter spacing
+ *    - Component-specific typography
+ * 
+ * 4. Effects (./tokens/effects.css)
+ *    - Border radius values
+ *    - Box shadows
+ *    - Transitions and animations
+ *    - Z-index scale
+ *    - Opacity values
+ */

@@ -3,13 +3,8 @@
 .markdown-preview {
   font-size: 16px;
   line-height: 1.6;
-  color: #374151;
-  background-color: #ffffff;
-}
-
-.dark .markdown-preview {
-  color: #e5e7eb;
-  background-color: #111827;
+  color: var(--color-text-primary);
+  background-color: transparent;
 }
 
 /* Prose overrides for better integration */
@@ -23,20 +18,11 @@
 .markdown-preview h4,
 .markdown-preview h5,
 .markdown-preview h6 {
-  color: #111827;
+  color: var(--color-text-primary);
   font-weight: 600;
   line-height: 1.25;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
-}
-
-.dark .markdown-preview h1,
-.dark .markdown-preview h2,
-.dark .markdown-preview h3,
-.dark .markdown-preview h4,
-.dark .markdown-preview h5,
-.dark .markdown-preview h6 {
-  color: #f3f4f6;
 }
 
 .markdown-preview h1 { font-size: 2.25em; }

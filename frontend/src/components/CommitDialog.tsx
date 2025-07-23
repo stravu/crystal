@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { GitCommit, X } from 'lucide-react';
+import { GitCommit } from 'lucide-react';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Button } from './ui/Button';
+import { Textarea } from './ui/Textarea';
 
 interface CommitDialogProps {
   isOpen: boolean;
@@ -63,89 +66,53 @@ export const CommitDialog: React.FC<CommitDialogProps> = ({
     }
   }, [handleCommit, onClose]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black bg-opacity-50"
-        onClick={onClose}
+    <Modal isOpen={isOpen} onClose={onClose} size="md">
+      <ModalHeader 
+        icon={<GitCommit className="w-5 h-5" />}
+        title="Commit Changes"
+        onClose={onClose}
       />
       
-      {/* Dialog */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <GitCommit className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Commit Changes
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      <ModalBody>
+        <p className="text-sm text-text-secondary mb-4">
+          Committing {fileCount} file{fileCount > 1 ? 's' : ''} with changes
+        </p>
+        
+        <Textarea
+          ref={textareaRef}
+          value={commitMessage}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommitMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Enter commit message..."
+          rows={4}
+          error={error}
+        />
+        
+        <p className="mt-2 text-xs text-text-tertiary">
+          Press Ctrl+Enter (Cmd+Enter on Mac) to commit
+        </p>
+      </ModalBody>
 
-        {/* Body */}
-        <div className="px-6 py-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Committing {fileCount} file{fileCount > 1 ? 's' : ''} with changes
-          </p>
-          
-          <textarea
-            ref={textareaRef}
-            value={commitMessage}
-            onChange={(e) => setCommitMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Enter commit message..."
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-            rows={4}
-          />
-          
-          {error && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-              {error}
-            </p>
-          )}
-          
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Press Ctrl+Enter (Cmd+Enter on Mac) to commit
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onClose}
-            disabled={isCommitting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCommit}
-            disabled={isCommitting || !commitMessage.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isCommitting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Committing...
-              </>
-            ) : (
-              <>
-                <GitCommit className="w-4 h-4" />
-                Commit
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+      <ModalFooter>
+        <Button
+          onClick={onClose}
+          disabled={isCommitting}
+          variant="secondary"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleCommit}
+          disabled={isCommitting || !commitMessage.trim()}
+          variant="primary"
+          loading={isCommitting}
+          loadingText="Committing..."
+        >
+          <GitCommit className="w-4 h-4" />
+          Commit
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 };

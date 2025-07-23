@@ -1,4 +1,6 @@
 import { LucideIcon } from 'lucide-react';
+import { Button } from './ui/Button';
+import { cn } from '../utils/cn';
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -11,21 +13,18 @@ interface EmptyStateProps {
   className?: string;
 }
 
-export function EmptyState({ icon: Icon, title, description, action, className = '' }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={`flex flex-col items-center justify-center p-12 text-center ${className}`}>
-      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-        <Icon className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+    <div className={cn('flex flex-col items-center justify-center p-12 text-center', className)}>
+      <div className="w-16 h-16 bg-surface-secondary rounded-full flex items-center justify-center mb-4">
+        <Icon className="w-8 h-8 text-text-tertiary" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm mb-6">{description}</p>
+      <h3 className="text-lg font-semibold text-text-primary mb-2">{title}</h3>
+      <p className="text-sm text-text-secondary max-w-sm mb-6">{description}</p>
       {action && (
-        <button
-          onClick={action.onClick}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
+        <Button onClick={action.onClick} variant="primary">
           {action.label}
-        </button>
+        </Button>
       )}
     </div>
   );

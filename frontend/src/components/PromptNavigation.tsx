@@ -189,24 +189,24 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
 
   if (isLoading && prompts.length === 0) {
     return (
-      <div className="w-64 bg-gray-800 border-l border-gray-700 p-4">
-        <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">Prompt History</h3>
-        <div className="text-gray-500 dark:text-gray-400 text-sm">Loading prompts...</div>
+      <div className="w-64 bg-surface-secondary border-l border-border-primary p-4">
+        <h3 className="font-semibold text-text-primary mb-4">Prompt History</h3>
+        <div className="text-text-tertiary text-sm">Loading prompts...</div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="w-64 bg-gray-800 border-l border-gray-700 flex flex-col h-full">
-        <div className="p-4 border-b border-gray-700">
-          <h3 className="font-semibold text-gray-700 dark:text-gray-300">Prompt History</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click to navigate • Double-click for details</p>
+      <div className="w-64 bg-surface-secondary border-l border-border-primary flex flex-col h-full">
+        <div className="p-4 border-b border-border-primary">
+          <h3 className="font-semibold text-text-primary">Prompt History</h3>
+          <p className="text-xs text-text-tertiary mt-1">Click to navigate • Double-click for details</p>
         </div>
       
       <div className="flex-1 overflow-y-auto">
         {prompts.length === 0 ? (
-          <div className="p-4 text-gray-500 dark:text-gray-400 text-sm">
+          <div className="p-4 text-text-tertiary text-sm">
             No prompts yet. Start by entering a prompt below.
           </div>
         ) : (
@@ -218,22 +218,22 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
                 onDoubleClick={() => handlePromptDoubleClick(marker, index)}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${
                   selectedPromptId === marker.id
-                    ? 'bg-blue-900/30 border-blue-700 border'
-                    : 'hover:bg-gray-700 border border-transparent'
+                    ? 'bg-interactive/20 border-interactive border'
+                    : 'hover:bg-bg-hover border border-transparent'
                 }`}
               >
                 <div className="flex items-start space-x-2">
-                  <span className="text-blue-500 dark:text-blue-400 font-mono text-sm mt-0.5">
+                  <span className="text-interactive font-mono text-sm mt-0.5">
                     #{index + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">
+                    <div className="text-sm text-text-primary line-clamp-2">
                       {marker.prompt_text}
                     </div>
-                    <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <div className="flex items-center space-x-2 text-xs text-text-tertiary mt-1">
                       <span>{formatDistanceToNow(parseTimestamp(marker.timestamp))} ago</span>
-                      <span className="text-gray-400">•</span>
-                      <span className="font-medium text-gray-600 dark:text-gray-400">
+                      <span className="text-text-tertiary">•</span>
+                      <span className="font-medium text-text-secondary">
                         {calculateDuration(marker, index)}
                       </span>
                     </div>

@@ -1,5 +1,8 @@
 /* Import markdown styles - must come first */
-@import './styles/markdown.css';
+/* Removed conflicting markdown.css - using markdown-preview.css instead */
+
+/* Import design tokens - must come before Tailwind */
+@import './styles/tokens.css';
 
 @tailwind base;
 @tailwind components;
@@ -17,14 +20,14 @@ body {
   overflow: hidden;
 }
 
-/* Light mode body colors */
+/* Body colors using design tokens */
 body {
-  @apply bg-white text-gray-900;
+  @apply bg-bg-primary text-text-primary;
 }
 
-/* Dark mode body colors */
-body.dark {
-  @apply bg-gray-900 text-gray-100;
+/* Apply light theme when body has light class */
+body.light {
+  @apply bg-bg-primary text-text-primary;
 }
 
 /* Scrollbar styling */
@@ -33,31 +36,62 @@ body.dark {
   height: 8px;
 }
 
-/* Light mode scrollbar */
+/* Scrollbar styling with design tokens */
 ::-webkit-scrollbar-track {
-  @apply bg-gray-200;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-400;
+  @apply bg-border-secondary;
   border-radius: 4px;
+  transition: background-color 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+  @apply bg-border-primary;
 }
 
-/* Dark mode scrollbar */
-.dark ::-webkit-scrollbar-track {
-  @apply bg-gray-800;
+/* Firefox scrollbar support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-secondary) transparent;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  @apply bg-gray-600;
+/* Custom scrollbar classes for Rich Output */
+.scrollbar-thin {
+  scrollbar-width: thin;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+.scrollbar-thumb-border-secondary {
+  scrollbar-color: var(--color-border-secondary) transparent;
+}
+
+.scrollbar-thumb-border-primary {
+  scrollbar-color: var(--color-border-primary) transparent;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) - Rich Output specific */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-secondary);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-primary);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-tertiary);
 }
 
 /* Custom animations for the working indicator */
@@ -95,6 +129,21 @@ body.dark {
 
 .xterm .xterm-screen {
   margin: 6px;
+}
+
+/* Terminal specific styling */
+.xterm {
+  height: 100%;
+  width: 100%;
+}
+
+.xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* Ensure terminal text uses our color tokens */
+.xterm .xterm-screen canvas {
+  image-rendering: crisp-edges;
 }
 
 /* Custom animations for UX improvements */
@@ -158,4 +207,69 @@ body.dark {
 
 .pill-activate {
   animation: pillActivate 0.2s ease-out;
+}
+
+/* Rich Output thinking content styling */
+.thinking-content p {
+  @apply mb-2 text-text-secondary;
+}
+
+.thinking-content p:last-child {
+  @apply mb-0;
+}
+
+.thinking-content ul,
+.thinking-content ol {
+  @apply mb-2 text-text-secondary;
+}
+
+.thinking-content li {
+  @apply mb-1;
+}
+
+.thinking-content code {
+  @apply text-xs;
+}
+
+.thinking-content pre {
+  @apply text-xs mb-2;
+}
+
+.thinking-content blockquote {
+  @apply text-text-secondary;
+  border-color: rgba(var(--color-interactive-rgb), 0.3);
+}
+
+/* Markdown list styling fixes */
+.markdown-preview ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+}
+
+.markdown-preview ul {
+  list-style-type: disc;
+  list-style-position: outside;
+}
+
+.markdown-preview ol ol {
+  list-style-type: lower-alpha;
+}
+
+.markdown-preview ul ul {
+  list-style-type: circle;
+}
+
+.markdown-preview li > p {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-preview li > *:first-child {
+  display: inline-block;
+}
+
+.markdown-preview li > ol,
+.markdown-preview li > ul {
+  display: block;
+  margin-top: 0.5rem;
 }

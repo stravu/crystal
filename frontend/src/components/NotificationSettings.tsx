@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { ToggleField } from './ui/Toggle';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -43,140 +46,79 @@ export function NotificationSettings({ settings, onUpdateSettings }: Notificatio
     }
   };
 
-  const handleToggle = (key: keyof NotificationSettings) => {
-    onUpdateSettings({ [key]: !settings[key] });
-  };
-
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Notification Settings</h3>
+        <h3 className="text-lg font-medium text-text-primary mb-4">Notification Settings</h3>
         
         {/* Permission Status */}
-        <div className="mb-6 p-4 border border-gray-300 dark:border-gray-700 rounded-lg">
+        <Card variant="bordered" className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-gray-700 dark:text-gray-300">Browser Permissions</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <h4 className="font-medium text-text-secondary">Browser Permissions</h4>
+              <p className="text-sm text-text-tertiary">
                 Status: {permissionStatus === 'granted' ? '✅ Enabled' : 
                         permissionStatus === 'denied' ? '❌ Denied' : '⚠️ Not requested'}
               </p>
             </div>
             {permissionStatus !== 'granted' && (
-              <button
+              <Button
                 onClick={requestPermission}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                size="sm"
+                variant="primary"
               >
                 Enable Notifications
-              </button>
+              </Button>
             )}
           </div>
           {permissionStatus === 'granted' && (
-            <button
+            <Button
               onClick={testNotification}
-              className="mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+              size="sm"
+              variant="secondary"
+              className="mt-2 !bg-status-success hover:!bg-status-success-hover !text-white"
             >
               Test Notification
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
 
         {/* Settings */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Enable Notifications</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Show browser notifications for session events</p>
-            </div>
-            <button
-              onClick={() => handleToggle('enabled')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          <ToggleField
+            label="Enable Notifications"
+            description="Show browser notifications for session events"
+            checked={settings.enabled}
+            onChange={(checked) => onUpdateSettings({ enabled: checked })}
+          />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Play Sound</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Play a sound when notifications appear</p>
-            </div>
-            <button
-              onClick={() => handleToggle('playSound')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.playSound ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.playSound ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          <ToggleField
+            label="Play Sound"
+            description="Play a sound when notifications appear"
+            checked={settings.playSound}
+            onChange={(checked) => onUpdateSettings({ playSound: checked })}
+          />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Status Changes</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Notify when session status changes</p>
-            </div>
-            <button
-              onClick={() => handleToggle('notifyOnStatusChange')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.notifyOnStatusChange ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.notifyOnStatusChange ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          <ToggleField
+            label="Status Changes"
+            description="Notify when session status changes"
+            checked={settings.notifyOnStatusChange}
+            onChange={(checked) => onUpdateSettings({ notifyOnStatusChange: checked })}
+          />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Input Required</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Notify when sessions are waiting for input</p>
-            </div>
-            <button
-              onClick={() => handleToggle('notifyOnWaiting')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.notifyOnWaiting ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.notifyOnWaiting ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          <ToggleField
+            label="Input Required"
+            description="Notify when sessions are waiting for input"
+            checked={settings.notifyOnWaiting}
+            onChange={(checked) => onUpdateSettings({ notifyOnWaiting: checked })}
+          />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Session Complete</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Notify when sessions finish successfully</p>
-            </div>
-            <button
-              onClick={() => handleToggle('notifyOnComplete')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.notifyOnComplete ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.notifyOnComplete ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          <ToggleField
+            label="Session Complete"
+            description="Notify when sessions finish successfully"
+            checked={settings.notifyOnComplete}
+            onChange={(checked) => onUpdateSettings({ notifyOnComplete: checked })}
+          />
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface JsonMessage {
   type: string;
@@ -19,11 +20,11 @@ function JsonMessageItem({ message }: JsonMessageItemProps) {
   
   const getMessageTypeColor = (type: string, subtype?: string) => {
     if (type === 'system') {
-      return subtype === 'init' ? 'bg-blue-900/20 border-blue-700' : 'bg-gray-800 border-gray-700';
+      return subtype === 'init' ? 'bg-interactive/10 border-interactive/30' : 'bg-surface-secondary border-border-primary';
     }
-    if (type === 'user') return 'bg-green-900/20 border-green-700';
-    if (type === 'assistant') return 'bg-purple-900/20 border-purple-700';
-    return 'bg-gray-800 border-gray-700';
+    if (type === 'user') return 'bg-status-success/10 border-status-success/30';
+    if (type === 'assistant') return 'bg-interactive/20 border-interactive';
+    return 'bg-surface-secondary border-border-primary';
   };
 
   const getMessageTypeIcon = (type: string, subtype?: string) => {
@@ -68,42 +69,40 @@ function JsonMessageItem({ message }: JsonMessageItemProps) {
   };
 
   return (
-    <div className={`border rounded-lg mb-2 ${getMessageTypeColor(message.type, message.subtype)}`}>
+    <div className={`border rounded-lg mb-2 ${getMessageTypeColor(message.type, message.subtype)} transition-all`}>
       <div 
-        className="p-3 cursor-pointer flex items-center justify-between hover:bg-opacity-80"
+        className="p-3 cursor-pointer flex items-center justify-between hover:bg-black/20 transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="flex items-center space-x-3">
           <span className="text-lg">{getMessageTypeIcon(message.type, message.subtype)}</span>
           <div>
-            <h4 className="font-medium text-gray-200">{getMessageTitle(message)}</h4>
+            <h4 className="font-medium text-text-primary">{getMessageTitle(message)}</h4>
             {isCollapsed && (
-              <p className="text-sm text-gray-400 mt-1">{getMessagePreview(message)}</p>
+              <p className="text-sm text-text-secondary mt-1">{getMessagePreview(message)}</p>
             )}
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-xs text-gray-400">{formatTimestamp(message.timestamp)}</span>
-          <span className={`transform transition-transform ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}>
-            ▼
-          </span>
+          <span className="text-xs text-text-tertiary">{formatTimestamp(message.timestamp)}</span>
+          <ChevronDown className={`w-4 h-4 text-text-tertiary transform transition-transform ${isCollapsed ? 'rotate-0' : 'rotate-180'}`} />
         </div>
       </div>
       
       {!isCollapsed && (
-        <div className="border-t bg-gray-900/50 p-4">
+        <div className="border-t border-border-primary bg-black/20 p-4">
           {message.content && (
             <div className="mb-4">
-              <h5 className="font-medium text-gray-300 mb-2">Content:</h5>
-              <div className="bg-gray-800 rounded p-3 text-sm font-mono whitespace-pre-wrap border border-gray-700 text-gray-200">
+              <h5 className="font-medium text-text-secondary mb-2">Content:</h5>
+              <div className="bg-surface-primary rounded p-3 text-sm font-mono whitespace-pre-wrap border border-border-primary text-text-primary">
                 {message.content}
               </div>
             </div>
           )}
           
           <details>
-            <summary className="cursor-pointer font-medium text-gray-300 mb-2">Raw JSON Data</summary>
-            <pre className="bg-gray-800 rounded p-3 text-xs overflow-auto max-h-64 border border-gray-700 text-gray-200">
+            <summary className="cursor-pointer font-medium text-text-secondary mb-2 hover:text-text-primary transition-colors">Raw JSON Data</summary>
+            <pre className="bg-surface-primary rounded p-3 text-xs overflow-auto max-h-64 border border-border-primary text-text-primary mt-2">
               {JSON.stringify(message, null, 2)}
             </pre>
           </details>
@@ -120,17 +119,17 @@ interface JsonMessageViewProps {
 export function JsonMessageView({ messages }: JsonMessageViewProps) {
   if (messages.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-400">
+      <div className="flex items-center justify-center h-32 text-text-tertiary">
         No messages yet
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-4xl mx-auto">
-          <h3 className="text-lg font-semibold text-gray-200 mb-4">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">
             Claude Code Messages ({messages.length})
           </h3>
           {messages.map((message, index) => (

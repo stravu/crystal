@@ -63,9 +63,9 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
 
   if (hasError) {
     return (
-      <div className="border border-red-300 dark:border-red-700 rounded p-4 bg-red-50 dark:bg-red-900/20">
-        <p className="text-red-600 dark:text-red-400 font-semibold">Failed to render diagram</p>
-        <pre className="text-xs text-red-500 dark:text-red-300 mt-2">{errorMessage}</pre>
+      <div className="border border-status-error/30 rounded p-4 bg-status-error/10">
+        <p className="text-status-error font-semibold">Failed to render diagram</p>
+        <pre className="text-xs text-status-error/80 mt-2">{errorMessage}</pre>
       </div>
     );
   }

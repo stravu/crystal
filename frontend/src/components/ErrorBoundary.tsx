@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { Button } from './ui/Button';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -38,19 +39,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="flex items-center justify-center h-full p-8">
           <div className="text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <AlertCircle className="w-12 h-12 text-status-error mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-text-primary mb-2">
               Something went wrong
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-text-secondary mb-4">
               The editor encountered an error. Please try refreshing the page.
             </p>
-            <button
+            <Button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              variant="primary"
             >
               Refresh Page
-            </button>
+            </Button>
           </div>
         </div>
       );
