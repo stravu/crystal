@@ -811,16 +811,17 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
 
   // Check if we're waiting for Claude's response
   const isWaitingForResponse = useMemo(() => {
-    // Check session status first
-    if (sessionStatus === 'running' || sessionStatus === 'waiting') {
-      // If we have messages, check if the last one is from the user
-      if (messages.length > 0) {
-        const lastMessage = messages[messages.length - 1];
-        return lastMessage.role === 'user';
-      }
-      // If no messages yet but session is running, show placeholder
-      return sessionStatus === 'running';
+    // Always show placeholder if session is actively running
+    if (sessionStatus === 'running') {
+      return true;
     }
+    
+    // Also show if waiting and last message is from user
+    if (sessionStatus === 'waiting' && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      return lastMessage.role === 'user';
+    }
+    
     return false;
   }, [messages, sessionStatus]);
 
@@ -935,7 +936,28 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
           ) : (
             <div className="space-y-4 px-4">
               {renderedMessages}
-              {isWaitingForResponse && <ThinkingPlaceholder />}
+              {isWaitingForResponse && (
+                messages.length === 0 || messages[messages.length - 1].role === 'user' ? (
+                  <ThinkingPlaceholder />
+                ) : (
+                  // Inline indicator when messages are already showing
+                  <div className="flex items-center gap-3 px-4 py-3 bg-surface-secondary/50 rounded-lg border border-border-primary animate-fadeIn">
+                    <div className="flex space-x-1">
+                      {[...Array(3)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-2 h-2 bg-interactive rounded-full"
+                          style={{
+                            animation: 'bounce 1.4s ease-in-out infinite',
+                            animationDelay: `${i * 0.16}s`
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-text-secondary">Claude is working on your request...</span>
+                  </div>
+                )
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
