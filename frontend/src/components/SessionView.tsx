@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, memo, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
-import { useNavigationStore } from '../stores/navigationStore';
+import { API } from '../utils/api';
 import { JsonMessageView } from './JsonMessageView';
 import { EmptyState } from './EmptyState';
 import CombinedDiffView from './CombinedDiffView';
@@ -15,18 +15,19 @@ import { CommitMessageDialog } from './session/CommitMessageDialog';
 import { PromptNavigation } from './PromptNavigation';
 import { isDocumentVisible } from '../utils/performanceUtils';
 import { FileEditor } from './FileEditor';
-import { ProjectView } from './ProjectView';
-import { API } from '../utils/api';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const sessions = useSessionStore((state) => state.sessions);
   const activeMainRepoSession = useSessionStore((state) => state.activeMainRepoSession);
-  const { activeView, activeProjectId } = useNavigationStore();
   const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
-  const [projectData, setProjectData] = useState<any>(null);
-  const [isProjectLoading, setIsProjectLoading] = useState(false);
-  const [isMergingProject, setIsMergingProject] = useState(false);
+  
+  // Stub variables for project view functionality (navigationStore was removed)
+  const activeView = 'session'; // Always show session view
+  const activeProjectId = null; // No active project
+  // const [projectData, setProjectData] = useState<any>(null);
+  // const [isProjectLoading, setIsProjectLoading] = useState(false);
+  // const [isMergingProject, setIsMergingProject] = useState(false);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -39,33 +40,33 @@ export const SessionView = memo(() => {
 
   // Load project data when activeProjectId changes
   useEffect(() => {
-    if (activeView === 'project' && activeProjectId) {
+    if (false && activeProjectId) { // Disabled: activeView === 'project'
       const loadProjectData = async () => {
-        setIsProjectLoading(true);
+        // setIsProjectLoading(true);
         try {
           // Get all projects and find the one we need
           const response = await API.projects.getAll();
           if (response.success && response.data) {
             const project = response.data.find((p: any) => p.id === activeProjectId);
             if (project) {
-              setProjectData(project);
+              // setProjectData(project);
             }
           }
         } catch (error) {
           console.error('Failed to load project data:', error);
         } finally {
-          setIsProjectLoading(false);
+          // setIsProjectLoading(false);
         }
       };
       loadProjectData();
     } else {
-      setProjectData(null);
+      // setProjectData(null);
     }
   }, [activeView, activeProjectId]);
 
-  const handleProjectGitPull = async () => {
-    if (!activeProjectId || !projectData) return;
-    setIsMergingProject(true);
+  /* const handleProjectGitPull = async () => {
+    if (!activeProjectId) return; // || !projectData
+    // setIsMergingProject(true);
     try {
       // Get or create main repo session for this project
       const sessionResponse = await API.sessions.getOrCreateMainRepoSession(activeProjectId);
@@ -78,13 +79,13 @@ export const SessionView = memo(() => {
     } catch (error) {
       console.error('Failed to perform git pull:', error);
     } finally {
-      setIsMergingProject(false);
+      // setIsMergingProject(false);
     }
-  };
+  }; */
 
-  const handleProjectGitPush = async () => {
-    if (!activeProjectId || !projectData) return;
-    setIsMergingProject(true);
+  /* const handleProjectGitPush = async () => {
+    if (!activeProjectId) return; // || !projectData
+    // setIsMergingProject(true);
     try {
       // Get or create main repo session for this project
       const sessionResponse = await API.sessions.getOrCreateMainRepoSession(activeProjectId);
@@ -97,9 +98,9 @@ export const SessionView = memo(() => {
     } catch (error) {
       console.error('Failed to perform git push:', error);
     } finally {
-      setIsMergingProject(false);
+      // setIsMergingProject(false);
     }
-  };
+  }; */
   
   const activeSession = activeSessionId 
     ? (activeMainRepoSession && activeMainRepoSession.id === activeSessionId 
@@ -115,32 +116,6 @@ export const SessionView = memo(() => {
   // Memoize props to prevent unnecessary re-renders
   const emptySelectedExecutions = useMemo(() => [], []);
   const isMainRepo = useMemo(() => activeSession?.isMainRepo || false, [activeSession?.isMainRepo]);
-
-  // Show project view if navigation is set to project
-  if (activeView === 'project' && activeProjectId) {
-    if (isProjectLoading || !projectData) {
-      return (
-        <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 p-6">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">Loading project...</p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <ProjectView
-        projectId={activeProjectId}
-        projectName={projectData.name || 'Project'}
-        onGitPull={handleProjectGitPull}
-        onGitPush={handleProjectGitPush}
-        isMerging={isMergingProject}
-      />
-    );
-  }
 
   if (!activeSession) {
     return (

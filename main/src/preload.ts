@@ -140,6 +140,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>): Promise<string[]> => ipcRenderer.invoke('sessions:save-images', sessionId, images),
+    
+    // Token tracking
+    getTokenUsage: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-token-usage', sessionId),
+    getTokenHistory: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-token-history', sessionId),
   },
 
   // Project management
@@ -358,6 +362,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('zombie-processes-detected', wrappedCallback);
       return () => ipcRenderer.removeListener('zombie-processes-detected', wrappedCallback);
     },
+  },
+
+  // Model context windows
+  models: {
+    getContextWindows: (): Promise<IPCResponse> => ipcRenderer.invoke('models:get-context-windows'),
   },
 
   // Debug utilities

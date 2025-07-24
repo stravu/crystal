@@ -38,7 +38,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-green-800',
           icon: Loader2,
           text: 'Initializing',
-          tooltip: 'Setting up git worktree and environment',
           animated: true,
           spin: true,
         };
@@ -51,7 +50,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-green-800',
           icon: Loader2,
           text: 'Running',
-          tooltip: 'Claude is actively processing your request',
           animated: true,
           spin: true,
         };
@@ -64,7 +62,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-amber-800',
           icon: PauseCircle,
           text: 'Waiting for input',
-          tooltip: 'Claude needs your input to continue',
           animated: true,
           pulse: true,
         };
@@ -77,7 +74,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-gray-700',
           icon: CheckCircle,
           text: 'Completed',
-          tooltip: 'Task finished successfully',
           animated: false,
         };
       case 'completed_unviewed':
@@ -89,7 +85,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-blue-800',
           icon: Bell,
           text: 'New activity',
-          tooltip: 'Session has new unviewed results',
           animated: true,
           pulse: true,
         };
@@ -102,7 +97,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-red-800',
           icon: AlertCircle,
           text: 'Error',
-          tooltip: 'Something went wrong with the session',
           animated: false,
         };
       default:
@@ -114,7 +108,6 @@ export const StatusIndicator = React.memo(({
           borderColor: 'border-gray-700',
           icon: AlertCircle,
           text: 'Unknown',
-          tooltip: 'Unknown status',
           animated: false,
         };
     }
@@ -179,7 +172,6 @@ export const StatusIndicator = React.memo(({
             ${shouldAnimate ? 'relative overflow-hidden' : ''}
             transition-all duration-200
           `}
-          title={config.tooltip}
         >
           {/* Animated background effect for active states */}
           {shouldAnimate && (
@@ -237,7 +229,7 @@ export const StatusIndicator = React.memo(({
 
   // Original dot indicator for when showText is false
   return (
-    <div className={`flex items-center ${sizeClasses.spacing}`} title={config.tooltip}>
+    <div className={`flex items-center ${sizeClasses.spacing}`}>
       {/* Status Indicator Dot */}
       <div className={`relative ${sizeClasses.container} flex items-center justify-center`} ref={elementRef}>
         <div

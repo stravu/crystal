@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, RefreshCw } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { SessionListItem } from './SessionListItem';
 import { CreateSessionDialog } from './CreateSessionDialog';
+import { MainBranchWarningDialog } from './MainBranchWarningDialog';
 import ProjectSettings from './ProjectSettings';
 import { EmptyState } from './EmptyState';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -48,6 +49,9 @@ export function DraggableProjectTreeView() {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const { setActiveSession } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
+  const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
+  const [pendingMainBranchProject, setPendingMainBranchProject] = useState<Project | null>(null);
+  const [detectedMainBranch, setDetectedMainBranch] = useState<string>('main');
   const [detectedBranchForNewProject, setDetectedBranchForNewProject] = useState<string | null>(null);
   
   // Track recent sessions to handle auto-selection for multiple session creation
@@ -61,9 +65,6 @@ export function DraggableProjectTreeView() {
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [parentFolderForCreate, setParentFolderForCreate] = useState<Folder | null>(null);
-  const [showFolderContextMenu, setShowFolderContextMenu] = useState(false);
-  const [folderContextMenuPosition, setFolderContextMenuPosition] = useState({ x: 0, y: 0 });
-  const [selectedFolderForMenu, setSelectedFolderForMenu] = useState<Folder | null>(null);
   const { showError } = useErrorStore();
   
   // Folder rename state
@@ -519,28 +520,6 @@ export function DraggableProjectTreeView() {
     setEditingFolderName(folder.name);
   };
 
-  const handleFolderContextMenu = (e: React.MouseEvent, folder: Folder, _projectId: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setSelectedFolderForMenu(folder);
-    setFolderContextMenuPosition({ x: e.clientX, y: e.clientY });
-    setShowFolderContextMenu(true);
-  };
-
-  const closeFolderContextMenu = () => {
-    setShowFolderContextMenu(false);
-    setSelectedFolderForMenu(null);
-  };
-
-  // Close folder context menu when clicking outside
-  useEffect(() => {
-    if (showFolderContextMenu) {
-      const handleClick = () => closeFolderContextMenu();
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
-    }
-  }, [showFolderContextMenu]);
-
   const handleSaveFolderEdit = async () => {
     if (!editingFolderId || !editingFolderName.trim()) {
       setEditingFolderId(null);
@@ -566,7 +545,6 @@ export function DraggableProjectTreeView() {
         });
       }
     } catch (error: any) {
-      console.error('Failed to rename folder:', error);
       showError({
         title: 'Failed to rename folder',
         error: error.message || 'Unknown error occurred'
@@ -753,9 +731,31 @@ export function DraggableProjectTreeView() {
   };
 
   const handleProjectClick = async (project: Project) => {
-    // Navigate to the project dashboard
-    const { navigateToProject } = useNavigationStore.getState();
-    navigateToProject(project.id);
+    // Check if we should show the warning
+    const warningKey = `mainBranchWarning_${project.id}`;
+    const hasShownWarning = localStorage.getItem(warningKey);
+    
+    if (!hasShownWarning) {
+      // Fetch the current branch before showing warning
+      try {
+        const response = await window.electronAPI.git.detectBranch(project.path);
+        if (response.success && response.data) {
+          setDetectedMainBranch(response.data);
+        } else {
+          setDetectedMainBranch('main');
+        }
+      } catch (error) {
+        console.error('Failed to detect branch:', error);
+        setDetectedMainBranch('main');
+      }
+      
+      // Show warning dialog
+      setPendingMainBranchProject(project);
+      setShowMainBranchWarning(true);
+    } else {
+      // Proceed directly
+      await openMainRepoSession(project);
+    }
   };
 
   const handleRefreshProjectGitStatus = async (project: Project, e: React.MouseEvent) => {
@@ -792,6 +792,31 @@ export function DraggableProjectTreeView() {
     }
   };
   
+  const openMainRepoSession = async (project: Project) => {
+    try {
+      // Get or create the main repo session
+      const response = await API.sessions.getOrCreateMainRepoSession(project.id);
+      
+      if (response.success && response.data) {
+        // Navigate to the main repo session
+        const session = response.data;
+        useSessionStore.getState().setActiveSession(session.id);
+        
+        // Don't expand the project - main repo sessions are accessed via folder click only
+      } else {
+        showError({
+          title: 'Failed to open main repository session',
+          error: response.error || 'Unknown error occurred'
+        });
+      }
+    } catch (error: any) {
+      console.error('Error handling project click:', error);
+      showError({
+        title: 'Failed to open main repository session',
+        error: error.message || 'Unknown error occurred'
+      });
+    }
+  };
 
   const handleCreateSession = (project: Project) => {
     // Just show the dialog for any project
@@ -1313,9 +1338,9 @@ export function DraggableProjectTreeView() {
   const renderFolder = (folder: Folder, project: ProjectWithSessions, level: number = 0, isLastInLevel: boolean = false, parentPath: boolean[] = []) => {
     const isExpanded = expandedFolders.has(folder.id);
     const folderSessions = project.sessions.filter(s => s.folderId === folder.id);
+    const folderUnviewedCount = folderSessions.filter(s => s.status === 'completed_unviewed').length;
     const isDraggingOverFolder = dragState.overType === 'folder' && dragState.overFolderId === folder.id;
     const hasChildren = (folder.children && folder.children.length > 0) || folderSessions.length > 0;
-    const folderUnviewedCount = folderSessions.filter(s => s.status === 'completed_unviewed').length;
     
     return (
       <div key={folder.id} className="relative" style={{ marginLeft: `${level * 16}px` }}>        
@@ -1366,7 +1391,7 @@ export function DraggableProjectTreeView() {
           )}
         </div>
         <div 
-          className={`relative group/folder flex items-center space-x-1 py-1 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+          className={`group/folder flex items-center space-x-1 px-2 py-1 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
             isDraggingOverFolder ? 'bg-blue-100 dark:bg-blue-900' : ''
           }`}
           style={{ marginLeft: `${0}px`, paddingLeft: '8px', paddingRight: '8px' }}
@@ -1376,7 +1401,6 @@ export function DraggableProjectTreeView() {
           onDrop={(e) => handleFolderDrop(e, folder, project.id)}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
-          onContextMenu={(e) => handleFolderContextMenu(e, folder, project.id)}
         >
           <div className="opacity-0 group-hover/folder:opacity-100 transition-opacity cursor-move">
             <GripVertical className="w-3 h-3 text-gray-400" />
@@ -1408,9 +1432,9 @@ export function DraggableProjectTreeView() {
             }}
           >
             {isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
             ) : (
-              <FolderIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
             )}
             {editingFolderId === folder.id ? (
               <input
@@ -1433,7 +1457,7 @@ export function DraggableProjectTreeView() {
               />
             ) : (
               <>
-                <span className="text-sm text-gray-700 dark:text-gray-300 truncate" title={folder.name}>
+                <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
                   {folder.name}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-500">
@@ -1477,27 +1501,37 @@ export function DraggableProjectTreeView() {
         </div>
         
         {isExpanded && hasChildren && (
-          <div className="mt-1 space-y-1" style={{ marginLeft: '16px' }}>
+          <div className="ml-4 mt-1 space-y-1">
             {/* Render subfolders first */}
-            {folder.children && folder.children.map((childFolder, index, array) => {
-              const isLastChild = index === array.length - 1 && folderSessions.length === 0;
-              const newParentPath = [...parentPath, !isLastChild];
-              return renderFolder(childFolder, project, level + 1, isLastChild, newParentPath);
+            {folder.children && folder.children.map((childFolder, childIndex) => {
+              const isLastChild = childIndex === folder.children!.length - 1;
+              const hasSessionsBelow = folderSessions.length > 0;
+              const newParentPath = [...parentPath, !isLastInLevel || hasSessionsBelow];
+              return renderFolder(childFolder, project, level + 1, isLastChild && !hasSessionsBelow, newParentPath);
             })}
             
             {/* Then render sessions in this folder */}
             {folderSessions
               .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-              .map((session, sessionIndex, sessionArray) => {
+              .map((session, sessionIndex) => {
                 const isDraggingOverSession = dragState.overType === 'session' && 
                                              dragState.overSessionId === session.id &&
                                              dragState.overProjectId === project.id;
-                const isLastSession = sessionIndex === sessionArray.length - 1;
+                const isLastSession = sessionIndex === folderSessions.length - 1;
                 
                 return (
                   <div
                     key={session.id}
-                    className="relative"
+                    className={`group flex items-center ${
+                      isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
+                    }`}
+                    draggable
+                    onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
+                    onDrop={(e) => handleSessionDrop(e, session, project.id)}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
                   >
                     {/* Tree lines for sessions */}
                     <div className="absolute inset-0 pointer-events-none">
@@ -1573,13 +1607,13 @@ export function DraggableProjectTreeView() {
             {projectsWithSessions.map((project) => {
           const isExpanded = expandedProjects.has(project.id);
           const sessionCount = project.sessions.length;
-          const isDraggingOver = dragState.overType === 'project' && dragState.overProjectId === project.id;
           const unviewedCount = project.sessions.filter(s => s.status === 'completed_unviewed').length;
+          const isDraggingOver = dragState.overType === 'project' && dragState.overProjectId === project.id;
           
           return (
-            <div key={project.id} className="mb-1">
+            <div key={project.id}>
               <div 
-                className={`group flex items-center space-x-1 px-2 py-2 rounded-lg cursor-pointer transition-colors bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                className={`group flex items-center space-x-1 px-2 py-1.5 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                   isDraggingOver ? 'bg-blue-100 dark:bg-blue-900' : ''
                 }`}
                 draggable
@@ -1594,32 +1628,35 @@ export function DraggableProjectTreeView() {
                   <GripVertical className="w-3 h-3 text-gray-400" />
                 </div>
                 
-                {(sessionCount > 0 || (project.folders && project.folders.length > 0)) ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleProject(project.id);
-                    }}
-                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-                  >
-                    {isExpanded ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleProject(project.id);
+                  }}
+                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                  disabled={sessionCount === 0}
+                >
+                  {sessionCount > 0 ? (
+                    isExpanded ? (
                       <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                     ) : (
                       <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                    )}
-                  </button>
-                ) : (
-                  <div className="w-3 h-3 p-0.5" />
-                )}
+                    )
+                  ) : (
+                    <div className="w-3 h-3" />
+                  )}
+                </button>
                 
                 <div 
                   className="flex items-center space-x-2 flex-1 min-w-0"
                   onClick={() => handleProjectClick(project)}
                 >
-                  <div className="relative" title="Git-backed project (connected to repository)">
-                    <GitBranch className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate text-left" title={project.name}>
+                  {isExpanded ? (
+                    <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  ) : (
+                    <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+                  )}
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate text-left">
                     {project.name}
                   </span>
                   {unviewedCount > 0 && (
@@ -1634,7 +1671,7 @@ export function DraggableProjectTreeView() {
                     e.stopPropagation();
                     handleCreateSession(project);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-all opacity-0 group-hover:opacity-100"
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors opacity-100"
                 >
                   <Plus className="w-3 h-3" />
                   <span>New Session</span>
@@ -1673,29 +1710,38 @@ export function DraggableProjectTreeView() {
                   {/* Render folders using recursive structure */}
                   {project.folders && (() => {
                     const folderTree = buildFolderTree(project.folders);
-                    const rootSessions = project.sessions.filter(s => !s.folderId);
-                    return folderTree.map((folder, index) => {
-                      const isLastFolder = index === folderTree.length - 1 && rootSessions.length === 0;
-                      return renderFolder(folder, project, 1, isLastFolder, [!isLastFolder]);
+                    return folderTree.map((folder, folderIndex) => {
+                      const isLastFolder = folderIndex === folderTree.length - 1;
+                      const hasSessionsAtRoot = project.sessions.some(s => !s.folderId);
+                      return renderFolder(folder, project, 0, isLastFolder && !hasSessionsAtRoot, []);
                     });
                   })()}
                   
                   {/* Render sessions without folders */}
-                  <div className="relative">
+                  <div className="ml-4">
                     {project.sessions
                       .filter(s => !s.folderId)
                       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-                      .map((session, sessionIndex, sessionArray) => {
+                      .map((session, sessionIndex, sessionsArray) => {
                         const isDraggingOverSession = dragState.overType === 'session' && 
                                                      dragState.overSessionId === session.id &&
                                                      dragState.overProjectId === project.id;
-                        const isLastSession = sessionIndex === sessionArray.length - 1;
+                        const isLastSession = sessionIndex === sessionsArray.length - 1;
                         
                         return (
                           <div
                             key={session.id}
-                            className="relative"
+                            className={`relative group flex items-center ${
+                              isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
+                            }`}
                             style={{ marginLeft: '16px' }}
+                            draggable
+                            onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
+                            onDrop={(e) => handleSessionDrop(e, session, project.id)}
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
                           >
                             {/* Tree lines for root sessions */}
                             <div className="absolute inset-0 pointer-events-none">
@@ -1746,7 +1792,7 @@ export function DraggableProjectTreeView() {
                   </div>
                   
                   {/* Add folder button */}
-                  <div className="ml-6 mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <div className="ml-4">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1766,15 +1812,13 @@ export function DraggableProjectTreeView() {
           );
         })}
         
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => setShowAddProjectDialog(true)}
-                className="w-full px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Project</span>
-              </button>
-            </div>
+            <button
+              onClick={() => setShowAddProjectDialog(true)}
+              className="w-full mt-2 px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Project</span>
+            </button>
           </>
         )}
         
@@ -1837,10 +1881,7 @@ export function DraggableProjectTreeView() {
                             <div
                               key={session.id}
                               className="cursor-pointer"
-                              onClick={() => {
-                                useSessionStore.getState().setActiveSession(session.id);
-                                useNavigationStore.getState().navigateToSessions();
-                              }}
+                              onClick={() => useSessionStore.getState().setActiveSession(session.id)}
                             >
                               <SessionListItem 
                                 session={session}
@@ -2016,6 +2057,26 @@ export function DraggableProjectTreeView() {
         </div>
       )}
       
+      {/* Main Branch Warning Dialog */}
+      {pendingMainBranchProject && (
+        <MainBranchWarningDialog
+          isOpen={showMainBranchWarning}
+          onClose={() => {
+            setShowMainBranchWarning(false);
+            setPendingMainBranchProject(null);
+          }}
+          onContinue={() => {
+            setShowMainBranchWarning(false);
+            if (pendingMainBranchProject) {
+              openMainRepoSession(pendingMainBranchProject);
+            }
+            setPendingMainBranchProject(null);
+          }}
+          projectName={pendingMainBranchProject.name}
+          projectId={pendingMainBranchProject.id}
+          mainBranch={detectedMainBranch}
+        />
+      )}
       
       {/* Create Folder Dialog */}
       {showCreateFolderDialog && selectedProjectForFolder && (
@@ -2047,24 +2108,6 @@ export function DraggableProjectTreeView() {
                   }}
                 />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Suggested Folder Types
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Features', 'Bugs', 'Exploration', 'Refactoring', 'Tests', 'Documentation'].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => setNewFolderName(suggestion)}
-                      className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="mt-6 flex justify-end space-x-3">
@@ -2088,57 +2131,6 @@ export function DraggableProjectTreeView() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Folder Context Menu */}
-      {showFolderContextMenu && selectedFolderForMenu && (
-        <div
-          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50 min-w-[150px]"
-          style={{ top: folderContextMenuPosition.y, left: folderContextMenuPosition.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => {
-              closeFolderContextMenu();
-              handleStartFolderEdit(selectedFolderForMenu);
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
-          >
-            Rename
-          </button>
-          <button
-            onClick={() => {
-              closeFolderContextMenu();
-              // Find the project that contains this folder
-              const project = projectsWithSessions.find(p => 
-                p.folders?.some(f => f.id === selectedFolderForMenu.id)
-              );
-              if (project) {
-                setSelectedProjectForCreate(project);
-                setShowCreateDialog(true);
-              }
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
-          >
-            New Session Here
-          </button>
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-          <button
-            onClick={() => {
-              closeFolderContextMenu();
-              // Find the project that contains this folder
-              const project = projectsWithSessions.find(p => 
-                p.folders?.some(f => f.id === selectedFolderForMenu.id)
-              );
-              if (project) {
-                handleDeleteFolder(selectedFolderForMenu, project.id);
-              }
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-300"
-          >
-            Delete
-          </button>
         </div>
       )}
     </>

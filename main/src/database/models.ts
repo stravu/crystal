@@ -155,3 +155,31 @@ export interface CreateExecutionDiffData {
   before_commit_hash?: string;
   after_commit_hash?: string;
 }
+
+export interface ModelContextWindow {
+  id: number;
+  model_name: string;
+  context_window_size: number;
+  display_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessageTokenUsage {
+  id: number;
+  session_id: string;
+  output_id: number;
+  message_type: 'user' | 'assistant' | 'system';
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  timestamp: string;
+}
+
+export interface SessionTokenSummary {
+  session_id: string;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  last_updated: string;
+}

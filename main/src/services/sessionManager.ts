@@ -312,14 +312,14 @@ export class SessionManager extends EventEmitter {
     this.emit('session-updated', session);
   }
 
-  addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): void {
+  addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): number {
     // Check if this is the first output for this session
     const existingOutputs = this.db.getSessionOutputs(id, 1);
     const isFirstOutput = existingOutputs.length === 0;
     
     // Store in database (stringify JSON objects)
     const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
-    this.db.addSessionOutput(id, output.type, dataToStore);
+    const outputId = this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Emit the output so it shows immediately in the UI
     const outputToEmit: SessionOutput = {
@@ -428,6 +428,8 @@ export class SessionManager extends EventEmitter {
     };
     
     this.emit('session-output', fullOutput);
+    
+    return outputId;
   }
 
   getSessionOutput(id: string, limit?: number): SessionOutput[] {

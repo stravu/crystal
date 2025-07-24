@@ -77,33 +77,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       // Fetch branches if projectId is provided
       if (projectId) {
         setIsLoadingBranches(true);
-        // First get the project to get its path
-        API.projects.getAll().then(projectsResponse => {
-          if (!projectsResponse.success || !projectsResponse.data) {
-            throw new Error('Failed to fetch projects');
-          }
-          const project = projectsResponse.data.find((p: any) => p.id === projectId);
-          if (!project) {
-            throw new Error('Project not found');
-          }
-          
-          return Promise.all([
-            API.projects.listBranches(projectId.toString()),
-            // Get the main branch for this project using its path
-            API.projects.detectBranch(project.path)
-          ]);
-        }).then(([branchesResponse, mainBranchResponse]) => {
-          if (branchesResponse.success && branchesResponse.data) {
-            setBranches(branchesResponse.data);
+        API.projects.listBranches(projectId.toString()).then(response => {
+          if (response.success && response.data) {
+            setBranches(response.data);
             // Set the current branch as default if available
-            const currentBranch = branchesResponse.data.find((b: any) => b.isCurrent);
+            const currentBranch = response.data.find((b: any) => b.isCurrent);
             if (currentBranch && !formData.baseBranch) {
               setFormData(prev => ({ ...prev, baseBranch: currentBranch.name }));
             }
-          }
-          
-          if (mainBranchResponse.success && mainBranchResponse.data) {
-            // Main branch detected but not currently used in UI
           }
         }).catch((err: any) => {
           console.error('Failed to fetch branches:', err);
@@ -512,7 +493,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Create the new session branch from this existing branch
                     </p>
-                    
                   </div>
                 )}
                 

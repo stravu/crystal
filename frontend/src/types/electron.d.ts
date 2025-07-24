@@ -99,6 +99,10 @@ interface ElectronAPI {
     
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>) => Promise<string[]>;
+    
+    // Token tracking
+    getTokenUsage: (sessionId: string) => Promise<IPCResponse>;
+    getTokenHistory: (sessionId: string) => Promise<IPCResponse>;
   };
 
   // Project management
@@ -251,6 +255,11 @@ interface ElectronAPI {
         sql: string;
       }>;
     }>>;
+  };
+
+  // Model context windows
+  models: {
+    getContextWindows: () => Promise<IPCResponse>;
   };
 }
 

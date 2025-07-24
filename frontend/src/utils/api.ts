@@ -238,6 +238,16 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.reorder(sessionOrders);
     },
+
+    async getTokenUsage(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getTokenUsage(sessionId);
+    },
+
+    async getTokenHistory(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getTokenHistory(sessionId);
+    },
   };
 
   // Project management
@@ -427,11 +437,11 @@ export class API {
     },
   };
 
-  // Dashboard
-  static dashboard = {
-    async getProjectStatus(projectId: number) {
+  // Model context windows
+  static models = {
+    async getContextWindows() {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.dashboard.getProjectStatus(projectId);
+      return window.electronAPI.models.getContextWindows();
     },
   };
 }
