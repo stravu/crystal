@@ -161,54 +161,6 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
               </button>
             </div>
             
-<<<<<<< HEAD
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
-                <div>
-                  <span className="text-gray-700 dark:text-gray-200 font-medium">Initializing</span>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Setting up git worktree and environment</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
-                <div>
-                  <span className="text-gray-700 dark:text-gray-200 font-medium">Running</span>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Claude is actively processing your request</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse flex-shrink-0"></div>
-                <div>
-                  <span className="text-gray-700 dark:text-gray-200 font-medium">Waiting</span>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Claude needs your input to continue</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-gray-400 rounded-full flex-shrink-0"></div>
-                <div>
-                  <span className="text-gray-700 dark:text-gray-200 font-medium">Completed</span>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Task finished successfully</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
-                <div>
-                  <span className="text-gray-700 dark:text-gray-200 font-medium">New Activity</span>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Session has new unviewed results</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
-                <div>
-                  <span className="text-gray-700 dark:text-gray-200 font-medium">Error</span>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Something went wrong with the session</p>
-=======
             <div className="flex-1 overflow-y-auto p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Column - Project & Session Status */}
@@ -370,7 +322,6 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
                       <li>Multiple states can be shown together</li>
                     </ul>
                   </div>
->>>>>>> origin/main
                 </div>
               </div>
             </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, RefreshCw } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
+import { useNavigationStore } from '../stores/navigationStore';
 import { SessionListItem } from './SessionListItem';
 import { CreateSessionDialog } from './CreateSessionDialog';
 import { MainBranchWarningDialog } from './MainBranchWarningDialog';
@@ -47,6 +48,7 @@ export function DraggableProjectTreeView() {
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const { setActiveSession } = useSessionStore();
+  const { navigateToSessions } = useNavigationStore();
   const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
   const [pendingMainBranchProject, setPendingMainBranchProject] = useState<Project | null>(null);
   const [detectedMainBranch, setDetectedMainBranch] = useState<string>('main');
@@ -1300,6 +1302,7 @@ export function DraggableProjectTreeView() {
   const renderFolder = (folder: Folder, project: ProjectWithSessions, level: number = 0, isLastInLevel: boolean = false, parentPath: boolean[] = []) => {
     const isExpanded = expandedFolders.has(folder.id);
     const folderSessions = project.sessions.filter(s => s.folderId === folder.id);
+    const folderUnviewedCount = folderSessions.filter(s => s.status === 'completed_unviewed').length;
     const isDraggingOverFolder = dragState.overType === 'folder' && dragState.overFolderId === folder.id;
     const hasChildren = (folder.children && folder.children.length > 0) || folderSessions.length > 0;
     
@@ -1568,6 +1571,7 @@ export function DraggableProjectTreeView() {
             {projectsWithSessions.map((project) => {
           const isExpanded = expandedProjects.has(project.id);
           const sessionCount = project.sessions.length;
+          const unviewedCount = project.sessions.filter(s => s.status === 'completed_unviewed').length;
           const isDraggingOver = dragState.overType === 'project' && dragState.overProjectId === project.id;
           
           return (

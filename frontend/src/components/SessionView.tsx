@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, memo, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { API } from '../utils/api';
 import { JsonMessageView } from './JsonMessageView';
 import { EmptyState } from './EmptyState';
 import CombinedDiffView from './CombinedDiffView';
@@ -24,9 +25,9 @@ export const SessionView = memo(() => {
   // Stub variables for project view functionality (navigationStore was removed)
   const activeView = 'session'; // Always show session view
   const activeProjectId = null; // No active project
-  const [projectData, setProjectData] = useState<any>(null);
-  const [isProjectLoading, setIsProjectLoading] = useState(false);
-  const [isMergingProject, setIsMergingProject] = useState(false);
+  // const [projectData, setProjectData] = useState<any>(null);
+  // const [isProjectLoading, setIsProjectLoading] = useState(false);
+  // const [isMergingProject, setIsMergingProject] = useState(false);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -39,33 +40,33 @@ export const SessionView = memo(() => {
 
   // Load project data when activeProjectId changes
   useEffect(() => {
-    if (activeView === 'project' && activeProjectId) {
+    if (false && activeProjectId) { // Disabled: activeView === 'project'
       const loadProjectData = async () => {
-        setIsProjectLoading(true);
+        // setIsProjectLoading(true);
         try {
           // Get all projects and find the one we need
           const response = await API.projects.getAll();
           if (response.success && response.data) {
             const project = response.data.find((p: any) => p.id === activeProjectId);
             if (project) {
-              setProjectData(project);
+              // setProjectData(project);
             }
           }
         } catch (error) {
           console.error('Failed to load project data:', error);
         } finally {
-          setIsProjectLoading(false);
+          // setIsProjectLoading(false);
         }
       };
       loadProjectData();
     } else {
-      setProjectData(null);
+      // setProjectData(null);
     }
   }, [activeView, activeProjectId]);
 
-  const handleProjectGitPull = async () => {
-    if (!activeProjectId || !projectData) return;
-    setIsMergingProject(true);
+  /* const handleProjectGitPull = async () => {
+    if (!activeProjectId) return; // || !projectData
+    // setIsMergingProject(true);
     try {
       // Get or create main repo session for this project
       const sessionResponse = await API.sessions.getOrCreateMainRepoSession(activeProjectId);
@@ -78,13 +79,13 @@ export const SessionView = memo(() => {
     } catch (error) {
       console.error('Failed to perform git pull:', error);
     } finally {
-      setIsMergingProject(false);
+      // setIsMergingProject(false);
     }
-  };
+  }; */
 
-  const handleProjectGitPush = async () => {
-    if (!activeProjectId || !projectData) return;
-    setIsMergingProject(true);
+  /* const handleProjectGitPush = async () => {
+    if (!activeProjectId) return; // || !projectData
+    // setIsMergingProject(true);
     try {
       // Get or create main repo session for this project
       const sessionResponse = await API.sessions.getOrCreateMainRepoSession(activeProjectId);
@@ -97,9 +98,9 @@ export const SessionView = memo(() => {
     } catch (error) {
       console.error('Failed to perform git push:', error);
     } finally {
-      setIsMergingProject(false);
+      // setIsMergingProject(false);
     }
-  };
+  }; */
   
   const activeSession = activeSessionId 
     ? (activeMainRepoSession && activeMainRepoSession.id === activeSessionId 
