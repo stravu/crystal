@@ -38,31 +38,10 @@ export const SessionView = memo(() => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Load project data when activeProjectId changes
-  useEffect(() => {
-    if (false && activeProjectId) { // Disabled: activeView === 'project'
-      const loadProjectData = async () => {
-        // setIsProjectLoading(true);
-        try {
-          // Get all projects and find the one we need
-          const response = await API.projects.getAll();
-          if (response.success && response.data) {
-            const project = response.data.find((p: any) => p.id === activeProjectId);
-            if (project) {
-              // setProjectData(project);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to load project data:', error);
-        } finally {
-          // setIsProjectLoading(false);
-        }
-      };
-      loadProjectData();
-    } else {
-      // setProjectData(null);
-    }
-  }, [activeView, activeProjectId]);
+  // Project data loading disabled for now
+  // useEffect(() => {
+  //   // TODO: Re-enable when project view is implemented
+  // }, [activeView, activeProjectId]);
 
   /* const handleProjectGitPull = async () => {
     if (!activeProjectId) return; // || !projectData
