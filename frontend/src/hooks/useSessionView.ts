@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTheme } from '../contexts/ThemeContext';
+import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -57,6 +58,7 @@ export const useSessionView = (
   const [shouldSquash, setShouldSquash] = useState(true);
   const [isWaitingForFirstOutput, setIsWaitingForFirstOutput] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [isOpeningIDE, setIsOpeningIDE] = useState(false);
   
   const [, forceUpdate] = useState({});
   const [shouldReloadOutput, setShouldReloadOutput] = useState(false);
@@ -1378,7 +1380,29 @@ export const useSessionView = (
   };
 
   const handleOpenIDE = async () => {
-    if(activeSession) await API.sessions.openIDE(activeSession.id);
+    if (!activeSession) return;
+    
+    setIsOpeningIDE(true);
+    
+    try {
+      const response = await API.sessions.openIDE(activeSession.id);
+      if (!response.success) {
+        // Import and use the error store
+        const { showError } = useErrorStore.getState();
+        showError({
+          title: 'Failed to open IDE',
+          error: response.error || 'Unknown error occurred',
+        });
+      }
+    } catch (error) {
+      const { showError } = useErrorStore.getState();
+      showError({
+        title: 'Failed to open IDE',
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    } finally {
+      setIsOpeningIDE(false);
+    }
   };
   
   const handleStravuFileSelect = (file: any, content: string) => {
@@ -1523,6 +1547,7 @@ export const useSessionView = (
     handleSquashAndRebaseToMain,
     performSquashWithCommitMessage,
     handleOpenIDE,
+    isOpeningIDE,
     handleStravuFileSelect,
     formatElapsedTime,
     handleStartEditName,

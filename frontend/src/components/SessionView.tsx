@@ -27,6 +27,14 @@ export const SessionView = memo(() => {
   const [projectData, setProjectData] = useState<any>(null);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [isMergingProject, setIsMergingProject] = useState(false);
+  const [sessionProject, setSessionProject] = useState<any>(null);
+
+  // Define activeSession early so it can be used in effects
+  const activeSession = activeSessionId 
+    ? (activeMainRepoSession && activeMainRepoSession.id === activeSessionId 
+        ? activeMainRepoSession 
+        : sessions.find(s => s.id === activeSessionId))
+    : undefined;
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -36,6 +44,28 @@ export const SessionView = memo(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
+
+  // Load project data for active session
+  useEffect(() => {
+    const loadSessionProject = async () => {
+      if (activeSession?.projectId) {
+        try {
+          const response = await API.projects.getAll();
+          if (response.success && response.data) {
+            const project = response.data.find((p: any) => p.id === activeSession.projectId);
+            if (project) {
+              setSessionProject(project);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load session project:', error);
+        }
+      } else {
+        setSessionProject(null);
+      }
+    };
+    loadSessionProject();
+  }, [activeSession?.projectId]);
 
   // Load project data when activeProjectId changes
   useEffect(() => {
@@ -100,12 +130,6 @@ export const SessionView = memo(() => {
       setIsMergingProject(false);
     }
   };
-  
-  const activeSession = activeSessionId 
-    ? (activeMainRepoSession && activeMainRepoSession.id === activeSessionId 
-        ? activeMainRepoSession 
-        : sessions.find(s => s.id === activeSessionId))
-    : undefined;
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const scriptTerminalRef = useRef<HTMLDivElement>(null);
@@ -173,6 +197,8 @@ export const SessionView = memo(() => {
         gitCommands={hook.gitCommands}
         handleSquashAndRebaseToMain={hook.handleSquashAndRebaseToMain}
         handleOpenIDE={hook.handleOpenIDE}
+        isOpeningIDE={hook.isOpeningIDE}
+        hasIdeCommand={!!sessionProject?.open_ide_command}
         mergeError={hook.mergeError}
         viewMode={hook.viewMode}
         setViewMode={hook.setViewMode}

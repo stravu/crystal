@@ -119,15 +119,42 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
 
       // Execute the IDE command in the worktree directory
       const { exec } = require('child_process');
-      exec(project.open_ide_command, { cwd: session.worktreePath }, (error: Error | null) => {
-        if (error) {
-          console.error('Failed to open IDE:', error);
-        } else {
-          console.log('Successfully opened IDE for session:', sessionId);
-        }
+      
+      // Wrap exec in a Promise to wait for completion
+      return new Promise((resolve) => {
+        exec(
+          project.open_ide_command,
+          {
+            cwd: session.worktreePath,
+            shell: true,
+            env: process.env  // Ensure PATH is inherited
+          },
+          (error: any, stdout: string, stderr: string) => {
+            if (error) {
+              console.error('Failed to open IDE:', error);
+              console.error('stdout:', stdout);
+              console.error('stderr:', stderr);
+              
+              let errorMessage = 'Failed to open IDE';
+              
+              // Provide more specific error messages
+              if (error.code === 127 || stderr.includes('command not found')) {
+                errorMessage = `IDE command not found: ${project.open_ide_command}. Make sure the command is in your PATH or use a full path.`;
+              } else if (error.code) {
+                errorMessage = `IDE command failed with exit code ${error.code}: ${stderr || error.message}`;
+              } else {
+                errorMessage = `Failed to open IDE: ${error.message}`;
+              }
+              
+              resolve({ success: false, error: errorMessage });
+            } else {
+              console.log('Successfully opened IDE for session:', sessionId);
+              if (stdout) console.log('IDE command output:', stdout);
+              resolve({ success: true });
+            }
+          }
+        );
       });
-
-      return { success: true };
     } catch (error) {
       console.error('Failed to open IDE:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Failed to open IDE' };
