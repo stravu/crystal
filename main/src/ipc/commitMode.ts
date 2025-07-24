@@ -1,12 +1,14 @@
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { projectDetectionService } from '../services/projectDetection';
 import { commitManager } from '../services/commitManager';
 import type { ProjectCharacteristics, CommitModeSettings, FinalizeSessionOptions } from '../../../shared/types';
 import type { DatabaseService } from '../database/database';
 import type { Logger } from '../utils/logger';
+import type { SessionManager } from '../services/sessionManager';
+import type { Session } from '../types/session';
 
-export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger): void {
+export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger, sessionManager?: SessionManager): void {
   // Get project characteristics for commit mode detection
   ipcMain.handle('commit-mode:get-project-characteristics', async (
     _event: IpcMainInvokeEvent,
@@ -37,12 +39,29 @@ export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger)
       
       // Store settings as JSON in the database
       const settingsJson = JSON.stringify(settings);
+      
       db.updateSession(sessionId, {
         commit_mode: settings.mode,
         commit_mode_settings: settingsJson
       });
       
-      logger?.verbose(`Updated session ${sessionId} to mode: ${settings.mode}`);
+      // Verify the update was successful by reading back from DB
+      const verifySession = db.getSession(sessionId);
+      if (verifySession) {
+        logger?.verbose(`Verified session update - commit_mode: ${verifySession.commit_mode}, settings: ${verifySession.commit_mode_settings}`);
+      }
+      
+      // Send a minimal update event directly to the renderer with the new values
+      const mainWindow = BrowserWindow.getAllWindows()[0];
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const sessionUpdate = {
+          id: sessionId,
+          commitMode: settings.mode,
+          commitModeSettings: settingsJson
+        };
+        
+        mainWindow.webContents.send('session:updated', sessionUpdate);
+      }
     } catch (error) {
       logger?.error('Failed to update session commit mode settings:', error instanceof Error ? error : undefined);
       throw error;

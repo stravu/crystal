@@ -85,6 +85,30 @@
   --color-focus-ring: var(--blue-500);
   --color-interactive-rgb: 37 99 235; /* RGB value for blue-600 */
   
+  /* High-contrast interactive text for dark backgrounds */
+  --color-text-interactive-on-dark: var(--blue-500); /* WCAG AA 4.5:1 against gray-800/900 */
+  --color-text-interactive-on-dark-hover: var(--blue-600);
+  --color-text-interactive-on-dark-active: var(--blue-400);
+  --color-text-interactive-on-dark-focus: var(--blue-500);
+  
+  /* Interactive surface tokens */
+  --color-surface-interactive: var(--gray-800);
+  --color-surface-interactive-hover: var(--gray-700);
+  --color-interactive-surface: rgba(var(--color-interactive-rgb), 0.2);
+  --color-interactive-surface-hover: rgba(var(--color-interactive-rgb), 0.3);
+  
+  /* Interactive border tokens */
+  --color-border-interactive-subtle: var(--gray-700);
+  --color-border-interactive: var(--gray-600);
+  --color-interactive-border: rgba(var(--color-interactive-rgb), 0.5);
+  --color-interactive-border-hover: rgba(var(--color-interactive-rgb), 0.7);
+  
+  /* Interactive text tokens */
+  --color-text-interactive-muted: var(--gray-400);
+  
+  /* Focus ring variations */
+  --color-focus-ring-subtle: rgba(var(--color-interactive-rgb), 0.5);
+  
   /* Semantic Tokens - Status */
   --color-status-success: var(--green-500);
   --color-status-success-hover: var(--green-600);
@@ -94,6 +118,19 @@
   --color-status-error-hover: var(--red-600);
   --color-status-info: var(--blue-500);
   --color-status-neutral: var(--gray-400);
+  
+  /* Context-Aware Text Tokens - Dark Mode */
+  /* Text on different backgrounds for proper contrast */
+  --color-text-on-primary: rgb(255 255 255);           /* White text on primary (dark) backgrounds */
+  --color-text-on-secondary: var(--gray-100);          /* Light text on secondary backgrounds */
+  --color-text-on-tertiary: var(--gray-200);           /* Light text on tertiary backgrounds */
+  --color-text-on-surface: var(--gray-100);            /* Light text on surface backgrounds */
+  --color-text-on-interactive: rgb(255 255 255);       /* White text on interactive backgrounds */
+  --color-text-on-status-success: rgb(255 255 255);    /* White text on success backgrounds */
+  --color-text-on-status-warning: rgb(0 0 0);          /* Black text on warning backgrounds */
+  --color-text-on-status-error: rgb(255 255 255);      /* White text on error backgrounds */
+  --color-text-on-status-info: rgb(255 255 255);       /* White text on info backgrounds */
+  --color-text-on-navigation: var(--gray-100);         /* Light text on navigation backgrounds */
   
   /* Component-Specific Tokens - Buttons */
   --color-button-primary-bg: var(--color-interactive-primary);
@@ -219,6 +256,31 @@
   /* Semantic Tokens - Special UI States */
   --color-modal-overlay: rgba(139, 103, 246, 0.1); /* Lilac tinted overlay */
   --color-focus-ring: var(--lilac-400);      /* Brand color focus */
+  
+  /* Light mode interactive tokens to match dark mode */
+  --color-surface-interactive: var(--warm-gray-100);
+  --color-surface-interactive-hover: var(--warm-gray-200);
+  --color-interactive-surface: var(--lilac-100);
+  --color-interactive-surface-hover: var(--lilac-200);
+  --color-border-interactive-subtle: var(--lilac-200);
+  --color-border-interactive: var(--lilac-300);
+  --color-interactive-border: var(--lilac-400);
+  --color-interactive-border-hover: var(--lilac-500);
+  --color-text-interactive-muted: var(--gray-500);
+  --color-focus-ring-subtle: rgba(var(--color-interactive-rgb), 0.4);
+  
+  /* Context-Aware Text Tokens - Light Mode */
+  /* Text on different backgrounds for proper contrast */
+  --color-text-on-primary: var(--gray-900);            /* Dark text on light backgrounds */
+  --color-text-on-secondary: var(--gray-800);          /* Dark text on secondary backgrounds */
+  --color-text-on-tertiary: var(--gray-700);           /* Dark text on tertiary backgrounds */
+  --color-text-on-surface: var(--gray-900);            /* Dark text on surface backgrounds */
+  --color-text-on-interactive: rgb(255 255 255);       /* White text on interactive backgrounds */
+  --color-text-on-status-success: rgb(255 255 255);    /* White text on success backgrounds */
+  --color-text-on-status-warning: rgb(255 255 255);    /* White text on warning backgrounds (adjusted) */
+  --color-text-on-status-error: rgb(255 255 255);      /* White text on error backgrounds */
+  --color-text-on-status-info: rgb(255 255 255);       /* White text on info backgrounds */
+  --color-text-on-navigation: var(--gray-700);         /* Dark text on light navigation */
   
   /* Component-Specific Tokens - Buttons */
   --color-button-primary-bg: var(--lilac-500);

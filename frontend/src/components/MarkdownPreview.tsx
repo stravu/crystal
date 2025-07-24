@@ -78,7 +78,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content, class
             </td>
           ),
           a: ({ href, children }) => (
-            <a href={href} className="text-interactive hover:text-interactive-hover hover:underline" target="_blank" rel="noopener noreferrer">
+            <a href={href} className="text-interactive-on-dark" target="_blank" rel="noopener noreferrer">
               {children}
             </a>
           ),

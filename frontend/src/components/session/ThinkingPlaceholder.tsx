@@ -56,7 +56,7 @@ export const ThinkingPlaceholder: React.FC = () => {
                 
                 {/* Center icon */}
                 <div className="relative w-20 h-20 bg-surface-tertiary rounded-full flex items-center justify-center">
-                  <Icon className="w-10 h-10 text-interactive animate-pulse" />
+                  <Icon className="w-10 h-10 text-interactive-on-dark animate-pulse" />
                 </div>
               </div>
             </div>

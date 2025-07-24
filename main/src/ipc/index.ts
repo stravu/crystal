@@ -32,5 +32,5 @@ export function registerIpcHandlers(services: AppServices): void {
   registerFolderHandlers(ipcMain, services);
   registerUIStateHandlers(services);
   registerDashboardHandlers(ipcMain, services);
-  registerCommitModeHandlers(services.databaseService, services.logger);
+  registerCommitModeHandlers(services.databaseService, services.logger, services.sessionManager);
 } 

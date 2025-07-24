@@ -1,10 +1,13 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
-import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { API } from '../../utils/api';
-import { CommitModeToggle } from '../CommitModeToggle';
+import { CommitModePill, AutoCommitSwitch } from '../CommitModeToggle';
+import { Dropdown, type DropdownItem } from '../ui/Dropdown';
+import { Pill } from '../ui/Pill';
+import { SwitchSimple as Switch } from '../ui/SwitchSimple';
 
 interface AttachedImage {
   id: string;
@@ -60,9 +63,15 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Calculate auto-commit enabled state
+  const effectiveMode = activeSession.commitMode || (activeSession.autoCommit === false ? 'disabled' : 'checkpoint');
+  const isAutoCommitEnabled = effectiveMode !== 'disabled';
 
   useEffect(() => {
     // Update selected model when switching to a different session
@@ -239,12 +248,25 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
   const handleFocus = useCallback(() => {
     setIsFocused(true);
+    setIsToolbarActive(true);
     onFocus?.();
   }, [onFocus]);
 
-  const handleBlur = useCallback(() => {
-    setIsFocused(false);
-    onBlur?.();
+  const handleBlur = useCallback((e: React.FocusEvent) => {
+    // Check if the blur is due to clicking within the toolbar
+    const toolbar = e.currentTarget.closest('[data-toolbar-container]');
+    const relatedTarget = e.relatedTarget;
+    
+    // Only remove focus if we're actually leaving the toolbar area
+    if (!toolbar || !relatedTarget || !toolbar.contains(relatedTarget as Node)) {
+      setIsFocused(false);
+      setIsToolbarActive(false);
+      onBlur?.();
+    } else {
+      // Keep toolbar active if staying within toolbar
+      setIsFocused(false); // Input not focused, but toolbar still active
+      setIsToolbarActive(true);
+    }
   }, [onBlur]);
 
   return (
@@ -298,10 +320,27 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         </div>
 
         {/* Command Input Area */}
-        <div className="p-4 bg-surface-primary"
+        <div 
+          className="p-4 bg-surface-primary"
+          data-toolbar-container
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
+          onFocusCapture={(e) => {
+            // When any element in the toolbar gets focus, keep toolbar active
+            setIsToolbarActive(true);
+          }}
+          onBlurCapture={(e) => {
+            // Use a timeout to check if focus moved outside the toolbar
+            setTimeout(() => {
+              const activeElement = document.activeElement;
+              const toolbar = e.currentTarget;
+              
+              if (!activeElement || !toolbar || !toolbar.contains(activeElement)) {
+                setIsToolbarActive(false);
+              }
+            }, 0);
+          }}
         >
           {/* Attached images */}
           {attachedImages.length > 0 && (
@@ -326,11 +365,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
           {/* Clean Input Container */}
           <div className={`
+            relative z-10
             bg-surface-primary 
             rounded-lg border border-border-primary 
             shadow-[0_4px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)]
             transition-all duration-200 backdrop-blur-sm
-            ${isFocused ? (buttonConfig.color === 'green' ? 'command-bar-focus-green' : 'command-bar-focus') : ''}
+            ${(isFocused || isToolbarActive) ? (buttonConfig.color === 'green' ? 'command-bar-focus-green' : 'command-bar-focus') : ''}
           `}>
             {/* Command prompt field */}
             <div className="relative">
@@ -392,111 +432,68 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             {/* Left Section - Tools and Settings */}
             <div className="flex items-center gap-2">
               {/* Attach Button */}
-              <button
+              <Pill
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3.5 py-1.5 rounded-full text-xs font-medium
-                  bg-surface-tertiary text-text-secondary 
-                  hover:bg-surface-hover 
-                  flex items-center gap-1.5 transition-all duration-200 
-                  hover:scale-105 active:scale-95
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary focus:ring-border-primary"
+                icon={<Paperclip className="w-3.5 h-3.5" />}
                 title="Attach images"
               >
-                <Paperclip className="w-3.5 h-3.5" />
-                <span className="leading-none">Attach Image</span>
-              </button>
+                Attach Image
+              </Pill>
               
               {/* Reference Button */}
               {isStravuConnected && (
-                <button 
+                <Pill
                   onClick={() => setShowStravuSearch(true)}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-medium
-                    bg-surface-tertiary text-text-secondary 
-                    hover:bg-surface-hover 
-                    flex items-center gap-1.5 transition-all duration-200 
-                    hover:scale-105 active:scale-95
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary focus:ring-interactive"
+                  icon={<AtSign className="w-3.5 h-3.5" />}
                   title="Reference files (@)"
                 >
-                  <AtSign className="w-3.5 h-3.5" />
-                  <span className="leading-none">Reference</span>
-                </button>
+                  Reference
+                </Pill>
               )}
 
               {/* Divider */}
               <div className="h-6 w-px bg-border-primary mx-1" />
 
-              {/* Model Selector */}
-              <div className="relative inline-flex items-center">
-                <select 
-                  value={selectedModel}
-                  onChange={async (e) => {
-                    const newModel = e.target.value;
-                    setSelectedModel(newModel);
-                    
-                    try {
-                      await API.config.update({ defaultModel: newModel });
-                    } catch (err) {
-                      console.error('Failed to save default model:', err);
-                    }
-                  }}
-                  className="appearance-none bg-surface-tertiary text-text-secondary 
-                    hover:bg-surface-hover 
-                    px-3.5 py-1.5 pr-8 rounded-full text-xs font-medium leading-none
-                    transition-all duration-200 cursor-pointer
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 
-                    focus:ring-offset-bg-primary focus:ring-interactive
-                    hover:scale-105 active:scale-95"
-                >
-                  <option value="claude-sonnet-4-20250514">Sonnet 4</option>
-                  <option value="claude-opus-4-20250514">Opus 4</option>
-                  <option value="claude-3-5-haiku-20241022">Haiku 3.5</option>
-                </select>
-                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none" 
-                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              {/* Action Bar - Horizontal row with semantic grouping */}
+              <div className="flex items-center gap-2">
+                {/* Model Selector */}
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                  showDropdown={showModelDropdown}
+                  setShowDropdown={setShowModelDropdown}
+                />
 
-              {/* Commit Mode Toggle */}
-              <CommitModeToggle
-                sessionId={activeSession.id}
-                currentMode={activeSession.commitMode}
-                currentSettings={activeSession.commitModeSettings}
-                autoCommit={activeSession.autoCommit}
-                projectId={activeSession.projectId}
-                onModeChange={() => {
-                  // Trigger a refresh of the session data
-                  handleToggleAutoCommit();
-                }}
-              />
-              
-              {/* Deep Analysis Toggle */}
-              <button
-                onClick={() => setUltrathink(!ultrathink)}
-                className={`
-                  px-3.5 py-1.5 rounded-full text-xs font-medium
-                  transition-all duration-200 flex items-center gap-1.5
-                  hover:scale-105 active:scale-95
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary
-                  ${ultrathink 
-                    ? 'bg-interactive/10 text-interactive hover:bg-interactive/20 focus:ring-interactive border border-interactive/30' 
-                    : 'bg-surface-tertiary text-text-secondary hover:bg-surface-hover focus:ring-interactive'
-                  }
-                `}
-              >
-                <div className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 flex items-center justify-center
-                  ${ultrathink
-                    ? 'bg-interactive border-interactive' 
-                    : 'border-border-primary'
-                  }`}>
-                  {ultrathink && (
-                    <Cpu className="w-2 h-2 text-white" />
-                  )}
+                {/* Auto-Commit Mode Pill - always visible */}
+                <CommitModePill
+                  sessionId={activeSession.id}
+                  currentMode={activeSession.commitMode}
+                  currentSettings={activeSession.commitModeSettings}
+                  autoCommit={activeSession.autoCommit}
+                  projectId={activeSession.projectId}
+                  isAutoCommitEnabled={isAutoCommitEnabled}
+                />
+
+                {/* Toggle Group - subtle visual grouping */}
+                <div className="flex items-center gap-2 ml-1 pl-2 border-l border-border-primary/20">
+                  {/* Auto-Commit Toggle */}
+                  <AutoCommitSwitch
+                    sessionId={activeSession.id}
+                    currentMode={activeSession.commitMode}
+                    currentSettings={activeSession.commitModeSettings}
+                    autoCommit={activeSession.autoCommit}
+                  />
+                  
+                  {/* Extended Thinking Toggle */}
+                  <Switch
+                    checked={ultrathink}
+                    onCheckedChange={setUltrathink}
+                    label="Extended Thinking"
+                    icon={<Cpu />}
+                    size="sm"
+                  />
                 </div>
-                <span className="leading-none">Extended Thinking</span>
-              </button>
-
+              </div>
             </div>
 
             {/* Right Section - Context Compaction & Continue Button */}
@@ -513,10 +510,10 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                     focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
                     border
                     ${activeSession.status === 'running' || activeSession.status === 'initializing'
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-700' 
+                      ? 'bg-surface-tertiary text-text-muted cursor-not-allowed border-border-secondary' 
                       : contextCompacted 
-                        ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/30 focus:ring-amber-500 border-amber-200 dark:border-amber-800'
-                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-gray-500 border-gray-300 dark:border-gray-600'
+                        ? 'bg-status-warning/10 text-status-warning hover:bg-status-warning/20 focus:ring-status-warning border-status-warning/30'
+                        : 'bg-surface-primary text-text-secondary hover:bg-surface-hover focus:ring-interactive border-border-primary'
                     }
                   `}
                   title={contextCompacted 
@@ -572,3 +569,87 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 });
 
 SessionInputWithImages.displayName = 'SessionInputWithImages';
+
+// Model Selector Component
+interface ModelSelectorProps {
+  selectedModel: string;
+  setSelectedModel: (model: string) => void;
+  showDropdown: boolean;
+  setShowDropdown: (show: boolean) => void;
+}
+
+const ModelSelector: React.FC<ModelSelectorProps> = ({
+  selectedModel,
+  setSelectedModel,
+  showDropdown,
+  setShowDropdown,
+}) => {
+  const handleModelChange = async (modelId: string) => {
+    setSelectedModel(modelId);
+    
+    try {
+      await API.config.update({ defaultModel: modelId });
+    } catch (err) {
+      console.error('Failed to save default model:', err);
+    }
+  };
+
+  // Model configurations
+  const modelConfigs = {
+    'claude-sonnet-4-20250514': {
+      label: 'Sonnet 4',
+      icon: Target,
+      iconColor: 'text-interactive',
+      description: 'Balanced',
+    },
+    'claude-opus-4-20250514': {
+      label: 'Opus 4',
+      icon: Brain,
+      iconColor: 'text-interactive',
+      description: 'Maximum',
+    },
+    'claude-3-5-haiku-20241022': {
+      label: 'Haiku 3.5',
+      icon: Zap,
+      iconColor: 'text-status-success',
+      description: 'Fast',
+    },
+  };
+
+  const currentConfig = modelConfigs[selectedModel as keyof typeof modelConfigs];
+  const Icon = currentConfig?.icon || Target;
+
+  // Create dropdown items
+  const dropdownItems: DropdownItem[] = Object.entries(modelConfigs).map(([modelId, config]) => ({
+    id: modelId,
+    label: config.label,
+    description: config.description,
+    icon: config.icon,
+    iconColor: config.iconColor,
+    onClick: () => handleModelChange(modelId),
+  }));
+
+  // Create trigger button
+  const triggerButton = (
+    <Pill
+      icon={<Icon className={`w-3.5 h-3.5 ${currentConfig?.iconColor}`} />}
+    >
+      {currentConfig?.label}
+      <svg className="w-3.5 h-3.5 text-text-tertiary" 
+        fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </Pill>
+  );
+
+  return (
+    <Dropdown
+      trigger={triggerButton}
+      items={dropdownItems}
+      selectedId={selectedModel}
+      position="auto"
+      width="sm"
+      onOpenChange={setShowDropdown}
+    />
+  );
+};

@@ -5,6 +5,17 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    'text-text-on-interactive',
+    'text-text-on-primary',
+    'text-text-on-secondary',
+    'text-text-on-surface',
+    'text-text-on-status-success',
+    'text-text-on-status-warning',
+    'text-text-on-status-error',
+    'text-text-on-status-info',
+    'text-text-on-navigation',
+  ],
   theme: {
     extend: {
       colors: {
@@ -59,6 +70,8 @@ export default {
           'primary': 'var(--color-surface-primary)',
           'secondary': 'var(--color-surface-secondary)',
           'hover': 'var(--color-surface-hover)',
+          'interactive': 'var(--color-surface-interactive)',
+          'interactive-hover': 'var(--color-surface-interactive-hover)',
         },
         // Text colors
         'text': {
@@ -67,6 +80,10 @@ export default {
           'tertiary': 'var(--color-text-tertiary)',
           'muted': 'var(--color-text-muted)',
           'disabled': 'var(--color-text-disabled)',
+          'interactive-muted': 'var(--color-text-interactive-muted)',
+          'interactive-on-dark': 'var(--color-text-interactive-on-dark)',
+          'interactive-on-dark-hover': 'var(--color-text-interactive-on-dark-hover)',
+          'interactive-on-dark-active': 'var(--color-text-interactive-on-dark-active)',
         },
         // Border colors
         'border': {
@@ -74,6 +91,8 @@ export default {
           'secondary': 'var(--color-border-secondary)',
           'hover': 'var(--color-border-hover)',
           'focus': 'var(--color-border-focus)',
+          'interactive-subtle': 'var(--color-border-interactive-subtle)',
+          'interactive': 'var(--color-border-interactive)',
         },
         // Interactive colors
         'interactive': {
@@ -81,7 +100,26 @@ export default {
           'hover': 'var(--color-interactive-hover)',
           'active': 'var(--color-interactive-active)',
           'text': 'var(--color-interactive-text)',
+          'on-dark': 'var(--color-text-interactive-on-dark)',
+          'on-dark-hover': 'var(--color-text-interactive-on-dark-hover)',
+          'on-dark-active': 'var(--color-text-interactive-on-dark-active)',
+          'on-dark-focus': 'var(--color-text-interactive-on-dark-focus)',
+          'surface': 'var(--color-interactive-surface)',
+          'surface-hover': 'var(--color-interactive-surface-hover)',
+          'border': 'var(--color-interactive-border)',
+          'border-hover': 'var(--color-interactive-border-hover)',
         },
+        // Context-aware text colors (moved to root for proper generation)
+        'text-on-primary': 'var(--color-text-on-primary)',
+        'text-on-secondary': 'var(--color-text-on-secondary)',
+        'text-on-tertiary': 'var(--color-text-on-tertiary)',
+        'text-on-surface': 'var(--color-text-on-surface)',
+        'text-on-interactive': 'var(--color-text-on-interactive)',
+        'text-on-status-success': 'var(--color-text-on-status-success)',
+        'text-on-status-warning': 'var(--color-text-on-status-warning)',
+        'text-on-status-error': 'var(--color-text-on-status-error)',
+        'text-on-status-info': 'var(--color-text-on-status-info)',
+        'text-on-navigation': 'var(--color-text-on-navigation)',
         // Status colors
         'status': {
           'success': 'var(--color-status-success)',
@@ -164,6 +202,15 @@ export default {
         'card': 'var(--card-shadow)',
         'modal': 'var(--modal-shadow)',
         'dropdown': 'var(--dropdown-shadow)',
+        'dropdown-enhanced': 'var(--shadow-dropdown-enhanced)',
+        'tactile': 'var(--shadow-tactile)',
+        'tactile-hover': 'var(--shadow-tactile-hover)',
+        'tactile-active': 'var(--shadow-tactile-active)',
+        'dropdown-item': 'var(--shadow-dropdown-item)',
+        'glow-interactive': 'var(--glow-interactive)',
+        'glow-interactive-hover': 'var(--glow-interactive-hover)',
+        'toggle-zone': 'var(--shadow-toggle-zone)',
+        'toggle-zone-subtle': 'var(--shadow-toggle-zone-subtle)',
       },
       transitionDuration: {
         'fast': 'var(--duration-75)',
@@ -171,6 +218,7 @@ export default {
         'slow': 'var(--duration-300)',
       },
       zIndex: {
+        'dropdown-backdrop': 'var(--z-dropdown-backdrop)',
         'dropdown': 'var(--z-dropdown)',
         'sticky': 'var(--z-sticky)',
         'fixed': 'var(--z-fixed)',
@@ -188,12 +236,52 @@ export default {
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',
+        'in': 'in 0.2s ease-out',
+        'fade-in': 'fade-in 0.2s ease-out',
+        'zoom-in-95': 'zoom-in-95 0.2s ease-out',
+        'dropdown-enter': 'dropdown-enter 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        'dropdown-enter-up': 'dropdown-enter-up 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
       },
       keyframes: {
         shimmer: {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' },
         },
+        'in': {
+          '0%': { opacity: 0, transform: 'scale(0.95)' },
+          '100%': { opacity: 1, transform: 'scale(1)' },
+        },
+        'fade-in': {
+          '0%': { opacity: 0 },
+          '100%': { opacity: 1 },
+        },
+        'zoom-in-95': {
+          '0%': { transform: 'scale(0.95)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'dropdown-enter': {
+          '0%': { 
+            opacity: 0, 
+            transform: 'translateY(-8px) scale(0.96)' 
+          },
+          '100%': { 
+            opacity: 1, 
+            transform: 'translateY(0) scale(1)' 
+          },
+        },
+        'dropdown-enter-up': {
+          '0%': { 
+            opacity: 0, 
+            transform: 'translateY(8px) scale(0.96)' 
+          },
+          '100%': { 
+            opacity: 1, 
+            transform: 'translateY(0) scale(1)' 
+          },
+        },
+      },
+      ringColor: {
+        'focus-ring-subtle': 'var(--color-focus-ring-subtle)',
       },
     },
   },

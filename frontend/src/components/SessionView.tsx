@@ -19,7 +19,7 @@ import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
 import { Button } from './ui/Button';
 import { Card, CardContent } from './ui/Card';
-import { RichOutputView } from './session/RichOutputView';
+import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
@@ -261,7 +261,12 @@ export const SessionView = memo(() => {
             <JsonMessageView messages={activeSession.jsonMessages || []} />
           </div>
           <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
-            <RichOutputView sessionId={activeSession.id} sessionStatus={activeSession.status} />
+            <RichOutputWithSidebar 
+              sessionId={activeSession.id} 
+              status={activeSession.status}
+              model={activeSession.model}
+              onNavigateToPrompt={hook.handleNavigateToPrompt}
+            />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>
             <CombinedDiffView 

@@ -216,7 +216,7 @@ export function PromptHistory() {
                 
                 {promptItem.prompt.length > 200 && (
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-interactive hover:text-interactive-hover text-sm transition-colors">
+                    <summary className="cursor-pointer text-interactive-on-dark text-sm transition-colors">
                       Show full prompt
                     </summary>
                     <p className="mt-2 text-text-secondary whitespace-pre-wrap">

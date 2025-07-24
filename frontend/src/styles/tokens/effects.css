@@ -50,6 +50,25 @@
   --modal-shadow: var(--shadow-xl);
   --dropdown-shadow: var(--shadow-lg);
   
+  /* Interactive shadows for depth and tactile feel */
+  --shadow-tactile: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-tactile-hover: 0 2px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.30);
+  --shadow-tactile-active: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  
+  /* Dropdown specific shadows - enhanced for visual cohesion */
+  --shadow-dropdown-elevated: 0 8px 25px rgba(0, 0, 0, 0.15), 0 3px 10px rgba(0, 0, 0, 0.1);
+  --shadow-dropdown-enhanced: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+  --shadow-dropdown-item: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-dropdown-pointer: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+  /* Glow effects for interactive elements */
+  --glow-interactive: 0 0 0 2px rgba(var(--color-interactive-rgb), 0.1);
+  --glow-interactive-hover: 0 0 0 3px rgba(var(--color-interactive-rgb), 0.15);
+  
+  /* Toggle zone shadows for subtle depth */
+  --shadow-toggle-zone: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-toggle-zone-subtle: 0 1px 1px rgba(0, 0, 0, 0.02);
+  
   /* Transitions */
   --transition-none: none;
   --transition-all: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -73,6 +92,8 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-back-out: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-dropdown: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   
   /* Z-Index Scale */
   --z-0: 0;
@@ -84,13 +105,14 @@
   --z-auto: auto;
   
   /* Component-Specific Z-Index */
-  --z-dropdown: 10;
-  --z-sticky: 20;
-  --z-fixed: 30;
-  --z-modal-backdrop: 40;
-  --z-modal: 50;
-  --z-popover: 60;
-  --z-tooltip: 70;
+  --z-dropdown-backdrop: 9998;
+  --z-dropdown: 9999;
+  --z-sticky: 1100;
+  --z-fixed: 1200;
+  --z-modal-backdrop: 10000;
+  --z-modal: 10001;
+  --z-popover: 10002;
+  --z-tooltip: 10003;
   
   /* Opacity */
   --opacity-0: 0;

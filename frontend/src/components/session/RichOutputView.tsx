@@ -80,7 +80,8 @@ const defaultSettings: RichOutputSettings = {
   showSessionInit: false, // Hide by default - it's developer info
 };
 
-export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessionId, sessionStatus }) => {
+export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
+  ({ sessionId, sessionStatus }, ref) => {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,11 +96,29 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
+  const userMessageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   // Save settings whenever they change
   useEffect(() => {
     localStorage.setItem('richOutputSettings', JSON.stringify(settings));
   }, [settings]);
+  
+  // Expose scroll method via ref
+  React.useImperativeHandle(ref, () => ({
+    scrollToPrompt: (promptIndex: number) => {
+      const messageDiv = userMessageRefs.current.get(promptIndex);
+      if (messageDiv && scrollContainerRef.current) {
+        // Scroll to the message with some offset from top
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Add a highlight effect
+        messageDiv.classList.add('highlight-prompt');
+        setTimeout(() => {
+          messageDiv.classList.remove('highlight-prompt');
+        }, 2000);
+      }
+    }
+  }), []);
 
   // Extract text content from various message formats
   const extractTextContent = (msg: RawMessage): string => {
@@ -462,7 +481,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
           onClick={() => toggleToolExpand(tool.id)}
           className="w-full px-3 py-2 bg-surface-tertiary/30 flex items-center gap-2 hover:bg-surface-tertiary/50 transition-colors text-left"
         >
-          <Wrench className="w-3.5 h-3.5 text-interactive flex-shrink-0" />
+          <Wrench className="w-3.5 h-3.5 text-interactive-on-dark flex-shrink-0" />
           <span className="font-mono text-xs text-text-primary flex-1">{tool.name}</span>
           {tool.status === 'success' && <CheckCircle className="w-3.5 h-3.5 text-status-success flex-shrink-0" />}
           {tool.status === 'error' && <XCircle className="w-3.5 h-3.5 text-status-error flex-shrink-0" />}
@@ -513,7 +532,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
             {input.file_path && (
               <div className="flex items-center gap-1">
                 <span className="text-text-tertiary">File:</span>
-                <span className="text-interactive truncate">{input.file_path}</span>
+                <span className="text-interactive-on-dark truncate">{input.file_path}</span>
               </div>
             )}
             {input.offset && <div className="text-text-tertiary">Lines: {input.offset}-{input.offset + (input.limit || 2000)}</div>}
@@ -524,7 +543,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
       case 'MultiEdit':
         return (
           <div className="font-mono text-sm space-y-1">
-            {input.file_path && <div>File: <span className="text-interactive">{input.file_path}</span></div>}
+            {input.file_path && <div>File: <span className="text-interactive-on-dark">{input.file_path}</span></div>}
             {toolName === 'MultiEdit' && input.edits && (
               <div>{input.edits.length} changes</div>
             )}
@@ -534,7 +553,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
       case 'Write':
         return (
           <div className="font-mono text-sm space-y-1">
-            {input.file_path && <div>File: <span className="text-interactive">{input.file_path}</span></div>}
+            {input.file_path && <div>File: <span className="text-interactive-on-dark">{input.file_path}</span></div>}
             {input.content && (
               <div>{input.content.split('\n').length} lines</div>
             )}
@@ -627,7 +646,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
   };
 
   // Render a complete message
-  const renderMessage = (message: ConversationMessage, index: number) => {
+  const renderMessage = (message: ConversationMessage, index: number, userMessageIndex?: number) => {
     const isCollapsed = collapsedMessages.has(message.id);
     const isUser = message.role === 'user';
     const isSystem = message.role === 'system';
@@ -662,7 +681,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
               `}
             >
               <div className="flex items-start gap-3">
-                <div className="rounded-full p-2 bg-interactive/10 text-interactive">
+                <div className="rounded-full p-2 bg-interactive/10 text-interactive-on-dark">
                   <Settings2 className="w-5 h-5" />
                 </div>
                 <div className="flex-1">
@@ -723,6 +742,9 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
     return (
       <div
         key={message.id}
+        ref={isUser && userMessageIndex !== undefined ? (el) => {
+          if (el) userMessageRefs.current.set(userMessageIndex, el);
+        } : undefined}
         className={`
           rounded-lg transition-all
           ${isUser ? 'bg-surface-secondary' : hasThinking ? 'bg-surface-primary/50' : 'bg-surface-primary'}
@@ -735,7 +757,7 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
         <div className="flex items-center gap-2 mb-2">
           <div className={`
             rounded-full p-1.5 flex-shrink-0
-            ${isUser ? 'bg-status-success/20 text-status-success' : 'bg-interactive/20 text-interactive'}
+            ${isUser ? 'bg-status-success/20 text-status-success' : 'bg-interactive/20 text-interactive-on-dark'}
           `}>
             {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
           </div>
@@ -856,10 +878,15 @@ export const RichOutputView: React.FC<RichOutputViewProps> = React.memo(({ sessi
   }, [messages, settings.showSessionInit]);
 
   // Memoize the rendered messages to prevent unnecessary re-renders
-  const renderedMessages = useMemo(
-    () => filteredMessages.map((msg, idx) => renderMessage(msg, idx)),
-    [filteredMessages, collapsedMessages, expandedTools, settings]
-  );
+  const renderedMessages = useMemo(() => {
+    let userMessageIndex = 0;
+    return filteredMessages.map((msg, idx) => {
+      const isUser = msg.role === 'user';
+      const element = renderMessage(msg, idx, isUser ? userMessageIndex : undefined);
+      if (isUser) userMessageIndex++;
+      return element;
+    });
+  }, [filteredMessages, collapsedMessages, expandedTools, settings]);
 
   if (loading) {
     return (

@@ -91,10 +91,10 @@ export const GitErrorDialog: React.FC<GitErrorDialogProps> = ({
 
             <Card variant="bordered" className="bg-interactive/10 border-interactive/30">
               <div className="flex items-start space-x-2">
-                <Info className="w-5 h-5 text-interactive mt-0.5 flex-shrink-0" />
+                <Info className="w-5 h-5 text-interactive-on-dark mt-0.5 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-interactive mb-1">Troubleshooting Tips</h4>
-                  <ul className="text-sm text-interactive/80 space-y-1">
+                  <h4 className="text-sm font-medium text-interactive-on-dark mb-1">Troubleshooting Tips</h4>
+                  <ul className="text-sm text-interactive-on-dark/80 space-y-1">
                     {getGitErrorTips(errorDetails).map((tip, idx) => <li key={idx}>{tip}</li>)}
                   </ul>
                 </div>

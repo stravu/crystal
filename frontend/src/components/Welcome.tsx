@@ -44,7 +44,7 @@ export default function Welcome({ isOpen, onClose }: WelcomeProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg">
       {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-interactive to-interactive-active p-6 text-white rounded-t-lg">
+      <div className="bg-gradient-to-r from-interactive to-interactive-active p-6 text-on-interactive rounded-t-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <img src={crystalLogo} alt="Crystal" className="h-10 w-10 mr-3" />
@@ -90,7 +90,7 @@ export default function Welcome({ isOpen, onClose }: WelcomeProps) {
               {/* Steps */}
               <div className="space-y-4">
                 <div className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 bg-interactive rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className="flex-shrink-0 w-8 h-8 bg-interactive rounded-full flex items-center justify-center text-on-interactive font-semibold">
                     1
                   </div>
                   <div className="ml-4 flex-1">
@@ -103,7 +103,7 @@ export default function Welcome({ isOpen, onClose }: WelcomeProps) {
                 </div>
 
                 <div className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 bg-interactive rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className="flex-shrink-0 w-8 h-8 bg-interactive rounded-full flex items-center justify-center text-on-interactive font-semibold">
                     2
                   </div>
                   <div className="ml-4 flex-1">
@@ -117,7 +117,7 @@ export default function Welcome({ isOpen, onClose }: WelcomeProps) {
                 </div>
 
                 <div className="flex items-start">
-                  <div className="flex-shrink-0 w-8 h-8 bg-interactive rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className="flex-shrink-0 w-8 h-8 bg-interactive rounded-full flex items-center justify-center text-on-interactive font-semibold">
                     3
                   </div>
                   <div className="ml-4 flex-1">

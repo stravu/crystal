@@ -3,6 +3,21 @@ import { Button, IconButton } from './ui/Button';
 import { Card, CardHeader, CardContent, CardFooter } from './ui/Card';
 import { Input, Textarea, Checkbox } from './ui/Input';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Cpu, Brain, Zap, ChevronDown, Settings, Shield, Save, FileText, Trash } from 'lucide-react';
+import { TogglePill, Pill } from './ui/Pill';
+import { TogglePillImproved } from './ui/TogglePillImproved';
+import { SwitchSimple as Switch } from './ui/SwitchSimple';
+import { Dropdown, type DropdownItem } from './ui/Dropdown';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from './ui/Select';
 
 export function TokenTest() {
   const [inputValue, setInputValue] = useState('');
@@ -10,6 +25,14 @@ export function TokenTest() {
   const [checkboxValue, setCheckboxValue] = useState(false);
   const [modalSize, setModalSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Extended Thinking toggle states
+  const [currentPill, setCurrentPill] = useState(false);
+  const [improvedPill, setImprovedPill] = useState(false);
+  const [switchState, setSwitchState] = useState(false);
+  const [switchSmall, setSwitchSmall] = useState(false);
+  const [switchMedium, setSwitchMedium] = useState(false);
+  const [switchLarge, setSwitchLarge] = useState(false);
   return (
     <div className="p-8 space-y-8">
       <h1 className="text-2xl font-bold mb-6">Design Token Test Page</h1>
@@ -528,6 +551,549 @@ export function TokenTest() {
             </Button>
           </ModalFooter>
         </Modal>
+      </section>
+
+      {/* Extended Thinking Toggle Study */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Extended Thinking Toggle - Dark Mode UX Study</h2>
+        <div className="space-y-6">
+          {/* Current vs Improved vs Recommended */}
+          <Card variant="bordered">
+            <CardContent>
+              <div className="grid grid-cols-3 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-text-secondary mb-3">Current Toggle</h3>
+                  <TogglePill
+                    checked={currentPill}
+                    onCheckedChange={setCurrentPill}
+                    icon={<Cpu className="w-2 h-2" />}
+                  >
+                    Extended Thinking
+                  </TogglePill>
+                  <ul className="mt-3 text-xs text-text-tertiary space-y-1">
+                    <li>• Poor idle affordance</li>
+                    <li>• Weak hover state</li>
+                    <li>• Small indicator (14px)</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium text-text-secondary mb-3">Improved Pill</h3>
+                  <TogglePillImproved
+                    checked={improvedPill}
+                    onCheckedChange={setImprovedPill}
+                    icon={<Cpu className="w-3 h-3" />}
+                  >
+                    Extended Thinking
+                  </TogglePillImproved>
+                  <ul className="mt-3 text-xs text-text-tertiary space-y-1">
+                    <li>• Better surface colors</li>
+                    <li>• Hover elevation</li>
+                    <li>• Larger indicator (16px)</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium text-text-secondary mb-3">
+                    <span className="text-interactive-on-dark">✨</span> Recommended Switch
+                  </h3>
+                  <Switch
+                    checked={switchState}
+                    onCheckedChange={setSwitchState}
+                    label="Extended Thinking"
+                    icon={<Cpu />}
+                    size="md"
+                  />
+                  <ul className="mt-3 text-xs text-text-tertiary space-y-1">
+                    <li>• Clear on/off state</li>
+                    <li>• Industry standard</li>
+                    <li>• Better accessibility</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interactive States Demo */}
+          <Card variant="bordered">
+            <CardHeader>Interactive States</CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Improved Pill States */}
+                <div>
+                  <h4 className="text-sm font-medium text-text-secondary mb-3">Improved Toggle Pill States</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <TogglePillImproved checked={false} onCheckedChange={() => {}}>
+                      Off State
+                    </TogglePillImproved>
+                    <TogglePillImproved checked={true} onCheckedChange={() => {}} icon={<Cpu className="w-3 h-3" />}>
+                      On State
+                    </TogglePillImproved>
+                    <TogglePillImproved checked={false} onCheckedChange={() => {}} disabled>
+                      Disabled Off
+                    </TogglePillImproved>
+                    <TogglePillImproved checked={true} onCheckedChange={() => {}} disabled icon={<Cpu className="w-3 h-3" />}>
+                      Disabled On
+                    </TogglePillImproved>
+                  </div>
+                </div>
+
+                {/* Switch Size Variations */}
+                <div>
+                  <h4 className="text-sm font-medium text-text-secondary mb-3">Switch Size Variations</h4>
+                  <div className="space-y-2">
+                    <Switch
+                      checked={switchSmall}
+                      onCheckedChange={setSwitchSmall}
+                      label="Small Switch"
+                      icon={<Zap />}
+                      size="sm"
+                    />
+                    <Switch
+                      checked={switchMedium}
+                      onCheckedChange={setSwitchMedium}
+                      label="Medium Switch (default)"
+                      icon={<Cpu />}
+                      size="md"
+                    />
+                    <Switch
+                      checked={switchLarge}
+                      onCheckedChange={setSwitchLarge}
+                      label="Large Switch"
+                      icon={<Brain />}
+                      size="lg"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* New Interactive Tokens */}
+          <Card variant="bordered">
+            <CardHeader>New Interactive Surface & Border Tokens</CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-text-muted mb-2">Surface Tokens</p>
+                  <div className="space-y-2">
+                    <div className="bg-surface-interactive p-3 rounded border border-border-interactive-subtle">
+                      <p className="text-xs">--color-surface-interactive</p>
+                    </div>
+                    <div className="bg-surface-interactive-hover p-3 rounded border border-border-interactive">
+                      <p className="text-xs">--color-surface-interactive-hover</p>
+                    </div>
+                    <div className="bg-interactive-surface p-3 rounded border border-interactive-border">
+                      <p className="text-xs text-interactive-on-dark">--color-interactive-surface</p>
+                    </div>
+                    <div className="bg-interactive-surface-hover p-3 rounded border border-interactive-border-hover">
+                      <p className="text-xs text-interactive-on-dark">--color-interactive-surface-hover</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-xs font-medium text-text-muted mb-2">Text & Focus Tokens</p>
+                  <div className="space-y-2">
+                    <p className="text-text-interactive-muted">--color-text-interactive-muted</p>
+                    <p className="text-interactive-on-dark">--color-text-interactive-on-dark</p>
+                    <div className="p-3 rounded-md ring-2 ring-focus-ring-subtle">
+                      <p className="text-xs">--color-focus-ring-subtle</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Dropdown Component (Pill Popup Menu) */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Dropdown Component (Pill Popup Menu)</h2>
+        <div className="space-y-6">
+          {/* Basic Dropdown Examples */}
+          <Card variant="bordered">
+            <CardHeader>Dropdown Variations</CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-4">
+                {/* Default Dropdown */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Default Dropdown</p>
+                  <Dropdown
+                    trigger={
+                      <Pill>
+                        Options
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Pill>
+                    }
+                    items={[
+                      { id: 'edit', label: 'Edit', icon: Settings },
+                      { id: 'save', label: 'Save', icon: Save },
+                      { id: 'delete', label: 'Delete', icon: Trash, variant: 'danger' },
+                    ]}
+                  />
+                </div>
+
+                {/* With Descriptions */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">With Descriptions</p>
+                  <Dropdown
+                    trigger={
+                      <Pill variant="active">
+                        Actions
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Pill>
+                    }
+                    items={[
+                      { 
+                        id: 'structured', 
+                        label: 'Structured Mode',
+                        description: 'AI handles commits',
+                        icon: Shield,
+                        iconColor: 'text-interactive'
+                      },
+                      { 
+                        id: 'checkpoint', 
+                        label: 'Checkpoint Mode',
+                        description: 'Manual commits at key points',
+                        icon: Save,
+                        iconColor: 'text-status-warning'
+                      },
+                      { 
+                        id: 'disabled', 
+                        label: 'Disabled',
+                        description: 'No automatic commits',
+                        icon: FileText,
+                        iconColor: 'text-text-tertiary'
+                      },
+                    ]}
+                  />
+                </div>
+
+                {/* Different Sizes */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Size Variations</p>
+                  <div className="flex gap-2">
+                    <Dropdown
+                      trigger={<Pill size="sm">Small <ChevronDown className="w-3 h-3" /></Pill>}
+                      items={[
+                        { id: '1', label: 'Option 1' },
+                        { id: '2', label: 'Option 2' },
+                      ]}
+                      width="sm"
+                    />
+                    <Dropdown
+                      trigger={<Pill>Medium <ChevronDown className="w-3.5 h-3.5" /></Pill>}
+                      items={[
+                        { id: '1', label: 'Option 1' },
+                        { id: '2', label: 'Option 2' },
+                      ]}
+                      width="md"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Advanced Features */}
+          <Card variant="bordered">
+            <CardHeader>Advanced Dropdown Features</CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-6">
+                {/* With Status Dots */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">With Status Indicators</p>
+                  <Dropdown
+                    trigger={
+                      <Pill>
+                        Status Options
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Pill>
+                    }
+                    items={[
+                      { 
+                        id: 'active', 
+                        label: 'Active',
+                        showDot: true,
+                        dotColor: 'bg-status-success'
+                      },
+                      { 
+                        id: 'pending', 
+                        label: 'Pending',
+                        showDot: true,
+                        dotColor: 'bg-status-warning'
+                      },
+                      { 
+                        id: 'disabled', 
+                        label: 'Disabled',
+                        showDot: true,
+                        dotColor: 'bg-text-tertiary',
+                        disabled: true
+                      },
+                    ]}
+                  />
+                </div>
+
+                {/* Different Positions */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Position Options</p>
+                  <div className="flex gap-2">
+                    <Dropdown
+                      trigger={<Pill>Bottom <ChevronDown className="w-3.5 h-3.5" /></Pill>}
+                      items={[{ id: '1', label: 'Shows below' }]}
+                      position="bottom"
+                    />
+                    <Dropdown
+                      trigger={<Pill>Top <ChevronDown className="w-3.5 h-3.5" /></Pill>}
+                      items={[{ id: '1', label: 'Shows above' }]}
+                      position="top"
+                    />
+                  </div>
+                </div>
+
+                {/* Selected State */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">With Selected Item</p>
+                  <Dropdown
+                    trigger={
+                      <Pill icon={<Brain className="w-3.5 h-3.5 text-interactive" />}>
+                        Model
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Pill>
+                    }
+                    items={[
+                      { id: 'sonnet', label: 'Sonnet 4', icon: Zap },
+                      { id: 'opus', label: 'Opus 4', icon: Brain },
+                      { id: 'haiku', label: 'Haiku 3.5', icon: Settings },
+                    ]}
+                    selectedId="opus"
+                  />
+                </div>
+
+                {/* Custom Trigger */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Custom Trigger</p>
+                  <Dropdown
+                    trigger={
+                      <Button variant="secondary" size="sm">
+                        Button Trigger
+                        <ChevronDown className="w-3.5 h-3.5 ml-1" />
+                      </Button>
+                    }
+                    items={[
+                      { id: '1', label: 'Works with any trigger' },
+                      { id: '2', label: 'Not just pills!' },
+                    ]}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interaction States */}
+          <Card variant="bordered">
+            <CardHeader>Dropdown States & Design Tokens</CardHeader>
+            <CardContent>
+              <div className="text-sm text-text-secondary space-y-2">
+                <p>The Dropdown component uses these design tokens:</p>
+                <ul className="list-disc list-inside text-text-tertiary ml-4 space-y-1">
+                  <li><code>--color-surface-secondary</code> - Dropdown background</li>
+                  <li><code>--color-border-primary</code> - Dropdown border</li>
+                  <li><code>--color-surface-hover</code> - Item hover background</li>
+                  <li><code>--color-interactive-surface</code> - Selected item background</li>
+                  <li><code>--color-text-primary/secondary/tertiary</code> - Text hierarchy</li>
+                  <li><code>--shadow-lg</code> - Dropdown elevation</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Select Component */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Select Component</h2>
+        <div className="space-y-6">
+          {/* Basic Select Examples */}
+          <Card variant="bordered">
+            <CardHeader>Select Variations</CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Default Select */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Default Select</p>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="option1">Option 1</SelectItem>
+                      <SelectItem value="option2">Option 2</SelectItem>
+                      <SelectItem value="option3">Option 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* With Groups */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">With Groups</p>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Large Models</SelectLabel>
+                        <SelectItem value="opus">Opus 4</SelectItem>
+                        <SelectItem value="sonnet">Sonnet 4</SelectItem>
+                      </SelectGroup>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel>Fast Models</SelectLabel>
+                        <SelectItem value="haiku">Haiku 3.5</SelectItem>
+                        <SelectItem value="claude-instant">Claude Instant</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Full Width */}
+                <div className="col-span-2">
+                  <p className="text-xs text-text-muted mb-2">Full Width Select</p>
+                  <Select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select your country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="us">United States</SelectItem>
+                      <SelectItem value="uk">United Kingdom</SelectItem>
+                      <SelectItem value="ca">Canada</SelectItem>
+                      <SelectItem value="au">Australia</SelectItem>
+                      <SelectItem value="de">Germany</SelectItem>
+                      <SelectItem value="fr">France</SelectItem>
+                      <SelectItem value="jp">Japan</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Advanced Features */}
+          <Card variant="bordered">
+            <CardHeader>Select Features & States</CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Disabled State */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Disabled State</p>
+                  <Select disabled>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Disabled select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Option 1</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* With Default Value */}
+                <div>
+                  <p className="text-xs text-text-muted mb-2">With Default Value</p>
+                  <Select defaultValue="medium">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="large">Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Form Integration Example */}
+          <Card variant="bordered">
+            <CardHeader>Form Integration</CardHeader>
+            <CardContent>
+              <form className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    Project Type
+                  </label>
+                  <Select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select project type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="web">Web Application</SelectItem>
+                      <SelectItem value="mobile">Mobile App</SelectItem>
+                      <SelectItem value="desktop">Desktop Software</SelectItem>
+                      <SelectItem value="api">API Service</SelectItem>
+                      <SelectItem value="library">Library/Package</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    Priority Level
+                  </label>
+                  <Select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Set priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-status-info" />
+                          Low Priority
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="medium">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-status-warning" />
+                          Medium Priority
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="high">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-status-error" />
+                          High Priority
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Design Token Usage */}
+          <Card variant="bordered">
+            <CardHeader>Select Design Tokens</CardHeader>
+            <CardContent>
+              <div className="text-sm text-text-secondary space-y-2">
+                <p>The Select component uses these design tokens:</p>
+                <ul className="list-disc list-inside text-text-tertiary ml-4 space-y-1">
+                  <li><code>--color-bg-primary</code> - Trigger background</li>
+                  <li><code>--color-border-subtle</code> - Default border</li>
+                  <li><code>--color-border-interactive-subtle</code> - Hover border</li>
+                  <li><code>--color-surface-primary</code> - Dropdown background</li>
+                  <li><code>--color-surface-secondary</code> - Item hover background</li>
+                  <li><code>--color-focus-ring-subtle</code> - Focus ring color</li>
+                  <li><code>--color-interactive</code> - Selected item checkmark</li>
+                  <li><code>--shadow-lg</code> - Dropdown shadow</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
       {/* CSS Variable Values */}

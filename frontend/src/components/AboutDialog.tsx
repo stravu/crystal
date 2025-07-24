@@ -230,7 +230,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         onClick={() => setShowUpdateDialog(true)}
-                        className="inline-flex items-center justify-center space-x-2 px-3 py-1.5 bg-interactive hover:bg-interactive-hover text-white text-sm font-medium rounded-md transition-colors"
+                        className="inline-flex items-center justify-center space-x-2 px-3 py-1.5 bg-interactive hover:bg-interactive-hover text-on-interactive text-sm font-medium rounded-md transition-colors"
                       >
                         <Download className="w-4 h-4" />
                         <span>Download Update</span>
@@ -270,7 +270,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <button
               onClick={checkForUpdates}
               disabled={isChecking}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-interactive hover:bg-interactive-hover disabled:bg-interactive/50 text-white text-sm font-medium rounded-lg transition-colors"
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-interactive hover:bg-interactive-hover disabled:bg-interactive/50 text-on-interactive text-sm font-medium rounded-lg transition-colors"
             >
               {isChecking ? (
                 <>

@@ -310,3 +310,67 @@ body.light {
   display: block;
   margin-top: 0.5rem;
 }
+
+/* Interactive text utilities */
+.text-interactive {
+  color: var(--color-interactive-text);
+  transition: color 150ms ease-in-out;
+}
+
+.text-interactive-hover:hover {
+  color: var(--color-interactive-hover);
+}
+
+/* High-contrast interactive text for dark backgrounds */
+.text-interactive-on-dark {
+  color: var(--color-text-interactive-on-dark);
+  transition: all 150ms ease-in-out;
+}
+
+.text-interactive-on-dark:hover {
+  color: var(--color-text-interactive-on-dark-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.text-interactive-on-dark:active {
+  color: var(--color-text-interactive-on-dark-active);
+}
+
+.text-interactive-on-dark:focus-visible {
+  color: var(--color-text-interactive-on-dark-focus);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Prompt navigation highlight effect */
+@keyframes highlightPrompt {
+  0% {
+    background-color: var(--color-interactive);
+    opacity: 0.3;
+  }
+  50% {
+    background-color: var(--color-interactive);
+    opacity: 0.5;
+  }
+  100% {
+    background-color: transparent;
+    opacity: 1;
+  }
+}
+
+.highlight-prompt {
+  animation: highlightPrompt 2s ease-out;
+  position: relative;
+}
+
+.highlight-prompt::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--color-interactive);
+  border-radius: 8px;
+  pointer-events: none;
+  animation: highlightPrompt 2s ease-out;
+}

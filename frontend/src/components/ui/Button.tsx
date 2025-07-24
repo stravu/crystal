@@ -27,7 +27,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-normal focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary disabled:cursor-not-allowed disabled:opacity-50';
     
     const variants = {
-      primary: 'bg-interactive text-white hover:bg-interactive-hover focus:ring-interactive shadow-button hover:shadow-button-hover',
+      primary: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover focus:ring-interactive shadow-button hover:shadow-button-hover',
       secondary: 'bg-surface-secondary text-text-secondary hover:bg-surface-hover focus:ring-border-primary',
       ghost: 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover focus:ring-border-primary',
       danger: 'bg-status-error text-white hover:bg-status-error-hover focus:ring-status-error',
@@ -102,7 +102,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center transition-all duration-normal focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary disabled:cursor-not-allowed disabled:opacity-50';
     
     const variants = {
-      primary: 'bg-interactive text-white hover:bg-interactive-hover focus:ring-interactive',
+      primary: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover focus:ring-interactive',
       secondary: 'bg-surface-secondary text-text-secondary hover:bg-surface-hover focus:ring-border-primary',
       ghost: 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover focus:ring-border-primary',
       danger: 'bg-status-error text-white hover:bg-status-error-hover focus:ring-status-error',
