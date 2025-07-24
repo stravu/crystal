@@ -168,17 +168,6 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               </span>
             </div>
 
-            {versionInfo?.workingDirectory && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Working Directory
-                </span>
-                <span className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={versionInfo.workingDirectory}>
-                  {versionInfo.workingDirectory.split('/').pop() || versionInfo.workingDirectory}
-                </span>
-              </div>
-            )}
-
             {versionInfo?.worktreeName && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
