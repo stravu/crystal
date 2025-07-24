@@ -16,6 +16,7 @@ import { DiscordPopup } from './components/DiscordPopup';
 import { useErrorStore } from './stores/errorStore';
 import { useSessionStore } from './stores/sessionStore';
 import { API } from './utils/api';
+import { ContextMenuProvider } from './contexts/ContextMenuContext';
 
 interface PermissionRequest {
   id: string;
@@ -241,52 +242,54 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <MainProcessLogger />
-      {/* Draggable title bar area */}
-      <div 
-        className="fixed top-0 left-0 right-0 h-8 z-50 flex items-center justify-end pr-4" 
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
+    <ContextMenuProvider>
+      <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <MainProcessLogger />
+        {/* Draggable title bar area */}
+        <div 
+          className="fixed top-0 left-0 right-0 h-8 z-50 flex items-center justify-end pr-4" 
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+        </div>
+        <Sidebar 
+          onHelpClick={() => setIsHelpOpen(true)}
+          onAboutClick={() => setIsAboutOpen(true)}
+          onPromptHistoryClick={() => setIsPromptHistoryOpen(true)}
+          width={sidebarWidth}
+          onResize={startResize}
+        />
+        <SessionView />
+        <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+        <Welcome isOpen={isWelcomeOpen} onClose={() => setIsWelcomeOpen(false)} />
+        <AboutDialog isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+        <UpdateDialog 
+          isOpen={isUpdateDialogOpen} 
+          onClose={() => setIsUpdateDialogOpen(false)}
+          versionInfo={updateVersionInfo}
+        />
+        <ErrorDialog 
+          isOpen={!!currentError}
+          onClose={clearError}
+          title={currentError?.title}
+          error={currentError?.error || ''}
+          details={currentError?.details}
+          command={currentError?.command}
+        />
+        <PermissionDialog
+          request={currentPermissionRequest}
+          onRespond={handlePermissionResponse}
+          session={currentPermissionRequest ? sessions.find(s => s.id === currentPermissionRequest.sessionId) : undefined}
+        />
+        <DiscordPopup 
+          isOpen={isDiscordOpen} 
+          onClose={() => setIsDiscordOpen(false)} 
+        />
+        <PromptHistoryModal
+          isOpen={isPromptHistoryOpen}
+          onClose={() => setIsPromptHistoryOpen(false)}
+        />
       </div>
-      <Sidebar 
-        onHelpClick={() => setIsHelpOpen(true)}
-        onAboutClick={() => setIsAboutOpen(true)}
-        onPromptHistoryClick={() => setIsPromptHistoryOpen(true)}
-        width={sidebarWidth}
-        onResize={startResize}
-      />
-      <SessionView />
-      <Help isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-      <Welcome isOpen={isWelcomeOpen} onClose={() => setIsWelcomeOpen(false)} />
-      <AboutDialog isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
-      <UpdateDialog 
-        isOpen={isUpdateDialogOpen} 
-        onClose={() => setIsUpdateDialogOpen(false)}
-        versionInfo={updateVersionInfo}
-      />
-      <ErrorDialog 
-        isOpen={!!currentError}
-        onClose={clearError}
-        title={currentError?.title}
-        error={currentError?.error || ''}
-        details={currentError?.details}
-        command={currentError?.command}
-      />
-      <PermissionDialog
-        request={currentPermissionRequest}
-        onRespond={handlePermissionResponse}
-        session={currentPermissionRequest ? sessions.find(s => s.id === currentPermissionRequest.sessionId) : undefined}
-      />
-      <DiscordPopup 
-        isOpen={isDiscordOpen} 
-        onClose={() => setIsDiscordOpen(false)} 
-      />
-      <PromptHistoryModal
-        isOpen={isPromptHistoryOpen}
-        onClose={() => setIsPromptHistoryOpen(false)}
-      />
-    </div>
+    </ContextMenuProvider>
   );
 }
 

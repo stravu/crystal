@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { StatusIndicator } from './StatusIndicator';
@@ -6,15 +6,15 @@ import { GitStatusIndicator } from './GitStatusIndicator';
 import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
 import type { Session, GitStatus } from '../types/session';
+import { useContextMenu } from '../contexts/ContextMenuContext';
 
 interface SessionListItemProps {
   session: Session;
   isNested?: boolean;
 }
 
-// Memoized component to prevent unnecessary re-renders
-export const SessionListItem = memo(function SessionListItem({ session, isNested = false }: SessionListItemProps) {
-  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId } = useSessionStore();
+export function SessionListItem({ session, isNested = false }: SessionListItemProps) {
+  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId, isGitStatusLoading } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
   const isActive = activeSessionId === session.id;
   const isDeleting = deletingSessionIds.has(session.id);
@@ -23,32 +23,37 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   const [isClosing, setIsClosing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(session.name);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
+  const gitStatusLoading = isGitStatusLoading(session.id);
+  const { menuState, openMenu, closeMenu, isMenuOpen } = useContextMenu();
   
-  // Selective subscription for git status loading state
-  const gitStatusLoading = useSessionStore((state) => state.gitStatusLoading.has(session.id));
-  
-  
-  // Subscribe to session status updates specifically for this session
+  // Force re-render when session status changes
+  const [, forceUpdate] = useState({});
   useEffect(() => {
-    const unsubscribe = useSessionStore.subscribe((state, prevState) => {
-      // Check if this session's status changed
-      const currentSession = state.sessions.find(s => s.id === session.id) || 
+    // Subscribe to session updates to ensure UI updates when this session's status changes
+    const unsubscribe = useSessionStore.subscribe((state) => {
+      const updatedSession = state.sessions.find(s => s.id === session.id) || 
         (state.activeMainRepoSession?.id === session.id ? state.activeMainRepoSession : null);
       
-      const previousSession = prevState.sessions.find(s => s.id === session.id) || 
-        (prevState.activeMainRepoSession?.id === session.id ? prevState.activeMainRepoSession : null);
-      
-      // Force component update if status changed
-      if (currentSession && previousSession && currentSession.status !== previousSession.status) {
-        // Status changed - component will re-render due to prop change
+      if (updatedSession && updatedSession.status !== session.status) {
+        forceUpdate({});
       }
     });
     
-    return unsubscribe;
-  }, [session.id]);
+    // Also listen for custom session status change events
+    const handleStatusChange = (event: CustomEvent) => {
+      if (event.detail.sessionId === session.id) {
+        forceUpdate({});
+      }
+    };
+    
+    window.addEventListener('session-status-changed', handleStatusChange as EventListener);
+    
+    return () => {
+      unsubscribe();
+      window.removeEventListener('session-status-changed', handleStatusChange as EventListener);
+    };
+  }, [session.id, session.status]);
   
   useEffect(() => {
     // Check if this session's project has a run script
@@ -84,7 +89,6 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     };
   }, [session.id, session.projectId]);
 
-  // Combine script-related effects
   useEffect(() => {
     // Check if this session is currently running
     API.sessions.getRunningSession()
@@ -94,22 +98,28 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
         }
       })
       .catch(console.error);
+  }, [session.id]);
 
+  useEffect(() => {
     // Listen for script session changes
     const handleScriptSessionChange = (event: CustomEvent) => {
       setIsRunning(event.detail === session.id);
     };
 
+    window.addEventListener('script-session-changed', handleScriptSessionChange as EventListener);
+    return () => {
+      window.removeEventListener('script-session-changed', handleScriptSessionChange as EventListener);
+    };
+  }, [session.id]);
+
+  useEffect(() => {
     // Listen for script closing state
     const handleScriptClosing = (event: CustomEvent) => {
       setIsClosing(event.detail === session.id);
     };
 
-    window.addEventListener('script-session-changed', handleScriptSessionChange as EventListener);
     window.addEventListener('script-closing', handleScriptClosing as EventListener);
-    
     return () => {
-      window.removeEventListener('script-session-changed', handleScriptSessionChange as EventListener);
       window.removeEventListener('script-closing', handleScriptClosing as EventListener);
     };
   }, [session.id]);
@@ -151,7 +161,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     };
   }, [session.id, session.archived, session.status, gitStatus]);
 
-  const handleRunScript = useCallback(async (e: React.MouseEvent) => {
+  const handleRunScript = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
     if (!hasRunScript) {
@@ -192,7 +202,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       window.dispatchEvent(new CustomEvent('script-closing', { detail: null }));
       alert('Failed to run script');
     }
-  }, [hasRunScript, session.id]);
+  };
 
   const handleStopScript = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -222,7 +232,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     }
   };
 
-  const handleDelete = useCallback(async (e: React.MouseEvent) => {
+  const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the session
     
     // Prevent deletion if already being deleted
@@ -254,7 +264,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     } finally {
       removeDeletingSessionId(session.id);
     }
-  }, [isDeleting, session.name, session.id, session.isMainRepo, session.worktreePath, isActive, addDeletingSessionId, removeDeletingSessionId, setActiveSession]);
+  };
 
   const handleSaveEdit = async () => {
     if (editName.trim() === '') {
@@ -299,31 +309,17 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
-    setShowContextMenu(true);
+    openMenu('session', session, { x: e.clientX, y: e.clientY });
   };
-
-  const closeContextMenu = () => {
-    setShowContextMenu(false);
-  };
-
-  // Close context menu when clicking outside
-  useEffect(() => {
-    if (showContextMenu) {
-      const handleClick = () => closeContextMenu();
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
-    }
-  }, [showContextMenu]);
 
   const handleRename = () => {
-    closeContextMenu();
+    closeMenu();
     setEditName(session.name);
     setIsEditing(true);
   };
 
   const handleDeleteFromMenu = () => {
-    closeContextMenu();
+    closeMenu();
     handleDelete({ stopPropagation: () => {} } as React.MouseEvent);
   };
 
@@ -449,10 +445,10 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       </div>
 
       {/* Context Menu */}
-      {showContextMenu && (
+      {isMenuOpen('session', session.id) && menuState.position && (
         <div
-          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50 min-w-[150px]"
-          style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
+          className="context-menu fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50 min-w-[150px]"
+          style={{ top: menuState.position.y, left: menuState.position.x }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -463,7 +459,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
           </button>
           <button
             onClick={() => {
-              closeContextMenu();
+              closeMenu();
               if (isRunning) {
                 handleStopScript({ stopPropagation: () => {} } as React.MouseEvent);
               } else {
@@ -490,4 +486,4 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       )}
     </>
   );
-});
+}
