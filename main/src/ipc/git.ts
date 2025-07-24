@@ -1061,4 +1061,21 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('git:cancel-status-for-project', async (_event, projectId: number) => {
+    try {
+      // Get all sessions for the project
+      const sessions = await sessionManager.getAllSessions();
+      const projectSessions = sessions.filter(s => s.projectId === projectId && !s.archived);
+      
+      // Cancel git status operations for all project sessions
+      const sessionIds = projectSessions.map(s => s.id);
+      gitStatusManager.cancelMultipleGitStatus(sessionIds);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error cancelling git status:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  });
 } 

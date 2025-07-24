@@ -117,6 +117,7 @@ interface ElectronAPI {
   // Git operations
   git: {
     detectBranch: (path: string) => Promise<IPCResponse<string>>;
+    cancelStatusForProject: (projectId: number) => Promise<{ success: boolean; error?: string }>;
   };
 
   // Folders
@@ -194,6 +195,8 @@ interface ElectronAPI {
     onSessionOutputAvailable: (callback: (info: any) => void) => () => void;
     onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => () => void;
     onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => () => void;
+    onGitStatusLoadingBatch?: (callback: (sessionIds: string[]) => void) => () => void;
+    onGitStatusUpdatedBatch?: (callback: (updates: Array<{ sessionId: string; status: any }>) => void) => () => void;
     
     // Project events
     onProjectUpdated: (callback: (project: any) => void) => () => void;

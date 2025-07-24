@@ -83,23 +83,53 @@ export function DraggableProjectTreeView() {
   });
   const dragCounter = useRef(0);
 
+  // Count of sessions currently loading git status
+  const gitStatusLoadingCount = useSessionStore((state) => state.gitStatusLoading.size);
+  
+  // Performance monitoring - track render count
+  const renderCountRef = useRef(0);
+  const lastRenderTimeRef = useRef(Date.now());
+  
+  useEffect(() => {
+    renderCountRef.current += 1;
+    const now = Date.now();
+    const timeSinceLastRender = now - lastRenderTimeRef.current;
+    
+    // Log if we're getting too many rapid re-renders (only in development)
+    if (process.env.NODE_ENV === 'development' && timeSinceLastRender < 100) {
+      console.warn('[DraggableProjectTreeView] Rapid re-render detected:', {
+        renderCount: renderCountRef.current,
+        timeSinceLastRender,
+        gitStatusLoadingCount
+      });
+    }
+    
+    lastRenderTimeRef.current = now;
+  });
+  
   // Create debounced save function
   const saveUIState = useCallback(
-    debounce(async (projectIds: number[], folderIds: string[]) => {
+    debounce(async (projectIds: number[], folderIds: string[], skipDuringGitLoading: boolean) => {
+      // Skip saving during heavy git status loading to avoid performance issues
+      if (skipDuringGitLoading && gitStatusLoadingCount > 5) {
+        return;
+      }
+      
       try {
         await window.electronAPI?.uiState?.saveExpanded(projectIds, folderIds);
       } catch (error) {
         console.error('[DraggableProjectTreeView] Failed to save UI state:', error);
       }
     }, 500),
-    []
+    [gitStatusLoadingCount]
   );
 
   // Save UI state whenever expanded state changes
   useEffect(() => {
     const projectIds = Array.from(expandedProjects);
     const folderIds = Array.from(expandedFolders);
-    saveUIState(projectIds, folderIds);
+    // Pass true to skip saving during heavy git loading
+    saveUIState(projectIds, folderIds, true);
   }, [expandedProjects, expandedFolders, saveUIState]);
 
   // Ensure paths are expanded when active session changes (for auto-selection)
@@ -454,19 +484,25 @@ export function DraggableProjectTreeView() {
     }
   };
 
-  const toggleProject = (projectId: number) => {
+  const toggleProject = useCallback((projectId: number) => {
     setExpandedProjects(prev => {
       const newSet = new Set(prev);
       if (newSet.has(projectId)) {
         newSet.delete(projectId);
+        // Cancel git status loading for collapsed project
+        if (window.electronAPI?.git?.cancelStatusForProject) {
+          window.electronAPI.git.cancelStatusForProject(projectId).catch(error => {
+            console.error('[DraggableProjectTreeView] Failed to cancel git status:', error);
+          });
+        }
       } else {
         newSet.add(projectId);
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const toggleFolder = (folderId: string) => {
+  const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
       if (newSet.has(folderId)) {
@@ -476,7 +512,7 @@ export function DraggableProjectTreeView() {
       }
       return newSet;
     });
-  };
+  }, []);
 
   const handleStartFolderEdit = (folder: Folder) => {
     setEditingFolderId(folder.id);
@@ -547,7 +583,7 @@ export function DraggableProjectTreeView() {
   };
 
   // Helper function to build folder tree structure
-  const buildFolderTree = (folders: Folder[]): Folder[] => {
+  const buildFolderTree = useCallback((folders: Folder[]): Folder[] => {
     const folderMap = new Map<string, Folder>();
     const rootFolders: Folder[] = [];
 
@@ -585,7 +621,7 @@ export function DraggableProjectTreeView() {
 
     sortFolders(rootFolders);
     return rootFolders;
-  };
+  }, []);
 
   const toggleArchivedProject = (projectId: number) => {
     setExpandedArchivedProjects(prev => {
