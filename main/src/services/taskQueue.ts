@@ -192,8 +192,8 @@ export class TaskQueue {
           autoCommit,
           job.data.folderId,
           model,
-          baseCommit,
-          actualBaseBranch,
+          undefined, // baseCommit - optional parameter
+          baseBranch, // actualBaseBranch -> baseBranch
           job.data.commitMode,
           job.data.commitModeSettings
         );
