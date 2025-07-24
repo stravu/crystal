@@ -51,6 +51,16 @@ export class GitStatusManager extends EventEmitter {
   private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly DEBOUNCE_MS = 500; // 500ms debounce for rapid refresh requests
   private gitLogger: GitStatusLogger;
+  
+  // Throttling for UI events
+  private eventThrottleTimer: NodeJS.Timeout | null = null;
+  private pendingEvents: Map<string, { type: 'loading' | 'updated', data?: GitStatus }> = new Map();
+  private readonly EVENT_THROTTLE_MS = 100; // Throttle UI events to prevent flooding
+  
+  // Concurrent operation limiting
+  private activeOperations = 0;
+  private readonly MAX_CONCURRENT_OPERATIONS = 3;
+  private operationQueue: Array<() => Promise<void>> = [];
 
   constructor(
     private sessionManager: SessionManager,
@@ -223,6 +233,13 @@ export class GitStatusManager extends EventEmitter {
     this.refreshDebounceTimers.forEach(timer => clearTimeout(timer));
     this.refreshDebounceTimers.clear();
 
+    // Clear event throttle timer
+    if (this.eventThrottleTimer) {
+      clearTimeout(this.eventThrottleTimer);
+      this.eventThrottleTimer = null;
+    }
+    this.pendingEvents.clear();
+
     // Note: In Electron main process, we don't have access to document
     // Window visibility changes should be handled via IPC from renderer
   }
@@ -279,13 +296,13 @@ export class GitStatusManager extends EventEmitter {
         
         // Only emit loading event for user-initiated refreshes
         if (isUserInitiated) {
-          this.emit('git-status-loading', sessionId);
+          this.emitThrottled(sessionId, 'loading');
         }
         
         const status = await this.fetchGitStatus(sessionId);
         if (status) {
           this.updateCache(sessionId, status);
-          this.emit('git-status-updated', sessionId, status);
+          this.emitThrottled(sessionId, 'updated', status);
         }
         resolve(status);
       }, this.DEBOUNCE_MS);
@@ -313,25 +330,23 @@ export class GitStatusManager extends EventEmitter {
       // Don't emit loading events during automatic polling
       // Loading spinners are distracting during background updates
 
-      // Process sessions in parallel with a limit
-      const batchSize = 3; // Limit concurrent Git operations
+      // Process sessions with concurrent limiting
       let successCount = 0;
       let errorCount = 0;
       
-      for (let i = 0; i < activeSessions.length; i += batchSize) {
-        const batch = activeSessions.slice(i, i + batchSize);
-        const results = await Promise.allSettled(
-          batch.map(session => this.refreshSessionGitStatus(session.id, false)) // false = not user initiated
-        );
-        
-        results.forEach((result, index) => {
-          if (result.status === 'fulfilled' && result.value) {
-            successCount++;
-          } else {
-            errorCount++;
-          }
-        });
-      }
+      const results = await Promise.allSettled(
+        activeSessions.map(session => 
+          this.executeWithLimit(() => this.refreshSessionGitStatus(session.id, false)) // false = not user initiated
+        )
+      );
+      
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      });
       
       this.gitLogger.logPollComplete(successCount, errorCount);
     } catch (error) {
@@ -473,7 +488,7 @@ export class GitStatusManager extends EventEmitter {
 
     // Only emit event if status actually changed
     if (hasChanged) {
-      this.emit('git-status-updated', sessionId, status);
+      this.emitThrottled(sessionId, 'updated', status);
     }
   }
 
@@ -489,5 +504,83 @@ export class GitStatusManager extends EventEmitter {
    */
   clearAllCache(): void {
     this.cache = {};
+  }
+
+  /**
+   * Emit a throttled event to prevent UI flooding
+   * @param sessionId The session ID
+   * @param type The event type (loading or updated)
+   * @param data Optional data for updated events
+   */
+  private emitThrottled(sessionId: string, type: 'loading' | 'updated', data?: GitStatus): void {
+    // Store the pending event
+    this.pendingEvents.set(sessionId, { type, data });
+    
+    // If we don't have a throttle timer, start one
+    if (!this.eventThrottleTimer) {
+      this.eventThrottleTimer = setTimeout(() => {
+        // Batch emit all pending events
+        const eventsToEmit = new Map(this.pendingEvents);
+        this.pendingEvents.clear();
+        this.eventThrottleTimer = null;
+        
+        // Group events by type for batch emission
+        const loadingEvents: string[] = [];
+        const updatedEvents: Array<{ sessionId: string; status: GitStatus }> = [];
+        
+        eventsToEmit.forEach((event, id) => {
+          if (event.type === 'loading') {
+            loadingEvents.push(id);
+          } else if (event.type === 'updated' && event.data) {
+            updatedEvents.push({ sessionId: id, status: event.data });
+          }
+        });
+        
+        // Emit batch events
+        if (loadingEvents.length > 0) {
+          this.emit('git-status-loading-batch', loadingEvents);
+        }
+        if (updatedEvents.length > 0) {
+          this.emit('git-status-updated-batch', updatedEvents);
+        }
+        
+        // Also emit individual events for backward compatibility
+        eventsToEmit.forEach((event, id) => {
+          if (event.type === 'loading') {
+            this.emit('git-status-loading', id);
+          } else if (event.type === 'updated' && event.data) {
+            this.emit('git-status-updated', id, event.data);
+          }
+        });
+      }, this.EVENT_THROTTLE_MS);
+    }
+  }
+
+  /**
+   * Execute an operation with concurrency limiting
+   * @param operation The operation to execute
+   */
+  private async executeWithLimit<T>(operation: () => Promise<T>): Promise<T> {
+    // Wait if we're at the limit
+    while (this.activeOperations >= this.MAX_CONCURRENT_OPERATIONS) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    this.activeOperations++;
+    try {
+      return await operation();
+    } finally {
+      this.activeOperations--;
+      
+      // Process queued operations
+      if (this.operationQueue.length > 0) {
+        const nextOp = this.operationQueue.shift();
+        if (nextOp) {
+          nextOp().catch(error => {
+            this.logger?.error('[GitStatus] Queued operation failed:', error as Error);
+          });
+        }
+      }
+    }
   }
 }

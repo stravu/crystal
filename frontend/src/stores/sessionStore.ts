@@ -17,6 +17,11 @@ interface SessionStore {
   deletingSessionIds: Set<string>; // Track sessions currently being deleted
   gitStatusLoading: Set<string>; // Track sessions currently loading git status
   
+  // Batching for git status updates
+  gitStatusBatchTimer: NodeJS.Timeout | null;
+  pendingGitStatusLoading: Map<string, boolean>; // sessionId -> loading state
+  pendingGitStatusUpdates: Map<string, GitStatus>; // sessionId -> GitStatus
+  
   setSessions: (sessions: Session[]) => void;
   loadSessions: (sessions: Session[]) => void;
   addSession: (session: Session) => void;
@@ -42,6 +47,11 @@ interface SessionStore {
   updateSessionGitStatus: (sessionId: string, gitStatus: GitStatus) => void;
   setGitStatusLoading: (sessionId: string, loading: boolean) => void;
   isGitStatusLoading: (sessionId: string) => boolean;
+  
+  // Batch update methods
+  setGitStatusLoadingBatch: (updates: Array<{ sessionId: string; loading: boolean }>) => void;
+  updateSessionGitStatusBatch: (updates: Array<{ sessionId: string; status: GitStatus }>) => void;
+  processPendingGitStatusUpdates: () => void;
 }
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
@@ -52,6 +62,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   scriptOutput: {},
   deletingSessionIds: new Set(),
   gitStatusLoading: new Set(),
+  
+  // Batching state
+  gitStatusBatchTimer: null,
+  pendingGitStatusLoading: new Map(),
+  pendingGitStatusUpdates: new Map(),
   
   setSessions: (sessions) => set({ sessions }),
   
@@ -408,36 +423,41 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   updateSessionGitStatus: (sessionId, gitStatus) => {
-    set((state) => {
-      // Remove from loading set when git status is updated
-      const newLoadingSet = new Set(state.gitStatusLoading);
-      newLoadingSet.delete(sessionId);
-      
-      const sessions = state.sessions.map(session => 
-        session.id === sessionId 
-          ? { ...session, gitStatus }
-          : session
-      );
-      
-      // Also update main repo session if it matches
-      const activeMainRepoSession = state.activeMainRepoSession?.id === sessionId
-        ? { ...state.activeMainRepoSession, gitStatus }
-        : state.activeMainRepoSession;
-      
-      return { sessions, activeMainRepoSession, gitStatusLoading: newLoadingSet };
-    });
+    const state = get();
+    
+    // Add to pending updates
+    state.pendingGitStatusUpdates.set(sessionId, gitStatus);
+    
+    // Clear existing timer
+    if (state.gitStatusBatchTimer) {
+      clearTimeout(state.gitStatusBatchTimer);
+    }
+    
+    // Set new timer to process pending updates
+    const timer = setTimeout(() => {
+      get().processPendingGitStatusUpdates();
+    }, 50); // 50ms batch window
+    
+    set({ gitStatusBatchTimer: timer });
   },
   
   setGitStatusLoading: (sessionId, loading) => {
-    set((state) => {
-      const newLoadingSet = new Set(state.gitStatusLoading);
-      if (loading) {
-        newLoadingSet.add(sessionId);
-      } else {
-        newLoadingSet.delete(sessionId);
-      }
-      return { gitStatusLoading: newLoadingSet };
-    });
+    const state = get();
+    
+    // Add to pending updates
+    state.pendingGitStatusLoading.set(sessionId, loading);
+    
+    // Clear existing timer
+    if (state.gitStatusBatchTimer) {
+      clearTimeout(state.gitStatusBatchTimer);
+    }
+    
+    // Set new timer to process pending updates
+    const timer = setTimeout(() => {
+      get().processPendingGitStatusUpdates();
+    }, 50); // 50ms batch window
+    
+    set({ gitStatusBatchTimer: timer });
   },
   
   isGitStatusLoading: (sessionId) => {
@@ -471,6 +491,81 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Session will be updated via IPC events, no need to manually update here
     } catch (error) {
       console.error('Error marking session as viewed:', error);
+    }
+  },
+  
+  // Batch update methods
+  setGitStatusLoadingBatch: (updates) => {
+    set((state) => {
+      const newLoadingSet = new Set(state.gitStatusLoading);
+      
+      updates.forEach(({ sessionId, loading }) => {
+        if (loading) {
+          newLoadingSet.add(sessionId);
+        } else {
+          newLoadingSet.delete(sessionId);
+        }
+      });
+      
+      return { gitStatusLoading: newLoadingSet };
+    });
+  },
+  
+  updateSessionGitStatusBatch: (updates) => {
+    set((state) => {
+      // Build maps for efficient lookup
+      const statusUpdates = new Map(updates.map(u => [u.sessionId, u.status]));
+      
+      // Remove updated sessions from loading set
+      const newLoadingSet = new Set(state.gitStatusLoading);
+      updates.forEach(({ sessionId }) => {
+        newLoadingSet.delete(sessionId);
+      });
+      
+      // Update sessions in one pass
+      const sessions = state.sessions.map(session => {
+        const newStatus = statusUpdates.get(session.id);
+        return newStatus ? { ...session, gitStatus: newStatus } : session;
+      });
+      
+      // Update main repo session if needed
+      let activeMainRepoSession = state.activeMainRepoSession;
+      if (activeMainRepoSession) {
+        const mainRepoUpdate = statusUpdates.get(activeMainRepoSession.id);
+        if (mainRepoUpdate) {
+          activeMainRepoSession = { ...activeMainRepoSession, gitStatus: mainRepoUpdate };
+        }
+      }
+      
+      return { sessions, activeMainRepoSession, gitStatusLoading: newLoadingSet };
+    });
+  },
+  
+  processPendingGitStatusUpdates: () => {
+    const state = get();
+    
+    // Clear timer
+    if (state.gitStatusBatchTimer) {
+      clearTimeout(state.gitStatusBatchTimer);
+      set({ gitStatusBatchTimer: null });
+    }
+    
+    // Process loading state updates
+    if (state.pendingGitStatusLoading.size > 0) {
+      const loadingUpdates = Array.from(state.pendingGitStatusLoading.entries()).map(
+        ([sessionId, loading]) => ({ sessionId, loading })
+      );
+      get().setGitStatusLoadingBatch(loadingUpdates);
+      state.pendingGitStatusLoading.clear();
+    }
+    
+    // Process status updates
+    if (state.pendingGitStatusUpdates.size > 0) {
+      const statusUpdates = Array.from(state.pendingGitStatusUpdates.entries()).map(
+        ([sessionId, status]) => ({ sessionId, status })
+      );
+      get().updateSessionGitStatusBatch(statusUpdates);
+      state.pendingGitStatusUpdates.clear();
     }
   }
 }));

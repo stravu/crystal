@@ -194,6 +194,8 @@ interface ElectronAPI {
     onSessionOutputAvailable: (callback: (info: any) => void) => () => void;
     onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => () => void;
     onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => () => void;
+    onGitStatusLoadingBatch?: (callback: (sessionIds: string[]) => void) => () => void;
+    onGitStatusUpdatedBatch?: (callback: (updates: Array<{ sessionId: string; status: any }>) => void) => () => void;
     
     // Project events
     onProjectUpdated: (callback: (project: any) => void) => () => void;

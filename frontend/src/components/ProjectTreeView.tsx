@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen, Plus, Settings } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
@@ -16,6 +16,70 @@ interface ProjectWithSessions extends Project {
   sessions: Session[];
 }
 
+// Memoized project item component
+const ProjectItem = memo(function ProjectItem({
+  project,
+  isExpanded,
+  onToggle,
+  onCreateSession,
+  onSettings,
+  children
+}: {
+  project: ProjectWithSessions;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onCreateSession: () => void;
+  onSettings: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-1">
+      <div className="flex items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md group">
+        <button
+          onClick={onToggle}
+          className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex-1 text-left"
+        >
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          )}
+          {isExpanded ? (
+            <FolderOpen className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+          ) : (
+            <Folder className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          )}
+          <span className="text-sm font-medium ml-1">{project.name}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+            ({project.sessions.length} session{project.sessions.length !== 1 ? 's' : ''})
+          </span>
+        </button>
+        <div className="flex items-center space-x-1 ml-2">
+          <button
+            onClick={onCreateSession}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+            title="Create new session"
+          >
+            <Plus className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </button>
+          <button
+            onClick={onSettings}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+            title="Project settings"
+          >
+            <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </button>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="ml-6 space-y-1">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+});
+
 export function ProjectTreeView() {
   const [projectsWithSessions, setProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
@@ -31,7 +95,6 @@ export function ProjectTreeView() {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
   const [pendingMainBranchProject, setPendingMainBranchProject] = useState<Project | null>(null);
-  const [detectedMainBranch, setDetectedMainBranch] = useState<string>('main');
   const [detectedBranchForNewProject, setDetectedBranchForNewProject] = useState<string | null>(null);
   const { showError } = useErrorStore();
 
@@ -134,22 +197,38 @@ export function ProjectTreeView() {
     }
   }, [showCreateDialog]);
 
-  // Sync sessions from store with local project state
+  // Count of sessions currently loading git status
+  const gitStatusLoadingCount = useSessionStore((state) => state.gitStatusLoading.size);
+  
+  // Performance safeguard: skip non-essential updates during heavy git loading
+  const skipNonEssentialUpdates = gitStatusLoadingCount > 5;
+  
+  // Sync sessions from store with local project state (throttled during heavy loading)
   useEffect(() => {
+    // Skip sync during heavy git status loading to prevent UI freezing
+    if (skipNonEssentialUpdates) {
+      return;
+    }
+    
     if (storesSessions.length > 0 && projectsWithSessions.length > 0) {
       setProjectsWithSessions(prevProjects => {
-        return prevProjects.map(project => {
+        let hasAnyChanges = false;
+        const updatedProjects = prevProjects.map(project => {
           // Find all sessions for this project from the store
           const projectSessions = storesSessions.filter(s => s.projectId === project.id);
           
-          // Only update if there are differences
+          // Only update if there are differences in essential properties
           const hasChanges = projectSessions.length !== project.sessions.length ||
             projectSessions.some(storeSession => {
               const localSession = project.sessions.find(s => s.id === storeSession.id);
-              return !localSession || localSession.status !== storeSession.status;
+              return !localSession || 
+                     localSession.status !== storeSession.status ||
+                     localSession.name !== storeSession.name ||
+                     localSession.archived !== storeSession.archived;
             });
           
           if (hasChanges) {
+            hasAnyChanges = true;
             return {
               ...project,
               sessions: projectSessions
@@ -158,9 +237,12 @@ export function ProjectTreeView() {
           
           return project;
         });
+        
+        // Only update state if there were actual changes
+        return hasAnyChanges ? updatedProjects : prevProjects;
       });
     }
-  }, [storesSessions]);
+  }, [storesSessions, skipNonEssentialUpdates]);
 
   const loadProjectsWithSessions = async () => {
     try {
@@ -194,7 +276,7 @@ export function ProjectTreeView() {
     }
   };
 
-  const toggleProject = (projectId: number) => {
+  const toggleProject = useCallback((projectId: number) => {
     setExpandedProjects(prev => {
       const newSet = new Set(prev);
       if (newSet.has(projectId)) {
@@ -204,35 +286,11 @@ export function ProjectTreeView() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const handleProjectClick = async (project: Project) => {
-    // Check if we should show the warning
-    const warningKey = `mainBranchWarning_${project.id}`;
-    const hasShownWarning = localStorage.getItem(warningKey);
-    
-    if (!hasShownWarning) {
-      // Fetch the current branch before showing warning
-      try {
-        const response = await window.electronAPI.git.detectBranch(project.path);
-        if (response.success && response.data) {
-          setDetectedMainBranch(response.data);
-        } else {
-          setDetectedMainBranch('main');
-        }
-      } catch (error) {
-        console.error('Failed to detect branch:', error);
-        setDetectedMainBranch('main');
-      }
-      
-      // Show warning dialog
-      setPendingMainBranchProject(project);
-      setShowMainBranchWarning(true);
-    } else {
-      // Proceed directly
-      await openMainRepoSession(project);
-    }
-  };
+  // TODO: Implement project click handler for main repo sessions
+  // This function would handle clicking on project folders to open main repo sessions
+  // Currently commented out as it's not used in the simplified ProjectTreeView
   
   const openMainRepoSession = async (project: Project) => {
     try {
@@ -260,11 +318,11 @@ export function ProjectTreeView() {
     }
   };
 
-  const handleCreateSession = (project: Project) => {
+  const handleCreateSession = useCallback((project: Project) => {
     // Just show the dialog for any project
     setSelectedProjectForCreate(project);
     setShowCreateDialog(true);
-  };
+  }, []);
 
   const detectCurrentBranch = async (path: string) => {
     if (!path) return;
@@ -335,91 +393,27 @@ export function ProjectTreeView() {
           />
         ) : (
           <>
-            {projectsWithSessions.map((project) => {
-          const isExpanded = expandedProjects.has(project.id);
-          const sessionCount = project.sessions.length;
-          
-          return (
-            <div key={project.id}>
-              <div 
-                className="group flex items-center space-x-1 px-2 py-1.5 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+            {projectsWithSessions.map((project) => (
+              <ProjectItem
+                key={project.id}
+                project={project}
+                isExpanded={expandedProjects.has(project.id)}
+                onToggle={() => toggleProject(project.id)}
+                onCreateSession={() => handleCreateSession(project)}
+                onSettings={() => {
+                  setSelectedProjectForSettings(project);
+                  setShowProjectSettings(true);
+                }}
               >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleProject(project.id);
-                  }}
-                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-                  disabled={sessionCount === 0}
-                >
-                  {sessionCount > 0 ? (
-                    isExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                    )
-                  ) : (
-                    <div className="w-3 h-3" />
-                  )}
-                </button>
-                
-                <div 
-                  className="flex items-center space-x-2 flex-1 min-w-0"
-                  onClick={() => handleProjectClick(project)}
-                >
-                  {isExpanded ? (
-                    <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  ) : (
-                    <Folder className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-                  )}
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate text-left">
-                    {project.name}
-                  </span>
-                </div>
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCreateSession(project);
-                  }}
-                  className={`relative p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors group/tooltip ${
-                    sessionCount === 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                >
-                  <Plus className="w-4 h-4 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" />
-                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 pointer-events-none z-50">
-                    Create new session
-                    <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-4 border-transparent border-t-gray-800 dark:border-t-gray-700"></span>
-                  </span>
-                </button>
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedProjectForSettings(project);
-                    setShowProjectSettings(true);
-                  }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors opacity-0 group-hover:opacity-100"
-                  title="Project settings"
-                >
-                  <Settings className="w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" />
-                </button>
-              </div>
-              
-              {isExpanded && sessionCount > 0 && (
-                <div className="ml-4 mt-1 space-y-1">
-                  {project.sessions.map((session) => (
-                    <SessionListItem 
-                      key={session.id} 
-                      session={session}
-                      isNested
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                {project.sessions.map((session) => (
+                  <SessionListItem 
+                    key={session.id} 
+                    session={session}
+                    isNested
+                  />
+                ))}
+              </ProjectItem>
+            ))}
         
             <button
               onClick={() => setShowAddProjectDialog(true)}
@@ -605,7 +599,7 @@ export function ProjectTreeView() {
           }}
           projectName={pendingMainBranchProject.name}
           projectId={pendingMainBranchProject.id}
-          mainBranch={detectedMainBranch}
+          mainBranch="main"
         />
       )}
     </>

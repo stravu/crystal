@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { StatusIndicator } from './StatusIndicator';
@@ -12,8 +12,9 @@ interface SessionListItemProps {
   isNested?: boolean;
 }
 
-export function SessionListItem({ session, isNested = false }: SessionListItemProps) {
-  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId, isGitStatusLoading } = useSessionStore();
+// Memoized component to prevent unnecessary re-renders
+export const SessionListItem = memo(function SessionListItem({ session, isNested = false }: SessionListItemProps) {
+  const { activeSessionId, setActiveSession, deletingSessionIds, addDeletingSessionId, removeDeletingSessionId } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
   const isActive = activeSessionId === session.id;
   const isDeleting = deletingSessionIds.has(session.id);
@@ -25,35 +26,29 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
-  const gitStatusLoading = isGitStatusLoading(session.id);
   
-  // Force re-render when session status changes
-  const [, forceUpdate] = useState({});
+  // Selective subscription for git status loading state
+  const gitStatusLoading = useSessionStore((state) => state.gitStatusLoading.has(session.id));
+  
+  
+  // Subscribe to session status updates specifically for this session
   useEffect(() => {
-    // Subscribe to session updates to ensure UI updates when this session's status changes
-    const unsubscribe = useSessionStore.subscribe((state) => {
-      const updatedSession = state.sessions.find(s => s.id === session.id) || 
+    const unsubscribe = useSessionStore.subscribe((state, prevState) => {
+      // Check if this session's status changed
+      const currentSession = state.sessions.find(s => s.id === session.id) || 
         (state.activeMainRepoSession?.id === session.id ? state.activeMainRepoSession : null);
       
-      if (updatedSession && updatedSession.status !== session.status) {
-        forceUpdate({});
+      const previousSession = prevState.sessions.find(s => s.id === session.id) || 
+        (prevState.activeMainRepoSession?.id === session.id ? prevState.activeMainRepoSession : null);
+      
+      // Force component update if status changed
+      if (currentSession && previousSession && currentSession.status !== previousSession.status) {
+        // Status changed - component will re-render due to prop change
       }
     });
     
-    // Also listen for custom session status change events
-    const handleStatusChange = (event: CustomEvent) => {
-      if (event.detail.sessionId === session.id) {
-        forceUpdate({});
-      }
-    };
-    
-    window.addEventListener('session-status-changed', handleStatusChange as EventListener);
-    
-    return () => {
-      unsubscribe();
-      window.removeEventListener('session-status-changed', handleStatusChange as EventListener);
-    };
-  }, [session.id, session.status]);
+    return unsubscribe;
+  }, [session.id]);
   
   useEffect(() => {
     // Check if this session's project has a run script
@@ -89,6 +84,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     };
   }, [session.id, session.projectId]);
 
+  // Combine script-related effects
   useEffect(() => {
     // Check if this session is currently running
     API.sessions.getRunningSession()
@@ -98,28 +94,22 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
         }
       })
       .catch(console.error);
-  }, [session.id]);
 
-  useEffect(() => {
     // Listen for script session changes
     const handleScriptSessionChange = (event: CustomEvent) => {
       setIsRunning(event.detail === session.id);
     };
 
-    window.addEventListener('script-session-changed', handleScriptSessionChange as EventListener);
-    return () => {
-      window.removeEventListener('script-session-changed', handleScriptSessionChange as EventListener);
-    };
-  }, [session.id]);
-
-  useEffect(() => {
     // Listen for script closing state
     const handleScriptClosing = (event: CustomEvent) => {
       setIsClosing(event.detail === session.id);
     };
 
+    window.addEventListener('script-session-changed', handleScriptSessionChange as EventListener);
     window.addEventListener('script-closing', handleScriptClosing as EventListener);
+    
     return () => {
+      window.removeEventListener('script-session-changed', handleScriptSessionChange as EventListener);
       window.removeEventListener('script-closing', handleScriptClosing as EventListener);
     };
   }, [session.id]);
@@ -161,7 +151,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     };
   }, [session.id, session.archived, session.status, gitStatus]);
 
-  const handleRunScript = async (e: React.MouseEvent) => {
+  const handleRunScript = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     
     if (!hasRunScript) {
@@ -202,7 +192,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
       window.dispatchEvent(new CustomEvent('script-closing', { detail: null }));
       alert('Failed to run script');
     }
-  };
+  }, [hasRunScript, session.id]);
 
   const handleStopScript = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -232,7 +222,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the session
     
     // Prevent deletion if already being deleted
@@ -264,7 +254,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     } finally {
       removeDeletingSessionId(session.id);
     }
-  };
+  }, [isDeleting, session.name, session.id, session.isMainRepo, session.worktreePath, isActive, addDeletingSessionId, removeDeletingSessionId, setActiveSession]);
 
   const handleSaveEdit = async () => {
     if (editName.trim() === '') {
@@ -337,7 +327,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
     handleDelete({ stopPropagation: () => {} } as React.MouseEvent);
   };
 
-  const handleToggleFavorite = async (e: React.MouseEvent) => {
+  const handleToggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     
     try {
@@ -351,7 +341,7 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
       console.error('Error toggling favorite status:', error);
       alert('Failed to toggle favorite status');
     }
-  };
+  }, [session.id]);
   
   return (
     <>
@@ -500,4 +490,16 @@ export function SessionListItem({ session, isNested = false }: SessionListItemPr
       )}
     </>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  // Only re-render if essential props change
+  return (
+    prevProps.session.id === nextProps.session.id &&
+    prevProps.session.name === nextProps.session.name &&
+    prevProps.session.status === nextProps.session.status &&
+    prevProps.session.archived === nextProps.session.archived &&
+    prevProps.session.isFavorite === nextProps.session.isFavorite &&
+    prevProps.session.isMainRepo === nextProps.session.isMainRepo &&
+    prevProps.isNested === nextProps.isNested
+  );
+});
