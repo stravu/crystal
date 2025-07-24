@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState, memo, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
-import { API } from '../utils/api';
 import { JsonMessageView } from './JsonMessageView';
 import { EmptyState } from './EmptyState';
 import CombinedDiffView from './CombinedDiffView';
@@ -23,8 +22,8 @@ export const SessionView = memo(() => {
   const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
   
   // Stub variables for project view functionality (navigationStore was removed)
-  const activeView = 'session'; // Always show session view
-  const activeProjectId = null; // No active project
+  // const activeView = 'session'; // Always show session view
+  // const activeProjectId = null; // No active project
   // const [projectData, setProjectData] = useState<any>(null);
   // const [isProjectLoading, setIsProjectLoading] = useState(false);
   // const [isMergingProject, setIsMergingProject] = useState(false);
