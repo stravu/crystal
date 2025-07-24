@@ -775,7 +775,6 @@ export class DatabaseService {
       console.log('[Database] Token tracking tables not yet created, skipping backfill');
       return;
     }
-<<<<<<< HEAD
     
     // Get count of already processed outputs
     const processedCount = this.db.prepare(`
