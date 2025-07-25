@@ -62,6 +62,10 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.getOutput(sessionId);
     },
+    async getJsonMessages(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getJsonMessages(sessionId);
+    },
 
     async getConversation(sessionId: string) {
       if (!isElectron()) throw new Error('Electron API not available');

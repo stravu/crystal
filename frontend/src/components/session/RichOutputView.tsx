@@ -218,6 +218,14 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       } else if (msg.type === 'assistant') {
         const segments: MessageSegment[] = [];
         
+        console.log('RichOutputView: Processing assistant message:', JSON.stringify({
+          hasText: !!msg.text,
+          hasMessage: !!msg.message,
+          hasContent: !!msg.message?.content,
+          contentLength: msg.message?.content?.length,
+          sample: msg.message?.content?.[0]
+        }, null, 2));
+        
         // Check for direct text field first (some messages come this way)
         if (msg.text && typeof msg.text === 'string') {
           segments.push({ type: 'text', content: msg.text.trim() });
@@ -227,6 +235,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             if (block.type === 'text' && block.text?.trim()) {
               segments.push({ type: 'text', content: block.text.trim() });
             } else if (block.type === 'thinking') {
+              console.log('RichOutputView: Found thinking block:', JSON.stringify(block, null, 2));
               if (block.thinking && typeof block.thinking === 'string' && block.thinking.trim()) {
                 segments.push({ type: 'thinking', content: block.thinking.trim() });
               }
@@ -337,7 +346,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       // Load both conversation messages (for user prompts) and JSON messages (for detailed responses)
       const [conversationResponse, outputResponse] = await Promise.all([
         API.sessions.getConversation(sessionId),
-        API.sessions.getOutput(sessionId)
+        API.sessions.getJsonMessages(sessionId)
       ]);
       
       // Combine both sources - conversation messages have the actual user prompts
@@ -372,7 +381,20 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         return timeA - timeB;
       });
       
+      console.log('RichOutputView: Raw messages from API:', JSON.stringify({
+        conversationCount: userPrompts.length,
+        outputCount: jsonResponse.data?.length || 0,
+        sampleOutput: jsonResponse.data?.slice(0, 3)
+      }, null, 2));
+      
       const conversationMessages = transformMessages(allMessages);
+      console.log('RichOutputView: Loaded messages:', JSON.stringify({
+        totalMessages: conversationMessages.length,
+        messageTypes: conversationMessages.map(m => ({
+          role: m.role,
+          segments: m.segments.map(s => s.type)
+        }))
+      }, null, 2));
       setMessages(conversationMessages);
     } catch (err) {
       console.error('Failed to load messages:', err);
