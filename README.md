@@ -120,6 +120,24 @@ This ensures:
 - Worktrees won't conflict between the two instances
 - You can safely test changes without affecting your primary Crystal setup
 
+## Using with Third-Party Deployments
+
+To use Crystal with cloud providers or via corporate infrastructure, you should create a [settings](https://docs.anthropic.com/en/docs/claude-code/settings) file with `ENV` values to correctly connect to the provider.
+
+For example, here is a minimal configuration to use Amazon Bedrock via an AWS Profile:
+
+```json5
+{
+  "env": {
+    "CLAUDE_CODE_USE_BEDROCK": "1",
+    "AWS_REGION": "us-east-2", // Replace with your AWS region
+    "AWS_PROFILE": "my-aws-profile" // Replace with your profile
+  },
+}
+```
+
+Check the [deployment documentation](https://docs.anthropic.com/en/docs/claude-code/third-party-integrations) for more information on getting setup with your particular deployment.
+
 ## Additional Documentation
 
 For a full project overview, see [CLAUDE.md](CLAUDE.md). Additional diagrams, database schema details, release instructions, and license notes can be found in the [docs](./docs) directory.
