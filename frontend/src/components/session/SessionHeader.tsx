@@ -5,6 +5,8 @@ import { ViewTabs } from './ViewTabs';
 import { ViewMode } from '../../hooks/useSessionView';
 import { CommitModeIndicator } from '../CommitModeIndicator';
 import { Button } from '../ui/Button';
+import { Dropdown } from '../ui/Dropdown';
+import { MoreVertical, GitBranch, Code2, Download, Upload, GitMerge } from 'lucide-react';
 
 interface SessionHeaderProps {
   activeSession: Session;
@@ -22,8 +24,6 @@ interface SessionHeaderProps {
   gitCommands: GitCommands | null;
   handleSquashAndRebaseToMain: () => void;
   handleOpenIDE: () => void;
-  isOpeningIDE?: boolean;
-  hasIdeCommand?: boolean;
   mergeError: string | null;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -33,6 +33,7 @@ interface SessionHeaderProps {
     changes: boolean;
     terminal: boolean;
     editor: boolean;
+    dashboard: boolean;
     richOutput: boolean;
   };
   setUnreadActivity: (activity: any) => void;
@@ -54,135 +55,134 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   gitCommands,
   handleSquashAndRebaseToMain,
   handleOpenIDE,
-  isOpeningIDE = false,
-  hasIdeCommand = true,
   mergeError,
   viewMode,
   setViewMode,
   unreadActivity,
   setUnreadActivity,
 }) => {
+  const branchActions = activeSession.isMainRepo ? [
+    {
+      id: 'pull',
+      label: 'Pull from Remote',
+      icon: Download,
+      onClick: handleGitPull,
+      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+      variant: 'default' as const,
+      description: gitCommands?.getPullCommand ? `git ${gitCommands.getPullCommand()}` : 'git pull'
+    },
+    {
+      id: 'push',
+      label: 'Push to Remote', 
+      icon: Upload,
+      onClick: handleGitPush,
+      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+      variant: 'success' as const,
+      description: gitCommands?.getPushCommand ? `git ${gitCommands.getPushCommand()}` : 'git push'
+    }
+  ] : [
+    {
+      id: 'rebase-from-main',
+      label: `Rebase from ${gitCommands?.mainBranch || 'main'}`,
+      icon: GitMerge,
+      onClick: handleRebaseMainIntoWorktree,
+      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || !hasChangesToRebase,
+      variant: 'default' as const,
+      description: gitCommands?.getRebaseFromMainCommand ? gitCommands.getRebaseFromMainCommand() : `Pulls latest changes from ${gitCommands?.mainBranch || 'main'}`
+    },
+    {
+      id: 'rebase-to-main',
+      label: `Rebase to ${gitCommands?.mainBranch || 'main'}`,
+      icon: GitMerge,
+      onClick: handleSquashAndRebaseToMain,
+      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+      variant: 'success' as const,
+      description: gitCommands?.getSquashAndRebaseToMainCommand ? gitCommands.getSquashAndRebaseToMainCommand() : `Squashes all commits and rebases onto ${gitCommands?.mainBranch || 'main'}`
+    },
+    {
+      id: 'open-ide',
+      label: 'Open in IDE',
+      icon: Code2,
+      onClick: handleOpenIDE,
+      disabled: activeSession.status === 'initializing',
+      variant: 'default' as const,
+      description: 'Open the worktree in your default IDE'
+    }
+  ];
+
   return (
-    <div className="bg-surface-primary border-b border-border-primary px-4 py-3 flex-shrink-0">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0 relative">
-          {isEditingName ? (
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onKeyDown={handleNameKeyDown}
-              onBlur={handleSaveEditName}
-              className="font-bold text-xl bg-surface-primary text-text-primary px-2 py-1 rounded border border-border-primary focus:border-interactive focus:outline-none w-full"
-              autoFocus
-            />
-          ) : (
-            <h2 
-              className="font-bold text-xl text-text-primary truncate cursor-pointer hover:text-text-secondary"
-              onDoubleClick={handleStartEditName}
-              title="Double-click to rename"
-            >
-              {activeSession.name}
-            </h2>
-          )}
-          {/* Status Indicator */}
-          <div className="flex items-center gap-2 mt-2">
-            <StatusIndicator key={`status-${activeSession.id}-${activeSession.status}`} session={activeSession} size="medium" showText showProgress />
-            <CommitModeIndicator mode={activeSession.commitMode} />
-          </div>
-          
-          {/* Git Actions */}
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <div className="flex flex-wrap items-center gap-2 relative z-20">
-              {activeSession.isMainRepo ? (
-                <>
-                  <div className="group relative">
-                    <Button
-                      onClick={handleGitPull}
-                      disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
-                      size="sm"
-                      variant="secondary"
-                      loading={isMerging}
-                      className="rounded-full border-interactive text-interactive hover:bg-interactive/20 hover:border-interactive-hover disabled:border-border-tertiary"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" /></svg>
-                      Pull
-                    </Button>
-                    {/* Tooltip */}
-                  </div>
-                  <div className="group relative">
-                    <Button
-                      onClick={handleGitPush}
-                      disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
-                      size="sm"
-                      variant="secondary"
-                      loading={isMerging}
-                      className="rounded-full border-status-success text-status-success hover:bg-status-success/20 hover:border-status-success-hover disabled:border-border-tertiary"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" /></svg>
-                      Push
-                    </Button>
-                    {/* Tooltip */}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="group relative">
-                    <Button
-                      onClick={handleRebaseMainIntoWorktree}
-                      disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || !hasChangesToRebase}
-                      size="sm"
-                      variant="secondary"
-                      loading={isMerging}
-                      className="rounded-full border-interactive text-interactive hover:bg-interactive/10 disabled:border-border-tertiary"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" /></svg>
-                      {isMerging ? 'Rebasing...' : `Rebase from local ${gitCommands?.mainBranch || 'main'}`}
-                    </Button>
-                    {/* Tooltip */}
-                  </div>
-                  <div className="group relative">
-                    <Button
-                      onClick={handleSquashAndRebaseToMain}
-                      disabled={isMerging || activeSession.status === 'running' || activeSession.status === 'initializing'}
-                      size="sm"
-                      variant="secondary"
-                      loading={isMerging}
-                      className="rounded-full border-status-success text-status-success hover:bg-status-success/10 disabled:border-border-tertiary"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" /></svg>
-                      {isMerging ? 'Squashing...' : `Rebase to ${gitCommands?.mainBranch || 'main'}`}
-                    </Button>
-                    {/* Tooltip */}
-                  </div>
-                  <div className="group relative">
-                    <Button
-                      onClick={handleOpenIDE}
-                      disabled={activeSession.status === 'initializing' || isOpeningIDE || !hasIdeCommand}
-                      size="sm"
-                      variant="secondary"
-                      loading={isOpeningIDE}
-                      className="rounded-full border-interactive text-interactive hover:bg-interactive/10 disabled:border-border-tertiary"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-                      {isOpeningIDE ? 'Opening...' : 'Open IDE'}
-                    </Button>
-                    {!hasIdeCommand && (
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-surface-inverted rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                        No IDE command configured for this project
-                      </div>
-                    )}
-                  </div>
-                </>
+    <div className="bg-surface-primary border-b border-border-primary flex-shrink-0">
+      {/* Top Row: Session Identity (left) and Session Actions (right) */}
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-4">
+          {/* Cluster 1: Session Identity (left-aligned) */}
+          <div className="flex-1 min-w-0">
+            {/* Session Name */}
+            {isEditingName ? (
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={handleNameKeyDown}
+                onBlur={handleSaveEditName}
+                className="font-bold text-xl bg-surface-primary text-text-primary px-2 py-1 rounded border border-border-primary focus:border-interactive focus:outline-none w-full"
+                autoFocus
+              />
+            ) : (
+              <h2 
+                className="font-bold text-xl text-text-primary truncate cursor-pointer hover:text-text-secondary transition-colors"
+                onDoubleClick={handleStartEditName}
+                title="Double-click to rename"
+              >
+                {activeSession.name}
+              </h2>
+            )}
+            
+            {/* Status and Mode Indicators */}
+            <div className="flex items-center gap-3 mt-2">
+              <StatusIndicator 
+                key={`status-${activeSession.id}-${activeSession.status}`} 
+                session={activeSession} 
+                size="medium" 
+                showText 
+                showProgress 
+              />
+              {activeSession.commitMode && activeSession.commitMode !== 'Disabled' && (
+                <CommitModeIndicator mode={activeSession.commitMode} />
               )}
             </div>
           </div>
-          {mergeError && (
-            <div className="mt-2 p-2 bg-status-error/20 border border-status-error rounded-md">
-              <p className="text-sm text-status-error">{mergeError}</p>
-            </div>
-          )}
+
+          {/* Cluster 3: Session Actions (right-aligned) */}
+          <div className="flex items-center gap-2">
+            <Dropdown
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  <span>Branch Actions</span>
+                  <MoreVertical className="w-3 h-3" />
+                </Button>
+              }
+              items={branchActions}
+              position="bottom-right"
+            />
+          </div>
         </div>
+
+        {/* Error Messages */}
+        {mergeError && (
+          <div className="mt-3 p-2 bg-status-error/10 border border-status-error/30 rounded-md">
+            <p className="text-sm text-status-error">{mergeError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Cluster 2: Workspace Views (below, full width) */}
+      <div className="border-t border-border-primary">
         <ViewTabs
           viewMode={viewMode}
           setViewMode={setViewMode}
@@ -194,4 +194,4 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
       </div>
     </div>
   );
-}; 
+};

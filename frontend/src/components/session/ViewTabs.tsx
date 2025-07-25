@@ -1,6 +1,7 @@
 import React from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
-import { Card } from '../ui/Card';
+import { cn } from '../../utils/cn';
+import { FileText, MessageSquare, GitCompare, Terminal, FileEdit, LayoutDashboard, Eye } from 'lucide-react';
 
 interface ViewTabsProps {
   viewMode: ViewMode;
@@ -11,6 +12,7 @@ interface ViewTabsProps {
     changes: boolean;
     terminal: boolean;
     editor: boolean;
+    dashboard: boolean;
     richOutput: boolean;
   };
   setUnreadActivity: (activity: any) => void;
@@ -26,37 +28,117 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
   jsonMessagesCount,
   isTerminalRunning,
 }) => {
-  const tabs: { mode: ViewMode; label: string; count?: number, activity?: boolean, status?: boolean }[] = [
-    { mode: 'output', label: 'Output', activity: unreadActivity.output },
-    { mode: 'richOutput', label: 'Rich Output', activity: unreadActivity.richOutput },
-    { mode: 'messages', label: 'Messages', count: jsonMessagesCount, activity: unreadActivity.messages },
-    { mode: 'changes', label: 'View Diff', activity: unreadActivity.changes },
-    { mode: 'terminal', label: 'Terminal', activity: unreadActivity.terminal, status: isTerminalRunning },
-    { mode: 'editor', label: 'File Editor', activity: unreadActivity.editor },
+  const tabs: { 
+    mode: ViewMode; 
+    label: string; 
+    icon: React.ReactNode;
+    count?: number;
+    activity?: boolean;
+    status?: boolean;
+  }[] = [
+    { 
+      mode: 'output', 
+      label: 'Output', 
+      icon: <FileText className="w-4 h-4" />,
+      activity: unreadActivity.output 
+    },
+    { 
+      mode: 'richOutput', 
+      label: 'Rich Output', 
+      icon: <Eye className="w-4 h-4" />,
+      activity: unreadActivity.richOutput 
+    },
+    { 
+      mode: 'messages', 
+      label: 'Messages', 
+      icon: <MessageSquare className="w-4 h-4" />,
+      count: jsonMessagesCount, 
+      activity: unreadActivity.messages 
+    },
+    { 
+      mode: 'changes', 
+      label: 'Diff', 
+      icon: <GitCompare className="w-4 h-4" />,
+      activity: unreadActivity.changes 
+    },
+    { 
+      mode: 'terminal', 
+      label: 'Terminal', 
+      icon: <Terminal className="w-4 h-4" />,
+      activity: unreadActivity.terminal, 
+      status: isTerminalRunning 
+    },
+    { 
+      mode: 'editor', 
+      label: 'Editor', 
+      icon: <FileEdit className="w-4 h-4" />,
+      activity: unreadActivity.editor 
+    },
+    { 
+      mode: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <LayoutDashboard className="w-4 h-4" />,
+      activity: unreadActivity.dashboard 
+    },
   ];
 
   return (
-    <div className="flex flex-col gap-2 relative z-10 mt-6">
-      <Card variant="bordered" padding="none" className="flex overflow-hidden flex-shrink-0">
-        {tabs.map(({ mode, label, count, activity, status }) => (
-          <button
-            key={mode}
-            onClick={() => {
-              setViewMode(mode);
-              setUnreadActivity((prev: any) => ({ ...prev, [mode]: false }));
-            }}
-            className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block transition-colors ${
-              viewMode === mode
-                ? 'bg-interactive text-white'
-                : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-            }`}
-          >
-            {label} {count !== undefined && `(${count})`}
-            {status && <span className="ml-1 inline-block w-2 h-2 bg-status-success rounded-full animate-pulse"></span>}
-            {activity && viewMode !== mode && <span className="absolute -top-1 -right-1 h-2 w-2 bg-status-error rounded-full"></span>}
-          </button>
-        ))}
-      </Card>
+    <div className="flex items-center px-4 bg-surface-secondary" role="tablist">
+      {tabs.map(({ mode, label, icon, count, activity, status }) => (
+        <button
+          key={mode}
+          role="tab"
+          aria-selected={viewMode === mode}
+          onClick={() => {
+            setViewMode(mode);
+            setUnreadActivity((prev: any) => ({ ...prev, [mode]: false }));
+          }}
+          className={cn(
+            "relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all",
+            "border-b-2 hover:text-text-primary",
+            viewMode === mode ? [
+              "text-text-primary border-interactive",
+              "bg-gradient-to-t from-interactive/5 to-transparent"
+            ] : [
+              "text-text-secondary border-transparent",
+              "hover:border-border-secondary hover:bg-surface-hover/50"
+            ]
+          )}
+        >
+          {/* Icon */}
+          <span className={cn(
+            "transition-colors",
+            viewMode === mode ? "text-interactive" : "text-text-tertiary"
+          )}>
+            {icon}
+          </span>
+          
+          {/* Label */}
+          <span>{label}</span>
+          
+          {/* Count */}
+          {count !== undefined && count > 0 && (
+            <span className={cn(
+              "ml-1 px-1.5 py-0.5 text-xs rounded-full",
+              viewMode === mode 
+                ? "bg-interactive/20 text-interactive" 
+                : "bg-surface-tertiary text-text-tertiary"
+            )}>
+              {count}
+            </span>
+          )}
+          
+          {/* Status indicator */}
+          {status && (
+            <span className="ml-1 inline-block w-2 h-2 bg-status-success rounded-full animate-pulse" />
+          )}
+          
+          {/* Activity indicator */}
+          {activity && viewMode !== mode && (
+            <span className="absolute top-2 right-2 h-2 w-2 bg-status-error rounded-full animate-pulse" />
+          )}
+        </button>
+      ))}
     </div>
   );
-}; 
+};
