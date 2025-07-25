@@ -8,6 +8,7 @@ import { CommitModePill, AutoCommitSwitch } from '../CommitModeToggle';
 import { Dropdown, type DropdownItem } from '../ui/Dropdown';
 import { Pill } from '../ui/Pill';
 import { SwitchSimple as Switch } from '../ui/SwitchSimple';
+import { Toggle } from '../ui/Toggle';
 
 interface AttachedImage {
   id: string;
@@ -30,7 +31,6 @@ interface SessionInputWithImagesProps {
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
   setUltrathink: (ultra: boolean) => void;
-  handleToggleAutoCommit: () => void;
   gitCommands: GitCommands | null;
   onFocus?: () => void;
   onBlur?: () => void;
@@ -52,7 +52,6 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   setShowStravuSearch,
   ultrathink,
   setUltrathink,
-  handleToggleAutoCommit,
   gitCommands,
   onFocus,
   onBlur,
@@ -326,7 +325,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onFocusCapture={(e) => {
+          onFocusCapture={() => {
             // When any element in the toolbar gets focus, keep toolbar active
             setIsToolbarActive(true);
           }}
@@ -334,7 +333,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             // Use a timeout to check if focus moved outside the toolbar
             setTimeout(() => {
               const activeElement = document.activeElement;
-              const toolbar = e.currentTarget;
+              const toolbar = (e as any).currentTarget;
               
               if (!activeElement || !toolbar || !toolbar.contains(activeElement)) {
                 setIsToolbarActive(false);
@@ -397,7 +396,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
                 onFocus={handleFocus}
-                onBlur={handleBlur}
+                onBlur={handleBlur as any}
                 style={{ 
                   height: `${textareaHeight}px`,
                   minHeight: '52px', 
@@ -581,7 +580,6 @@ interface ModelSelectorProps {
 const ModelSelector: React.FC<ModelSelectorProps> = ({
   selectedModel,
   setSelectedModel,
-  showDropdown,
   setShowDropdown,
 }) => {
   const handleModelChange = async (modelId: string) => {

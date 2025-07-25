@@ -263,9 +263,6 @@ export const SessionView = memo(() => {
           <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
             <RichOutputWithSidebar 
               sessionId={activeSession.id} 
-              status={activeSession.status}
-              model={activeSession.model}
-              onNavigateToPrompt={hook.handleNavigateToPrompt}
             />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>
@@ -356,7 +353,6 @@ export const SessionView = memo(() => {
           setShowStravuSearch={hook.setShowStravuSearch}
           ultrathink={hook.ultrathink}
           setUltrathink={hook.setUltrathink}
-          handleToggleAutoCommit={hook.handleToggleAutoCommit}
           gitCommands={hook.gitCommands}
           handleCompactContext={hook.handleCompactContext}
           contextCompacted={hook.contextCompacted}

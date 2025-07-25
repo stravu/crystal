@@ -52,7 +52,6 @@ export const Pill = forwardRef<HTMLButtonElement, PillProps>(
   }, ref) => {
     const variantStyles = pillVariants[variant];
     const currentVariantStyle = isActive ? variantStyles.active : variantStyles.base;
-    const showBorder = isActive && variant !== 'default';
     
     return (
       <button

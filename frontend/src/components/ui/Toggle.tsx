@@ -2,12 +2,17 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 
 interface ToggleProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
+  checked?: boolean;
+  pressed?: boolean;
+  onChange?: (checked: boolean) => void;
+  onPressedChange?: (pressed: boolean) => void;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   id?: string;
+  variant?: 'default' | 'warning';
+  title?: string;
+  children?: React.ReactNode;
 }
 
 const sizeClasses = {
@@ -33,26 +38,68 @@ const sizeClasses = {
 
 export const Toggle: React.FC<ToggleProps> = ({
   checked,
+  pressed,
   onChange,
+  onPressedChange,
   disabled = false,
   size = 'md',
   className,
-  id
+  id,
+  variant = 'default',
+  title,
+  children
 }) => {
   const sizes = sizeClasses[size];
+  const isPressed = pressed ?? checked ?? false;
+  const handleChange = (newValue: boolean) => {
+    if (onPressedChange) {
+      onPressedChange(newValue);
+    } else if (onChange) {
+      onChange(newValue);
+    }
+  };
 
+  // If children are provided, render as button toggle instead of switch
+  if (children) {
+    return (
+      <button
+        id={id}
+        type="button"
+        title={title}
+        disabled={disabled}
+        onClick={() => !disabled && handleChange(!isPressed)}
+        className={cn(
+          'px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+          'focus:outline-none focus:ring-2 focus:ring-interactive focus:ring-offset-2',
+          isPressed 
+            ? variant === 'warning' 
+              ? 'bg-status-warning/20 text-status-warning border border-status-warning/30'
+              : 'bg-interactive/20 text-interactive border border-interactive/30'
+            : 'bg-surface-secondary text-text-secondary border border-border-primary hover:bg-surface-hover',
+          disabled && 'opacity-50 cursor-not-allowed',
+          !disabled && 'cursor-pointer',
+          className
+        )}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  // Default switch toggle
   return (
     <button
       id={id}
       type="button"
       role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
+      title={title}
+      aria-checked={isPressed}
+      onClick={() => !disabled && handleChange(!isPressed)}
       disabled={disabled}
       className={cn(
         'relative inline-flex items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-interactive focus:ring-offset-2',
         sizes.container,
-        checked ? 'bg-interactive' : 'bg-surface-tertiary',
+        isPressed ? 'bg-interactive' : 'bg-surface-tertiary',
         disabled && 'opacity-50 cursor-not-allowed',
         !disabled && 'cursor-pointer',
         className

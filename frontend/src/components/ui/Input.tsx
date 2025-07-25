@@ -6,6 +6,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   error?: string;
   helperText?: string;
   fullWidth?: boolean;
+  icon?: React.ReactNode;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -15,6 +16,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     error,
     helperText,
     fullWidth = false,
+    icon,
     id,
     ...props 
   }, ref) => {
@@ -38,19 +40,27 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {label}
           </label>
         )}
-        <input
-          ref={ref}
-          id={inputId}
-          className={cn(
-            baseStyles,
-            stateStyles,
-            widthStyles,
-            className
+        <div className={cn('relative', fullWidth && 'w-full')}>
+          {icon && (
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
+              {icon}
+            </div>
           )}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
-          {...props}
-        />
+          <input
+            ref={ref}
+            id={inputId}
+            className={cn(
+              baseStyles,
+              stateStyles,
+              widthStyles,
+              icon && 'pl-10',
+              className
+            )}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
+            {...props}
+          />
+        </div>
         {error && (
           <p id={`${inputId}-error`} className="mt-1 text-sm text-status-error">
             {error}

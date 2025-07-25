@@ -7,7 +7,7 @@ import { Cpu, Brain, Zap, ChevronDown, Settings, Shield, Save, FileText, Trash }
 import { TogglePill, Pill } from './ui/Pill';
 import { TogglePillImproved } from './ui/TogglePillImproved';
 import { SwitchSimple as Switch } from './ui/SwitchSimple';
-import { Dropdown, type DropdownItem } from './ui/Dropdown';
+import { Dropdown } from './ui/Dropdown';
 import {
   Select,
   SelectContent,
@@ -843,12 +843,12 @@ export function TokenTest() {
                     <Dropdown
                       trigger={<Pill>Bottom <ChevronDown className="w-3.5 h-3.5" /></Pill>}
                       items={[{ id: '1', label: 'Shows below' }]}
-                      position="bottom"
+                      position="bottom-right"
                     />
                     <Dropdown
                       trigger={<Pill>Top <ChevronDown className="w-3.5 h-3.5" /></Pill>}
                       items={[{ id: '1', label: 'Shows above' }]}
-                      position="top"
+                      position="top-right"
                     />
                   </div>
                 </div>

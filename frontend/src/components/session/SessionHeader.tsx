@@ -147,7 +147,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
                 showText 
                 showProgress 
               />
-              {activeSession.commitMode && activeSession.commitMode !== 'Disabled' && (
+              {activeSession.commitMode && activeSession.commitMode !== 'disabled' && (
                 <CommitModeIndicator mode={activeSession.commitMode} />
               )}
             </div>

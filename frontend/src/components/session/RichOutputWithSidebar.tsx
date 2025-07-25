@@ -8,7 +8,6 @@ interface RichOutputWithSidebarProps {
   sessionId: string;
   sessionStatus?: string;
   model?: string;
-  onNavigateToPrompt?: (marker: any) => void;
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'crystal-rich-output-sidebar-collapsed';
@@ -16,8 +15,6 @@ const SIDEBAR_COLLAPSED_KEY = 'crystal-rich-output-sidebar-collapsed';
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionId,
   sessionStatus,
-  model,
-  onNavigateToPrompt = () => {}
 }) => {
   // Load collapsed state from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -49,7 +46,6 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           ref={richOutputRef}
           sessionId={sessionId}
           sessionStatus={sessionStatus}
-          model={model}
         />
       </div>
 

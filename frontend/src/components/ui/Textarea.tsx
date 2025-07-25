@@ -5,10 +5,12 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
   error?: string | null;
   label?: string;
   description?: string;
+  helperText?: string;
+  fullWidth?: boolean;
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, error, label, description, id, ...props }, ref) => {
+  ({ className, error, label, description, helperText, fullWidth, id, ...props }, ref) => {
     return (
       <div className="w-full">
         {label && (
@@ -45,6 +47,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {description && !error && (
           <p className="mt-2 text-sm text-text-tertiary">
             {description}
+          </p>
+        )}
+        
+        {helperText && !error && !description && (
+          <p className="mt-2 text-sm text-text-tertiary">
+            {helperText}
           </p>
         )}
       </div>

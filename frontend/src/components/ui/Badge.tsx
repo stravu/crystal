@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 
 interface BadgeProps {
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
   className?: string;
@@ -17,7 +17,8 @@ const variantClasses = {
   success: 'bg-status-success/20 text-status-success border-status-success/30',
   warning: 'bg-status-warning/20 text-status-warning border-status-warning/30',
   error: 'bg-status-error/20 text-status-error border-status-error/30',
-  info: 'bg-status-info/20 text-status-info border-status-info/30'
+  info: 'bg-status-info/20 text-status-info border-status-info/30',
+  primary: 'bg-interactive/20 text-interactive border-interactive/30'
 };
 
 const sizeClasses = {

@@ -6,6 +6,7 @@ export interface CommitModeSettings {
   mode: CommitMode;
   structuredPromptTemplate?: string;
   checkpointPrefix?: string;
+  allowClaudeTools?: boolean;
 }
 
 export interface ProjectCharacteristics {

@@ -77,6 +77,10 @@ export interface GitCommands {
   squashCommands: string[];
   mainBranch?: string;
   currentBranch?: string;
+  getPullCommand?: () => string;
+  getPushCommand?: () => string;
+  getRebaseFromMainCommand?: () => string;
+  getSquashAndRebaseToMainCommand?: () => string;
 }
 
 export interface GitErrorDetails {
