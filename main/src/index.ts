@@ -1,7 +1,15 @@
 // Load ReadableStream polyfill before any other imports
 import './polyfills/readablestream';
 
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+// Fix GTK 2/3 and GTK 4 conflict on Linux (Electron 36 issue)
+// This MUST be done before importing electron
+import { app } from 'electron';
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('gtk-version', '3');
+}
+
+// Now import the rest of electron
+import { BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
