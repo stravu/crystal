@@ -1,0 +1,6 @@
+-- The main_branch column is now completely ignored by the application
+-- The system always uses dynamic branch detection via getProjectMainBranch()
+-- This migration documents that the main_branch column is no longer used
+-- but we keep it in the database for backward compatibility
+--
+-- The column remains in the schema but all code ignores it

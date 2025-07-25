@@ -68,6 +68,11 @@ export class API {
       return window.electronAPI.sessions.getConversation(sessionId);
     },
 
+    async getConversationMessages(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getConversationMessages(sessionId);
+    },
+
     async markViewed(sessionId: string) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.markViewed(sessionId);
@@ -237,6 +242,11 @@ export class API {
     async reorder(sessionOrders: Array<{ id: string; displayOrder: number }>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.reorder(sessionOrders);
+    },
+
+    async generateCompactedContext(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.generateCompactedContext(sessionId);
     },
   };
 

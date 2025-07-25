@@ -1,15 +1,10 @@
 import Database from 'better-sqlite3';
-import { mkdirSync } from 'fs';
+import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
-import { SQLiteAdapter } from './adapters/SQLiteAdapter';
-import { Migrator } from './Migrator';
-import { ProductionMigrator } from './ProductionMigrator';
 
 export class DatabaseService {
   private db: Database.Database;
-  private adapter: SQLiteAdapter;
-  private migrator: Migrator | ProductionMigrator;
 
   constructor(dbPath: string) {
     // Ensure the directory exists before creating the database
@@ -17,66 +12,731 @@ export class DatabaseService {
     mkdirSync(dir, { recursive: true });
     
     this.db = new Database(dbPath);
-    
-    // Emergency fallback for legacy system
-    if (process.env.USE_NEW_MIGRATIONS === 'false') {
-      throw new Error(
-        'Legacy migration system has been removed. Please remove USE_NEW_MIGRATIONS=false and use the new migration system. See /src/database/MIGRATION_ROADMAP.md for details.'
-      );
-    }
-    
-    // Always use new migration system
-    this.adapter = new SQLiteAdapter(dbPath);
-    
-    // Check if we're running in a packaged app
-    const isPackaged = process.mainModule?.filename.indexOf('app.asar') !== -1 || 
-                      process.env.NODE_ENV === 'production';
-    
-    if (isPackaged) {
-      // Use embedded migrations for packaged apps
-      this.migrator = new ProductionMigrator({
-        adapter: this.adapter,
-        logger: (message) => console.log(`[Migration] ${message}`)
-      });
-    } else {
-      // Use filesystem migrations for development
-      // Check if running via ts-node (development) or compiled JS
-      const isTypescript = __filename.endsWith('.ts');
-      const migrationsPath = isTypescript 
-        ? join(__dirname, 'migrations')  // src/database/migrations for ts-node
-        : join(__dirname, 'migrations');  // dist/main/src/database/migrations for compiled
-      
-      this.migrator = new Migrator({
-        adapter: this.adapter,
-        migrationsPath,
-        logger: (message) => console.log(`[Migration] ${message}`)
-      });
-    }
   }
 
-  async initialize(): Promise<void> {
-    // Run all pending migrations
-    await this.runMigrations();
+  initialize(): void {
+    this.initializeSchema();
+    this.runMigrations();
   }
 
-  private async runMigrations(): Promise<void> {
-    try {
-      // Run all pending migrations - they handle existing tables gracefully
-      const pending = await this.migrator.pending();
-      if (pending.length > 0) {
-        console.log(`[Database] Running ${pending.length} pending migrations...`);
-        const executed = await this.migrator.up();
-        console.log(`[Database] Successfully ran ${executed.length} migrations`);
-      } else {
-        console.log('[Database] No pending migrations');
+  private initializeSchema(): void {
+    const schemaPath = join(__dirname, 'schema.sql');
+    const schema = readFileSync(schemaPath, 'utf-8');
+    
+    // Execute schema in parts (sqlite3 doesn't support multiple statements in exec)
+    const statements = schema.split(';').filter(stmt => stmt.trim());
+    for (const statement of statements) {
+      if (statement.trim()) {
+        this.db.prepare(statement.trim()).run();
       }
-    } catch (error) {
-      console.error('[Database] Migration failed:', error);
-      throw error;
+    }
+  }
+
+  private runMigrations(): void {
+    // Check if archived column exists
+    const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
+    const hasInitialPromptColumn = tableInfo.some((col: any) => col.name === 'initial_prompt');
+    const hasLastViewedAtColumn = tableInfo.some((col: any) => col.name === 'last_viewed_at');
+    
+    if (!hasArchivedColumn) {
+      // Run migration to add archived column
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN archived BOOLEAN DEFAULT 0").run();
+      this.db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived)").run();
     }
 
-    // All database migrations are now handled by the migration system above.
-    // No additional manual schema changes should be added here.
+    // Check if we need to rename prompt to initial_prompt
+    if (!hasInitialPromptColumn) {
+      const hasPromptColumn = tableInfo.some((col: any) => col.name === 'prompt');
+      if (hasPromptColumn) {
+        this.db.prepare("ALTER TABLE sessions RENAME COLUMN prompt TO initial_prompt").run();
+      }
+      
+      // Create conversation messages table if it doesn't exist
+      const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_messages'").all();
+      if (tables.length === 0) {
+        this.db.prepare(`
+          CREATE TABLE conversation_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            message_type TEXT NOT NULL CHECK (message_type IN ('user', 'assistant')),
+            content TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+          )
+        `).run();
+        this.db.prepare("CREATE INDEX idx_conversation_messages_session_id ON conversation_messages(session_id)").run();
+        this.db.prepare("CREATE INDEX idx_conversation_messages_timestamp ON conversation_messages(timestamp)").run();
+      }
+    }
+
+    // Check if prompt_markers table exists
+    const promptMarkersTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_markers'").all();
+    if (promptMarkersTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE prompt_markers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          prompt_text TEXT NOT NULL,
+          output_index INTEGER NOT NULL,
+          output_line INTEGER,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_prompt_markers_session_id ON prompt_markers(session_id)").run();
+      this.db.prepare("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)").run();
+    } else {
+      // Check if the table has the correct column name
+      const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
+      const hasOutputLineColumn = promptMarkersInfo.some((col: any) => col.name === 'output_line');
+      const hasTerminalLineColumn = promptMarkersInfo.some((col: any) => col.name === 'terminal_line');
+      
+      if (hasTerminalLineColumn && !hasOutputLineColumn) {
+        // Rename the column from terminal_line to output_line
+        this.db.prepare(`
+          ALTER TABLE prompt_markers RENAME COLUMN terminal_line TO output_line
+        `).run();
+      }
+    }
+
+    // Check if execution_diffs table exists
+    const executionDiffsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='execution_diffs'").all();
+    if (executionDiffsTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE execution_diffs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          prompt_marker_id INTEGER,
+          execution_sequence INTEGER NOT NULL,
+          git_diff TEXT,
+          files_changed TEXT,
+          stats_additions INTEGER DEFAULT 0,
+          stats_deletions INTEGER DEFAULT 0,
+          stats_files_changed INTEGER DEFAULT 0,
+          before_commit_hash TEXT,
+          after_commit_hash TEXT,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+          FOREIGN KEY (prompt_marker_id) REFERENCES prompt_markers(id) ON DELETE SET NULL
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_session_id ON execution_diffs(session_id)").run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_prompt_marker_id ON execution_diffs(prompt_marker_id)").run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_timestamp ON execution_diffs(timestamp)").run();
+      this.db.prepare("CREATE INDEX idx_execution_diffs_sequence ON execution_diffs(session_id, execution_sequence)").run();
+    }
+
+    // Add last_viewed_at column if it doesn't exist
+    if (!hasLastViewedAtColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at TEXT").run();
+    }
+
+    // Check if claude_session_id column exists
+    const sessionTableInfoClaude = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasClaudeSessionIdColumn = sessionTableInfoClaude.some((col: any) => col.name === 'claude_session_id');
+    
+    if (!hasClaudeSessionIdColumn) {
+      // Add claude_session_id column to store Claude's actual session ID
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN claude_session_id TEXT").run();
+    }
+
+    // Check if permission_mode column exists
+    const hasPermissionModeColumn = sessionTableInfoClaude.some((col: any) => col.name === 'permission_mode');
+    
+    if (!hasPermissionModeColumn) {
+      // Add permission_mode column to sessions table
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN permission_mode TEXT DEFAULT 'ignore' CHECK(permission_mode IN ('approve', 'ignore'))").run();
+    }
+
+    // Add project support migration
+    const projectsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'").all();
+    if (projectsTable.length === 0) {
+      // Create projects table
+      this.db.prepare(`
+        CREATE TABLE projects (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          path TEXT NOT NULL UNIQUE,
+          system_prompt TEXT,
+          run_script TEXT,
+          active BOOLEAN NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      
+      // Add project_id to sessions table
+      const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all();
+      const hasProjectIdColumn = sessionsTableInfoProjects.some((col: any) => col.name === 'project_id');
+      
+      if (!hasProjectIdColumn) {
+        this.db.prepare("ALTER TABLE sessions ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE").run();
+        this.db.prepare("CREATE INDEX idx_sessions_project_id ON sessions(project_id)").run();
+      }
+
+      // Import existing config as default project if it exists
+      try {
+        const configManager = require('../services/configManager').configManager;
+        const gitRepoPath = configManager.getGitRepoPath();
+        
+        if (gitRepoPath) {
+          const projectName = gitRepoPath.split('/').pop() || 'Default Project';
+          const result = this.db.prepare(`
+            INSERT INTO projects (name, path, active)
+            VALUES (?, ?, 1)
+          `).run(projectName, gitRepoPath);
+          
+          // Update existing sessions to use this project
+          if (result.lastInsertRowid) {
+            this.db.prepare(`
+              UPDATE sessions 
+              SET project_id = ?
+              WHERE project_id IS NULL
+            `).run(result.lastInsertRowid);
+          }
+        }
+      } catch {
+        // Config manager not available during initial setup
+        console.log('Skipping default project creation during initial setup');
+      }
+    }
+
+    // Add is_main_repo column to sessions table if it doesn't exist
+    const sessionTableInfoForMainRepo = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasIsMainRepoColumn = sessionTableInfoForMainRepo.some((col: any) => col.name === 'is_main_repo');
+    
+    if (!hasIsMainRepoColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN is_main_repo BOOLEAN DEFAULT 0").run();
+      this.db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_is_main_repo ON sessions(is_main_repo, project_id)").run();
+    }
+
+    // Add main_branch column to projects table if it doesn't exist
+    const projectsTableInfo = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasMainBranchColumn = projectsTableInfo.some((col: any) => col.name === 'main_branch');
+    
+    if (!hasMainBranchColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN main_branch TEXT").run();
+    }
+
+    // Add build_script column to projects table if it doesn't exist
+    const hasBuildScriptColumn = projectsTableInfo.some((col: any) => col.name === 'build_script');
+    
+    if (!hasBuildScriptColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN build_script TEXT").run();
+    }
+
+    // Add default_permission_mode column to projects table if it doesn't exist
+    const hasDefaultPermissionModeColumn = projectsTableInfo.some((col: any) => col.name === 'default_permission_mode');
+    
+    if (!hasDefaultPermissionModeColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN default_permission_mode TEXT DEFAULT 'ignore' CHECK(default_permission_mode IN ('approve', 'ignore'))").run();
+    }
+
+    // Add open_ide_command column to projects table if it doesn't exist
+    const hasOpenIdeCommandColumn = projectsTableInfo.some((col: any) => col.name === 'open_ide_command');
+    
+    if (!hasOpenIdeCommandColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN open_ide_command TEXT").run();
+    }
+
+    // Create project_run_commands table if it doesn't exist
+    const runCommandsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_run_commands'").all();
+    if (runCommandsTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE project_run_commands (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          command TEXT NOT NULL,
+          display_name TEXT,
+          order_index INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_project_run_commands_project_id ON project_run_commands(project_id)").run();
+      
+      // Migrate existing run_script data to the new table
+      const projectsWithRunScripts = this.db.prepare("SELECT id, run_script FROM projects WHERE run_script IS NOT NULL").all() as Array<{id: number; run_script: string}>;
+      for (const project of projectsWithRunScripts) {
+        if (project.run_script) {
+          this.db.prepare(`
+            INSERT INTO project_run_commands (project_id, command, display_name, order_index)
+            VALUES (?, ?, 'Default Run Command', 0)
+          `).run(project.id, project.run_script);
+        }
+      }
+    }
+    
+    // Check if display_order columns exist
+    const projectsTableInfo2 = this.db.prepare("PRAGMA table_info(projects)").all();
+    const sessionsTableInfo2 = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasProjectsDisplayOrder = projectsTableInfo2.some((col: any) => col.name === 'display_order');
+    const hasSessionsDisplayOrder = sessionsTableInfo2.some((col: any) => col.name === 'display_order');
+    
+    if (!hasProjectsDisplayOrder) {
+      // Add display_order to projects
+      this.db.prepare("ALTER TABLE projects ADD COLUMN display_order INTEGER").run();
+      
+      // Initialize display_order for existing projects
+      this.db.prepare(`
+        UPDATE projects 
+        SET display_order = (
+          SELECT COUNT(*) 
+          FROM projects p2 
+          WHERE p2.created_at <= projects.created_at OR (p2.created_at = projects.created_at AND p2.id <= projects.id)
+        ) - 1
+        WHERE display_order IS NULL
+      `).run();
+      
+      this.db.prepare("CREATE INDEX IF NOT EXISTS idx_projects_display_order ON projects(display_order)").run();
+    }
+    
+    if (!hasSessionsDisplayOrder) {
+      // Add display_order to sessions
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN display_order INTEGER").run();
+      
+      // Initialize display_order for existing sessions within each project
+      this.db.prepare(`
+        UPDATE sessions 
+        SET display_order = (
+          SELECT COUNT(*) 
+          FROM sessions s2 
+          WHERE s2.project_id = sessions.project_id 
+          AND (s2.created_at < sessions.created_at OR (s2.created_at = sessions.created_at AND s2.id <= sessions.id))
+        ) - 1
+        WHERE display_order IS NULL
+      `).run();
+      
+      this.db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_display_order ON sessions(project_id, display_order)").run();
+    }
+    
+    // Normalize timestamp fields migration
+    // Check if last_viewed_at is still TEXT type
+    const sessionTableInfoTimestamp = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const lastViewedAtColumn = sessionTableInfoTimestamp.find((col: any) => col.name === 'last_viewed_at') as any;
+    
+    if (lastViewedAtColumn && lastViewedAtColumn.type === 'TEXT') {
+      console.log('[Database] Running timestamp normalization migration...');
+      
+      try {
+        // Create new temporary columns with DATETIME type
+        this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at_new DATETIME").run();
+        this.db.prepare("ALTER TABLE sessions ADD COLUMN run_started_at_new DATETIME").run();
+        
+        // Copy and convert existing data
+        this.db.prepare("UPDATE sessions SET last_viewed_at_new = datetime(last_viewed_at) WHERE last_viewed_at IS NOT NULL").run();
+        this.db.prepare("UPDATE sessions SET run_started_at_new = datetime(run_started_at) WHERE run_started_at IS NOT NULL").run();
+        
+        // Create a backup of the table with proper schema
+        this.db.prepare(`
+          CREATE TABLE sessions_new (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            initial_prompt TEXT NOT NULL,
+            worktree_name TEXT NOT NULL,
+            worktree_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_output TEXT,
+            exit_code INTEGER,
+            pid INTEGER,
+            claude_session_id TEXT,
+            archived BOOLEAN DEFAULT 0,
+            last_viewed_at DATETIME,
+            project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            permission_mode TEXT DEFAULT 'ignore' CHECK(permission_mode IN ('approve', 'ignore')),
+            run_started_at DATETIME,
+            is_main_repo BOOLEAN DEFAULT 0,
+            display_order INTEGER
+          )
+        `).run();
+        
+        // Copy all data to new table
+        this.db.prepare(`
+          INSERT INTO sessions_new 
+          SELECT id, name, initial_prompt, worktree_name, worktree_path, status, 
+                 created_at, updated_at, last_output, exit_code, pid, claude_session_id,
+                 archived, last_viewed_at_new, project_id, permission_mode, 
+                 run_started_at_new, is_main_repo, display_order
+          FROM sessions
+        `).run();
+        
+        // Drop old table and rename new one
+        this.db.prepare("DROP TABLE sessions").run();
+        this.db.prepare("ALTER TABLE sessions_new RENAME TO sessions").run();
+        
+        // Recreate indexes
+        this.db.prepare("CREATE INDEX idx_sessions_archived ON sessions(archived)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_project_id ON sessions(project_id)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_is_main_repo ON sessions(is_main_repo, project_id)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_display_order ON sessions(project_id, display_order)").run();
+        
+        console.log('[Database] Timestamp normalization migration completed successfully');
+      } catch (error) {
+        console.error('[Database] Failed to normalize timestamps:', error);
+        // Don't throw - allow app to continue with TEXT fields
+      }
+    }
+    
+    // Add missing completion_timestamp to prompt_markers if it doesn't exist
+    const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
+    const hasCompletionTimestamp = promptMarkersInfo.some((col: any) => col.name === 'completion_timestamp');
+    
+    if (!hasCompletionTimestamp) {
+      this.db.prepare("ALTER TABLE prompt_markers ADD COLUMN completion_timestamp DATETIME").run();
+    }
+    
+    // Add is_favorite column to sessions table if it doesn't exist
+    const sessionTableInfoFavorite = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasIsFavoriteColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'is_favorite');
+    
+    if (!hasIsFavoriteColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN is_favorite BOOLEAN DEFAULT 0").run();
+      console.log('[Database] Added is_favorite column to sessions table');
+    }
+
+    // Add auto_commit column to sessions table if it doesn't exist
+    const hasAutoCommitColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'auto_commit');
+    
+    if (!hasAutoCommitColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN auto_commit BOOLEAN DEFAULT 1").run();
+      console.log('[Database] Added auto_commit column to sessions table');
+    }
+
+    // Handle folder table migration
+    // First, check if project_folders table exists (old schema)
+    const projectFoldersExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_folders'").all().length > 0;
+    const foldersExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='folders'").all().length > 0;
+    
+    if (projectFoldersExists) {
+      console.log('[Database] Found legacy project_folders table, migrating to new folders schema...');
+      
+      // Check if the old folders table has INTEGER id
+      if (foldersExists) {
+        const foldersInfo = this.db.prepare("PRAGMA table_info(folders)").all();
+        const idColumn = foldersInfo.find((col: any) => col.name === 'id') as any;
+        
+        if (idColumn && idColumn.type === 'INTEGER') {
+          // Old folders table with INTEGER id exists, drop it
+          console.log('[Database] Dropping old folders table with INTEGER id...');
+          this.db.prepare('DROP TABLE IF EXISTS folders').run();
+        }
+      }
+      
+      // Create new folders table with TEXT id
+      this.db.prepare(`
+        CREATE TABLE IF NOT EXISTS folders (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          project_id INTEGER NOT NULL,
+          display_order INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `).run();
+      
+      // Migrate data from project_folders to folders
+      const projectFolders = this.db.prepare('SELECT * FROM project_folders').all() as any[];
+      console.log(`[Database] Migrating ${projectFolders.length} folders from project_folders to folders table...`);
+      
+      for (const folder of projectFolders) {
+        const newId = `folder-${folder.id}-${Date.now()}`;
+        this.db.prepare(`
+          INSERT INTO folders (id, name, project_id, display_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(newId, folder.name, folder.project_id, folder.display_order || 0, folder.created_at, folder.updated_at);
+        
+        // Update sessions that reference this folder
+        this.db.prepare(`
+          UPDATE sessions 
+          SET folder_id = ? 
+          WHERE folder_id = ?
+        `).run(newId, folder.id);
+      }
+      
+      // Drop the old project_folders table
+      this.db.prepare('DROP TABLE project_folders').run();
+      console.log('[Database] Dropped legacy project_folders table');
+      
+      // Update sessions table folder_id column type if needed
+      const sessionTableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
+      const folderIdColumn = sessionTableInfo.find((col: any) => col.name === 'folder_id') as any;
+      
+      if (folderIdColumn && folderIdColumn.type === 'INTEGER') {
+        console.log('[Database] Converting sessions.folder_id from INTEGER to TEXT...');
+        
+        // Create new sessions table with correct schema
+        this.db.prepare(`
+          CREATE TABLE sessions_folders_migration (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            initial_prompt TEXT NOT NULL,
+            worktree_name TEXT NOT NULL,
+            worktree_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_output TEXT,
+            exit_code INTEGER,
+            pid INTEGER,
+            claude_session_id TEXT,
+            archived BOOLEAN DEFAULT 0,
+            last_viewed_at DATETIME,
+            project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            permission_mode TEXT DEFAULT 'ignore' CHECK(permission_mode IN ('approve', 'ignore')),
+            run_started_at DATETIME,
+            is_main_repo BOOLEAN DEFAULT 0,
+            display_order INTEGER,
+            is_favorite BOOLEAN DEFAULT 0,
+            folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL,
+            auto_commit BOOLEAN DEFAULT 1
+          )
+        `).run();
+        
+        // Copy data, folder_id has already been converted to TEXT values above
+        this.db.prepare(`
+          INSERT INTO sessions_folders_migration 
+          SELECT * FROM sessions
+        `).run();
+        
+        // Drop old table and rename new one
+        this.db.prepare('DROP TABLE sessions').run();
+        this.db.prepare('ALTER TABLE sessions_folders_migration RENAME TO sessions').run();
+        
+        // Recreate indexes
+        this.db.prepare("CREATE INDEX idx_sessions_archived ON sessions(archived)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_project_id ON sessions(project_id)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_is_main_repo ON sessions(is_main_repo, project_id)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_display_order ON sessions(project_id, display_order)").run();
+        this.db.prepare("CREATE INDEX idx_sessions_folder_id ON sessions(folder_id)").run();
+        
+        console.log('[Database] Successfully converted sessions.folder_id to TEXT type');
+      }
+    } else {
+      // No project_folders table, create folders table normally
+      this.db.prepare(`
+        CREATE TABLE IF NOT EXISTS folders (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          project_id INTEGER NOT NULL,
+          display_order INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `).run();
+    }
+
+    // Create index on folders project_id
+    this.db.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_folders_project_id 
+      ON folders(project_id)
+    `).run();
+    
+    // Create additional index for display order
+    this.db.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_folders_display_order 
+      ON folders(project_id, display_order)
+    `).run();
+
+    // Add folder_id column to sessions table if it doesn't exist
+    const hasFolderIdColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'folder_id');
+    
+    if (!hasFolderIdColumn) {
+      this.db.prepare('ALTER TABLE sessions ADD COLUMN folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL').run();
+      console.log('[Database] Added folder_id column to sessions table');
+      
+      // Create index on sessions folder_id
+      this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_sessions_folder_id 
+        ON sessions(folder_id)
+      `).run();
+    }
+
+    // Add parent_folder_id column to folders table for nested folders support
+    const foldersTableInfo = this.db.prepare("PRAGMA table_info(folders)").all();
+    const hasParentFolderIdColumn = foldersTableInfo.some((col: any) => col.name === 'parent_folder_id');
+    
+    if (!hasParentFolderIdColumn) {
+      this.db.prepare('ALTER TABLE folders ADD COLUMN parent_folder_id TEXT REFERENCES folders(id) ON DELETE CASCADE').run();
+      console.log('[Database] Added parent_folder_id column to folders table for nested folders support');
+      
+      // Create index on parent_folder_id for efficient hierarchy queries
+      this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_folders_parent_id 
+        ON folders(parent_folder_id)
+      `).run();
+    }
+
+    // Add UI state table if it doesn't exist
+    const uiStateTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ui_state'").all();
+    if (uiStateTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE ui_state (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key TEXT NOT NULL UNIQUE,
+          value TEXT NOT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_ui_state_key ON ui_state(key)").run();
+      console.log('[Database] Created ui_state table');
+    }
+
+    // Add app_opens table to track application launches
+    const appOpensTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='app_opens'").all();
+    if (appOpensTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE app_opens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          welcome_hidden BOOLEAN DEFAULT 0,
+          discord_shown BOOLEAN DEFAULT 0
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_app_opens_opened_at ON app_opens(opened_at)").run();
+      console.log('[Database] Created app_opens table');
+    }
+
+    // Add model column to sessions table if it doesn't exist
+    const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasModelColumn = sessionTableInfoModel.some((col: any) => col.name === 'model');
+    
+    if (!hasModelColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN model TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      console.log('[Database] Added model column to sessions table');
+    }
+
+    // Add user_preferences table to store all user preferences
+    const userPreferencesTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'").all();
+    if (userPreferencesTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE user_preferences (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key TEXT NOT NULL UNIQUE,
+          value TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_user_preferences_key ON user_preferences(key)").run();
+      console.log('[Database] Created user_preferences table');
+      
+      // Set default preferences
+      this.db.prepare(`
+        INSERT INTO user_preferences (key, value) VALUES 
+        ('hide_welcome', 'false'),
+        ('hide_discord', 'false'),
+        ('welcome_shown', 'false')
+      `).run();
+    } else {
+      // For existing users, ensure default preferences exist
+      const defaultPreferences = [
+        { key: 'hide_welcome', value: 'false' },
+        { key: 'hide_discord', value: 'false' },
+        { key: 'welcome_shown', value: 'false' }
+      ];
+      
+      for (const pref of defaultPreferences) {
+        const existing = this.db.prepare('SELECT value FROM user_preferences WHERE key = ?').get(pref.key);
+        if (!existing) {
+          this.db.prepare('INSERT INTO user_preferences (key, value) VALUES (?, ?)').run(pref.key, pref.value);
+          console.log(`[Database] Added missing default preference: ${pref.key} = ${pref.value}`);
+        }
+      }
+    }
+
+    // Add worktree_folder column to projects table if it doesn't exist
+    const projectsTableInfoWorktree = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasWorktreeFolderColumn = projectsTableInfoWorktree.some((col: any) => col.name === 'worktree_folder');
+    
+    if (!hasWorktreeFolderColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
+      console.log('[Database] Added worktree_folder column to projects table');
+    }
+
+    // Add lastUsedModel column to projects table if it doesn't exist
+    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
+    
+    if (!hasLastUsedModelColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      console.log('[Database] Added lastUsedModel column to projects table');
+    }
+
+    // Add base_commit and base_branch columns to sessions table if they don't exist
+    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_commit');
+    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_branch');
+    
+    if (!hasBaseCommitColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN base_commit TEXT").run();
+      console.log('[Database] Added base_commit column to sessions table');
+    }
+    
+    if (!hasBaseBranchColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN base_branch TEXT").run();
+      console.log('[Database] Added base_branch column to sessions table');
+    }
+
+    // Add commit mode settings columns to projects table if they don't exist
+    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all();
+    const hasCommitModeColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
+    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_structured_prompt_template');
+    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_checkpoint_prefix');
+    
+    if (!hasCommitModeColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_mode TEXT DEFAULT 'checkpoint'").run();
+      console.log('[Database] Added commit_mode column to projects table');
+    }
+    
+    if (!hasCommitStructuredPromptTemplateColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_structured_prompt_template TEXT").run();
+      console.log('[Database] Added commit_structured_prompt_template column to projects table');
+    }
+    
+    if (!hasCommitCheckpointPrefixColumn) {
+      this.db.prepare("ALTER TABLE projects ADD COLUMN commit_checkpoint_prefix TEXT DEFAULT 'checkpoint: '").run();
+      console.log('[Database] Added commit_checkpoint_prefix column to projects table');
+    }
+
+    // Add commit mode settings columns to sessions table if they don't exist
+    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
+    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode_settings');
+    
+    if (!hasSessionCommitModeColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode TEXT").run();
+      console.log('[Database] Added commit_mode column to sessions table');
+    }
+    
+    if (!hasSessionCommitModeSettingsColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode_settings TEXT").run();
+      console.log('[Database] Added commit_mode_settings column to sessions table');
+    }
+
+    // Migrate existing auto_commit boolean to commit_mode
+    const hasAutoCommitMigrated = this.db.prepare("SELECT value FROM user_preferences WHERE key = 'auto_commit_migrated'").get();
+    if (!hasAutoCommitMigrated) {
+      console.log('[Database] Migrating auto_commit boolean to commit_mode...');
+      
+      // Update sessions: auto_commit=true -> commit_mode='checkpoint', auto_commit=false -> commit_mode='disabled'
+      this.db.prepare(`
+        UPDATE sessions 
+        SET commit_mode = CASE 
+          WHEN auto_commit = 1 THEN 'checkpoint'
+          ELSE 'disabled'
+        END
+        WHERE commit_mode IS NULL
+      `).run();
+      
+      // Mark migration as complete
+      this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('auto_commit_migrated', 'true')").run();
+      console.log('[Database] Completed auto_commit migration');
+    }
   }
 
   // Project operations
@@ -1039,9 +1699,6 @@ export class DatabaseService {
   }
 
   close(): void {
-    // Close adapter connection
-    this.adapter.close();
-    // Close main database connection
     this.db.close();
   }
 }

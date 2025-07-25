@@ -283,20 +283,35 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
                     value={openIdeCommand}
                     onChange={(e) => setOpenIdeCommand(e.target.value)}
                     className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 font-mono text-sm"
-                    placeholder='open -na "PyCharm.app" --args "`pwd`"'
+                    placeholder='code .'
                   />
                   <p className="mt-1 text-xs text-gray-600 dark:text-gray-500">
-                    Command to open the worktree in your IDE. Use `pwd` to reference the worktree directory.
+                    Command to open the worktree in your IDE. The command will be executed in the worktree directory.
                     <br />
-                    <span className="text-gray-700 dark:text-gray-600">Examples:</span>
+                    <span className="text-gray-700 dark:text-gray-600 font-semibold">Common Examples:</span>
                     <br />
-                    <span className="font-mono text-gray-700 dark:text-gray-600">• code . (VS Code)</span>
+                    <span className="font-mono text-gray-700 dark:text-gray-600">• code . </span><span className="text-gray-600 dark:text-gray-500">(VS Code)</span>
                     <br />
-                    <span className="font-mono text-gray-700 dark:text-gray-600">• cursor . (Cursor)</span>
+                    <span className="font-mono text-gray-700 dark:text-gray-600">• cursor . </span><span className="text-gray-600 dark:text-gray-500">(Cursor)</span>
                     <br />
-                    <span className="text-gray-700 dark:text-gray-600 italic">Note: You may need to install the shell command separately for VS Code and Cursor</span>
+                    <span className="font-mono text-gray-700 dark:text-gray-600">• subl . </span><span className="text-gray-600 dark:text-gray-500">(Sublime Text)</span>
                     <br />
-                    <span className="font-mono text-gray-700 dark:text-gray-600">• open -na "PyCharm.app" --args "`pwd`" (PyCharm on macOS)</span>
+                    <span className="font-mono text-gray-700 dark:text-gray-600">• idea . </span><span className="text-gray-600 dark:text-gray-500">(IntelliJ IDEA)</span>
+                    <br />
+                    <span className="font-mono text-gray-700 dark:text-gray-600">• open -a "PyCharm" . </span><span className="text-gray-600 dark:text-gray-500">(PyCharm on macOS)</span>
+                    <br />
+                    <br />
+                    <span className="text-gray-700 dark:text-gray-600 font-semibold">Troubleshooting:</span>
+                    <br />
+                    <span className="text-gray-600 dark:text-gray-500">• If the command is not found, use the full path (e.g., </span><span className="font-mono text-gray-700 dark:text-gray-600">/usr/local/bin/code .</span><span className="text-gray-600 dark:text-gray-500">)</span>
+                    <br />
+                    <span className="text-gray-600 dark:text-gray-500">• For VS Code and Cursor, install the shell command from the Command Palette:</span>
+                    <br />
+                    <span className="text-gray-600 dark:text-gray-500 ml-2">→ VS Code: "Shell Command: Install 'code' command in PATH"</span>
+                    <br />
+                    <span className="text-gray-600 dark:text-gray-500 ml-2">→ Cursor: "Shell Command: Install 'cursor' command in PATH"</span>
+                    <br />
+                    <span className="text-gray-600 dark:text-gray-500">• The command runs with your shell's environment, inheriting your PATH</span>
                   </p>
                 </div>
               </div>

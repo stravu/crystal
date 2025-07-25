@@ -8,18 +8,9 @@
     "dev": "tsc -w",
     "build": "rimraf dist && tsc && npm run copy:assets && npm run bundle:mcp",
     "bundle:mcp": "node build-mcp-bridge.js",
-    "copy:assets": "mkdirp dist/main/src/database/migrations",
+    "copy:assets": "mkdirp dist/main/src/database/migrations && cp src/database/*.sql dist/main/src/database/ && cp src/database/migrations/*.sql dist/main/src/database/migrations/",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "db:create-migration": "ts-node src/database/cli/create-migration.ts",
-    "db:migrate": "ts-node src/database/cli/run-migrations.ts up",
-    "db:rollback": "ts-node src/database/cli/run-migrations.ts down",
-    "db:status": "ts-node src/database/cli/run-migrations.ts status",
-    "db:reset": "ts-node src/database/cli/run-migrations.ts reset",
-    "db:validate": "ts-node src/database/utils/migrationValidator.ts",
-    "db:test": "jest src/database/test/migration.test.ts",
-    "db:test:ci": "ts-node src/database/test/ci-startup-test.ts",
-    "db:test:all": "scripts/test-database-migrations.sh",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage"
@@ -29,13 +20,12 @@
     "@anthropic-ai/sdk": "^0.53.0",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.12.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "^11.7.0",
     "bull": "^4.16.3",
     "dotenv": "^16.4.7",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.6.2",
     "glob": "^11.0.0",
-    "umzug": "^3.8.1",
     "web-streams-polyfill": "^3.3.3"
   },
   "devDependencies": {
@@ -51,7 +41,6 @@
     "eslint": "^9.17.0",
     "mkdirp": "^3.0.1",
     "rimraf": "^6.0.1",
-    "ts-node": "^10.9.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

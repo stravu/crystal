@@ -472,6 +472,58 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  ipcMain.handle('sessions:get-conversation-messages', async (_event, sessionId: string) => {
+    try {
+      const messages = await sessionManager.getConversationMessages(sessionId);
+      return { success: true, data: messages };
+    } catch (error) {
+      console.error('Failed to get conversation messages:', error);
+      return { success: false, error: 'Failed to get conversation messages' };
+    }
+  });
+
+  ipcMain.handle('sessions:generate-compacted-context', async (_event, sessionId: string) => {
+    try {
+      console.log('[IPC] sessions:generate-compacted-context called for sessionId:', sessionId);
+      
+      // Get all the data we need for compaction
+      const session = await sessionManager.getSession(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found' };
+      }
+
+      // Get the database session for the compactor (it expects the database model)
+      const dbSession = databaseService.getSession(sessionId);
+      if (!dbSession) {
+        return { success: false, error: 'Session not found in database' };
+      }
+
+      const conversationMessages = await sessionManager.getConversationMessages(sessionId);
+      const promptMarkers = databaseService.getPromptMarkers(sessionId);
+      const executionDiffs = databaseService.getExecutionDiffs(sessionId);
+      const sessionOutputs = await sessionManager.getSessionOutputs(sessionId);
+      
+      // Import the compactor utility
+      const { ProgrammaticCompactor } = await import('../utils/contextCompactor');
+      const compactor = new ProgrammaticCompactor(databaseService);
+      
+      // Generate the compacted summary
+      const summary = await compactor.generateSummary(sessionId, {
+        session: dbSession,
+        conversationMessages,
+        promptMarkers,
+        executionDiffs,
+        sessionOutputs: sessionOutputs as any // Type conversion needed
+      });
+      
+      console.log('[IPC] Generated compacted context summary');
+      return { success: true, data: { summary } };
+    } catch (error) {
+      console.error('Failed to generate compacted context:', error);
+      return { success: false, error: 'Failed to generate compacted context' };
+    }
+  });
+
   ipcMain.handle('sessions:get-json-messages', async (_event, sessionId: string) => {
     try {
       console.log(`[IPC] sessions:get-json-messages called for session: ${sessionId}`);

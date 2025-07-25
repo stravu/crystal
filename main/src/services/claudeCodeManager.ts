@@ -158,7 +158,16 @@ export class ClaudeCodeManager extends EventEmitter {
       
       // Add model argument if specified
       if (model) {
-        args.push('--model', model);
+        // Map full model identifiers to shorthand for Bedrock compatibility
+        // Only opus and sonnet have shorthand versions, haiku passes through
+        let modelOrAlias = model;
+        if (model.includes('opus')) {
+          modelOrAlias = 'opus';
+        } else if (model.includes('sonnet')) {
+          modelOrAlias = 'sonnet';
+        }
+
+        args.push('--model', modelOrAlias);
         this.logger?.verbose(`Using model: ${model}`);
       }
       

@@ -31,6 +31,9 @@ interface SessionInputWithImagesProps {
   gitCommands: GitCommands | null;
   onFocus?: () => void;
   onBlur?: () => void;
+  handleCompactContext?: () => void;
+  contextCompacted?: boolean;
+  hasConversationHistory?: boolean;
 }
 
 export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = memo(({
@@ -50,6 +53,9 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   gitCommands,
   onFocus,
   onBlur,
+  handleCompactContext,
+  contextCompacted,
+  hasConversationHistory,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -490,6 +496,37 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 </div>
                 <span className="leading-none">Extended Thinking</span>
               </button>
+
+              {/* Context Compaction Button */}
+              {handleCompactContext && hasConversationHistory && (
+                <button
+                  onClick={handleCompactContext}
+                  disabled={activeSession.status === 'running' || activeSession.status === 'initializing'}
+                  className={`
+                    px-3.5 py-1.5 rounded-full text-xs font-medium
+                    transition-all duration-200 flex items-center gap-1.5
+                    hover:scale-105 active:scale-95
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-950
+                    ${activeSession.status === 'running' || activeSession.status === 'initializing'
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed' 
+                      : contextCompacted 
+                        ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/30 focus:ring-amber-500 border border-amber-200 dark:border-amber-800'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500'
+                    }
+                  `}
+                  title={contextCompacted 
+                    ? 'Context summary ready - will be added to your next prompt'
+                    : 'Generate a summary of the conversation to continue in a new context window'
+                  }
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                  <span className="leading-none">
+                    {contextCompacted ? 'Context Ready' : 'Compact Context'}
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* Right Section - Continue Button */}
