@@ -1017,13 +1017,6 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
 
   return (
     <div className="h-full flex flex-col bg-bg-primary relative">
-      {/* Settings Bar */}
-      <div className="border-b border-border-primary px-4 py-2 flex items-center justify-between bg-surface-secondary">
-        <div className="text-sm text-text-tertiary">
-          {messages.length} message{messages.length !== 1 ? 's' : ''}
-        </div>
-      </div>
-      
       {/* Floating Settings Panel - controlled by parent */}
       {showSettings && onSettingsClick && (
         <>
@@ -1033,8 +1026,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             onClick={onSettingsClick}
           />
           
-          {/* Settings Dropdown - positioned from tab bar */}
-          <div className="absolute top-[120px] right-4 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+          {/* Settings Dropdown - positioned near tab bar */}
+          <div className="absolute top-12 right-4 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="p-4">
                   <div className="space-y-4">
                     {/* Content Display Settings */}

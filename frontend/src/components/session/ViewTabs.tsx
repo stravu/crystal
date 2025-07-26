@@ -149,8 +149,8 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
         <button
           onClick={onSettingsClick}
           className={cn(
-            "ml-auto mr-2 p-2 rounded-md transition-all",
-            "text-text-secondary hover:text-text-primary",
+            "ml-auto mr-2 px-3 py-2 rounded-md transition-all flex items-center gap-2",
+            "text-text-secondary hover:text-text-primary text-sm",
             showSettings ? [
               "bg-surface-hover text-text-primary",
               "ring-1 ring-border-secondary"
@@ -158,9 +158,10 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
               "hover:bg-surface-hover"
             ]
           )}
-          title="Rich Output Settings"
+          title="Configure Rich Output display settings"
         >
           <Settings className="w-4 h-4" />
+          <span>Display Settings</span>
         </button>
       )}
     </div>
