@@ -89,11 +89,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   }),
   
   updateSession: (updatedSession) => set((state) => {
-    console.log(`[SessionStore] updateSession called for ${updatedSession.id}`, {
-      model: updatedSession.model,
-      status: updatedSession.status,
-      fullUpdate: updatedSession
-    });
     
     // If this is the active main repo session, update it
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === updatedSession.id) {

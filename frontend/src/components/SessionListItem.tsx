@@ -45,6 +45,14 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       const previousSession = prevState.sessions.find(s => s.id === session.id) || 
         (prevState.activeMainRepoSession?.id === session.id ? prevState.activeMainRepoSession : null);
       
+      // Debug: Compare store status with prop status
+      if (currentSession) {
+        console.log(`[SessionListItem] Session ${session.id} - Store status: ${currentSession.status}, Prop status: ${session.status}`);
+        if (currentSession.status !== session.status) {
+          console.warn(`[SessionListItem] Session ${session.id} status mismatch! Store: ${currentSession.status}, Prop: ${session.status}`);
+        }
+      }
+      
       // Force component update if status changed
       if (currentSession && previousSession && currentSession.status !== previousSession.status) {
         // Status changed - component will re-render due to prop change
@@ -52,7 +60,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     });
     
     return unsubscribe;
-  }, [session.id]);
+  }, [session.id, session.status]);
   
   useEffect(() => {
     // Check if this session's project has a run script

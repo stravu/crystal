@@ -308,6 +308,26 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           }
         });
         
+      } else if (msg.type === 'system' && msg.subtype === 'context_compacted') {
+        // Handle context compaction messages
+        transformed.push({
+          id: msg.id || `context-compacted-${i}-${msg.timestamp}`,
+          role: 'system',
+          timestamp: msg.timestamp,
+          segments: [{ 
+            type: 'text', 
+            content: msg.summary || ''
+          }, {
+            type: 'system_info',
+            info: {
+              message: msg.message
+            }
+          }],
+          metadata: {
+            systemSubtype: 'context_compacted'
+          }
+        });
+        
       } else if (msg.type === 'result') {
         // Handle execution result messages - especially errors
         if (msg.is_error && msg.result) {
@@ -753,6 +773,54 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 </div>
                 <div className="text-sm text-text-primary whitespace-pre-wrap font-mono">
                   {textContent}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      } else if (message.metadata?.systemSubtype === 'context_compacted') {
+        // Render context compaction messages
+        // Get the message info from the system_info segment
+        const infoSegment = message.segments.find(seg => seg.type === 'system_info');
+        const helpMessage = infoSegment?.type === 'system_info' ? infoSegment.info.message : 
+          'Context has been compacted. You can continue chatting - your next message will automatically include the context summary above.';
+        
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all bg-status-warning/10 border border-status-warning/30
+              ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-start gap-3">
+              <div className="rounded-full p-2 bg-status-warning/20 text-status-warning">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="font-semibold text-status-warning">Context Compacted</span>
+                  <span className="text-sm text-text-tertiary">
+                    {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                  </span>
+                </div>
+                
+                {/* Summary content */}
+                <div className="bg-surface-secondary rounded-lg p-3 mb-3 border border-border-primary">
+                  <div className="text-sm text-text-secondary font-mono whitespace-pre-wrap">
+                    {textContent}
+                  </div>
+                </div>
+                
+                {/* Clear instruction message */}
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-status-success mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-text-primary">
+                    <span className="font-medium">Ready to continue!</span> {helpMessage}
+                  </div>
                 </div>
               </div>
             </div>

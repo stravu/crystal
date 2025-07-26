@@ -355,8 +355,8 @@ export const SessionView = memo(() => {
           setUltrathink={hook.setUltrathink}
           gitCommands={hook.gitCommands}
           handleCompactContext={hook.handleCompactContext}
-          contextCompacted={hook.contextCompacted}
           hasConversationHistory={hook.hasConversationHistory}
+          contextCompacted={hook.contextCompacted}
         />
       )}
 

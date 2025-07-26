@@ -1609,7 +1609,8 @@ export const useSessionView = (
           });
           
           terminalInstance.current.write('\r\n\x1b[1;33m══════════════════════════════════════════════════════════════════\x1b[0m\r\n');
-          terminalInstance.current.write('\x1b[1;32m✓ Context ready - will be injected into your next prompt\x1b[0m\r\n');
+          terminalInstance.current.write('\x1b[1;32m✓ Context compacted successfully!\x1b[0m\r\n');
+          terminalInstance.current.write('\x1b[1;36mJust type your next message - the context above will be automatically included.\x1b[0m\r\n');
           terminalInstance.current.write('\x1b[1;33m══════════════════════════════════════════════════════════════════\x1b[0m\r\n\r\n');
           
           // Scroll to bottom to show the summary

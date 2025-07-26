@@ -5,6 +5,7 @@ import { isDocumentVisible } from '../utils/performanceUtils';
 import { Badge } from './ui/Badge';
 import { StatusDot } from './ui/StatusDot';
 import { cn } from '../utils/cn';
+import { useSessionStore } from '../stores/sessionStore';
 
 interface StatusIndicatorProps {
   session: Session;
@@ -20,6 +21,15 @@ export const StatusIndicator = React.memo(({
   showProgress = false 
 }: StatusIndicatorProps) => {
   const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
+  
+  // Get the current session status from the store - this is the source of truth
+  const storeSession = useSessionStore((state) => 
+    state.sessions.find(s => s.id === session.id) || 
+    (state.activeMainRepoSession?.id === session.id ? state.activeMainRepoSession : null)
+  );
+  
+  // Use store session status if available, otherwise fall back to prop
+  const currentStatus = storeSession?.status || session.status;
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -68,7 +78,7 @@ export const StatusIndicator = React.memo(({
         return {
           variant: 'default' as const,
           badgeVariant: 'default' as const,
-          dotStatus: 'success' as const,
+          dotStatus: 'default' as const,
           icon: CheckCircle,
           text: 'Completed',
           tooltip: 'Task finished successfully',
@@ -130,19 +140,20 @@ export const StatusIndicator = React.memo(({
     }
   };
 
-  const config = getStatusConfig(session.status);
+  const config = getStatusConfig(currentStatus);
   const badgeSize = getBadgeSize(size);
   const dotSize = getDotSize(size);
+  
   
   // Disable animations when not visible or for non-active states
   const shouldAnimate = animationsEnabled && config.animated;
 
   const estimateProgress = (): number => {
-    if (session.status === 'stopped') return 100;
-    if (session.status === 'error') return 0;
-    if (session.status === 'waiting') return 75;
-    if (session.status === 'running') return 50;
-    if (session.status === 'initializing') return 25;
+    if (currentStatus === 'stopped') return 100;
+    if (currentStatus === 'error') return 0;
+    if (currentStatus === 'waiting') return 75;
+    if (currentStatus === 'running') return 50;
+    if (currentStatus === 'initializing') return 25;
     return 0;
   };
 
@@ -179,7 +190,6 @@ export const StatusIndicator = React.memo(({
                   config.dotStatus === 'waiting' && 'bg-status-warning',
                   config.dotStatus === 'error' && 'bg-status-error',
                   config.dotStatus === 'info' && 'bg-status-info',
-                  config.dotStatus === 'success' && 'bg-status-success',
                   config.dotStatus === 'default' && 'bg-text-tertiary'
                 )}
                 style={{ width: `${estimateProgress()}%` }}

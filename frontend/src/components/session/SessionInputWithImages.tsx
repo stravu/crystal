@@ -1,14 +1,13 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
-import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { API } from '../../utils/api';
 import { CommitModePill, AutoCommitSwitch } from '../CommitModeToggle';
 import { Dropdown, type DropdownItem } from '../ui/Dropdown';
 import { Pill } from '../ui/Pill';
 import { SwitchSimple as Switch } from '../ui/SwitchSimple';
-import { Toggle } from '../ui/Toggle';
 
 interface AttachedImage {
   id: string;
@@ -35,8 +34,8 @@ interface SessionInputWithImagesProps {
   onFocus?: () => void;
   onBlur?: () => void;
   handleCompactContext?: () => void;
-  contextCompacted?: boolean;
   hasConversationHistory?: boolean;
+  contextCompacted?: boolean;
 }
 
 export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = memo(({
@@ -56,15 +55,14 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   onFocus,
   onBlur,
   handleCompactContext,
-  contextCompacted,
   hasConversationHistory,
+  contextCompacted = false,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -268,6 +266,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     }
   }, [onBlur]);
 
+
   return (
     <div className="border-t-2 border-border-primary flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
       <div className="bg-surface-secondary">
@@ -304,6 +303,19 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   </svg>
                   <span className="leading-none font-mono">
                     {gitCommands.currentBranch}
+                  </span>
+                </div>
+              )}
+              
+              {/* Context Compacted Indicator */}
+              {contextCompacted && (
+                <div className="px-2.5 py-1 rounded-full text-xs font-medium
+                  bg-status-warning/10 text-status-warning 
+                  border border-status-warning/30
+                  flex items-center gap-1.5 animate-pulse">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span className="leading-none">
+                    Context Ready
                   </span>
                 </div>
               )}
@@ -459,8 +471,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 <ModelSelector
                   selectedModel={selectedModel}
                   setSelectedModel={setSelectedModel}
-                  showDropdown={showModelDropdown}
-                  setShowDropdown={setShowModelDropdown}
+                  setShowDropdown={() => {}}
                 />
 
                 {/* Auto-Commit Mode Pill - always visible */}
@@ -573,7 +584,6 @@ SessionInputWithImages.displayName = 'SessionInputWithImages';
 interface ModelSelectorProps {
   selectedModel: string;
   setSelectedModel: (model: string) => void;
-  showDropdown: boolean;
   setShowDropdown: (show: boolean) => void;
 }
 

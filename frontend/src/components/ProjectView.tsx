@@ -488,11 +488,10 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
           setShowStravuSearch={hook.setShowStravuSearch}
           ultrathink={hook.ultrathink}
           setUltrathink={hook.setUltrathink}
-          handleToggleAutoCommit={hook.handleToggleAutoCommit}
           gitCommands={hook.gitCommands}
           handleCompactContext={hook.handleCompactContext}
-          contextCompacted={hook.contextCompacted}
           hasConversationHistory={hook.hasConversationHistory}
+          contextCompacted={hook.contextCompacted}
         />
       )}
     </div>

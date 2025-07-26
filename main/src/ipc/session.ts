@@ -559,6 +559,21 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       });
       console.log('[IPC] Generated compacted context summary and set skip_continue_next flag');
       
+      // Add a system message to the session outputs so it appears in rich output view
+      const contextCompactionMessage = {
+        type: 'system',
+        subtype: 'context_compacted',
+        timestamp: new Date().toISOString(),
+        summary: summary,
+        message: 'Context has been compacted. You can continue chatting - your next message will automatically include the context summary above.'
+      };
+      
+      await sessionManager.addSessionOutput(sessionId, {
+        type: 'json',
+        data: contextCompactionMessage,
+        timestamp: new Date()
+      });
+      
       return { success: true, data: { summary } };
     } catch (error) {
       console.error('Failed to generate compacted context:', error);
