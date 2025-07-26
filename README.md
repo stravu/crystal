@@ -43,6 +43,7 @@ https://github.com/user-attachments/assets/e32f0ee7-c25a-43d6-a704-8a39878032eb
 - Claude Code installed and logged in or API key provided
 - Git installed
 - Git repository (Crystal will initialize one if needed)
+- **Supported platforms**: macOS, Linux, and Windows
 
 ### 1. Create a Project
 Create a new project if you haven't already. This can be an empty folder or an existing git repository. Crystal will initialize git if needed.
@@ -77,6 +78,14 @@ When everything looks good:
   - Open the DMG file and drag Crystal to your Applications folder
   - On first launch, you may need to right-click and select "Open" due to macOS security settings
 
+- **Windows**: Download `Crystal-{version}-windows.exe` from the [latest release](https://github.com/stravu/crystal/releases/latest)
+  - Run the installer and follow the installation wizard
+  - Crystal will be installed to your Program Files directory and available from the Start Menu
+
+- **Linux**: Download from the [latest release](https://github.com/stravu/crystal/releases/latest)
+  - `.deb` file for Debian/Ubuntu: `sudo dpkg -i Crystal-{version}.deb`
+  - `.AppImage` for all distributions: Make executable with `chmod +x` and run directly
+
 
 ## Building from Source
 
@@ -97,6 +106,12 @@ pnpm run electron-dev
 ```bash
 # Build for macOS
 pnpm build:mac
+
+# Build for Windows
+pnpm build:win
+
+# Build for Linux
+pnpm build:linux
 ```
 
 
