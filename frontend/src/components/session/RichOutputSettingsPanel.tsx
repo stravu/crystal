@@ -28,7 +28,7 @@ export const RichOutputSettingsPanel: React.FC<RichOutputSettingsPanelProps> = (
       />
       
       {/* Settings Dropdown - positioned below tab bar */}
-      <div className="fixed top-[165px] right-4 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+      <div className="fixed top-[140px] right-4 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
         <div className="p-4">
           <div className="space-y-4">
             {/* Content Display Settings */}

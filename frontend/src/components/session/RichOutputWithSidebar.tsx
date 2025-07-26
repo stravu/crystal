@@ -21,9 +21,6 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionId,
   sessionStatus,
   settings,
-  onSettingsChange,
-  showSettings,
-  onSettingsClick,
 }) => {
   // Load collapsed state from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -56,9 +53,6 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           sessionId={sessionId}
           sessionStatus={sessionStatus}
           settings={settings}
-          onSettingsChange={onSettingsChange}
-          showSettings={showSettings}
-          onSettingsClick={onSettingsClick}
         />
       </div>
 

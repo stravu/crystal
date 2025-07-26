@@ -228,7 +228,7 @@ export const SessionView = memo(() => {
         setViewMode={hook.setViewMode}
         unreadActivity={hook.unreadActivity}
         setUnreadActivity={hook.setUnreadActivity}
-        onSettingsClick={hook.viewMode === 'richOutput' ? () => setShowRichOutputSettings(!showRichOutputSettings) : undefined}
+        onSettingsClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
         showSettings={showRichOutputSettings}
       />
       
@@ -288,8 +288,6 @@ export const SessionView = memo(() => {
               sessionId={activeSession.id}
               settings={richOutputSettings}
               onSettingsChange={handleRichOutputSettingsChange}
-              showSettings={showRichOutputSettings}
-              onSettingsClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
             />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>

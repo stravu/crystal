@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { API } from '../../utils/api';
 import { MarkdownPreview } from '../MarkdownPreview';
-import { User, Bot, ChevronDown, ChevronRight, Eye, EyeOff, Settings2, Wrench, CheckCircle, XCircle, Clock, ArrowDown, Terminal, Package, Brain, Maximize2, ScrollText } from 'lucide-react';
+import { User, Bot, ChevronDown, ChevronRight, Eye, EyeOff, Settings2, Wrench, CheckCircle, XCircle, Clock, ArrowDown } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from './ThinkingPlaceholder';
-import { SwitchSimple } from '../ui/SwitchSimple';
 
 // Agent-agnostic message types for flexibility
 interface RawMessage {
@@ -61,9 +60,6 @@ interface RichOutputViewProps {
   sessionId: string;
   sessionStatus?: string;
   settings?: RichOutputSettings;
-  onSettingsChange?: (settings: RichOutputSettings) => void;
-  showSettings?: boolean;
-  onSettingsClick?: () => void;
 }
 
 // Settings stored in localStorage for persistence
@@ -86,7 +82,7 @@ const defaultSettings: RichOutputSettings = {
 };
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
-  ({ sessionId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings: propsShowSettings, onSettingsClick }, ref) => {
+  ({ sessionId, sessionStatus, settings: propsSettings }, ref) => {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,23 +90,14 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [showScrollButton, setShowScrollButton] = useState(false);
   
-  // Use parent-controlled settings if provided, otherwise use local state
-  const [localSettings, setLocalSettings] = useState<RichOutputSettings>(() => {
+  // Use parent-controlled settings if provided, otherwise use default
+  const localSettings = useMemo<RichOutputSettings>(() => {
     const saved = localStorage.getItem('richOutputSettings');
     return saved ? JSON.parse(saved) : defaultSettings;
-  });
+  }, []);
   
   const settings = propsSettings || localSettings;
-  const showSettings = propsShowSettings !== undefined ? propsShowSettings : false;
   
-  const updateSettings = useCallback((newSettings: RichOutputSettings) => {
-    if (onSettingsChange) {
-      onSettingsChange(newSettings);
-    } else {
-      setLocalSettings(newSettings);
-      localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
-    }
-  }, [onSettingsChange]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
@@ -529,10 +516,6 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     });
   };
 
-  const toggleSetting = (key: keyof RichOutputSettings) => {
-    const newSettings = { ...settings, [key]: !settings[key] };
-    updateSettings(newSettings);
-  };
 
   // Render a tool call segment
   const renderToolCall = (tool: ToolCall) => {
@@ -1017,111 +1000,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
 
   return (
     <div className="h-full flex flex-col bg-bg-primary relative">
-      {/* Floating Settings Panel - controlled by parent */}
-      {showSettings && onSettingsClick && (
-        <>
-          {/* Backdrop to close settings when clicking outside */}
-          <div 
-            className="fixed inset-0 z-20" 
-            onClick={onSettingsClick}
-          />
-          
-          {/* Settings Dropdown - positioned near tab bar */}
-          <div className="absolute top-12 right-4 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
-                <div className="p-4">
-                  <div className="space-y-4">
-                    {/* Content Display Settings */}
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-2">Content</h4>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Wrench className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span className="text-sm text-text-primary">Tool Calls</span>
-                          </div>
-                          <SwitchSimple
-                            checked={settings.showToolCalls}
-                            onCheckedChange={() => toggleSetting('showToolCalls')}
-                            size="sm"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Brain className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span className="text-sm text-text-primary">Thinking Process</span>
-                          </div>
-                          <SwitchSimple
-                            checked={settings.showThinking}
-                            onCheckedChange={() => toggleSetting('showThinking')}
-                            size="sm"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Terminal className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span className="text-sm text-text-primary">Session Info</span>
-                          </div>
-                          <SwitchSimple
-                            checked={settings.showSessionInit}
-                            onCheckedChange={() => toggleSetting('showSessionInit')}
-                            size="sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="h-px bg-border-primary"></div>
-                    
-                    {/* Layout Settings */}
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-2">Layout</h4>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Maximize2 className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span className="text-sm text-text-primary">Compact View</span>
-                          </div>
-                          <SwitchSimple
-                            checked={settings.compactMode}
-                            onCheckedChange={() => toggleSetting('compactMode')}
-                            size="sm"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Package className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span className="text-sm text-text-primary">Minimize Tools</span>
-                          </div>
-                          <SwitchSimple
-                            checked={settings.collapseTools}
-                            onCheckedChange={() => toggleSetting('collapseTools')}
-                            size="sm"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <ScrollText className="w-3.5 h-3.5 text-text-tertiary" />
-                            <span className="text-sm text-text-primary">Auto-scroll</span>
-                          </div>
-                          <SwitchSimple
-                            checked={settings.autoScroll}
-                            onCheckedChange={() => toggleSetting('autoScroll')}
-                            size="sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-        </>
-      )}
+      {/* Settings panel is now rendered in SessionView to avoid duplication */}
 
       {/* Messages */}
       <div 
