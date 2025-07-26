@@ -21,6 +21,7 @@ import { Button } from './ui/Button';
 import { Card, CardContent } from './ui/Card';
 import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
 import { RichOutputSettings } from './session/RichOutputView';
+import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
@@ -412,6 +413,15 @@ export const SessionView = memo(() => {
         onClose={() => hook.setShowStravuSearch(false)}
         onFileSelect={hook.handleStravuFileSelect}
       />
+      
+      {/* Rich Output Settings Panel */}
+      {hook.viewMode === 'richOutput' && showRichOutputSettings && (
+        <RichOutputSettingsPanel
+          settings={richOutputSettings}
+          onSettingsChange={handleRichOutputSettingsChange}
+          onClose={() => setShowRichOutputSettings(false)}
+        />
+      )}
     </div>
   );
 });
