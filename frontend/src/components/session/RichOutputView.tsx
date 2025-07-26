@@ -996,10 +996,13 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   }
 
   return (
-    <div className="h-full flex flex-col bg-bg-primary">
+    <div className="h-full flex flex-col bg-bg-primary relative">
       {/* Settings Bar */}
       <div className="border-b border-border-primary px-4 py-2 flex items-center justify-between bg-surface-secondary">
-        <div className="flex items-center gap-2">
+        <div className="text-sm text-text-tertiary">
+          {messages.length} message{messages.length !== 1 ? 's' : ''}
+        </div>
+        <div className="relative">
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`
@@ -1011,127 +1014,116 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             `}
           >
             <Settings2 className="w-4 h-4" />
-            <span className="font-medium">Display Options</span>
-            {showSettings ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            <span className="font-medium">Display</span>
           </button>
-        </div>
-        <div className="text-sm text-text-tertiary">
-          {messages.length} message{messages.length !== 1 ? 's' : ''}
+          
+          {/* Floating Settings Panel */}
+          {showSettings && (
+            <>
+              {/* Backdrop to close settings when clicking outside */}
+              <div 
+                className="fixed inset-0 z-20" 
+                onClick={() => setShowSettings(false)}
+              />
+              
+              {/* Settings Dropdown */}
+              <div className="absolute right-0 mt-2 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="p-4">
+                  <div className="space-y-4">
+                    {/* Content Display Settings */}
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-2">Content</h4>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Wrench className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span className="text-sm text-text-primary">Tool Calls</span>
+                          </div>
+                          <SwitchSimple
+                            checked={settings.showToolCalls}
+                            onCheckedChange={() => toggleSetting('showToolCalls')}
+                            size="sm"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Brain className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span className="text-sm text-text-primary">Thinking Process</span>
+                          </div>
+                          <SwitchSimple
+                            checked={settings.showThinking}
+                            onCheckedChange={() => toggleSetting('showThinking')}
+                            size="sm"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Terminal className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span className="text-sm text-text-primary">Session Info</span>
+                          </div>
+                          <SwitchSimple
+                            checked={settings.showSessionInit}
+                            onCheckedChange={() => toggleSetting('showSessionInit')}
+                            size="sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="h-px bg-border-primary"></div>
+                    
+                    {/* Layout Settings */}
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-2">Layout</h4>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Maximize2 className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span className="text-sm text-text-primary">Compact View</span>
+                          </div>
+                          <SwitchSimple
+                            checked={settings.compactMode}
+                            onCheckedChange={() => toggleSetting('compactMode')}
+                            size="sm"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Package className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span className="text-sm text-text-primary">Minimize Tools</span>
+                          </div>
+                          <SwitchSimple
+                            checked={settings.collapseTools}
+                            onCheckedChange={() => toggleSetting('collapseTools')}
+                            size="sm"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <ScrollText className="w-3.5 h-3.5 text-text-tertiary" />
+                            <span className="text-sm text-text-primary">Auto-scroll</span>
+                          </div>
+                          <SwitchSimple
+                            checked={settings.autoScroll}
+                            onCheckedChange={() => toggleSetting('autoScroll')}
+                            size="sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="border-b border-border-primary bg-surface-secondary">
-          <div className="px-4 py-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Content Display Settings */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-text-primary mb-2">Content Display</h4>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="w-4 h-4 text-text-tertiary" />
-                      <div>
-                        <p className="text-sm text-text-primary">Tool Calls</p>
-                        <p className="text-xs text-text-tertiary">Display Claude's tool usage</p>
-                      </div>
-                    </div>
-                    <SwitchSimple
-                      checked={settings.showToolCalls}
-                      onCheckedChange={() => toggleSetting('showToolCalls')}
-                      size="sm"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Brain className="w-4 h-4 text-text-tertiary" />
-                      <div>
-                        <p className="text-sm text-text-primary">Thinking Process</p>
-                        <p className="text-xs text-text-tertiary">Claude's internal reasoning</p>
-                      </div>
-                    </div>
-                    <SwitchSimple
-                      checked={settings.showThinking}
-                      onCheckedChange={() => toggleSetting('showThinking')}
-                      size="sm"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="w-4 h-4 text-text-tertiary" />
-                      <div>
-                        <p className="text-sm text-text-primary">Session Initialization</p>
-                        <p className="text-xs text-text-tertiary">Technical session details</p>
-                      </div>
-                    </div>
-                    <SwitchSimple
-                      checked={settings.showSessionInit}
-                      onCheckedChange={() => toggleSetting('showSessionInit')}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Layout & Behavior Settings */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-text-primary mb-2">Layout & Behavior</h4>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Maximize2 className="w-4 h-4 text-text-tertiary" />
-                      <div>
-                        <p className="text-sm text-text-primary">Compact View</p>
-                        <p className="text-xs text-text-tertiary">Reduce spacing between messages</p>
-                      </div>
-                    </div>
-                    <SwitchSimple
-                      checked={settings.compactMode}
-                      onCheckedChange={() => toggleSetting('compactMode')}
-                      size="sm"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-text-tertiary" />
-                      <div>
-                        <p className="text-sm text-text-primary">Minimize Tool Output</p>
-                        <p className="text-xs text-text-tertiary">Start with tool results collapsed</p>
-                      </div>
-                    </div>
-                    <SwitchSimple
-                      checked={settings.collapseTools}
-                      onCheckedChange={() => toggleSetting('collapseTools')}
-                      size="sm"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ScrollText className="w-4 h-4 text-text-tertiary" />
-                      <div>
-                        <p className="text-sm text-text-primary">Follow Conversation</p>
-                        <p className="text-xs text-text-tertiary">Auto-scroll to new messages</p>
-                      </div>
-                    </div>
-                    <SwitchSimple
-                      checked={settings.autoScroll}
-                      onCheckedChange={() => toggleSetting('autoScroll')}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Messages */}
       <div 
