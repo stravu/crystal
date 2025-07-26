@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, HelpCircle, Hammer, Play } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -14,6 +14,11 @@ import type { Session } from '../types/session';
 import type { Project } from '../types/project';
 import type { Folder } from '../types/folder';
 import { useContextMenu } from '../contexts/ContextMenuContext';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Button } from './ui/Button';
+import { EnhancedInput } from './ui/EnhancedInput';
+import { FieldWithTooltip } from './ui/FieldWithTooltip';
+import { Card } from './ui/Card';
 
 interface ProjectWithSessions extends Project {
   sessions: Session[];
@@ -46,6 +51,7 @@ export function DraggableProjectTreeView() {
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const { setActiveSession } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
@@ -800,7 +806,10 @@ export function DraggableProjectTreeView() {
   };
 
   const handleCreateProject = async () => {
-    if (!newProject.name || !newProject.path) return;
+    if (!newProject.name || !newProject.path) {
+      setShowValidationErrors(true);
+      return;
+    }
 
     try {
       const response = await API.projects.create(newProject);
@@ -817,6 +826,8 @@ export function DraggableProjectTreeView() {
 
       setShowAddProjectDialog(false);
       setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+      setDetectedBranchForNewProject(null);
+      setShowValidationErrors(false);
       
       // Add the new project to the list without reloading everything
       const newProjectWithSessions = { ...response.data, sessions: [], folders: [] };
@@ -1887,125 +1898,178 @@ export function DraggableProjectTreeView() {
       )}
       
       {/* Add Project Dialog */}
-      {showAddProjectDialog && (
-        <div className="fixed inset-0 bg-modal-overlay flex items-center justify-center z-50">
-          <div className="bg-surface-primary rounded-lg p-6 w-96 shadow-xl border border-border-primary">
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Add New Project</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Project Name
-                </label>
-                <input
+      <Modal 
+        isOpen={showAddProjectDialog} 
+        onClose={() => {
+          setShowAddProjectDialog(false);
+          setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+          setDetectedBranchForNewProject(null);
+          setShowValidationErrors(false);
+        }}
+        size="lg"
+      >
+        <ModalHeader title="Add New Project" icon={<Plus className="w-5 h-5" />} />
+        <ModalBody>
+          <div className="space-y-8">
+            {/* Project Info Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                <FolderIcon className="w-5 h-5 text-interactive" />
+                <h3 className="text-heading-3 font-semibold text-text-primary">Project Information</h3>
+              </div>
+              
+              <FieldWithTooltip
+                label="Project Name"
+                tooltip="A descriptive name for your project that will appear in the project selector."
+                required
+              >
+                <EnhancedInput
                   type="text"
                   value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
-                  placeholder="My Project"
+                  onChange={(e) => {
+                    setNewProject({ ...newProject, name: e.target.value });
+                    if (showValidationErrors) setShowValidationErrors(false);
+                  }}
+                  placeholder="Enter project name"
+                  size="lg"
+                  fullWidth
+                  required
+                  showRequiredIndicator={showValidationErrors}
                 />
-              </div>
+              </FieldWithTooltip>
 
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Repository Path
-                </label>
-                <div className="flex gap-2">
-                  <input
+              <FieldWithTooltip
+                label="Repository Path"
+                tooltip="Path to your git repository. This is where Crystal will create worktrees for parallel development."
+                required
+              >
+                <div className="space-y-3">
+                  <EnhancedInput
                     type="text"
                     value={newProject.path}
                     onChange={(e) => {
                       setNewProject({ ...newProject, path: e.target.value });
                       detectCurrentBranch(e.target.value);
+                      if (showValidationErrors) setShowValidationErrors(false);
                     }}
-                    className="flex-1 px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
-                    placeholder="/path/to/repository"
+                    placeholder="/path/to/your/repository"
+                    size="lg"
+                    fullWidth
+                    required
+                    showRequiredIndicator={showValidationErrors}
                   />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const result = await API.dialog.openDirectory({
-                        title: 'Select Repository Directory',
-                        buttonLabel: 'Select',
-                      });
-                      if (result.success && result.data) {
-                        setNewProject({ ...newProject, path: result.data });
-                        detectCurrentBranch(result.data);
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-text-secondary bg-surface-tertiary border border-border-primary rounded-md hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-interactive"
-                  >
-                    Browse
-                  </button>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        const result = await API.dialog.openDirectory({
+                          title: 'Select Repository Directory',
+                          buttonLabel: 'Select',
+                        });
+                        if (result.success && result.data) {
+                          setNewProject({ ...newProject, path: result.data });
+                          detectCurrentBranch(result.data);
+                        }
+                      }}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Browse
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </FieldWithTooltip>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Current Branch <span className="text-text-tertiary">(Auto-detected)</span>
-                </label>
-                <div className="w-full px-3 py-2 bg-surface-tertiary border border-border-primary rounded-md text-text-secondary">
-                  {detectedBranchForNewProject || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
-                </div>
-                <p className="text-xs text-text-tertiary mt-1">
-                  The main branch is automatically detected from the repository. This will be used for git operations.
-                </p>
+            {/* Git Info Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                <GitBranch className="w-5 h-5 text-interactive" />
+                <h3 className="text-heading-3 font-semibold text-text-primary">Git Information</h3>
               </div>
+              
+              <FieldWithTooltip
+                label="Main Branch"
+                tooltip="The main branch of your repository. Crystal will automatically detect this from your git configuration."
+              >
+                <Card variant="bordered" padding="md" className="text-text-secondary bg-surface-secondary">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="w-4 h-4" />
+                    <span className="font-mono">
+                      {detectedBranchForNewProject || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
+                    </span>
+                  </div>
+                </Card>
+              </FieldWithTooltip>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Build Script <span className="text-text-tertiary">(optional)</span>
-                </label>
-                <input
+            {/* Optional Scripts Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                <Play className="w-5 h-5 text-interactive" />
+                <h3 className="text-heading-3 font-semibold text-text-primary">Optional Scripts</h3>
+              </div>
+              
+              <FieldWithTooltip
+                label="Build Script"
+                tooltip="Command to build your project. This runs automatically before each Claude Code session starts."
+              >
+                <EnhancedInput
                   type="text"
                   value={newProject.buildScript}
                   onChange={(e) => setNewProject({ ...newProject, buildScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
-                  placeholder="e.g., pnpm build or npm run build"
+                  placeholder="pnpm build"
+                  size="lg"
+                  fullWidth
                 />
-                <p className="text-xs text-text-tertiary mt-1">
-                  This script will run automatically before each Claude Code session starts.
-                </p>
-              </div>
+              </FieldWithTooltip>
 
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Run Script <span className="text-text-tertiary">(optional)</span>
-                </label>
-                <input
+              <FieldWithTooltip
+                label="Run Script"
+                tooltip="Command to start your development server. You can run this manually from the Terminal view during sessions."
+              >
+                <EnhancedInput
                   type="text"
                   value={newProject.runScript}
                   onChange={(e) => setNewProject({ ...newProject, runScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
-                  placeholder="e.g., pnpm dev or npm start"
+                  placeholder="pnpm dev"
+                  size="lg"
+                  fullWidth
                 />
-                <p className="text-xs text-text-tertiary mt-1">
-                  This script can be run manually from the Terminal view during sessions.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowAddProjectDialog(false);
-                  setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
-                }}
-                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateProject}
-                disabled={!newProject.name || !newProject.path}
-                className="px-4 py-2 bg-interactive hover:bg-interactive-hover text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Add Project
-              </button>
+              </FieldWithTooltip>
             </div>
           </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            onClick={() => {
+              setShowAddProjectDialog(false);
+              setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+              setDetectedBranchForNewProject(null);
+              setShowValidationErrors(false);
+            }}
+            variant="ghost"
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (!newProject.name || !newProject.path) {
+                setShowValidationErrors(true);
+                return;
+              }
+              handleCreateProject();
+            }}
+            disabled={!newProject.name || !newProject.path}
+            variant="primary"
+            size="md"
+            className={(!newProject.name || !newProject.path) ? 'border-status-error border-2' : ''}
+          >
+            Create Project
+          </Button>
+        </ModalFooter>
+      </Modal>
       
       
       {/* Create Folder Dialog */}
