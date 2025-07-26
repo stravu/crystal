@@ -20,6 +20,7 @@ import { API } from '../utils/api';
 import { Button } from './ui/Button';
 import { Card, CardContent } from './ui/Card';
 import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
+import { RichOutputSettings } from './session/RichOutputView';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
@@ -139,6 +140,25 @@ export const SessionView = memo(() => {
 
   const hook = useSessionView(activeSession, terminalRef, scriptTerminalRef);
   
+  // Settings state for Rich Output view
+  const [showRichOutputSettings, setShowRichOutputSettings] = useState(false);
+  const [richOutputSettings, setRichOutputSettings] = useState<RichOutputSettings>(() => {
+    const saved = localStorage.getItem('richOutputSettings');
+    return saved ? JSON.parse(saved) : {
+      showToolCalls: true,
+      compactMode: false,
+      collapseTools: false,
+      showThinking: true,
+      autoScroll: true,
+      showSessionInit: false,
+    };
+  });
+  
+  const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
+    setRichOutputSettings(newSettings);
+    localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
+  };
+  
   // Memoize props to prevent unnecessary re-renders
   const emptySelectedExecutions = useMemo(() => [], []);
   const isMainRepo = useMemo(() => activeSession?.isMainRepo || false, [activeSession?.isMainRepo]);
@@ -207,6 +227,8 @@ export const SessionView = memo(() => {
         setViewMode={hook.setViewMode}
         unreadActivity={hook.unreadActivity}
         setUnreadActivity={hook.setUnreadActivity}
+        onSettingsClick={hook.viewMode === 'richOutput' ? () => setShowRichOutputSettings(!showRichOutputSettings) : undefined}
+        showSettings={showRichOutputSettings}
       />
       
       <div className="flex-1 flex relative min-h-0">
@@ -262,7 +284,11 @@ export const SessionView = memo(() => {
           </div>
           <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
             <RichOutputWithSidebar 
-              sessionId={activeSession.id} 
+              sessionId={activeSession.id}
+              settings={richOutputSettings}
+              onSettingsChange={handleRichOutputSettingsChange}
+              showSettings={showRichOutputSettings}
+              onSettingsClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
             />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>

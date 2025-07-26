@@ -37,6 +37,8 @@ interface SessionHeaderProps {
     richOutput: boolean;
   };
   setUnreadActivity: (activity: any) => void;
+  onSettingsClick?: () => void;
+  showSettings?: boolean;
 }
 
 export const SessionHeader: React.FC<SessionHeaderProps> = ({
@@ -60,6 +62,8 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   setViewMode,
   unreadActivity,
   setUnreadActivity,
+  onSettingsClick,
+  showSettings,
 }) => {
   const branchActions = activeSession.isMainRepo ? [
     {
@@ -190,6 +194,8 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
           setUnreadActivity={setUnreadActivity}
           jsonMessagesCount={activeSession.jsonMessages?.length || 0}
           isTerminalRunning={activeSession.isRunning || false}
+          onSettingsClick={onSettingsClick}
+          showSettings={showSettings}
         />
       </div>
     </div>

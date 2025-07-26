@@ -3,11 +3,16 @@ import { ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { RichOutputView } from './RichOutputView';
 import { PromptNavigation } from '../PromptNavigation';
 import { cn } from '../../utils/cn';
+import { RichOutputSettings } from './RichOutputView';
 
 interface RichOutputWithSidebarProps {
   sessionId: string;
   sessionStatus?: string;
   model?: string;
+  settings?: RichOutputSettings;
+  onSettingsChange?: (settings: RichOutputSettings) => void;
+  showSettings?: boolean;
+  onSettingsClick?: () => void;
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'crystal-rich-output-sidebar-collapsed';
@@ -15,6 +20,10 @@ const SIDEBAR_COLLAPSED_KEY = 'crystal-rich-output-sidebar-collapsed';
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionId,
   sessionStatus,
+  settings,
+  onSettingsChange,
+  showSettings,
+  onSettingsClick,
 }) => {
   // Load collapsed state from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -46,6 +55,10 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           ref={richOutputRef}
           sessionId={sessionId}
           sessionStatus={sessionStatus}
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+          showSettings={showSettings}
+          onSettingsClick={onSettingsClick}
         />
       </div>
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
 import { cn } from '../../utils/cn';
-import { FileText, MessageSquare, GitCompare, Terminal, FileEdit, LayoutDashboard, Eye } from 'lucide-react';
+import { FileText, MessageSquare, GitCompare, Terminal, FileEdit, LayoutDashboard, Eye, Settings } from 'lucide-react';
 
 interface ViewTabsProps {
   viewMode: ViewMode;
@@ -18,6 +18,8 @@ interface ViewTabsProps {
   setUnreadActivity: (activity: any) => void;
   jsonMessagesCount: number;
   isTerminalRunning: boolean;
+  onSettingsClick?: () => void;
+  showSettings?: boolean;
 }
 
 export const ViewTabs: React.FC<ViewTabsProps> = ({
@@ -27,6 +29,8 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
   setUnreadActivity,
   jsonMessagesCount,
   isTerminalRunning,
+  onSettingsClick,
+  showSettings,
 }) => {
   const tabs: { 
     mode: ViewMode; 
@@ -139,6 +143,26 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
           )}
         </button>
       ))}
+      
+      {/* Settings button - only show for Rich Output view */}
+      {viewMode === 'richOutput' && onSettingsClick && (
+        <button
+          onClick={onSettingsClick}
+          className={cn(
+            "ml-auto mr-2 p-2 rounded-md transition-all",
+            "text-text-secondary hover:text-text-primary",
+            showSettings ? [
+              "bg-surface-hover text-text-primary",
+              "ring-1 ring-border-secondary"
+            ] : [
+              "hover:bg-surface-hover"
+            ]
+          )}
+          title="Rich Output Settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 };

@@ -60,10 +60,14 @@ interface ToolResult {
 interface RichOutputViewProps {
   sessionId: string;
   sessionStatus?: string;
+  settings?: RichOutputSettings;
+  onSettingsChange?: (settings: RichOutputSettings) => void;
+  showSettings?: boolean;
+  onSettingsClick?: () => void;
 }
 
 // Settings stored in localStorage for persistence
-interface RichOutputSettings {
+export interface RichOutputSettings {
   showToolCalls: boolean;
   compactMode: boolean;
   collapseTools: boolean;
@@ -82,27 +86,42 @@ const defaultSettings: RichOutputSettings = {
 };
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
-  ({ sessionId, sessionStatus }, ref) => {
+  ({ sessionId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings: propsShowSettings, onSettingsClick }, ref) => {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsedMessages, setCollapsedMessages] = useState<Set<string>>(new Set());
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
-  const [showSettings, setShowSettings] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [settings, setSettings] = useState<RichOutputSettings>(() => {
+  
+  // Use parent-controlled settings if provided, otherwise use local state
+  const [localSettings, setLocalSettings] = useState<RichOutputSettings>(() => {
     const saved = localStorage.getItem('richOutputSettings');
     return saved ? JSON.parse(saved) : defaultSettings;
   });
+  
+  const settings = propsSettings || localSettings;
+  const showSettings = propsShowSettings !== undefined ? propsShowSettings : false;
+  
+  const updateSettings = useCallback((newSettings: RichOutputSettings) => {
+    if (onSettingsChange) {
+      onSettingsChange(newSettings);
+    } else {
+      setLocalSettings(newSettings);
+      localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
+    }
+  }, [onSettingsChange]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
   const userMessageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  // Save settings whenever they change
+  // Save local settings to localStorage when they change
   useEffect(() => {
-    localStorage.setItem('richOutputSettings', JSON.stringify(settings));
-  }, [settings]);
+    if (!propsSettings) {
+      localStorage.setItem('richOutputSettings', JSON.stringify(localSettings));
+    }
+  }, [localSettings, propsSettings]);
   
   // Expose scroll method via ref
   React.useImperativeHandle(ref, () => ({
@@ -511,7 +530,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   };
 
   const toggleSetting = (key: keyof RichOutputSettings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    const newSettings = { ...settings, [key]: !settings[key] };
+    updateSettings(newSettings);
   };
 
   // Render a tool call segment
@@ -1002,32 +1022,19 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         <div className="text-sm text-text-tertiary">
           {messages.length} message{messages.length !== 1 ? 's' : ''}
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`
-              flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-all
-              ${showSettings 
-                ? 'bg-interactive/10 text-interactive border border-interactive/30' 
-                : 'hover:bg-surface-hover text-text-secondary hover:text-text-primary'
-              }
-            `}
-          >
-            <Settings2 className="w-4 h-4" />
-            <span className="font-medium">Display</span>
-          </button>
+      </div>
+      
+      {/* Floating Settings Panel - controlled by parent */}
+      {showSettings && onSettingsClick && (
+        <>
+          {/* Backdrop to close settings when clicking outside */}
+          <div 
+            className="fixed inset-0 z-20" 
+            onClick={onSettingsClick}
+          />
           
-          {/* Floating Settings Panel */}
-          {showSettings && (
-            <>
-              {/* Backdrop to close settings when clicking outside */}
-              <div 
-                className="fixed inset-0 z-20" 
-                onClick={() => setShowSettings(false)}
-              />
-              
-              {/* Settings Dropdown */}
-              <div className="absolute right-0 mt-2 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+          {/* Settings Dropdown - positioned from tab bar */}
+          <div className="absolute top-[120px] right-4 w-80 z-30 bg-surface-primary border border-border-primary rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="p-4">
                   <div className="space-y-4">
                     {/* Content Display Settings */}
@@ -1120,10 +1127,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                   </div>
                 </div>
               </div>
-            </>
-          )}
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Messages */}
       <div 
