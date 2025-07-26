@@ -565,7 +565,7 @@ export class WorktreeManager {
       
       // Get the last N commits with stats
       const { stdout } = await execWithShellPath(
-        `git log -${count} --pretty=format:'%H|%s|%ai' --shortstat`
+        `git log -${count} --pretty=format:${process.platform === 'win32' ? '%H^|%s^|%ai' : '%H|%s|%ai'} --shortstat`
       );
       
       // Parse the output

@@ -1,6 +1,6 @@
 {
   "name": "crystal",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "private": true,
   "description": "Crystal - Claude Code Commander for managing multiple Claude Code instances",
   "author": {
@@ -15,7 +15,12 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "electron"
+      "@homebridge/node-pty-prebuilt-multiarch",
+      "better-sqlite3",
+      "electron",
+      "esbuild",
+      "lzma-native",
+      "msgpackr-extract"
     ]
   },
   "scripts": {
@@ -48,10 +53,12 @@
     "test:ci": "playwright test --config=playwright.ci.config.ts",
     "test:ci:minimal": "playwright test --config=playwright.ci.minimal.config.ts",
     "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed"
+    "test:headed": "playwright test --headed",
+    "build:win": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --win --publish never",
+    "release:win": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --win --publish always"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1.0.33",
+    "@anthropic-ai/claude-code": "^1.0.51",
     "@anthropic-ai/sdk": "^0.53.0",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.12.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
@@ -117,6 +124,13 @@
         }
       ],
       "artifactName": "${productName}-${version}-macOS-universal.${ext}"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "main/assets/icon.ico",
+      "artifactName": "${productName}-${version}-windows.${ext}"
     },
     "linux": {
       "target": [

@@ -140,7 +140,7 @@ Check the [deployment documentation](https://docs.anthropic.com/en/docs/claude-c
 
 ## Additional Documentation
 
-For a full project overview, see [CLAUDE.md](CLAUDE.md). Additional diagrams, database schema details, release instructions, and license notes can be found in the [docs](./docs) directory.
+For a full project overview, see [CLAUDE.md](grok.md). Additional diagrams, database schema details, release instructions, and license notes can be found in the [docs](./docs) directory.
 
 ## 📄 License
 

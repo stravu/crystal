@@ -111,7 +111,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
     
     // Otherwise update in regular sessions
-    const newSessions = state.sessions.map(session => {
+    const newSessions = state.sessions.map((session: Session) => {
       if (session.id === updatedSession.id) {
         const updatedSessionWithOutput = {
           ...session,
@@ -289,7 +289,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   setSessionOutput: (sessionId, output) => set((state) => {
     // Update sessions array
-    const updatedSessions = state.sessions.map(session => 
+    const updatedSessions = state.sessions.map((session: Session) => 
       session.id === sessionId
         ? { ...session, output: [output] }
         : session
@@ -308,14 +308,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     };
   }),
   
-  setSessionOutputs: (sessionId, outputs) => set((state) => {
+  setSessionOutputs: (sessionId: string, outputs: SessionOutput[]) => set((state: SessionStore) => {
     console.log(`[SessionStore] Setting ${outputs.length} outputs for session ${sessionId}`);
     
     // Separate outputs and JSON messages
     const stdOutputs: string[] = [];
     const jsonMessages: any[] = [];
     
-    outputs.forEach(output => {
+    outputs.forEach((output: SessionOutput) => {
       if (output.type === 'json') {
         jsonMessages.push({ ...output.data, timestamp: output.timestamp });
       } else if (output.type === 'stdout' || output.type === 'stderr') {
@@ -326,7 +326,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     console.log(`[SessionStore] Processed outputs - stdout: ${stdOutputs.length}, json: ${jsonMessages.length}`);
     
     // Always update the sessions array
-    const updatedSessions = state.sessions.map(session => {
+    const updatedSessions = state.sessions.map((session: Session) => {
       if (session.id === sessionId) {
         console.log(`[SessionStore] Updating session ${sessionId} with outputs`);
         return { ...session, output: stdOutputs, jsonMessages };
@@ -348,9 +348,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     };
   }),
   
-  clearSessionOutput: (sessionId) => set((state) => {
+  clearSessionOutput: (sessionId: string) => set((state: SessionStore) => {
     // Update sessions array
-    const updatedSessions = state.sessions.map(session => 
+    const updatedSessions = state.sessions.map((session: Session) => 
       session.id === sessionId
         ? { ...session, output: [], jsonMessages: [] }
         : session
@@ -369,7 +369,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     };
   }),
   
-  createSession: async (request) => {
+  createSession: async (request: CreateSessionRequest) => {
     try {
       const response = await API.sessions.create(request);
 
@@ -384,7 +384,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  addScriptOutput: (output) => set((state) => ({
+  addScriptOutput: (output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => set((state: SessionStore) => ({
     scriptOutput: {
       ...state.scriptOutput,
       [output.sessionId]: [
@@ -394,14 +394,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   })),
 
-  clearScriptOutput: (sessionId: string) => set((state) => ({
+  clearScriptOutput: (sessionId: string) => set((state: SessionStore) => ({
     scriptOutput: {
       ...state.scriptOutput,
       [sessionId]: []
     }
   })),
 
-  getScriptOutput: (sessionId) => {
+  getScriptOutput: (sessionId: string) => {
     const state = get();
     return state.scriptOutput[sessionId] || [];
   },
@@ -417,12 +417,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
     
     // Otherwise look in regular sessions
-    const found = state.sessions.find(session => session.id === state.activeSessionId);
+    const found = state.sessions.find((session: Session) => session.id === state.activeSessionId);
     console.log('[SessionStore] Found session in sessions array:', found?.id, found?.name);
     return found;
   },
 
-  updateSessionGitStatus: (sessionId, gitStatus) => {
+  updateSessionGitStatus: (sessionId: string, gitStatus: GitStatus) => {
     const state = get();
     
     // Add to pending updates
@@ -441,7 +441,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({ gitStatusBatchTimer: timer });
   },
   
-  setGitStatusLoading: (sessionId, loading) => {
+  setGitStatusLoading: (sessionId: string, loading: boolean) => {
     const state = get();
     
     // Add to pending updates
@@ -460,19 +460,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({ gitStatusBatchTimer: timer });
   },
   
-  isGitStatusLoading: (sessionId) => {
+  isGitStatusLoading: (sessionId: string) => {
     return get().gitStatusLoading.has(sessionId);
   },
 
-  setDeletingSessionIds: (ids) => set({ deletingSessionIds: new Set(ids) }),
+  setDeletingSessionIds: (ids: string[]) => set({ deletingSessionIds: new Set(ids) }),
   
-  addDeletingSessionId: (id) => set((state) => {
+  addDeletingSessionId: (id: string) => set((state: SessionStore) => {
     const newSet = new Set(state.deletingSessionIds);
     newSet.add(id);
     return { deletingSessionIds: newSet };
   }),
   
-  removeDeletingSessionId: (id) => set((state) => {
+  removeDeletingSessionId: (id: string) => set((state: SessionStore) => {
     const newSet = new Set(state.deletingSessionIds);
     newSet.delete(id);
     return { deletingSessionIds: newSet };
@@ -480,7 +480,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   clearDeletingSessionIds: () => set({ deletingSessionIds: new Set() }),
 
-  markSessionAsViewed: async (sessionId) => {
+  markSessionAsViewed: async (sessionId: string) => {
     try {
       const response = await API.sessions.markViewed(sessionId);
 
@@ -523,7 +523,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       });
       
       // Update sessions in one pass
-      const sessions = state.sessions.map(session => {
+      const sessions = state.sessions.map((session: Session) => {
         const newStatus = statusUpdates.get(session.id);
         return newStatus ? { ...session, gitStatus: newStatus } : session;
       });

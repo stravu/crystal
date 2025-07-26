@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@anthropic-ai/claude-code':
-        specifier: ^1.0.33
+        specifier: ^1.0.51
         version: 1.0.56
       '@anthropic-ai/sdk':
         specifier: ^0.53.0

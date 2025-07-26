@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         # Build both platforms for validation, but use different commands for speed
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         include:
           - os: macos-latest
             build_cmd: build:mac:ci
@@ -24,6 +24,10 @@ jobs:
             artifact_path: |
               dist-electron/*.deb
               dist-electron/*.AppImage
+      - os: windows-latest
+        build_cmd: build:win
+        artifact_name: crystal-windows
+        artifact_path: dist-electron/*.exe
     
     runs-on: ${{ matrix.os }}
     
