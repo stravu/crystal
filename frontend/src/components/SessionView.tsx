@@ -12,8 +12,6 @@ import { SessionHeader } from './session/SessionHeader';
 import { SessionInputWithImages } from './session/SessionInputWithImages';
 import { GitErrorDialog } from './session/GitErrorDialog';
 import { CommitMessageDialog } from './session/CommitMessageDialog';
-import { PromptNavigation } from './PromptNavigation';
-import { isDocumentVisible } from '../utils/performanceUtils';
 import { FileEditor } from './FileEditor';
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
@@ -28,7 +26,6 @@ export const SessionView = memo(() => {
   const sessions = useSessionStore((state) => state.sessions);
   const activeMainRepoSession = useSessionStore((state) => state.activeMainRepoSession);
   const { activeView, activeProjectId } = useNavigationStore();
-  const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
   const [projectData, setProjectData] = useState<any>(null);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [isMergingProject, setIsMergingProject] = useState(false);
@@ -41,14 +38,6 @@ export const SessionView = memo(() => {
         : sessions.find(s => s.id === activeSessionId))
     : undefined;
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      setAnimationsEnabled(isDocumentVisible());
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
 
   // Load project data for active session
   useEffect(() => {
@@ -237,49 +226,6 @@ export const SessionView = memo(() => {
           {hook.isLoadingOutput && (
             <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
           )}
-          <div className={`bg-bg-primary h-full ${hook.viewMode === 'output' ? 'flex flex-col' : 'hidden'} relative`}>
-            <div 
-              ref={terminalRef} 
-              className="flex-1 min-h-0"
-            />
-            {(activeSession.status === 'running' || activeSession.status === 'initializing') && (
-              <div className="bg-surface-primary border-t border-border-primary px-4 py-2 flex-shrink-0">
-                <div className="flex items-center justify-between text-text-primary">
-                    <div className="flex items-center space-x-3">
-                        <div className="flex space-x-1">
-                            <div className={`w-2 h-2 bg-interactive rounded-full ${animationsEnabled ? 'animate-typing-dot' : ''}`}></div>
-                            <div className={`w-2 h-2 bg-interactive rounded-full ${animationsEnabled ? 'animate-typing-dot' : ''}`} style={{ animationDelay: '0.2s' }}></div>
-                            <div className={`w-2 h-2 bg-interactive rounded-full ${animationsEnabled ? 'animate-typing-dot' : ''}`} style={{ animationDelay: '0.4s' }}></div>
-                        </div>
-                        <span className="text-sm font-medium">
-                            {activeSession.status === 'initializing' ? 'Starting Claude Code...' : 'Claude is working...'}
-                        </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                        <div className="text-xs text-text-secondary font-mono">
-                            {activeSession.status === 'initializing' ? '⚡' : hook.formatElapsedTime(hook.elapsedTime)}
-                        </div>
-                        <button onClick={hook.handleStopSession} className="px-3 py-1 text-xs bg-status-error hover:bg-status-error/90 text-white rounded-md transition-colors">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-              </div>
-            )}
-            {hook.loadError && hook.viewMode === 'output' && (
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                <Card variant="bordered" className="shadow-lg">
-                  <CardContent className="p-6">
-                    <p className="text-text-primary mb-2">Failed to load output content</p>
-                    <p className="text-text-secondary text-sm mb-4">{hook.loadError}</p>
-                    <Button onClick={() => hook.loadOutputContent(activeSession.id)}>
-                      Reload Output
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </div>
           <div className={`h-full ${hook.viewMode === 'messages' ? 'block' : 'hidden'}`}>
             <JsonMessageView messages={activeSession.jsonMessages || []} />
           </div>
@@ -356,12 +302,6 @@ export const SessionView = memo(() => {
             <FileEditor sessionId={activeSession.id} />
           </div>
         </div>
-        {hook.viewMode === 'output' && (
-          <PromptNavigation 
-            sessionId={activeSession.id} 
-            onNavigateToPrompt={hook.handleNavigateToPrompt}
-          />
-        )}
       </div>
       
       {hook.viewMode !== 'terminal' && (

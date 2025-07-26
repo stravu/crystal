@@ -9,7 +9,7 @@ import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard' | 'richOutput';
+export type ViewMode = 'richOutput' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -26,9 +26,8 @@ export const useSessionView = (
   const scriptFitAddon = useRef<FitAddon | null>(null);
 
   // States
-  const [viewMode, setViewMode] = useState<ViewMode>('output');
+  const [viewMode, setViewMode] = useState<ViewMode>('richOutput');
   const [unreadActivity, setUnreadActivity] = useState({
-    output: false,
     messages: false,
     changes: false,
     terminal: false,
@@ -330,11 +329,10 @@ export const useSessionView = (
     forceResetLoadingState();
     
     // Reset view mode to output when switching sessions
-    setViewMode('output');
+    setViewMode('richOutput');
     
     // Reset unread activity indicators
     setUnreadActivity({
-      output: false,
       messages: false,
       changes: false,
       terminal: false,
@@ -619,7 +617,7 @@ export const useSessionView = (
 
   useEffect(() => {
     console.log(`[useSessionView] Terminal initialization effect - viewMode: ${viewMode}, terminalRef.current: ${!!terminalRef.current}`);
-    if (viewMode === 'output' && terminalRef.current) {
+    if (false && terminalRef.current) { // Disabled - output view removed
       initTerminal(terminalRef, terminalInstance, fitAddon, false);
       
       // After terminal is initialized, trigger a check for loading output
@@ -633,14 +631,14 @@ export const useSessionView = (
             console.log(`[useSessionView] Terminal initialized, checking if output needs to be loaded`);
             clearInterval(checkInterval);
             // Force a re-evaluation of whether to load output
-            if (activeSession.status !== 'initializing') {
+            if (activeSession && activeSession.status !== 'initializing') {
               loadOutputContent(activeSession.id);
             }
           } else if (attempts >= maxAttempts) {
             console.log(`[useSessionView] Terminal initialization timed out, loading output anyway`);
             clearInterval(checkInterval);
             // Try to load output even without terminal
-            if (activeSession.status !== 'initializing') {
+            if (activeSession && activeSession.status !== 'initializing') {
               loadOutputContent(activeSession.id);
             }
           }
@@ -753,14 +751,15 @@ export const useSessionView = (
     }
   }, [viewMode, activeSessionId]);
 
-  useEffect(() => {
+  // Terminal writing useEffect - disabled since output view was removed
+  /* useEffect(() => {
+    // Output view removed - skip terminal writing entirely
+    if (!activeSession || !terminalInstance.current) return;
     console.log(`[Terminal Write Effect] Called, formatted output length: ${formattedOutput.length}, session: ${currentSessionIdForOutput}, lastProcessed: ${lastProcessedOutputLength.current}, viewMode: ${viewMode}`);
     
     // Skip if not in output view mode
-    if (viewMode !== 'output') {
-      console.log(`[Terminal Write Effect] Not in output view mode, skipping`);
-      return;
-    }
+    // Output view removed - skip terminal writing
+    return;
     
     if (!terminalInstance.current) {
       console.log(`[Terminal Write Effect] No terminal instance yet`);
@@ -825,7 +824,7 @@ export const useSessionView = (
         terminalInstance.current.scrollToBottom();
       }
     }
-  }, [formattedOutput, currentSessionIdForOutput, initTerminal, terminalRef, viewMode]);
+  }, [formattedOutput, currentSessionIdForOutput, initTerminal, terminalRef, viewMode]); */
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
@@ -940,8 +939,8 @@ export const useSessionView = (
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (viewMode === 'output') fitAddon.current?.fit();
-      else if (viewMode === 'terminal') scriptFitAddon.current?.fit();
+      // Output view removed, only handle terminal
+      if (viewMode === 'terminal') scriptFitAddon.current?.fit();
     }, 100);
     return () => clearTimeout(timer);
   }, [viewMode]);
@@ -949,7 +948,7 @@ export const useSessionView = (
   useEffect(() => {
     if (!terminalRef.current) return;
     const observer = new ResizeObserver(() => {
-      if (viewMode === 'output') fitAddon.current?.fit();
+      // Output view removed
     });
     observer.observe(terminalRef.current);
     return () => observer.disconnect();
@@ -957,7 +956,7 @@ export const useSessionView = (
 
   // Trigger terminal resize when session status changes (for padding adjustment)
   useEffect(() => {
-    if (viewMode === 'output' && fitAddon.current && activeSession) {
+    if (false && fitAddon.current && activeSession) { // Output view removed
       // Small delay to ensure DOM updates have completed
       const timer = setTimeout(() => {
         fitAddon.current?.fit();
@@ -1023,7 +1022,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false, dashboard: false, richOutput: false });
+    setUnreadActivity({ messages: false, changes: false, terminal: false, editor: false, dashboard: false, richOutput: false });
   }, [activeSessionId]);
 
 
@@ -1085,12 +1084,8 @@ export const useSessionView = (
   
   const handleNavigateToPrompt = useCallback((marker: any) => {
     if (!terminalInstance.current) return;
-    if (viewMode !== 'output') {
-      setViewMode('output');
-      setTimeout(() => navigateToPromptInTerminal(marker), 200);
-    } else {
-      navigateToPromptInTerminal(marker);
-    }
+    // Output view removed - always navigate directly
+    navigateToPromptInTerminal(marker);
   }, [viewMode]);
 
   const navigateToPromptInTerminal = (marker: any) => {

@@ -1,13 +1,12 @@
 import React from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
 import { cn } from '../../utils/cn';
-import { FileText, MessageSquare, GitCompare, Terminal, FileEdit, LayoutDashboard, Eye, Settings } from 'lucide-react';
+import { MessageSquare, GitCompare, Terminal, FileEdit, LayoutDashboard, Eye, Settings } from 'lucide-react';
 
 interface ViewTabsProps {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   unreadActivity: {
-    output: boolean;
     messages: boolean;
     changes: boolean;
     terminal: boolean;
@@ -41,14 +40,8 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
     status?: boolean;
   }[] = [
     { 
-      mode: 'output', 
-      label: 'Output', 
-      icon: <FileText className="w-4 h-4" />,
-      activity: unreadActivity.output 
-    },
-    { 
       mode: 'richOutput', 
-      label: 'Rich Output', 
+      label: 'Output', 
       icon: <Eye className="w-4 h-4" />,
       activity: unreadActivity.richOutput 
     },

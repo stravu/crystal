@@ -477,7 +477,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       {viewMode === 'output' && mainRepoSession && (
         <SessionInputWithImages
           activeSession={mainRepoSession}
-          viewMode="output"
+          viewMode="richOutput"
           input={hook.input}
           setInput={hook.setInput}
           textareaRef={hook.textareaRef}

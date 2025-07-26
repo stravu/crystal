@@ -28,7 +28,6 @@ interface SessionHeaderProps {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   unreadActivity: {
-    output: boolean;
     messages: boolean;
     changes: boolean;
     terminal: boolean;
