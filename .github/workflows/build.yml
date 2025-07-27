@@ -24,10 +24,10 @@ jobs:
             artifact_path: |
               dist-electron/*.deb
               dist-electron/*.AppImage
-      - os: windows-latest
-        build_cmd: build:win
-        artifact_name: crystal-windows
-        artifact_path: dist-electron/*.exe
+          - os: windows-latest
+            build_cmd: build:win
+            artifact_name: crystal-windows
+            artifact_path: dist-electron/*.exe
     
     runs-on: ${{ matrix.os }}
     
