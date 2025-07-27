@@ -242,9 +242,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             if (block.type === 'text' && block.text?.trim()) {
               segments.push({ type: 'text', content: block.text.trim() });
             } else if (block.type === 'thinking') {
-              console.log('RichOutputView: Found thinking block:', JSON.stringify(block, null, 2));
-              if (block.thinking && typeof block.thinking === 'string' && block.thinking.trim()) {
-                segments.push({ type: 'thinking', content: block.thinking.trim() });
+              const thinkingContent = block.thinking || block.content || block.text;
+              if (thinkingContent && typeof thinkingContent === 'string' && thinkingContent.trim()) {
+                segments.push({ type: 'thinking', content: thinkingContent.trim() });
               }
             } else if (block.type === 'tool_use') {
               const toolCall: ToolCall = {
@@ -395,10 +395,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       
       // Combine user prompts with output messages (filter for JSON messages)
       const allMessages = [...userPrompts];
-      if (outputResponse.data && Array.isArray(outputResponse.data)) {
-        // Filter for JSON messages from the output
-        const jsonMessages = outputResponse.data.filter(msg => msg.type === 'json');
-        allMessages.push(...jsonMessages);
+      if (outputResponse.success && outputResponse.data && Array.isArray(outputResponse.data)) {
+        // JSON messages are already in the correct format from getJsonMessages
+        allMessages.push(...outputResponse.data);
       }
       
       // Sort by timestamp to get correct order
@@ -408,20 +407,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         return timeA - timeB;
       });
       
-      console.log('RichOutputView: Raw messages from API:', JSON.stringify({
-        conversationCount: userPrompts.length,
-        outputCount: jsonResponse.data?.length || 0,
-        sampleOutput: jsonResponse.data?.slice(0, 3)
-      }, null, 2));
       
       const conversationMessages = transformMessages(allMessages);
-      console.log('RichOutputView: Loaded messages:', JSON.stringify({
-        totalMessages: conversationMessages.length,
-        messageTypes: conversationMessages.map(m => ({
-          role: m.role,
-          segments: m.segments.map(s => s.type)
-        }))
-      }, null, 2));
       setMessages(conversationMessages);
     } catch (err) {
       console.error('Failed to load messages:', err);
