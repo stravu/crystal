@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Download, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Download, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Button } from './ui/Button';
 
 interface UpdateDialogProps {
   isOpen: boolean;
@@ -150,31 +152,23 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div className="flex items-center gap-3">
-            <Download className="w-6 h-6 text-blue-400" />
-            <h2 className="text-xl font-semibold text-gray-100">Software Update</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-200 transition-colors"
-            disabled={updateState === 'downloading'}
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <ModalHeader onClose={updateState === 'downloading' ? undefined : onClose}>
+        <div className="flex items-center gap-3">
+          <Download className="w-6 h-6 text-interactive" />
+          <h2 className="text-xl font-semibold text-text-primary">Software Update</h2>
         </div>
+      </ModalHeader>
 
-        <div className="flex-1 overflow-y-auto p-6">
+      <ModalBody className="space-y-6">
           {versionInfo && (
-            <div className="mb-6">
-              <div className="text-gray-300 mb-2">
-                Current version: <span className="font-mono text-gray-100">{versionInfo.current}</span>
+            <div>
+              <div className="text-text-secondary mb-2">
+                Current version: <span className="font-mono text-text-primary">{versionInfo.current}</span>
               </div>
               {versionInfo.hasUpdate && (
-                <div className="text-gray-300">
-                  Latest version: <span className="font-mono text-green-400">{versionInfo.latest}</span>
+                <div className="text-text-secondary">
+                  Latest version: <span className="font-mono text-status-success">{versionInfo.latest}</span>
                 </div>
               )}
             </div>
@@ -183,76 +177,76 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
           {/* Update State UI */}
           <div className="space-y-4">
             {updateState === 'idle' && versionInfo?.hasUpdate && (
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-medium text-gray-100 mb-2">Update Available</h3>
-                <p className="text-gray-300 mb-4">
+              <div className="bg-surface-secondary rounded-lg p-4">
+                <h3 className="text-lg font-medium text-text-primary mb-2">Update Available</h3>
+                <p className="text-text-secondary mb-4">
                   A new version of Crystal is available. 
                   {isPackaged ? ' Click below to download and install the update.' : ' Auto-update is only available in the packaged app.'}
                 </p>
                 
                 {isPackaged ? (
-                  <button
+                  <Button
                     onClick={handleCheckForUpdates}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    variant="primary"
+                    icon={<Download className="w-4 h-4" />}
                   >
                     Download Update
-                  </button>
+                  </Button>
                 ) : (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => versionInfo.releaseUrl && window.electronAPI.openExternal(versionInfo.releaseUrl)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                    >
-                      View Release
-                    </button>
-                  </div>
+                  <Button
+                    onClick={() => versionInfo.releaseUrl && window.electronAPI.openExternal(versionInfo.releaseUrl)}
+                    variant="primary"
+                  >
+                    View Release
+                  </Button>
                 )}
               </div>
             )}
 
             {updateState === 'checking' && (
-              <div className="flex items-center gap-3 text-gray-300">
+              <div className="flex items-center gap-3 text-text-secondary">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Checking for updates...</span>
               </div>
             )}
 
             {updateState === 'available' && (
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-medium text-gray-100 mb-2">Ready to Download</h3>
-                <p className="text-gray-300 mb-4">
+              <div className="bg-surface-secondary rounded-lg p-4">
+                <h3 className="text-lg font-medium text-text-primary mb-2">Ready to Download</h3>
+                <p className="text-text-secondary mb-4">
                   The update is ready to download. This may take a few minutes depending on your connection.
                 </p>
-                <button
+                <Button
                   onClick={handleDownloadUpdate}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  variant="primary"
+                  icon={<Download className="w-4 h-4" />}
                 >
                   Start Download
-                </button>
+                </Button>
               </div>
             )}
 
             {updateState === 'downloading' && downloadProgress && (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 text-gray-300">
+                <div className="flex items-center gap-3 text-text-secondary">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>Downloading update...</span>
                 </div>
                 
-                <div className="bg-gray-700 rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between text-sm text-gray-400">
+                <div className="bg-surface-secondary rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between text-sm text-text-tertiary">
                     <span>{formatBytes(downloadProgress.transferred)} / {formatBytes(downloadProgress.total)}</span>
                     <span>{formatSpeed(downloadProgress.bytesPerSecond)}</span>
                   </div>
                   
-                  <div className="w-full bg-gray-600 rounded-full h-2">
+                  <div className="w-full bg-surface-tertiary rounded-full h-2">
                     <div 
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      className="bg-interactive h-2 rounded-full transition-all duration-300"
                       style={{ width: `${downloadProgress.percent}%` }}
                     />
                   </div>
                   
-                  <div className="text-center text-sm text-gray-400">
+                  <div className="text-center text-sm text-text-tertiary">
                     {Math.round(downloadProgress.percent)}%
                   </div>
                 </div>
@@ -260,20 +254,21 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
             )}
 
             {updateState === 'downloaded' && (
-              <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+              <div className="bg-status-success/10 border border-status-success/30 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-400 mt-0.5" />
+                  <CheckCircle className="w-5 h-5 text-status-success mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="text-lg font-medium text-green-400 mb-2">Update Downloaded</h3>
-                    <p className="text-gray-300 mb-4">
+                    <h3 className="text-lg font-medium text-status-success mb-2">Update Downloaded</h3>
+                    <p className="text-text-secondary mb-4">
                       The update has been downloaded successfully. Crystal will restart to apply the update.
                     </p>
-                    <button
+                    <Button
                       onClick={handleInstallUpdate}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      variant="primary"
+                      className="bg-status-success hover:bg-status-success/90"
                     >
                       Restart and Install
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -283,37 +278,37 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
               <div className="space-y-4">
                 {/* Manual Download Box */}
                 {versionInfo?.releaseUrl && (
-                  <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                  <div className="bg-interactive/10 border border-interactive/30 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-lg font-medium text-blue-400 mb-1">Manual Update Available</h3>
-                        <p className="text-sm text-gray-300">
+                        <h3 className="text-lg font-medium text-interactive mb-1">Manual Update Available</h3>
+                        <p className="text-sm text-text-secondary">
                           Automatic update failed, but you can download the latest version manually.
                         </p>
                       </div>
-                      <button
+                      <Button
                         onClick={() => window.electronAPI.openExternal(versionInfo.releaseUrl!)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        variant="primary"
+                        icon={<Download className="w-4 h-4" />}
                       >
-                        <Download className="w-4 h-4" />
                         Download from GitHub
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
 
                 {/* Error Details */}
-                <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
+                <div className="bg-status-error/10 border border-status-error/30 rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-400 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-status-error mt-0.5" />
                     <div className="flex-1">
-                      <h3 className="text-lg font-medium text-red-400 mb-2">Update Error</h3>
-                      <p className="text-gray-300 mb-2">{error}</p>
+                      <h3 className="text-lg font-medium text-status-error mb-2">Update Error</h3>
+                      <p className="text-text-secondary mb-2">{error}</p>
                       <div className="space-y-3">
-                        <p className="text-sm text-gray-400">
+                        <p className="text-sm text-text-tertiary">
                           To update manually:
                         </p>
-                        <ol className="text-sm text-gray-300 list-decimal list-inside ml-2 space-y-2">
+                        <ol className="text-sm text-text-secondary list-decimal list-inside ml-2 space-y-2">
                           <li>Click "Download from GitHub" above</li>
                           <li>Download the .dmg file from the release page</li>
                           <li>Close Crystal</li>
@@ -321,11 +316,11 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
                           <li>Drag Crystal to your Applications folder</li>
                           <li>Launch the new version of Crystal</li>
                         </ol>
-                        <p className="text-sm text-gray-400 mt-3">
+                        <p className="text-sm text-text-tertiary mt-3">
                           Your settings and sessions will be preserved during the update.
                         </p>
                         {(error.includes('404') || error.includes('latest-mac.yml')) && (
-                          <div className="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-500">
+                          <div className="mt-3 p-2 bg-surface-primary rounded text-xs text-text-tertiary">
                             <p className="font-semibold mb-1">Technical Details:</p>
                             <p>The release may be missing required update metadata files, or you may be testing with a development version.</p>
                           </div>
@@ -334,7 +329,7 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
                       {versionInfo?.releaseUrl && (
                         <button
                           onClick={() => window.electronAPI.openExternal(versionInfo.releaseUrl!)}
-                          className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline"
+                          className="mt-3 text-sm text-interactive hover:text-interactive-hover underline"
                         >
                           View Release on GitHub
                         </button>
@@ -347,8 +342,8 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
 
             {!versionInfo?.hasUpdate && updateState === 'idle' && (
               <div className="text-center py-8">
-                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                <p className="text-gray-300">You're running the latest version of Crystal!</p>
+                <CheckCircle className="w-12 h-12 text-status-success mx-auto mb-3" />
+                <p className="text-text-secondary">You're running the latest version of Crystal!</p>
               </div>
             )}
           </div>
@@ -356,38 +351,37 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
           {/* Release Notes */}
           {versionInfo?.releaseNotes && (
             <div className="mt-6">
-              <h3 className="text-lg font-medium text-gray-100 mb-3">Release Notes</h3>
-              <div className="bg-gray-700 rounded-lg p-4 max-h-64 overflow-y-auto">
-                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-sans">
+              <h3 className="text-lg font-medium text-text-primary mb-3">Release Notes</h3>
+              <div className="bg-surface-secondary rounded-lg p-4 max-h-64 overflow-y-auto">
+                <pre className="text-sm text-text-secondary whitespace-pre-wrap font-sans">
                   {versionInfo.releaseNotes}
                 </pre>
               </div>
             </div>
           )}
-        </div>
+      </ModalBody>
 
-        <div className="p-6 border-t border-gray-700">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-400">
-              {versionInfo?.releaseUrl && (
-                <button
-                  onClick={() => window.electronAPI.openExternal(versionInfo.releaseUrl!)}
-                  className="hover:text-gray-200 underline transition-colors"
-                >
-                  View on GitHub
-                </button>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
-              disabled={updateState === 'downloading'}
-            >
-              Close
-            </button>
+      <ModalFooter>
+        <div className="flex justify-between items-center w-full">
+          <div className="text-sm text-text-tertiary">
+            {versionInfo?.releaseUrl && (
+              <button
+                onClick={() => window.electronAPI.openExternal(versionInfo.releaseUrl!)}
+                className="hover:text-text-secondary underline transition-colors"
+              >
+                View on GitHub
+              </button>
+            )}
           </div>
+          <Button
+            onClick={onClose}
+            variant="secondary"
+            disabled={updateState === 'downloading'}
+          >
+            Close
+          </Button>
         </div>
-      </div>
-    </div>
+      </ModalFooter>
+    </Modal>
   );
 }

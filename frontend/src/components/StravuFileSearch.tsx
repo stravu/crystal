@@ -178,14 +178,14 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-4xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-modal-overlay flex items-center justify-center z-50">
+      <div className="bg-surface-secondary rounded-lg w-full max-w-4xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-border-primary">
           <h2 className="text-lg font-semibold text-white">Search Stravu Notebooks</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-text-tertiary hover:text-text-secondary transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -200,24 +200,24 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
               {isConnecting ? (
                 <div className="space-y-4">
                   <div className="flex justify-center">
-                    <svg className="w-8 h-8 animate-spin text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-8 h-8 animate-spin text-interactive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </div>
-                  <p className="text-gray-600 dark:text-gray-400">Connecting to Stravu...</p>
+                  <p className="text-text-secondary">Connecting to Stravu...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="flex justify-center">
-                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-12 h-12 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
                     </svg>
                   </div>
-                  <p className="text-gray-600 dark:text-gray-400">Not connected to Stravu</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Please authenticate with Stravu to access your notebooks.</p>
+                  <p className="text-text-secondary">Not connected to Stravu</p>
+                  <p className="text-sm text-text-tertiary">Please authenticate with Stravu to access your notebooks.</p>
                   <button
                     onClick={connectToStravu}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    className="px-4 py-2 bg-interactive text-white rounded-md hover:bg-interactive-hover transition-colors"
                   >
                     Connect to Stravu
                   </button>
@@ -234,12 +234,12 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Search for notebooks (AI-powered semantic search)..."
-                  className="flex-1 px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-100 bg-gray-700 placeholder-gray-400"
+                  className="flex-1 px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-primary placeholder-text-tertiary"
                 />
                 <button
                   onClick={handleSearch}
                   disabled={isSearching || !searchQuery.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-4 py-2 bg-interactive text-white rounded-md hover:bg-interactive-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isSearching ? (
                     <>
@@ -261,15 +261,15 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
 
               {/* Error Display */}
               {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                  <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+                <div className="bg-status-error/10 border border-status-error/30 rounded-md p-3">
+                  <p className="text-status-error text-sm">{error}</p>
                 </div>
               )}
 
               {/* Search Results */}
               {searchResults.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <h3 className="text-sm font-medium text-text-secondary">
                     Search Results ({searchResults.length})
                   </h3>
                   <div className="grid gap-2">
@@ -277,44 +277,44 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
                       <div
                         key={notebook.id}
                         onClick={() => handleNotebookClick(notebook)}
-                        className={`p-3 border border-gray-700 rounded-md hover:bg-gray-700 cursor-pointer transition-colors ${
-                          selectedNotebook?.id === notebook.id && isLoadingContent ? 'bg-blue-900/20 border-blue-700' : ''
+                        className={`p-3 border border-border-primary rounded-md hover:bg-surface-hover cursor-pointer transition-colors ${
+                          selectedNotebook?.id === notebook.id && isLoadingContent ? 'bg-interactive/20 border-interactive' : ''
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2">
-                              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-text-tertiary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                               </svg>
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{notebook.title}</h4>
+                              <h4 className="text-sm font-medium text-text-primary truncate">{notebook.title}</h4>
                               {selectedNotebook?.id === notebook.id && isLoadingContent && (
-                                <svg className="w-4 h-4 animate-spin text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 animate-spin text-interactive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
                               )}
                               {notebook.similarity && (
-                                <span className="text-xs bg-blue-900/30 text-blue-200 px-2 py-1 rounded">
+                                <span className="text-xs bg-interactive/30 text-interactive px-2 py-1 rounded">
                                   {Math.round(notebook.similarity * 100)}% match
                                 </span>
                               )}
                             </div>
                             {notebook.excerpt && (
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notebook.excerpt}</p>
+                              <p className="text-xs text-text-secondary mt-1">{notebook.excerpt}</p>
                             )}
-                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                            <div className="flex items-center space-x-4 mt-2 text-xs text-text-tertiary">
                               <span>{formatWordCount(notebook.wordCount)}</span>
                               <span>{formatDate(notebook.lastModified)}</span>
                               {notebook.tags.length > 0 && (
                                 <div className="flex items-center space-x-1">
                                   <span>Tags:</span>
                                   {notebook.tags.slice(0, 3).map((tag) => (
-                                    <span key={tag} className="bg-gray-700 text-gray-400 px-1 rounded text-xs">
+                                    <span key={tag} className="bg-surface-tertiary text-text-secondary px-1 rounded text-xs">
                                       {tag}
                                     </span>
                                   ))}
                                   {notebook.tags.length > 3 && (
-                                    <span className="text-gray-400">+{notebook.tags.length - 3}</span>
+                                    <span className="text-text-tertiary">+{notebook.tags.length - 3}</span>
                                   )}
                                 </div>
                               )}
@@ -329,22 +329,22 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
 
               {searchQuery && !isSearching && searchResults.length === 0 && !error && (
                 <div className="text-center py-8">
-                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 text-text-tertiary mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
-                  <p className="text-gray-600 dark:text-gray-400">No notebooks found for "{searchQuery}"</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Try a different search term or concept</p>
+                  <p className="text-text-secondary">No notebooks found for "{searchQuery}"</p>
+                  <p className="text-sm text-text-tertiary mt-1">Try a different search term or concept</p>
                 </div>
               )}
 
               {!searchQuery && (
                 <div className="text-center py-8">
-                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 text-text-tertiary mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  <p className="text-gray-600 dark:text-gray-400">Search for Stravu notebooks</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Use AI-powered semantic search to find notebooks by concept</p>
-                  <p className="text-xs text-gray-400 mt-2">💡 Try searching for "machine learning examples" or "API documentation"</p>
+                  <p className="text-text-secondary">Search for Stravu notebooks</p>
+                  <p className="text-sm text-text-tertiary mt-1">Use AI-powered semantic search to find notebooks by concept</p>
+                  <p className="text-xs text-text-tertiary mt-2">💡 Try searching for "machine learning examples" or "API documentation"</p>
                 </div>
               )}
             </div>
@@ -352,10 +352,10 @@ export function StravuFileSearch({ isOpen, onClose, onFileSelect }: StravuFileSe
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-gray-700">
+        <div className="flex justify-end space-x-3 p-6 border-t border-border-primary">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
           >
             Cancel
           </button>

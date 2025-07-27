@@ -4,6 +4,12 @@ import { API } from '../utils/api';
 import type { Project } from '../types/project';
 import ProjectSettings from './ProjectSettings';
 import { useErrorStore } from '../stores/errorStore';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Button, IconButton } from './ui/Button';
+import { EnhancedInput } from './ui/EnhancedInput';
+import { FieldWithTooltip } from './ui/FieldWithTooltip';
+import { Card } from './ui/Card';
+import { Folder, GitBranch, Hammer, Play } from 'lucide-react';
 
 interface ProjectSelectorProps {
   onProjectChange?: (project: Project) => void;
@@ -15,6 +21,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
   const [isOpen, setIsOpen] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [detectedBranch, setDetectedBranch] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
@@ -144,210 +151,259 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
     <>
       <div className="relative">
         <div className="flex items-center space-x-2">
-          <button
+          <Button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex-1 flex items-center space-x-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-md text-sm transition-colors"
+            variant="secondary"
+            size="md"
+            className="flex-1 justify-between"
           >
-            <span className="text-gray-300">
+            <span>
               {activeProject ? activeProject.name : 'Select Project'}
             </span>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
+            <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </Button>
           {activeProject && (
-            <button
+            <IconButton
               onClick={() => handleSettingsClick(activeProject)}
-              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-md transition-colors"
-              title="Project Settings"
-            >
-              <Settings className="w-4 h-4 text-gray-400" />
-            </button>
+              aria-label="Project Settings"
+              size="md"
+              icon={<Settings className="w-4 h-4" />}
+            />
           )}
         </div>
 
         {isOpen && (
-          <div className="absolute top-full left-0 mt-1 w-64 bg-gray-800 rounded-md shadow-lg border border-gray-700 z-50">
-            <div className="p-2">
+          <Card 
+            variant="elevated" 
+            className="absolute top-full left-0 mt-1 w-64 z-50"
+            padding="none"
+          >
+            <div className="p-1">
               {projects.map(project => (
                 <div
                   key={project.id}
-                  className="flex items-center hover:bg-gray-700 rounded group"
+                  className="flex items-center hover:bg-bg-hover rounded-md group"
                 >
                   <button
                     onClick={() => handleSelectProject(project)}
                     className="flex-1 text-left px-3 py-2 flex items-center justify-between"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-200">{project.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{project.path}</div>
+                      <div className="text-sm font-medium text-text-primary">{project.name}</div>
+                      <div className="text-xs text-text-tertiary truncate">{project.path}</div>
                     </div>
                     {project.active && (
-                      <Check className="w-4 h-4 text-green-500 ml-2 flex-shrink-0" />
+                      <Check className="w-4 h-4 text-status-success ml-2 flex-shrink-0" />
                     )}
                   </button>
-                  <button
+                  <IconButton
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSettingsClick(project);
                     }}
-                    className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Project Settings"
-                  >
-                    <Settings className="w-4 h-4 text-gray-400 hover:text-gray-200" />
-                  </button>
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Project Settings"
+                    icon={<Settings className="w-4 h-4" />}
+                  />
                 </div>
               ))}
               
-              <div className="border-t border-gray-700 mt-2 pt-2">
-                <button
+              <div className="border-t border-border-primary mt-2 pt-2">
+                <Button
                   onClick={() => {
                     setIsOpen(false);
                     setShowAddDialog(true);
                   }}
-                  className="w-full text-left px-3 py-2 rounded hover:bg-gray-700 flex items-center space-x-2 text-sm"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
                 >
-                  <Plus className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-300">Add Project</span>
-                </button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Project
+                </Button>
               </div>
             </div>
-          </div>
+          </Card>
         )}
       </div>
 
       {/* Add Project Dialog */}
-      {showAddDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 w-96 relative">
-            <button
-              onClick={() => {
-                setShowAddDialog(false);
-                setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
-      setDetectedBranch(null);
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-200 transition-colors"
-              title="Close"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <h3 className="text-lg font-semibold text-gray-200 mb-4 pr-8">Add New Project</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Project Name
-                </label>
-                <input
-                  type="text"
-                  value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
-                  placeholder="My Project"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Repository Path
-                </label>
-                <div className="flex gap-2">
-                  <input
+      <Modal 
+        isOpen={showAddDialog} 
+        onClose={() => {
+          setShowAddDialog(false);
+          setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+          setDetectedBranch(null);
+          setShowValidationErrors(false);
+        }}
+        size="lg"
+      >
+        <ModalHeader title="Add New Project" icon={<Plus className="w-5 h-5" />} />
+        <ModalBody>
+            <div className="space-y-8">
+              {/* Project Info Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                  <Folder className="w-5 h-5 text-interactive" />
+                  <h3 className="text-heading-3 font-semibold text-text-primary">Project Information</h3>
+                </div>
+                
+                <FieldWithTooltip
+                  label="Project Name"
+                  tooltip="A descriptive name for your project that will appear in the project selector."
+                  required
+                >
+                  <EnhancedInput
                     type="text"
-                    value={newProject.path}
+                    value={newProject.name}
                     onChange={(e) => {
-                      setNewProject({ ...newProject, path: e.target.value });
-                      detectCurrentBranch(e.target.value);
+                      setNewProject({ ...newProject, name: e.target.value });
+                      if (showValidationErrors) setShowValidationErrors(false);
                     }}
-                    className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
-                    placeholder="/path/to/repository"
+                    placeholder="Enter project name"
+                    size="lg"
+                    fullWidth
+                    required
+                    showRequiredIndicator={showValidationErrors}
                   />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const result = await API.dialog.openDirectory({
-                        title: 'Select Repository Directory',
-                        buttonLabel: 'Select',
-                      });
-                      if (result.success && result.data) {
-                        setNewProject({ ...newProject, path: result.data });
-                        detectCurrentBranch(result.data);
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    Browse
-                  </button>
+                </FieldWithTooltip>
+
+                <FieldWithTooltip
+                  label="Repository Path"
+                  tooltip="Path to your git repository. This is where Crystal will create worktrees for parallel development."
+                  required
+                >
+                  <div className="space-y-3">
+                    <EnhancedInput
+                      type="text"
+                      value={newProject.path}
+                      onChange={(e) => {
+                        setNewProject({ ...newProject, path: e.target.value });
+                        detectCurrentBranch(e.target.value);
+                        if (showValidationErrors) setShowValidationErrors(false);
+                      }}
+                      placeholder="/path/to/your/repository"
+                      size="lg"
+                      fullWidth
+                      required
+                      showRequiredIndicator={showValidationErrors}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          const result = await API.dialog.openDirectory({
+                            title: 'Select Repository Directory',
+                            buttonLabel: 'Select',
+                          });
+                          if (result.success && result.data) {
+                            setNewProject({ ...newProject, path: result.data });
+                            detectCurrentBranch(result.data);
+                          }
+                        }}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Browse
+                      </Button>
+                    </div>
+                  </div>
+                </FieldWithTooltip>
+              </div>
+
+              {/* Git Info Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                  <GitBranch className="w-5 h-5 text-interactive" />
+                  <h3 className="text-heading-3 font-semibold text-text-primary">Git Information</h3>
                 </div>
+                
+                <FieldWithTooltip
+                  label="Main Branch"
+                  tooltip="The main branch of your repository. Crystal will automatically detect this from your git configuration."
+                >
+                  <Card variant="bordered" padding="md" className="text-text-secondary bg-surface-secondary">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="w-4 h-4" />
+                      <span className="font-mono">
+                        {detectedBranch || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
+                      </span>
+                    </div>
+                  </Card>
+                </FieldWithTooltip>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Current Branch <span className="text-gray-500">(Auto-detected)</span>
-                </label>
-                <div className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200">
-                  {detectedBranch || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
+              {/* Optional Scripts Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                  <Play className="w-5 h-5 text-interactive" />
+                  <h3 className="text-heading-3 font-semibold text-text-primary">Optional Scripts</h3>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  The main branch is automatically detected from the repository. This will be used for git operations.
-                </p>
-              </div>
+                
+                <FieldWithTooltip
+                  label="Build Script"
+                  tooltip="Command to build your project. This runs automatically before each Claude Code session starts."
+                >
+                  <EnhancedInput
+                    type="text"
+                    value={newProject.buildScript}
+                    onChange={(e) => setNewProject({ ...newProject, buildScript: e.target.value })}
+                    placeholder="pnpm build"
+                    size="lg"
+                    fullWidth
+                    icon={<Hammer className="w-4 h-4" />}
+                  />
+                </FieldWithTooltip>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Build Script <span className="text-gray-500">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={newProject.buildScript}
-                  onChange={(e) => setNewProject({ ...newProject, buildScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
-                  placeholder="e.g., pnpm build or npm run build"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This script will run automatically before each Claude Code session starts.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Run Script <span className="text-gray-500">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={newProject.runScript}
-                  onChange={(e) => setNewProject({ ...newProject, runScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200 focus:outline-none focus:border-blue-500"
-                  placeholder="e.g., pnpm dev or npm start"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This script can be run manually from the Terminal view during sessions.
-                </p>
+                <FieldWithTooltip
+                  label="Run Script"
+                  tooltip="Command to start your development server. You can run this manually from the Terminal view during sessions."
+                >
+                  <EnhancedInput
+                    type="text"
+                    value={newProject.runScript}
+                    onChange={(e) => setNewProject({ ...newProject, runScript: e.target.value })}
+                    placeholder="pnpm dev"
+                    size="lg"
+                    fullWidth
+                    icon={<Play className="w-4 h-4" />}
+                  />
+                </FieldWithTooltip>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowAddDialog(false);
-                  setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
-      setDetectedBranch(null);
-                }}
-                className="px-4 py-2 text-gray-300 hover:text-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateProject}
-                disabled={!newProject.name || !newProject.path}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Add Project
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            onClick={() => {
+              setShowAddDialog(false);
+              setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+              setDetectedBranch(null);
+              setShowValidationErrors(false);
+            }}
+            variant="ghost"
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (!newProject.name || !newProject.path) {
+                setShowValidationErrors(true);
+                return;
+              }
+              handleCreateProject();
+            }}
+            disabled={!newProject.name || !newProject.path}
+            variant="primary"
+            size="md"
+            className={(!newProject.name || !newProject.path) ? 'border-status-error border-2' : ''}
+          >
+            Create Project
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* Project Settings Dialog */}
       {settingsProject && (

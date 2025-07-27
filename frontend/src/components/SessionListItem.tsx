@@ -8,6 +8,8 @@ import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
 import type { Session, GitStatus } from '../types/session';
 import { useContextMenu } from '../contexts/ContextMenuContext';
+import { IconButton } from './ui/IconButton';
+import { cn } from '../utils/cn';
 
 interface SessionListItemProps {
   session: Session;
@@ -43,6 +45,14 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       const previousSession = prevState.sessions.find(s => s.id === session.id) || 
         (prevState.activeMainRepoSession?.id === session.id ? prevState.activeMainRepoSession : null);
       
+      // Debug: Compare store status with prop status
+      if (currentSession) {
+        console.log(`[SessionListItem] Session ${session.id} - Store status: ${currentSession.status}, Prop status: ${session.status}`);
+        if (currentSession.status !== session.status) {
+          console.warn(`[SessionListItem] Session ${session.id} status mismatch! Store: ${currentSession.status}, Prop: ${session.status}`);
+        }
+      }
+      
       // Force component update if status changed
       if (currentSession && previousSession && currentSession.status !== previousSession.status) {
         // Status changed - component will re-render due to prop change
@@ -50,7 +60,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     });
     
     return unsubscribe;
-  }, [session.id]);
+  }, [session.id, session.status]);
   
   useEffect(() => {
     // Check if this session's project has a run script
@@ -331,11 +341,13 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   return (
     <>
       <div
-        className={`w-full text-left ${isNested ? 'px-2 py-1.5' : 'px-3 py-2'} rounded-md flex items-center space-x-2 transition-colors group ${
+        className={cn(
+          'w-full text-left rounded-md flex items-center space-x-2 transition-all group',
+          isNested ? 'px-2 py-1.5 text-sm' : 'px-3 py-2',
           isActive 
-            ? 'bg-blue-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
-            : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
-        } ${isNested ? 'text-sm' : ''}`}
+            ? 'bg-interactive/20 text-text-primary shadow-sm ring-1 ring-interactive/20 dark:ring-interactive/30' 
+            : 'hover:bg-surface-hover text-text-secondary hover:shadow-sm'
+        )}
         onContextMenu={handleContextMenu}
       >
         <button
@@ -353,23 +365,30 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
               onKeyDown={handleKeyDown}
               onBlur={handleSaveEdit}
               onClick={(e) => e.stopPropagation()}
-              className="flex-1 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1 rounded border border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:outline-none"
+              className="flex-1 text-sm bg-surface-primary text-text-primary px-2 py-1 rounded border border-border-primary focus:border-interactive focus:outline-none focus:ring-2 focus:ring-interactive/20"
               autoFocus
             />
           ) : (
-            <span className="flex-1 truncate text-sm text-left flex items-center gap-2">
+            <span className={cn(
+              'flex-1 truncate text-sm text-left flex items-center gap-2',
+              (isActive || session.status === 'completed_unviewed') && 'font-semibold',
+              session.status === 'completed_unviewed' && 'text-interactive'
+            )} title={session.name}>
               {(gitStatus || gitStatusLoading) && !session.archived && (
                 <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
               )}
               <StatusIndicator session={session} size="small" />
               <span className="ml-1">{session.name}</span>
               {!!session.isMainRepo && (
-                <span className="text-xs text-blue-600 dark:text-blue-400 ml-1">(main)</span>
+                <span className="ml-1 text-xs text-interactive">(main)</span>
               )}
             </span>
           )}
           {!isEditing && (isRunning || isClosing) && (
-            <span className={isClosing ? "text-amber-600 dark:text-amber-400 text-xs" : "text-green-600 dark:text-green-400 text-xs"}>
+            <span className={cn(
+              'text-xs',
+              isClosing ? 'text-status-warning' : 'text-status-success'
+            )}>
               {isClosing ? '⏸️ Closing' : '▶️ Running'}
             </span>
           )}
@@ -378,34 +397,39 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
           {!isEditing && (
             <>
               {!session.archived && (
-                <button
+                <IconButton
                   onClick={handleToggleFavorite}
-                  className={`p-1 rounded transition-all ${
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'transition-all',
                     session.isFavorite 
-                      ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300' 
-                      : 'text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 opacity-0 group-hover:opacity-100'
-                  } hover:bg-gray-100 dark:hover:bg-gray-700/50`}
-                  title={session.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <Star 
-                    className="w-4 h-4" 
-                    fill={session.isFavorite ? 'currentColor' : 'none'}
-                    strokeWidth={session.isFavorite ? 0 : 2}
-                  />
-                </button>
+                      ? 'text-status-warning hover:text-status-warning-hover' 
+                      : 'text-text-tertiary opacity-0 group-hover:opacity-100'
+                  )}
+                  aria-label={session.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  icon={
+                    <Star 
+                      className="w-4 h-4" 
+                      fill={session.isFavorite ? 'currentColor' : 'none'}
+                      strokeWidth={session.isFavorite ? 0 : 2}
+                    />
+                  }
+                />
               )}
               {!session.archived && (
                 <button
                   onClick={isRunning ? handleStopScript : handleRunScript}
-                  className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
+                  className={cn(
+                    'opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded',
                     isClosing
-                      ? 'cursor-wait text-amber-600 dark:text-amber-400'
+                      ? 'cursor-wait text-status-warning'
                       : isRunning 
-                      ? 'hover:bg-red-100 dark:hover:bg-red-600/20 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300' 
+                      ? 'hover:bg-status-error/10 text-status-error hover:text-status-error' 
                       : hasRunScript
-                        ? 'hover:bg-green-100 dark:hover:bg-green-600/20 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-600/20 text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400'
-                  }`}
+                        ? 'hover:bg-status-success/10 text-status-success hover:text-status-success'
+                        : 'hover:bg-surface-hover text-text-tertiary hover:text-text-secondary'
+                  )}
                   title={isClosing ? 'Closing script...' : isRunning ? 'Stop script' : (hasRunScript ? 'Run script' : 'No run script configured - Click to configure')}
                   disabled={isClosing}
                 >
@@ -413,20 +437,25 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
                 </button>
               )}
               {!session.archived && (
-                <button
+                <IconButton
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-600/20 ${
-                    isDeleting ? 'cursor-not-allowed' : ''
-                  }`}
-                  title="Archive session"
-                >
-                  {isDeleting ? (
-                    <span className="text-gray-600 dark:text-gray-400">⏳</span>
-                  ) : (
-                    <Archive className="w-4 h-4 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300" />
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'opacity-0 group-hover:opacity-100 transition-opacity',
+                    'hover:bg-status-warning/10',
+                    isDeleting && 'cursor-not-allowed'
                   )}
-                </button>
+                  aria-label="Archive session"
+                  icon={
+                    isDeleting ? (
+                      <span className="text-text-tertiary">⏳</span>
+                    ) : (
+                      <Archive className="w-4 h-4 text-status-warning hover:text-status-warning" />
+                    )
+                  }
+                />
               )}
             </>
           )}
@@ -436,13 +465,13 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       {/* Context Menu */}
       {isMenuOpen('session', session.id) && menuState.position && (
         <div
-          className="context-menu fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50 min-w-[150px]"
+          className="fixed bg-surface-primary border border-border-primary rounded-md shadow-lg py-1 z-50 min-w-[150px]"
           style={{ top: menuState.position.y, left: menuState.position.x }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={handleRename}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+            className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
           >
             Rename
           </button>
@@ -456,18 +485,19 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
               }
             }}
             disabled={isClosing}
-            className={`w-full text-left px-4 py-2 text-sm ${
+            className={cn(
+              'w-full text-left px-4 py-2 text-sm',
               isClosing 
-                ? 'text-gray-400 dark:text-gray-600 cursor-wait' 
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
-            }`}
+                ? 'text-text-tertiary cursor-wait' 
+                : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+            )}
           >
             {isClosing ? 'Closing Script...' : isRunning ? 'Stop Script' : 'Run Script'}
           </button>
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+          <div className="border-t border-border-primary my-1" />
           <button
             onClick={handleDeleteFromMenu}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-300"
+            className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-surface-hover hover:text-status-error"
           >
             Archive
           </button>

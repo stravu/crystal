@@ -63,7 +63,7 @@ function FileTreeNode({ file, level, onFileClick, onRefresh, onDelete, selectedP
       <>
         {parts.map((part, index) => 
           part.toLowerCase() === searchQuery.toLowerCase() ? (
-            <span key={index} className="bg-yellow-600 text-gray-900">
+            <span key={index} className="bg-status-warning text-text-primary">
               {part}
             </span>
           ) : (
@@ -77,8 +77,8 @@ function FileTreeNode({ file, level, onFileClick, onRefresh, onDelete, selectedP
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <div
-        className={`flex items-center px-2 py-1 hover:bg-gray-700 cursor-pointer group ${
-          isSelected ? 'bg-blue-600' : ''
+        className={`flex items-center px-2 py-1 hover:bg-surface-hover cursor-pointer group ${
+          isSelected ? 'bg-interactive' : ''
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={handleClick}
@@ -87,23 +87,23 @@ function FileTreeNode({ file, level, onFileClick, onRefresh, onDelete, selectedP
         {file.isDirectory ? (
           <>
             {isExpanded ? (
-              <ChevronDown className="w-4 h-4 mr-1 text-gray-400" />
+              <ChevronDown className="w-4 h-4 mr-1 text-text-tertiary" />
             ) : (
-              <ChevronRight className="w-4 h-4 mr-1 text-gray-400" />
+              <ChevronRight className="w-4 h-4 mr-1 text-text-tertiary" />
             )}
-            <Folder className="w-4 h-4 mr-2 text-blue-400" />
+            <Folder className="w-4 h-4 mr-2 text-interactive" />
           </>
         ) : (
           <>
             <div className="w-4 h-4 mr-1" />
-            <File className="w-4 h-4 mr-2 text-gray-400" />
+            <File className="w-4 h-4 mr-2 text-text-tertiary" />
           </>
         )}
-        <span className="flex-1 text-sm truncate text-gray-200">{highlightText(file.name)}</span>
+        <span className="flex-1 text-sm truncate text-text-primary">{highlightText(file.name)}</span>
         {file.isDirectory && (
           <button
             onClick={handleRefresh}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200"
+            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface-hover rounded text-text-tertiary hover:text-text-primary"
             title="Refresh folder"
           >
             <RefreshCw className="w-3 h-3" />
@@ -111,10 +111,10 @@ function FileTreeNode({ file, level, onFileClick, onRefresh, onDelete, selectedP
         )}
         <button
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded ml-1"
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface-hover rounded ml-1"
           title={`Delete ${file.isDirectory ? 'folder' : 'file'}`}
         >
-          <Trash2 className="w-3 h-3 text-red-400" />
+          <Trash2 className="w-3 h-3 text-status-error" />
         </button>
       </div>
     </div>
@@ -400,42 +400,42 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
   }, [showSearch, searchQuery, showNewItemDialog]);
 
   if (loading && files.size === 0) {
-    return <div className="p-4 text-gray-400">Loading files...</div>;
+    return <div className="p-4 text-text-secondary">Loading files...</div>;
   }
 
   if (error) {
-    return <div className="p-4 text-red-400">Error: {error}</div>;
+    return <div className="p-4 text-status-error">Error: {error}</div>;
   }
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between p-2 border-b border-gray-700">
-        <span className="text-sm font-medium text-gray-200">Files</span>
+      <div className="flex items-center justify-between p-2 border-b border-border-primary">
+        <span className="text-sm font-medium text-text-primary">Files</span>
         <div className="flex gap-1">
           <button
             onClick={() => setShowSearch(!showSearch)}
-            className={`p-1 rounded text-gray-400 hover:text-gray-200 ${showSearch ? 'bg-gray-700' : 'hover:bg-gray-700'}`}
+            className={`p-1 rounded text-text-tertiary hover:text-text-primary ${showSearch ? 'bg-surface-tertiary' : 'hover:bg-surface-hover'}`}
             title="Search files (Cmd/Ctrl+F)"
           >
             <Search className="w-4 h-4" />
           </button>
           <button
             onClick={handleNewFile}
-            className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-200"
+            className="p-1 hover:bg-surface-hover rounded text-text-tertiary hover:text-text-primary"
             title="New file"
           >
             <Plus className="w-4 h-4" />
           </button>
           <button
             onClick={handleNewFolder}
-            className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-200"
+            className="p-1 hover:bg-surface-hover rounded text-text-tertiary hover:text-text-primary"
             title="New folder"
           >
             <FolderPlus className="w-4 h-4" />
           </button>
           <button
             onClick={() => loadFiles('')}
-            className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-200"
+            className="p-1 hover:bg-surface-hover rounded text-text-tertiary hover:text-text-primary"
             title="Refresh all"
           >
             <RefreshCw className="w-4 h-4" />
@@ -443,7 +443,7 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
         </div>
       </div>
       {showSearch && (
-        <div className="p-2 border-b border-gray-700">
+        <div className="p-2 border-b border-border-primary">
           <div className="relative">
             <input
               ref={searchInputRef}
@@ -451,27 +451,27 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search files..."
-              className="w-full pl-8 pr-8 py-1 bg-gray-900 border border-gray-600 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full pl-8 pr-8 py-1 bg-surface-primary border border-border-primary rounded text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive"
             />
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-tertiary" />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-0.5 hover:bg-gray-700 rounded"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-0.5 hover:bg-surface-hover rounded"
               >
-                <X className="w-3 h-3 text-gray-400" />
+                <X className="w-3 h-3 text-text-tertiary" />
               </button>
             )}
           </div>
           {searchQuery && (
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-xs text-text-tertiary">
               Press ESC to clear • Cmd/Ctrl+F to toggle search
             </div>
           )}
         </div>
       )}
       {showNewItemDialog && (
-        <div className="p-2 border-b border-gray-700 bg-gray-900">
+        <div className="p-2 border-b border-border-primary bg-surface-secondary">
           <form onSubmit={(e) => { e.preventDefault(); handleCreateNewItem(); }}>
             <div className="flex items-center gap-2">
               <input
@@ -480,19 +480,19 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 placeholder={`Enter ${showNewItemDialog} name...`}
-                className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                className="flex-1 px-2 py-1 bg-surface-primary border border-border-primary rounded text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive"
               />
               <button
                 type="submit"
                 disabled={!newItemName.trim()}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded text-sm"
+                className="px-3 py-1 bg-interactive hover:bg-interactive-hover disabled:bg-surface-tertiary disabled:text-text-tertiary text-white rounded text-sm transition-colors"
               >
                 Create
               </button>
               <button
                 type="button"
                 onClick={() => { setShowNewItemDialog(null); setNewItemName(''); }}
-                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm"
+                className="px-3 py-1 bg-surface-tertiary hover:bg-surface-hover text-text-secondary rounded text-sm transition-colors"
               >
                 Cancel
               </button>
@@ -501,7 +501,7 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
         </div>
       )}
       {error && (
-        <div className="px-3 py-2 bg-red-900 text-red-200 text-sm border-b border-red-800">
+        <div className="px-3 py-2 bg-status-error/20 text-status-error text-sm border-b border-status-error/30">
           {error}
         </div>
       )}
@@ -614,7 +614,7 @@ export function FileEditor({ sessionId }: FileEditorProps) {
   return (
     <div className="h-full flex">
       <div 
-        className="bg-gray-800 border-r border-gray-700 relative flex-shrink-0"
+        className="bg-surface-secondary border-r border-border-primary relative flex-shrink-0"
         style={{ width: `${fileTreeWidth}px` }}
       >
         <FileTree
@@ -629,15 +629,15 @@ export function FileEditor({ sessionId }: FileEditorProps) {
           onMouseDown={startResize}
         >
           {/* Visual indicator */}
-          <div className="absolute inset-0 bg-gray-700 group-hover:bg-blue-500 transition-colors" />
+          <div className="absolute inset-0 bg-border-primary group-hover:bg-interactive transition-colors" />
           {/* Larger grab area */}
           <div className="absolute -left-2 -right-2 top-0 bottom-0" />
           {/* Drag indicator dots */}
           <div className="absolute top-1/2 -translate-y-1/2 right-0 transform translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="flex flex-col gap-1">
-              <div className="w-1 h-1 bg-blue-400 rounded-full" />
-              <div className="w-1 h-1 bg-blue-400 rounded-full" />
-              <div className="w-1 h-1 bg-blue-400 rounded-full" />
+              <div className="w-1 h-1 bg-interactive rounded-full" />
+              <div className="w-1 h-1 bg-interactive rounded-full" />
+              <div className="w-1 h-1 bg-interactive rounded-full" />
             </div>
           </div>
         </div>
@@ -645,24 +645,24 @@ export function FileEditor({ sessionId }: FileEditorProps) {
       <div className="flex-1 flex flex-col">
         {selectedFile ? (
           <>
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+            <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-primary">
               <div className="flex items-center gap-2">
-                <File className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-200">
+                <File className="w-4 h-4 text-text-tertiary" />
+                <span className="text-sm text-text-primary">
                   {selectedFile.path}
-                  {hasUnsavedChanges && <span className="text-yellow-400 ml-2">●</span>}
+                  {hasUnsavedChanges && <span className="text-status-warning ml-2">●</span>}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 {/* Preview Toggle for Markdown Files */}
                 {isMarkdownFile && (
-                  <div className="flex items-center rounded-lg border border-gray-600 bg-gray-700">
+                  <div className="flex items-center rounded-lg border border-border-primary bg-surface-tertiary">
                     <button
                       onClick={() => setViewMode('edit')}
                       className={`px-2 py-1 text-xs font-medium rounded-l-lg transition-colors flex items-center gap-1 ${
                         viewMode === 'edit'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-300 hover:bg-gray-600'
+                          ? 'bg-interactive text-white'
+                          : 'text-text-secondary hover:bg-surface-hover'
                       }`}
                       title="Edit mode"
                     >
@@ -673,8 +673,8 @@ export function FileEditor({ sessionId }: FileEditorProps) {
                       onClick={() => setViewMode('preview')}
                       className={`px-2 py-1 text-xs font-medium rounded-r-lg transition-colors flex items-center gap-1 ${
                         viewMode === 'preview'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-300 hover:bg-gray-600'
+                          ? 'bg-interactive text-white'
+                          : 'text-text-secondary hover:bg-surface-hover'
                       }`}
                       title="Preview mode"
                     >
@@ -686,26 +686,26 @@ export function FileEditor({ sessionId }: FileEditorProps) {
                 <div className="flex items-center gap-2 text-sm">
                   {hasUnsavedChanges ? (
                     <>
-                      <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                      <span className="text-yellow-400">Auto-saving...</span>
+                      <div className="w-2 h-2 bg-status-warning rounded-full animate-pulse" />
+                      <span className="text-status-warning">Auto-saving...</span>
                     </>
                   ) : (
                     <>
-                      <div className="w-2 h-2 bg-green-400 rounded-full" />
-                      <span className="text-green-400">All changes saved</span>
+                      <div className="w-2 h-2 bg-status-success rounded-full" />
+                      <span className="text-status-success">All changes saved</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
             {error && (
-              <div className="px-4 py-2 bg-red-900 text-red-200 text-sm">
+              <div className="px-4 py-2 bg-status-error/20 text-status-error text-sm">
                 Error: {error}
               </div>
             )}
             <div className="flex-1 overflow-hidden">
               {viewMode === 'preview' && isMarkdownFile ? (
-                <div className="h-full overflow-auto bg-white dark:bg-gray-900">
+                <div className="h-full overflow-auto bg-bg-primary">
                   <MarkdownPreview
                     content={fileContent}
                     className="min-h-full"
@@ -733,7 +733,7 @@ export function FileEditor({ sessionId }: FileEditorProps) {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center text-text-secondary">
             {loading ? 'Loading...' : 'Select a file to edit'}
           </div>
         )}

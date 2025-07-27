@@ -90,7 +90,9 @@ export function useIPCEvents() {
       console.log('[useIPCEvents] Session updated event received:', {
         id: session.id,
         model: session.model,
-        status: session.status
+        status: session.status,
+        commitMode: session.commitMode,
+        commitModeSettings: session.commitModeSettings
       });
       
       // Ensure we have valid session data

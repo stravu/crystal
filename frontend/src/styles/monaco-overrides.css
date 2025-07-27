@@ -1,0 +1,39 @@
+/* Monaco Editor CSS Variable Overrides */
+
+/* Dark theme overrides */
+:root.dark {
+  --vscode-editor-background: #111827 !important; /* gray-900 */
+  --vscode-editor-foreground: #f3f4f6 !important; /* gray-100 */
+  --vscode-editorWidget-background: #111827 !important;
+  --vscode-editorWidget-foreground: #f3f4f6 !important;
+  --vscode-diffEditor-insertedTextBackground: #10b98120 !important;
+  --vscode-diffEditor-removedTextBackground: #ef444420 !important;
+  --vscode-diffEditor-insertedLineBackground: #10b98115 !important;
+  --vscode-diffEditor-removedLineBackground: #ef444415 !important;
+}
+
+/* Light theme overrides */
+:root:not(.dark) {
+  --vscode-editor-background: #ffffff !important; /* white */
+  --vscode-editor-foreground: #1e2026 !important; /* gray-900 */
+  --vscode-editorWidget-background: #ffffff !important;
+  --vscode-editorWidget-foreground: #1e2026 !important;
+  --vscode-diffEditor-insertedTextBackground: #16a34a15 !important;
+  --vscode-diffEditor-removedTextBackground: #dc262615 !important;
+  --vscode-diffEditor-insertedLineBackground: #16a34a10 !important;
+  --vscode-diffEditor-removedLineBackground: #dc262610 !important;
+}
+
+/* Additional Monaco editor style overrides */
+.monaco-editor,
+.monaco-diff-editor,
+.monaco-editor-background,
+.monaco-editor .margin,
+.monaco-editor .monaco-editor-background {
+  background-color: var(--vscode-editor-background) !important;
+}
+
+.monaco-editor .view-overlays,
+.monaco-editor .margin-view-overlays {
+  background: transparent !important;
+}

@@ -342,21 +342,21 @@ export function ProjectTreeView() {
           return (
             <div key={project.id}>
               <div 
-                className="group flex items-center space-x-1 px-2 py-1.5 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="group flex items-center space-x-1 px-2 py-1.5 rounded cursor-pointer transition-colors hover:bg-surface-hover"
               >
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleProject(project.id);
                   }}
-                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                  className="p-0.5 hover:bg-surface-hover rounded transition-colors"
                   disabled={sessionCount === 0}
                 >
                   {sessionCount > 0 ? (
                     isExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                      <ChevronDown className="w-3 h-3 text-text-tertiary" />
                     ) : (
-                      <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                      <ChevronRight className="w-3 h-3 text-text-tertiary" />
                     )
                   ) : (
                     <div className="w-3 h-3" />
@@ -368,11 +368,11 @@ export function ProjectTreeView() {
                   onClick={() => handleProjectClick(project)}
                 >
                   {isExpanded ? (
-                    <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <FolderOpen className="w-4 h-4 text-interactive flex-shrink-0" />
                   ) : (
-                    <Folder className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+                    <Folder className="w-4 h-4 text-text-tertiary flex-shrink-0" />
                   )}
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate text-left">
+                  <span className="text-sm font-medium text-text-primary truncate text-left">
                     {project.name}
                   </span>
                 </div>
@@ -382,14 +382,14 @@ export function ProjectTreeView() {
                     e.stopPropagation();
                     handleCreateSession(project);
                   }}
-                  className={`relative p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors group/tooltip ${
+                  className={`relative p-1 hover:bg-surface-hover rounded transition-colors group/tooltip ${
                     sessionCount === 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                   }`}
                 >
-                  <Plus className="w-4 h-4 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" />
-                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 pointer-events-none z-50">
+                  <Plus className="w-4 h-4 text-text-tertiary hover:text-text-primary" />
+                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-white bg-surface-tertiary rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 pointer-events-none z-50">
                     Create new session
-                    <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-4 border-transparent border-t-gray-800 dark:border-t-gray-700"></span>
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-4 border-transparent border-t-surface-tertiary"></span>
                   </span>
                 </button>
                 
@@ -399,10 +399,10 @@ export function ProjectTreeView() {
                     setSelectedProjectForSettings(project);
                     setShowProjectSettings(true);
                   }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 hover:bg-surface-hover rounded transition-colors opacity-0 group-hover:opacity-100"
                   title="Project settings"
                 >
-                  <Settings className="w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" />
+                  <Settings className="w-3 h-3 text-text-tertiary hover:text-text-primary" />
                 </button>
               </div>
               
@@ -423,7 +423,7 @@ export function ProjectTreeView() {
         
             <button
               onClick={() => setShowAddProjectDialog(true)}
-              className="w-full mt-2 px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center space-x-2"
+              className="w-full mt-2 px-2 py-1.5 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors flex items-center justify-center space-x-2"
             >
               <Plus className="w-4 h-4" />
               <span>New Project</span>
@@ -469,26 +469,26 @@ export function ProjectTreeView() {
       
       {/* Add Project Dialog */}
       {showAddProjectDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Add New Project</h3>
+        <div className="fixed inset-0 bg-modal-overlay flex items-center justify-center z-50">
+          <div className="bg-surface-primary rounded-lg p-6 w-96 shadow-xl border border-border-primary">
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Add New Project</h3>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Project Name
                 </label>
                 <input
                   type="text"
                   value={newProject.name}
                   onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
                   placeholder="My Project"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Repository Path
                 </label>
                 <div className="flex gap-2">
@@ -499,7 +499,7 @@ export function ProjectTreeView() {
                       setNewProject({ ...newProject, path: e.target.value });
                       detectCurrentBranch(e.target.value);
                     }}
-                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+                    className="flex-1 px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
                     placeholder="/path/to/repository"
                   />
                   <button
@@ -514,7 +514,7 @@ export function ProjectTreeView() {
                         detectCurrentBranch(result.data);
                       }
                     }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-4 py-2 text-sm font-medium text-text-secondary bg-surface-tertiary border border-border-primary rounded-md hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-interactive"
                   >
                     Browse
                   </button>
@@ -522,45 +522,45 @@ export function ProjectTreeView() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Current Branch <span className="text-gray-500">(Auto-detected)</span>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Current Branch <span className="text-text-tertiary">(Auto-detected)</span>
                 </label>
-                <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200">
+                <div className="w-full px-3 py-2 bg-surface-tertiary border border-border-primary rounded-md text-text-secondary">
                   {detectedBranchForNewProject || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   The main branch is automatically detected from the repository. This will be used for git operations.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Build Script <span className="text-gray-500 dark:text-gray-500">(optional)</span>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Build Script <span className="text-text-tertiary">(optional)</span>
                 </label>
                 <input
                   type="text"
                   value={newProject.buildScript}
                   onChange={(e) => setNewProject({ ...newProject, buildScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
                   placeholder="e.g., pnpm build or npm run build"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   This script will run automatically before each Claude Code session starts.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Run Script <span className="text-gray-500 dark:text-gray-500">(optional)</span>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Run Script <span className="text-text-tertiary">(optional)</span>
                 </label>
                 <input
                   type="text"
                   value={newProject.runScript}
                   onChange={(e) => setNewProject({ ...newProject, runScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
                   placeholder="e.g., pnpm dev or npm start"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   This script can be run manually from the Terminal view during sessions.
                 </p>
               </div>
@@ -572,14 +572,14 @@ export function ProjectTreeView() {
                   setShowAddProjectDialog(false);
                   setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
                 }}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateProject}
                 disabled={!newProject.name || !newProject.path}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-interactive hover:bg-interactive-hover text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Add Project
               </button>

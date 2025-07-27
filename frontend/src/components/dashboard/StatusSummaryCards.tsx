@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SessionBranchInfo } from '../../types/projectDashboard';
+import { Card } from '../ui/Card';
 
 interface StatusSummaryCardsProps {
   sessions: SessionBranchInfo[];
@@ -12,40 +13,40 @@ export const StatusSummaryCards: React.FC<StatusSummaryCardsProps> = ({ sessions
 
   return (
     <div className="grid grid-cols-3 gap-3 mb-6">
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+      <Card className="p-4">
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Up to date</span>
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">Up to date</span>
+            <div className="w-2 h-2 bg-status-success rounded-full"></div>
           </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <div className="text-2xl font-bold text-text-primary">
             {upToDateCount}
-            <span className="text-sm font-normal text-gray-500 dark:text-gray-400">/{sessions.length}</span>
+            <span className="text-sm font-normal text-text-tertiary">/{sessions.length}</span>
           </div>
         </div>
-      </div>
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+      </Card>
+      <Card className="p-4">
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stale</span>
-            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+            <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">Stale</span>
+            <div className="w-2 h-2 bg-status-warning rounded-full"></div>
           </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <div className="text-2xl font-bold text-text-primary">
             {staleCount}
           </div>
         </div>
-      </div>
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+      </Card>
+      <Card className="p-4">
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Changes</span>
-            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+            <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">Changes</span>
+            <div className="w-2 h-2 bg-status-warning rounded-full"></div>
           </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <div className="text-2xl font-bold text-text-primary">
             {needsAttentionCount}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

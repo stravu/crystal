@@ -1,4 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Button } from './ui/Button';
+import { ToggleField } from './ui/Toggle';
+import { CollapsibleCard } from './ui/CollapsibleCard';
+import { SettingsSection } from './ui/SettingsSection';
+import { Bell, BellOff, Volume2, VolumeX, Zap, Shield } from 'lucide-react';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -43,142 +48,142 @@ export function NotificationSettings({ settings, onUpdateSettings }: Notificatio
     }
   };
 
-  const handleToggle = (key: keyof NotificationSettings) => {
-    onUpdateSettings({ [key]: !settings[key] });
+  const getPermissionIcon = () => {
+    switch (permissionStatus) {
+      case 'granted': return <Bell className="w-4 h-4 text-status-success" />;
+      case 'denied': return <BellOff className="w-4 h-4 text-status-error" />;
+      default: return <Shield className="w-4 h-4 text-status-warning" />;
+    }
   };
+
+  const getPermissionStatus = () => {
+    switch (permissionStatus) {
+      case 'granted': return { text: 'Enabled', color: 'text-status-success' };
+      case 'denied': return { text: 'Denied', color: 'text-status-error' };
+      default: return { text: 'Not requested', color: 'text-status-warning' };
+    }
+  };
+
+  const status = getPermissionStatus();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Notification Settings</h3>
-        
-        {/* Permission Status */}
-        <div className="mb-6 p-4 border border-gray-300 dark:border-gray-700 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-gray-700 dark:text-gray-300">Browser Permissions</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Status: {permissionStatus === 'granted' ? '✅ Enabled' : 
-                        permissionStatus === 'denied' ? '❌ Denied' : '⚠️ Not requested'}
+      {/* Browser Permissions */}
+      <CollapsibleCard
+        title="Browser Permissions"
+        subtitle="Allow Crystal to show desktop notifications"
+        icon={getPermissionIcon()}
+        defaultExpanded={true}
+      >
+        <SettingsSection
+          title="Notification Access"
+          description="Crystal needs browser permission to show notifications when your sessions update"
+          icon={getPermissionIcon()}
+        >
+          <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg border border-border-secondary">
+            <div className="flex items-center gap-3">
+              {getPermissionIcon()}
+              <div>
+                <span className="text-sm font-medium text-text-primary">Permission Status</span>
+                <p className={`text-sm ${status.color} font-medium`}>
+                  {status.text}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {permissionStatus !== 'granted' && (
+                <Button
+                  onClick={requestPermission}
+                  size="sm"
+                  variant="primary"
+                >
+                  Enable Notifications
+                </Button>
+              )}
+              {permissionStatus === 'granted' && (
+                <Button
+                  onClick={testNotification}
+                  size="sm"
+                  variant="secondary"
+                >
+                  Test Notification
+                </Button>
+              )}
+            </div>
+          </div>
+          {permissionStatus === 'denied' && (
+            <div className="mt-3 p-3 bg-status-error/10 border border-status-error/20 rounded-lg">
+              <p className="text-xs text-status-error">
+                Notifications are blocked. Please enable them in your browser settings and refresh Crystal.
               </p>
             </div>
-            {permissionStatus !== 'granted' && (
-              <button
-                onClick={requestPermission}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-              >
-                Enable Notifications
-              </button>
-            )}
-          </div>
-          {permissionStatus === 'granted' && (
-            <button
-              onClick={testNotification}
-              className="mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-            >
-              Test Notification
-            </button>
           )}
-        </div>
+        </SettingsSection>
+      </CollapsibleCard>
 
-        {/* Settings */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Enable Notifications</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Show browser notifications for session events</p>
-            </div>
-            <button
-              onClick={() => handleToggle('enabled')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+      {/* Notification Preferences */}
+      <CollapsibleCard
+        title="Notification Preferences"
+        subtitle="Customize when and how you receive notifications"
+        icon={settings.enabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+        defaultExpanded={true}
+      >
+        <SettingsSection
+          title="Master Control"
+          description="Turn all notifications on or off"
+          icon={settings.enabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+        >
+          <ToggleField
+            label="Enable Notifications"
+            description="Show browser notifications for session events"
+            checked={settings.enabled}
+            onChange={(checked) => onUpdateSettings({ enabled: checked })}
+          />
+        </SettingsSection>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Play Sound</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Play a sound when notifications appear</p>
-            </div>
-            <button
-              onClick={() => handleToggle('playSound')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.playSound ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.playSound ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+        <SettingsSection
+          title="Sound & Audio"
+          description="Control notification sounds"
+          icon={settings.playSound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        >
+          <ToggleField
+            label="Play notification sounds"
+            description="Play a subtle sound when notifications appear"
+            checked={settings.playSound}
+            onChange={(checked) => onUpdateSettings({ playSound: checked })}
+          />
+        </SettingsSection>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Status Changes</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Notify when session status changes</p>
-            </div>
-            <button
-              onClick={() => handleToggle('notifyOnStatusChange')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.notifyOnStatusChange ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.notifyOnStatusChange ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+        <SettingsSection
+          title="Event Triggers"
+          description="Choose which session events should trigger notifications"
+          icon={<Zap className="w-4 h-4" />}
+          spacing="sm"
+        >
+          <div className="space-y-3">
+            <ToggleField
+              label="Status changes"
+              description="When sessions start, stop, or change state"
+              checked={settings.notifyOnStatusChange}
+              onChange={(checked) => onUpdateSettings({ notifyOnStatusChange: checked })}
+            />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Input Required</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Notify when sessions are waiting for input</p>
-            </div>
-            <button
-              onClick={() => handleToggle('notifyOnWaiting')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.notifyOnWaiting ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.notifyOnWaiting ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+            <ToggleField
+              label="Input required"
+              description="When Claude is waiting for your response"
+              checked={settings.notifyOnWaiting}
+              onChange={(checked) => onUpdateSettings({ notifyOnWaiting: checked })}
+            />
 
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-medium text-gray-700 dark:text-gray-300">Session Complete</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Notify when sessions finish successfully</p>
-            </div>
-            <button
-              onClick={() => handleToggle('notifyOnComplete')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.notifyOnComplete ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.notifyOnComplete ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+            <ToggleField
+              label="Task completion"
+              description="When sessions finish successfully"
+              checked={settings.notifyOnComplete}
+              onChange={(checked) => onUpdateSettings({ notifyOnComplete: checked })}
+            />
           </div>
-        </div>
-      </div>
+        </SettingsSection>
+      </CollapsibleCard>
     </div>
   );
 }

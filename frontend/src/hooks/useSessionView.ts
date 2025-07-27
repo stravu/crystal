@@ -6,9 +6,10 @@ import { API } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Session, GitCommands, GitErrorDetails } from '../types/session';
+import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'output' | 'messages' | 'changes' | 'terminal' | 'editor';
+export type ViewMode = 'richOutput' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -25,13 +26,14 @@ export const useSessionView = (
   const scriptFitAddon = useRef<FitAddon | null>(null);
 
   // States
-  const [viewMode, setViewMode] = useState<ViewMode>('output');
+  const [viewMode, setViewMode] = useState<ViewMode>('richOutput');
   const [unreadActivity, setUnreadActivity] = useState({
-    output: false,
     messages: false,
     changes: false,
     terminal: false,
     editor: false,
+    dashboard: false,
+    richOutput: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -327,15 +329,16 @@ export const useSessionView = (
     forceResetLoadingState();
     
     // Reset view mode to output when switching sessions
-    setViewMode('output');
+    setViewMode('richOutput');
     
     // Reset unread activity indicators
     setUnreadActivity({
-      output: false,
       messages: false,
       changes: false,
       terminal: false,
       editor: false,
+      dashboard: false,
+      richOutput: false,
     });
     
     // Reset context compaction state when switching sessions
@@ -565,11 +568,15 @@ export const useSessionView = (
         convertEol: true,
         rows: 30,
         cols: 80,
-        scrollback: isScript ? 2000 : 5000, // Further reduced for better performance
+        scrollback: 100000, // Unlimited terminal output support
         fastScrollModifier: 'ctrl',
         fastScrollSensitivity: 5,
         scrollSensitivity: 1,
-        theme: theme === 'light' ? lightTheme : (isScript ? scriptDarkTheme : darkTheme)
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontSize: 13,
+        lineHeight: 1.2,
+        theme: isScript ? getScriptTerminalTheme() : getTerminalTheme(),
+        allowTransparency: false
     });
 
     const addon = new FitAddon();
@@ -610,7 +617,7 @@ export const useSessionView = (
 
   useEffect(() => {
     console.log(`[useSessionView] Terminal initialization effect - viewMode: ${viewMode}, terminalRef.current: ${!!terminalRef.current}`);
-    if (viewMode === 'output' && terminalRef.current) {
+    if (false && terminalRef.current) { // Disabled - output view removed
       initTerminal(terminalRef, terminalInstance, fitAddon, false);
       
       // After terminal is initialized, trigger a check for loading output
@@ -624,14 +631,14 @@ export const useSessionView = (
             console.log(`[useSessionView] Terminal initialized, checking if output needs to be loaded`);
             clearInterval(checkInterval);
             // Force a re-evaluation of whether to load output
-            if (activeSession.status !== 'initializing') {
+            if (activeSession && activeSession.status !== 'initializing') {
               loadOutputContent(activeSession.id);
             }
           } else if (attempts >= maxAttempts) {
             console.log(`[useSessionView] Terminal initialization timed out, loading output anyway`);
             clearInterval(checkInterval);
             // Try to load output even without terminal
-            if (activeSession.status !== 'initializing') {
+            if (activeSession && activeSession.status !== 'initializing') {
               loadOutputContent(activeSession.id);
             }
           }
@@ -744,14 +751,15 @@ export const useSessionView = (
     }
   }, [viewMode, activeSessionId]);
 
-  useEffect(() => {
+  // Terminal writing useEffect - disabled since output view was removed
+  /* useEffect(() => {
+    // Output view removed - skip terminal writing entirely
+    if (!activeSession || !terminalInstance.current) return;
     console.log(`[Terminal Write Effect] Called, formatted output length: ${formattedOutput.length}, session: ${currentSessionIdForOutput}, lastProcessed: ${lastProcessedOutputLength.current}, viewMode: ${viewMode}`);
     
     // Skip if not in output view mode
-    if (viewMode !== 'output') {
-      console.log(`[Terminal Write Effect] Not in output view mode, skipping`);
-      return;
-    }
+    // Output view removed - skip terminal writing
+    return;
     
     if (!terminalInstance.current) {
       console.log(`[Terminal Write Effect] No terminal instance yet`);
@@ -816,7 +824,7 @@ export const useSessionView = (
         terminalInstance.current.scrollToBottom();
       }
     }
-  }, [formattedOutput, currentSessionIdForOutput, initTerminal, terminalRef, viewMode]);
+  }, [formattedOutput, currentSessionIdForOutput, initTerminal, terminalRef, viewMode]); */
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
@@ -931,8 +939,8 @@ export const useSessionView = (
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (viewMode === 'output') fitAddon.current?.fit();
-      else if (viewMode === 'terminal') scriptFitAddon.current?.fit();
+      // Output view removed, only handle terminal
+      if (viewMode === 'terminal') scriptFitAddon.current?.fit();
     }, 100);
     return () => clearTimeout(timer);
   }, [viewMode]);
@@ -940,7 +948,7 @@ export const useSessionView = (
   useEffect(() => {
     if (!terminalRef.current) return;
     const observer = new ResizeObserver(() => {
-      if (viewMode === 'output') fitAddon.current?.fit();
+      // Output view removed
     });
     observer.observe(terminalRef.current);
     return () => observer.disconnect();
@@ -948,7 +956,7 @@ export const useSessionView = (
 
   // Trigger terminal resize when session status changes (for padding adjustment)
   useEffect(() => {
-    if (viewMode === 'output' && fitAddon.current && activeSession) {
+    if (false && fitAddon.current && activeSession) { // Output view removed
       // Small delay to ensure DOM updates have completed
       const timer = setTimeout(() => {
         fitAddon.current?.fit();
@@ -958,8 +966,28 @@ export const useSessionView = (
   }, [activeSession?.status, viewMode]);
 
   useEffect(() => {
-    if (terminalInstance.current) terminalInstance.current.options.theme = theme === 'light' ? lightTheme : darkTheme;
-    if (scriptTerminalInstance.current) scriptTerminalInstance.current.options.theme = theme === 'light' ? lightTheme : scriptDarkTheme;
+    // Add a small delay to ensure CSS has propagated
+    const timer = setTimeout(() => {
+      console.log('[Terminal Theme Update] Theme changed to:', theme);
+      console.log('[Terminal Theme Update] Root classes:', document.documentElement.className);
+      
+      if (terminalInstance.current) {
+        const newTheme = getTerminalTheme();
+        console.log('[Terminal Theme Update] New terminal theme:', newTheme);
+        terminalInstance.current.options.theme = newTheme;
+        // Force refresh to apply new colors
+        terminalInstance.current.refresh(0, terminalInstance.current.rows - 1);
+      }
+      if (scriptTerminalInstance.current) {
+        const newScriptTheme = getScriptTerminalTheme();
+        console.log('[Terminal Theme Update] New script terminal theme:', newScriptTheme);
+        scriptTerminalInstance.current.options.theme = newScriptTheme;
+        // Force refresh to apply new colors
+        scriptTerminalInstance.current.refresh(0, scriptTerminalInstance.current.rows - 1);
+      }
+    }, 50); // Small delay to ensure CSS updates have propagated
+    
+    return () => clearTimeout(timer);
   }, [theme]);
 
   useEffect(() => {
@@ -982,8 +1010,13 @@ export const useSessionView = (
   useEffect(() => {
     if (!activeSession) return;
     const currentMessageCount = activeSession.jsonMessages?.length || 0;
-    if (currentMessageCount > previousMessageCountRef.current && viewMode !== 'messages') {
-      setUnreadActivity(prev => ({ ...prev, messages: true }));
+    if (currentMessageCount > previousMessageCountRef.current) {
+      if (viewMode !== 'messages') {
+        setUnreadActivity(prev => ({ ...prev, messages: true }));
+      }
+      if (viewMode !== 'richOutput') {
+        setUnreadActivity(prev => ({ ...prev, richOutput: true }));
+      }
     }
     previousMessageCountRef.current = currentMessageCount;
   }, [activeSession?.jsonMessages?.length, viewMode]);
@@ -1009,7 +1042,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ output: false, messages: false, changes: false, terminal: false, editor: false });
+    setUnreadActivity({ messages: false, changes: false, terminal: false, editor: false, dashboard: false, richOutput: false });
   }, [activeSessionId]);
 
 
@@ -1071,12 +1104,8 @@ export const useSessionView = (
   
   const handleNavigateToPrompt = useCallback((marker: any) => {
     if (!terminalInstance.current) return;
-    if (viewMode !== 'output') {
-      setViewMode('output');
-      setTimeout(() => navigateToPromptInTerminal(marker), 200);
-    } else {
-      navigateToPromptInTerminal(marker);
-    }
+    // Output view removed - always navigate directly
+    navigateToPromptInTerminal(marker);
   }, [viewMode]);
 
   const navigateToPromptInTerminal = (marker: any) => {
@@ -1595,7 +1624,8 @@ export const useSessionView = (
           });
           
           terminalInstance.current.write('\r\n\x1b[1;33m══════════════════════════════════════════════════════════════════\x1b[0m\r\n');
-          terminalInstance.current.write('\x1b[1;32m✓ Context ready - will be injected into your next prompt\x1b[0m\r\n');
+          terminalInstance.current.write('\x1b[1;32m✓ Context compacted successfully!\x1b[0m\r\n');
+          terminalInstance.current.write('\x1b[1;36mJust type your next message - the context above will be automatically included.\x1b[0m\r\n');
           terminalInstance.current.write('\x1b[1;33m══════════════════════════════════════════════════════════════════\x1b[0m\r\n\r\n');
           
           // Scroll to bottom to show the summary
@@ -1686,70 +1716,4 @@ export const useSessionView = (
     hasConversationHistory,
     compactedContext,
   };
-};
-
-const lightTheme = {
-  background: '#f9fafb',
-  foreground: '#1f2937',
-  cursor: '#1f2937',
-  black: '#1f2937',
-  red: '#dc2626',
-  green: '#16a34a',
-  yellow: '#ca8a04',
-  blue: '#2563eb',
-  magenta: '#9333ea',
-  cyan: '#0891b2',
-  white: '#f3f4f6',
-  brightBlack: '#6b7280',
-  brightRed: '#ef4444',
-  brightGreen: '#22c55e',
-  brightYellow: '#eab308',
-  brightBlue: '#3b82f6',
-  brightMagenta: '#a855f7',
-  brightCyan: '#06b6d4',
-  brightWhite: '#ffffff'
-};
-
-const darkTheme = {
-  background: '#000000',
-  foreground: '#d4d4d4',
-  cursor: '#d4d4d4',
-  black: '#000000',
-  red: '#cd3131',
-  green: '#0dbc79',
-  yellow: '#e5e510',
-  blue: '#2472c8',
-  magenta: '#bc3fbc',
-  cyan: '#11a8cd',
-  white: '#e5e5e5',
-  brightBlack: '#666666',
-  brightRed: '#f14c4c',
-  brightGreen: '#23d18b',
-  brightYellow: '#f5f543',
-  brightBlue: '#3b8eea',
-  brightMagenta: '#d670d6',
-  brightCyan: '#29b8db',
-  brightWhite: '#e5e5e5'
-};
-
-const scriptDarkTheme = {
-  background: '#0f172a',
-  foreground: '#e2e8f0',
-  cursor: '#e2e8f0',
-  black: '#1e293b',
-  red: '#ef4444',
-  green: '#22c55e',
-  yellow: '#eab308',
-  blue: '#3b82f6',
-  magenta: '#a855f7',
-  cyan: '#06b6d4',
-  white: '#f1f5f9',
-  brightBlack: '#475569',
-  brightRed: '#f87171',
-  brightGreen: '#4ade80',
-  brightYellow: '#facc15',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#c084fc',
-  brightCyan: '#22d3ee',
-  brightWhite: '#ffffff'
 };

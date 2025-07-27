@@ -17,6 +17,7 @@ import { useErrorStore } from './stores/errorStore';
 import { useSessionStore } from './stores/sessionStore';
 import { API } from './utils/api';
 import { ContextMenuProvider } from './contexts/ContextMenuContext';
+import { TokenTest } from './components/TokenTest';
 
 interface PermissionRequest {
   id: string;
@@ -36,6 +37,7 @@ function App() {
   const [isDiscordOpen, setIsDiscordOpen] = useState(false);
   const [hasCheckedWelcome, setHasCheckedWelcome] = useState(false);
   const [isPromptHistoryOpen, setIsPromptHistoryOpen] = useState(false);
+  const [isTokenTestOpen, setIsTokenTestOpen] = useState(false);
   const { currentError, clearError } = useErrorStore();
   const { sessions, isLoaded } = useSessionStore();
   
@@ -227,6 +229,22 @@ function App() {
       }
     };
   }, [showNotification]);
+
+  // Add keyboard shortcut for token test page (Cmd/Ctrl + Shift + T) - Development only
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'T') {
+        // Only allow in development mode
+        if (process.env.NODE_ENV === 'development') {
+          e.preventDefault();
+          setIsTokenTestOpen(prev => !prev);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   
   const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: any, message?: string) => {
     try {
@@ -243,7 +261,7 @@ function App() {
 
   return (
     <ContextMenuProvider>
-      <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <div className="h-screen flex overflow-hidden bg-bg-primary">
         <MainProcessLogger />
         {/* Draggable title bar area */}
         <div 
@@ -288,6 +306,27 @@ function App() {
           isOpen={isPromptHistoryOpen}
           onClose={() => setIsPromptHistoryOpen(false)}
         />
+        
+        {/* Token Test Modal - Toggle with Cmd/Ctrl + Shift + T (Development Only) */}
+        {isTokenTestOpen && process.env.NODE_ENV === 'development' && (
+          <div className="fixed inset-0 bg-modal-overlay flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-bg-primary w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-lg relative border border-border-primary shadow-2xl">
+              <button
+                onClick={() => setIsTokenTestOpen(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-surface-hover rounded-lg transition-colors text-text-secondary hover:text-text-primary"
+                title="Close Token Test (Cmd/Ctrl + Shift + T)"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <div className="absolute top-4 left-4 text-xs text-text-muted bg-surface-secondary px-2 py-1 rounded">
+                DEV ONLY
+              </div>
+              <TokenTest />
+            </div>
+          </div>
+        )}
       </div>
     </ContextMenuProvider>
   );

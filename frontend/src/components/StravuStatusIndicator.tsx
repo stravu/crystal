@@ -123,15 +123,15 @@ export function StravuStatusIndicator() {
   const getStatusColor = () => {
     switch (connectionState.status) {
       case 'connected':
-        return 'text-green-600 dark:text-green-400';
+        return 'text-status-success';
       case 'connecting':
-        return 'text-blue-600 dark:text-blue-400';
+        return 'text-interactive';
       case 'expired':
-        return 'text-yellow-600 dark:text-yellow-400';
+        return 'text-status-warning';
       case 'error':
-        return 'text-red-600 dark:text-red-400';
+        return 'text-status-error';
       default:
-        return 'text-gray-400 dark:text-gray-500';
+        return 'text-text-tertiary';
     }
   };
 
@@ -182,7 +182,7 @@ export function StravuStatusIndicator() {
         onClick={handleConnect}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${getStatusColor()}`}
+        className={`p-2 rounded-lg hover:bg-surface-hover transition-colors ${getStatusColor()}`}
         disabled={connectionState.status === 'connecting'}
       >
         {renderIcon()}
@@ -190,30 +190,30 @@ export function StravuStatusIndicator() {
 
       {/* Tooltip */}
       {showTooltip && (
-        <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 text-white text-sm rounded-lg p-3 z-50">
+        <div className="absolute right-0 top-full mt-2 w-64 bg-surface-tertiary text-text-primary text-sm rounded-lg p-3 z-50">
           <div className="font-medium mb-1">Stravu Integration</div>
-          <div className="text-gray-300">{getStatusText()}</div>
+          <div className="text-text-secondary">{getStatusText()}</div>
           
           {connectionState.status === 'connected' && connectionState.memberInfo && (
-            <div className="mt-2 pt-2 border-t border-gray-700">
-              <div className="text-xs text-gray-400">
+            <div className="mt-2 pt-2 border-t border-border-secondary">
+              <div className="text-xs text-text-tertiary">
                 Member: {connectionState.memberInfo.memberId}
               </div>
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-text-tertiary">
                 Scopes: {connectionState.memberInfo.scopes.join(', ')}
               </div>
             </div>
           )}
           
           {(connectionState.status === 'disconnected' || connectionState.status === 'error') && (
-            <div className="mt-2 text-xs text-gray-400">
+            <div className="mt-2 text-xs text-text-tertiary">
               Click to connect to Stravu
             </div>
           )}
 
           {/* Arrow pointing up */}
           <div className="absolute top-0 right-4 transform -translate-y-1">
-            <div className="w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+            <div className="w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-surface-tertiary"></div>
           </div>
         </div>
       )}

@@ -1,0 +1,357 @@
+/* Color Design Tokens for Crystal */
+
+:root {
+  /* Primitive Colors - Based on Tailwind's Default Palette */
+  --gray-50: rgb(249 250 251);
+  --gray-100: rgb(243 244 246);
+  --gray-200: rgb(229 231 235);
+  --gray-300: rgb(209 213 219);
+  --gray-400: rgb(156 163 175);
+  --gray-500: rgb(107 114 128);
+  --gray-600: rgb(75 85 99);
+  --gray-700: rgb(55 65 81);
+  --gray-800: rgb(31 41 55);
+  --gray-900: rgb(17 24 39);
+  
+  --blue-400: rgb(96 165 250);
+  --blue-500: rgb(59 130 246);
+  --blue-600: rgb(37 99 235);
+  --blue-700: rgb(29 78 216);
+  
+  --green-500: rgb(34 197 94);
+  --amber-500: rgb(245 158 11);
+  --red-500: rgb(239 68 68);
+  --red-600: rgb(220 38 38);
+  
+  /* Brand Colors */
+  --discord-primary: #5865F2;
+  --discord-hover: #4752C4;
+  --discord-secondary: #7289DA;
+  
+  /* Light Theme Brand Colors - Soft Lilac/Purple Accent */
+  --lilac-50: rgb(250 248 255);   /* Very light lilac for backgrounds */
+  --lilac-100: rgb(243 239 255);  /* Light lilac for surface */
+  --lilac-200: rgb(229 219 255);  /* Soft lilac for hover states */
+  --lilac-300: rgb(202 182 255);  /* Medium lilac for borders */
+  --lilac-400: rgb(167 139 250);  /* Vibrant lilac for interactive */
+  --lilac-500: rgb(139 103 246);  /* Primary brand lilac */
+  --lilac-600: rgb(124 79 243);   /* Hover state */
+  --lilac-700: rgb(104 56 235);   /* Active/pressed state */
+  
+  /* Warm Off-Whites for Light Theme */
+  --warm-white: rgb(252 252 251); /* Slight warm tint */
+  --warm-gray-50: rgb(250 250 249);
+  --warm-gray-100: rgb(245 245 243);
+  --warm-gray-200: rgb(235 235 233);
+  --warm-gray-300: rgb(220 220 218);
+  
+  /* Navigation-specific grays for dark theme */
+  --gray-750: rgb(42 50 63);  /* Between gray-700 and gray-800 */
+  --gray-850: rgb(24 32 44);  /* Between gray-800 and gray-900 */
+}
+
+/* Dark Theme - Current Default */
+:root {
+  /* Semantic Tokens - Backgrounds */
+  --color-bg-primary: var(--gray-900);
+  --color-bg-secondary: var(--gray-800);
+  --color-bg-tertiary: var(--gray-700);
+  --color-bg-hover: var(--gray-700);
+  --color-bg-active: var(--gray-600);
+  
+  /* Semantic Tokens - Surface Colors */
+  --color-surface-primary: var(--gray-800);
+  --color-surface-secondary: var(--gray-700);
+  --color-surface-hover: var(--gray-700);
+  
+  /* Semantic Tokens - Text */
+  --color-text-primary: rgb(255 255 255);
+  --color-text-secondary: var(--gray-100);
+  --color-text-tertiary: var(--gray-300);
+  --color-text-muted: var(--gray-400);
+  --color-text-disabled: var(--gray-500);
+  
+  /* Semantic Tokens - Borders */
+  --color-border-primary: var(--gray-750);
+  --color-border-secondary: var(--gray-700);
+  --color-border-hover: var(--gray-600);
+  --color-border-focus: var(--blue-500);
+  
+  /* Semantic Tokens - Interactive */
+  --color-interactive-primary: var(--blue-600);
+  --color-interactive-hover: var(--blue-700);
+  --color-interactive-active: var(--blue-500);
+  --color-interactive-text: var(--blue-400);
+  --color-focus-ring: var(--blue-500);
+  --color-interactive-rgb: 37 99 235; /* RGB value for blue-600 */
+  
+  /* High-contrast interactive text for dark backgrounds */
+  --color-text-interactive-on-dark: var(--blue-500); /* WCAG AA 4.5:1 against gray-800/900 */
+  --color-text-interactive-on-dark-hover: var(--blue-600);
+  --color-text-interactive-on-dark-active: var(--blue-400);
+  --color-text-interactive-on-dark-focus: var(--blue-500);
+  
+  /* Interactive surface tokens */
+  --color-surface-interactive: var(--gray-800);
+  --color-surface-interactive-hover: var(--gray-700);
+  --color-interactive-surface: rgba(var(--color-interactive-rgb), 0.2);
+  --color-interactive-surface-hover: rgba(var(--color-interactive-rgb), 0.3);
+  
+  /* Interactive border tokens */
+  --color-border-interactive-subtle: var(--gray-700);
+  --color-border-interactive: var(--gray-600);
+  --color-interactive-border: rgba(var(--color-interactive-rgb), 0.5);
+  --color-interactive-border-hover: rgba(var(--color-interactive-rgb), 0.7);
+  
+  /* Interactive text tokens */
+  --color-text-interactive-muted: var(--gray-400);
+  
+  /* Focus ring variations */
+  --color-focus-ring-subtle: rgba(var(--color-interactive-rgb), 0.5);
+  
+  /* Semantic Tokens - Status */
+  --color-status-success: var(--green-500);
+  --color-status-success-hover: var(--green-600);
+  --color-status-warning: var(--amber-500);
+  --color-status-warning-hover: var(--amber-600);
+  --color-status-error: var(--red-500);
+  --color-status-error-hover: var(--red-600);
+  --color-status-info: var(--blue-500);
+  --color-status-neutral: var(--gray-400);
+  
+  /* Context-Aware Text Tokens - Dark Mode */
+  /* Text on different backgrounds for proper contrast */
+  --color-text-on-primary: rgb(255 255 255);           /* White text on primary (dark) backgrounds */
+  --color-text-on-secondary: var(--gray-100);          /* Light text on secondary backgrounds */
+  --color-text-on-tertiary: var(--gray-200);           /* Light text on tertiary backgrounds */
+  --color-text-on-surface: var(--gray-100);            /* Light text on surface backgrounds */
+  --color-text-on-interactive: rgb(255 255 255);       /* White text on interactive backgrounds */
+  --color-text-on-status-success: rgb(255 255 255);    /* White text on success backgrounds */
+  --color-text-on-status-warning: rgb(0 0 0);          /* Black text on warning backgrounds */
+  --color-text-on-status-error: rgb(255 255 255);      /* White text on error backgrounds */
+  --color-text-on-status-info: rgb(255 255 255);       /* White text on info backgrounds */
+  --color-text-on-navigation: var(--gray-100);         /* Light text on navigation backgrounds */
+  
+  /* Component-Specific Tokens - Buttons */
+  --color-button-primary-bg: var(--color-interactive-primary);
+  --color-button-primary-hover: var(--color-interactive-hover);
+  --color-button-primary-text: rgb(255 255 255);
+  
+  --color-button-secondary-bg: var(--gray-700);
+  --color-button-secondary-hover: var(--gray-600);
+  --color-button-secondary-text: var(--gray-100);
+  
+  --color-button-ghost-hover: var(--gray-700);
+  --color-button-ghost-text: var(--gray-300);
+  
+  /* Component-Specific Tokens - Cards/Panels */
+  --color-card-bg: var(--color-surface-primary);
+  --color-card-border: var(--color-border-primary);
+  --color-card-nested-bg: var(--gray-700);
+  
+  /* Component-Specific Tokens - Forms */
+  --color-input-bg: var(--gray-900);
+  --color-input-border: var(--color-border-primary);
+  --color-input-focus: var(--color-focus-ring);
+  --color-input-text: var(--color-text-primary);
+  --color-input-placeholder: var(--gray-500);
+  
+  /* Component-Specific Tokens - Modal/Dialog */
+  --color-modal-overlay: rgba(0, 0, 0, 0.5);
+  --color-modal-bg: var(--color-surface-primary);
+  
+  /* Component-Specific Tokens - Navigation/Sidebar */
+  --color-surface-navigation: var(--gray-850);
+  --color-surface-navigation-hover: var(--gray-750);
+  --color-surface-navigation-active: var(--gray-700);
+  --color-surface-navigation-selected: rgba(var(--color-interactive-rgb), 0.2);
+  --color-surface-navigation-selected-hover: rgba(var(--color-interactive-rgb), 0.25);
+  
+  --color-text-navigation-primary: var(--gray-100);
+  --color-text-navigation-secondary: var(--gray-400);
+  --color-text-navigation-muted: var(--gray-500);
+  --color-text-navigation-selected: var(--gray-50);
+  --color-text-navigation-hover: var(--gray-50);
+  --color-text-navigation-section: var(--gray-500);
+  --color-text-navigation-brand: var(--gray-300);
+  
+  --color-border-navigation: var(--gray-700);
+  --color-divider-navigation: var(--gray-750);
+  --color-divider-navigation-subtle: var(--gray-800);
+  
+  /* Scrollbar Colors */
+  --color-scrollbar-track: var(--gray-800);
+  --color-scrollbar-thumb: var(--gray-600);
+  --color-scrollbar-thumb-hover: var(--gray-500);
+  
+  /* Terminal Colors - Dark Theme */
+  --color-terminal-bg: rgb(17 24 39);              /* gray-900 */
+  --color-terminal-fg: rgb(243 244 246);           /* gray-100 */
+  --color-terminal-cursor: rgb(96 165 250);        /* blue-400 */
+  --color-terminal-black: rgb(17 24 39);           /* gray-900 */
+  --color-terminal-red: rgb(239 68 68);            /* red-500 */
+  --color-terminal-green: rgb(34 197 94);          /* green-500 */
+  --color-terminal-yellow: rgb(234 179 8);         /* yellow-500 */
+  --color-terminal-blue: rgb(59 130 246);          /* blue-500 */
+  --color-terminal-magenta: rgb(168 85 247);       /* purple-500 */
+  --color-terminal-cyan: rgb(6 182 212);           /* cyan-500 */
+  --color-terminal-white: rgb(243 244 246);        /* gray-100 */
+  --color-terminal-bright-black: rgb(75 85 99);    /* gray-600 */
+  --color-terminal-bright-red: rgb(248 113 113);   /* red-400 */
+  --color-terminal-bright-green: rgb(74 222 128);  /* green-400 */
+  --color-terminal-bright-yellow: rgb(250 204 21); /* yellow-400 */
+  --color-terminal-bright-blue: rgb(96 165 250);   /* blue-400 */
+  --color-terminal-bright-magenta: rgb(192 132 252); /* purple-400 */
+  --color-terminal-bright-cyan: rgb(34 211 238);   /* cyan-400 */
+  --color-terminal-bright-white: rgb(255 255 255); /* white */
+}
+
+/* Light Theme */
+:root.light {
+  /* Semantic Tokens - Backgrounds */
+  --color-bg-primary: var(--lilac-50);        /* Very light lilac background */
+  --color-bg-secondary: var(--warm-white);    /* Warm off-white */
+  --color-bg-tertiary: var(--warm-gray-50);   /* Warm gray for depth */
+  --color-bg-hover: var(--lilac-100);         /* Light lilac hover */
+  --color-bg-active: var(--lilac-200);        /* Soft lilac active */
+  
+  /* Semantic Tokens - Surface Colors */
+  --color-surface-primary: var(--warm-white); /* Warm white cards */
+  --color-surface-secondary: var(--lilac-50); /* Light lilac surface */
+  --color-surface-tertiary: var(--warm-gray-100); /* Subtle depth */
+  --color-surface-hover: var(--lilac-100);    /* Light lilac hover */
+  
+  /* Semantic Tokens - Text */
+  --color-text-primary: rgb(30 32 38);        /* Softer than pure black */
+  --color-text-secondary: rgb(71 76 87);      /* Warm gray-700 equivalent */
+  --color-text-tertiary: rgb(107 114 128);    /* Balanced contrast */
+  --color-text-muted: rgb(156 163 175);       /* Subtle muted text */
+  --color-text-disabled: rgb(209 213 219);    /* Disabled state text */
+  
+  /* Semantic Tokens - Borders */
+  --color-border-primary: var(--lilac-200);   /* Soft lilac borders */
+  --color-border-secondary: var(--lilac-300); /* Medium lilac borders */
+  --color-border-tertiary: var(--lilac-100);  /* Very light borders */
+  --color-border-hover: var(--lilac-400);     /* Hover state borders */
+  --color-border-focus: var(--lilac-500);     /* Focus state borders */
+  
+  /* Semantic Tokens - Interactive Elements */
+  --color-interactive: var(--lilac-500);      /* Primary brand lilac */
+  --color-interactive-primary: var(--lilac-500); /* Primary interactive */
+  --color-interactive-hover: var(--lilac-600); /* Deeper lilac hover */
+  --color-interactive-active: var(--lilac-700); /* Active state */
+  --color-interactive-text: var(--lilac-500);  /* Link text color */
+  --color-interactive-rgb: 139 103 246;       /* RGB value for lilac-500 */
+  
+  /* Semantic Tokens - Status Colors */
+  --color-status-success: rgb(22 163 74);    /* Softer green */
+  --color-status-success-hover: rgb(21 128 61);
+  --color-status-warning: rgb(217 119 6);    /* Warmer amber */
+  --color-status-warning-hover: rgb(180 83 9);
+  --color-status-error: rgb(220 38 38);      /* Softer red */
+  --color-status-error-hover: rgb(185 28 28);
+  --color-status-info: var(--lilac-500);     /* Use brand color */
+  --color-status-neutral: var(--gray-400);
+  
+  /* Semantic Tokens - Special UI States */
+  --color-modal-overlay: rgba(139, 103, 246, 0.1); /* Lilac tinted overlay */
+  --color-focus-ring: var(--lilac-400);      /* Brand color focus */
+  
+  /* Light mode interactive tokens to match dark mode */
+  --color-surface-interactive: var(--warm-gray-100);
+  --color-surface-interactive-hover: var(--warm-gray-200);
+  --color-interactive-surface: var(--lilac-100);
+  --color-interactive-surface-hover: var(--lilac-200);
+  --color-border-interactive-subtle: var(--lilac-200);
+  --color-border-interactive: var(--lilac-300);
+  --color-interactive-border: var(--lilac-400);
+  --color-interactive-border-hover: var(--lilac-500);
+  --color-text-interactive-muted: var(--gray-500);
+  --color-focus-ring-subtle: rgba(var(--color-interactive-rgb), 0.4);
+  
+  /* Context-Aware Text Tokens - Light Mode */
+  /* Text on different backgrounds for proper contrast */
+  --color-text-on-primary: var(--gray-900);            /* Dark text on light backgrounds */
+  --color-text-on-secondary: var(--gray-800);          /* Dark text on secondary backgrounds */
+  --color-text-on-tertiary: var(--gray-700);           /* Dark text on tertiary backgrounds */
+  --color-text-on-surface: var(--gray-900);            /* Dark text on surface backgrounds */
+  --color-text-on-interactive: rgb(255 255 255);       /* White text on interactive backgrounds */
+  --color-text-on-status-success: rgb(255 255 255);    /* White text on success backgrounds */
+  --color-text-on-status-warning: rgb(255 255 255);    /* White text on warning backgrounds (adjusted) */
+  --color-text-on-status-error: rgb(255 255 255);      /* White text on error backgrounds */
+  --color-text-on-status-info: rgb(255 255 255);       /* White text on info backgrounds */
+  --color-text-on-navigation: var(--gray-700);         /* Dark text on light navigation */
+  
+  /* Component-Specific Tokens - Buttons */
+  --color-button-primary-bg: var(--lilac-500);
+  --color-button-primary-hover: var(--lilac-600);
+  --color-button-primary-text: rgb(255 255 255);
+  
+  --color-button-secondary-bg: var(--warm-gray-100);
+  --color-button-secondary-hover: var(--lilac-100);
+  --color-button-secondary-text: var(--color-text-primary);
+  
+  --color-button-ghost-hover: var(--lilac-50);
+  --color-button-ghost-text: var(--color-text-secondary);
+  
+  /* Component-Specific Tokens - Cards/Panels */
+  --color-card-bg: var(--warm-white);
+  --color-card-border: var(--lilac-100);
+  --color-card-nested-bg: var(--lilac-50);
+  
+  /* Component-Specific Tokens - Forms */
+  --color-input-bg: var(--warm-white);
+  --color-input-border: var(--lilac-200);
+  --color-input-focus: var(--lilac-400);
+  --color-input-text: var(--color-text-primary);
+  --color-input-placeholder: var(--color-text-muted);
+  
+  /* Component-Specific Tokens - Modal/Dialog */
+  --color-modal-overlay: rgba(139, 103, 246, 0.15);
+  --color-modal-bg: var(--warm-white);
+  
+  /* Component-Specific Tokens - Navigation/Sidebar */
+  --color-surface-navigation: var(--warm-gray-50);
+  --color-surface-navigation-hover: var(--lilac-50);
+  --color-surface-navigation-active: var(--lilac-100);
+  --color-surface-navigation-selected: var(--lilac-100);
+  --color-surface-navigation-selected-hover: var(--lilac-200);
+  
+  --color-text-navigation-primary: var(--gray-700);
+  --color-text-navigation-secondary: var(--gray-500);
+  --color-text-navigation-muted: var(--gray-400);
+  --color-text-navigation-selected: var(--lilac-700);
+  --color-text-navigation-hover: var(--gray-900);
+  --color-text-navigation-section: var(--gray-500);
+  --color-text-navigation-brand: var(--lilac-600);
+  
+  --color-border-navigation: var(--lilac-100);
+  --color-divider-navigation: var(--warm-gray-200);
+  --color-divider-navigation-subtle: var(--warm-gray-100);
+  
+  /* Scrollbar Colors */
+  --color-scrollbar-track: var(--lilac-50);
+  --color-scrollbar-thumb: var(--lilac-200);
+  --color-scrollbar-thumb-hover: var(--lilac-300);
+  
+  /* Terminal Colors - Light Theme */
+  --color-terminal-bg: rgb(255 255 255);           /* Pure white background */
+  --color-terminal-fg: rgb(30 32 38);              /* Dark gray text */
+  --color-terminal-cursor: var(--lilac-500);
+  --color-terminal-black: rgb(30 32 38);           /* Dark gray instead of black */
+  --color-terminal-red: rgb(220 38 38);
+  --color-terminal-green: rgb(22 163 74);
+  --color-terminal-yellow: rgb(217 119 6);
+  --color-terminal-blue: rgb(79 70 229);           /* Darker blue for better contrast */
+  --color-terminal-magenta: rgb(147 51 234);
+  --color-terminal-cyan: rgb(8 145 178);
+  --color-terminal-white: rgb(249 250 251);        /* Off-white */
+  --color-terminal-bright-black: rgb(107 114 128); /* Medium gray */
+  --color-terminal-bright-red: rgb(239 68 68);
+  --color-terminal-bright-green: rgb(34 197 94);
+  --color-terminal-bright-yellow: rgb(245 158 11);
+  --color-terminal-bright-blue: rgb(99 102 241);   /* Indigo for contrast */
+  --color-terminal-bright-magenta: rgb(168 85 247);
+  --color-terminal-bright-cyan: rgb(6 182 212);
+  --color-terminal-bright-white: rgb(243 244 246); /* Light gray */
+}

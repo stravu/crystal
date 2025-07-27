@@ -37,15 +37,15 @@ const ProjectViewTabs: React.FC<ProjectViewTabsProps> = ({ viewMode, setViewMode
 
   return (
     <div className="flex flex-col gap-2 relative z-10 mt-6">
-      <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden flex-shrink-0">
+      <div className="flex bg-surface-secondary rounded-lg border border-border-primary overflow-hidden flex-shrink-0">
         {tabs.map(({ mode, label }) => (
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
-            className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block ${
+            className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block transition-colors ${
               viewMode === mode
-                ? 'bg-blue-500 text-white'
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-interactive text-interactive-on-dark'
+                : 'text-text-primary hover:bg-surface-hover'
             }`}
           >
             {label}
@@ -133,7 +133,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       convertEol: true,
       rows: 30,
       cols: 80,
-      scrollback: 2000,
+      scrollback: 100000,
       fastScrollModifier: 'ctrl',
       theme: theme === 'dark' ? {
         background: '#1a1a1a',
@@ -321,12 +321,12 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
 
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       {/* Project Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex-shrink-0">
+      <div className="bg-surface-primary border-b border-border-primary px-4 py-3 flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0 relative">
-            <h2 className="font-bold text-xl text-gray-900 dark:text-gray-100 truncate">
+            <h2 className="font-bold text-xl text-text-primary truncate">
               {projectName}
             </h2>
             
@@ -339,8 +339,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                     disabled={isMerging} 
                     className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
                       isMerging 
-                        ? 'bg-gray-700 border-gray-600 text-gray-500 cursor-not-allowed' 
-                        : 'bg-gray-700 border-blue-600 text-blue-400 hover:bg-blue-900/20 hover:border-blue-500'
+                        ? 'bg-surface-secondary border-border-secondary text-text-disabled cursor-not-allowed' 
+                        : 'bg-surface-secondary border-status-info text-status-info hover:bg-status-info/10 hover:border-status-info/70'
                     }`}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -355,8 +355,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                     disabled={isMerging} 
                     className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
                       isMerging 
-                        ? 'bg-gray-700 border-gray-600 text-gray-500 cursor-not-allowed' 
-                        : 'bg-gray-700 border-green-600 text-green-400 hover:bg-green-900/20 hover:border-green-500'
+                        ? 'bg-surface-secondary border-border-secondary text-text-disabled cursor-not-allowed' 
+                        : 'bg-surface-secondary border-status-success text-status-success hover:bg-status-success/10 hover:border-status-success/70'
                     }`}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,8 +388,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
             {isLoadingSession || !mainRepoSessionId ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600 dark:text-gray-400">Loading file tree...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-interactive mx-auto mb-4"></div>
+                  <p className="text-text-secondary">Loading file tree...</p>
                 </div>
               </div>
             ) : (
@@ -398,15 +398,15 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
           </div>
           
           {/* Terminal View */}
-          <div className={`h-full ${viewMode === 'terminal' ? 'flex flex-col' : 'hidden'} bg-gray-50 dark:bg-black`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className={`h-full ${viewMode === 'terminal' ? 'flex flex-col' : 'hidden'} bg-surface-primary`}>
+            <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-primary">
+              <div className="text-sm text-text-secondary">
                 Terminal - {projectName}
               </div>
               {mainRepoSessionId && (
                 <button
                   onClick={handleClearTerminal}
-                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors"
                   title="Clear terminal"
                 >
                   <svg 
@@ -428,8 +428,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
             {isLoadingSession || !mainRepoSessionId ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600 dark:text-gray-400">Loading terminal...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-interactive mx-auto mb-4"></div>
+                  <p className="text-text-secondary">Loading terminal...</p>
                 </div>
               </div>
             ) : (
@@ -477,7 +477,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       {viewMode === 'output' && mainRepoSession && (
         <SessionInputWithImages
           activeSession={mainRepoSession}
-          viewMode="output"
+          viewMode="richOutput"
           input={hook.input}
           setInput={hook.setInput}
           textareaRef={hook.textareaRef}
@@ -488,11 +488,10 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
           setShowStravuSearch={hook.setShowStravuSearch}
           ultrathink={hook.ultrathink}
           setUltrathink={hook.setUltrathink}
-          handleToggleAutoCommit={hook.handleToggleAutoCommit}
           gitCommands={hook.gitCommands}
           handleCompactContext={hook.handleCompactContext}
-          contextCompacted={hook.contextCompacted}
           hasConversationHistory={hook.hasConversationHistory}
+          contextCompacted={hook.contextCompacted}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import { MonacoDiffViewer } from './MonacoDiffViewer';
 import { FileText, ChevronRight, ChevronDown } from 'lucide-react';
 import type { DiffViewerProps } from '../types/diff';
 import type { FileDiff } from '../types/diff';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Parse unified diff format to extract individual file diffs
 const parseUnifiedDiff = (diff: string): FileDiff[] => {
@@ -136,6 +137,7 @@ export interface DiffViewerHandle {
 }
 
 const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, sessionId, className = '', onFileSave, isAllCommitsSelected = true, mainBranch = 'main' }, ref) => {
+  const { theme } = useTheme();
   const [viewType, setViewType] = useState<'split' | 'inline'>('split');
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [filesWithFullContent, setFilesWithFullContent] = useState<FileDiff[]>([]);
@@ -329,19 +331,19 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
 
   if (!diff || diff.trim() === '' || files.length === 0) {
     return (
-      <div className={`p-4 text-gray-500 dark:text-gray-400 text-center ${className}`}>
+      <div className={`p-4 text-text-secondary text-center ${className}`}>
         No changes to display
       </div>
     );
   }
 
-  const isDarkMode = document.documentElement.classList.contains('dark');
+  const isDarkMode = theme === 'dark';
   
   // Show loading state while fetching full content
   if (loadingFullContent && isAllCommitsSelected) {
     return (
       <div className={`flex items-center justify-center p-8 ${className}`}>
-        <div className="text-gray-600 dark:text-gray-400">Loading file contents for editing...</div>
+        <div className="text-text-secondary">Loading file contents for editing...</div>
       </div>
     );
   }
@@ -352,22 +354,22 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
   return (
     <div className={`diff-viewer ${className}`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <div className="flex justify-between items-center px-4 py-2 flex-shrink-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center px-4 py-2 flex-shrink-0 bg-surface-secondary border-b border-border-primary">
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-text-secondary">
               {filesToRender.length} {filesToRender.length === 1 ? 'file' : 'files'} changed
             </span>
           </div>
 
           <div className="flex items-center space-x-4">
             {/* Split/Unified Toggle */}
-            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+            <div className="inline-flex rounded-lg border border-border-primary bg-surface-primary">
               <button
                 onClick={() => handleViewTypeChange('inline')}
                 className={`px-3 py-1 text-sm font-medium rounded-l-lg transition-colors ${
                   viewType === 'inline'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
               >
                 Unified
@@ -376,8 +378,8 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
                 onClick={() => handleViewTypeChange('split')}
                 className={`px-3 py-1 text-sm font-medium rounded-r-lg transition-colors ${
                   viewType === 'split'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
               >
                 Split
@@ -401,14 +403,14 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
             
             if (file.isBinary || (!file.oldValue && !file.newValue && file.type !== 'added' && file.type !== 'deleted')) {
               return (
-                <div key={fileKey} className="border-b border-gray-200 dark:border-gray-700">
-                  <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800">
+                <div key={fileKey} className="border-b border-border-primary">
+                  <div className="px-4 py-3 bg-surface-secondary">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <span className="font-medium text-text-primary flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         {file.path}
                       </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-text-tertiary">
                         {file.isBinary ? 'Binary file' : file.type}
                       </span>
                     </div>
@@ -422,53 +424,53 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
                 key={fileKey} 
                 id={`file-${index}`}
                 data-file-path={file.path}
-                className="border-b border-gray-200 dark:border-gray-700"
+                className="border-b border-border-primary"
               >
                 {/* File header */}
                 <div 
-                  className="px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                  className="px-4 py-3 bg-surface-secondary hover:bg-surface-hover cursor-pointer transition-colors"
                   onClick={() => toggleFile(fileKey)}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <span className="font-medium text-text-primary flex items-center gap-2">
                       {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       <FileText className="w-4 h-4" />
                       {file.path}
                       {isModified && (
-                        <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded">Modified</span>
+                        <span className="text-xs bg-status-warning text-white px-2 py-0.5 rounded">Modified</span>
                       )}
                       {file.type === 'deleted' && (
-                        <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded">Deleted</span>
+                        <span className="text-xs bg-status-error text-white px-2 py-0.5 rounded">Deleted</span>
                       )}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                      {file.additions > 0 && <span className="text-green-600">+{file.additions}</span>}
-                      {file.deletions > 0 && <span className="text-red-600">-{file.deletions}</span>}
+                    <span className="text-xs text-text-tertiary flex items-center gap-2">
+                      {file.additions > 0 && <span className="text-status-success">+{file.additions}</span>}
+                      {file.deletions > 0 && <span className="text-status-error">-{file.deletions}</span>}
                     </span>
                   </div>
                 </div>
 
                 {/* Diff content */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 dark:border-gray-700">
+                  <div className="border-t border-border-primary">
                     {file.type === 'deleted' ? (
-                      <div className="p-4 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                      <div className="p-4 bg-surface-secondary text-text-secondary">
                         <p className="text-sm">This file has been deleted from the filesystem.</p>
                       </div>
                     ) : (
                       <>
                         {loadErrors[file.path] && isAllCommitsSelected ? (
-                          <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-700">
-                            <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                          <div className="p-4 bg-status-error/10 border-b border-status-error/30">
+                            <div className="flex items-center gap-2 text-status-error">
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                               <span className="font-medium">Failed to load full file content</span>
                             </div>
-                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            <p className="mt-1 text-sm text-status-error/80">
                               {loadErrors[file.path]}
                             </p>
-                            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                            <p className="mt-2 text-sm text-status-error/80">
                               ⚠️ Auto-save is disabled for this file to prevent data loss. Only the diff is shown below.
                             </p>
                           </div>

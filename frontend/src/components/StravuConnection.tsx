@@ -131,15 +131,15 @@ export function StravuConnection({ className = '' }: StravuConnectionProps) {
   const getStatusIndicator = () => {
     switch (connectionState.status) {
       case 'connected':
-        return <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />;
+        return <div className="w-3 h-3 bg-status-success rounded-full animate-pulse" />;
       case 'connecting':
-        return <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse" />;
+        return <div className="w-3 h-3 bg-status-warning rounded-full animate-pulse" />;
       case 'expired':
-        return <div className="w-3 h-3 bg-orange-500 rounded-full" />;
+        return <div className="w-3 h-3 bg-status-warning rounded-full" />;
       case 'error':
-        return <div className="w-3 h-3 bg-red-500 rounded-full" />;
+        return <div className="w-3 h-3 bg-status-error rounded-full" />;
       default:
-        return <div className="w-3 h-3 bg-gray-400 dark:bg-gray-500 rounded-full" />;
+        return <div className="w-3 h-3 bg-text-tertiary rounded-full" />;
     }
   };
 
@@ -164,10 +164,10 @@ export function StravuConnection({ className = '' }: StravuConnectionProps) {
         <div className="flex items-center space-x-3">
           {getStatusIndicator()}
           <div>
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div className="text-sm font-medium text-text-primary">
               Stravu Integration
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">
+            <div className="text-xs text-text-tertiary">
               {getStatusText()}
             </div>
           </div>
@@ -178,7 +178,7 @@ export function StravuConnection({ className = '' }: StravuConnectionProps) {
             <button
               onClick={handleConnect}
               disabled={false}
-              className="px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-800 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-sm font-medium text-interactive bg-interactive/10 border border-interactive/30 rounded-md hover:bg-interactive/20 focus:outline-none focus:ring-2 focus:ring-interactive disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {connectionState.status === 'expired' ? 'Reconnect' : 'Connect'}
             </button>
@@ -186,7 +186,7 @@ export function StravuConnection({ className = '' }: StravuConnectionProps) {
             <>
               <button
                 onClick={checkConnectionStatus}
-                className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-1.5 text-text-tertiary hover:text-text-primary rounded-md hover:bg-surface-hover"
                 title="Refresh connection status"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,7 +195,7 @@ export function StravuConnection({ className = '' }: StravuConnectionProps) {
               </button>
               <button
                 onClick={handleDisconnect}
-                className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md hover:bg-red-200 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="px-3 py-1.5 text-sm font-medium text-status-error bg-status-error/10 border border-status-error/30 rounded-md hover:bg-status-error/20 focus:outline-none focus:ring-2 focus:ring-status-error"
               >
                 Disconnect
               </button>
@@ -205,13 +205,13 @@ export function StravuConnection({ className = '' }: StravuConnectionProps) {
       </div>
 
       {connectionState.error && (
-        <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md p-2">
+        <div className="mt-2 text-xs text-status-error bg-status-error/10 border border-status-error/30 rounded-md p-2">
           {connectionState.error}
         </div>
       )}
 
       {connectionState.status === 'connecting' && (
-        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-800 rounded-md p-2">
+        <div className="mt-2 text-xs text-interactive bg-interactive/10 border border-interactive/30 rounded-md p-2">
           Please complete authentication in your browser. This may take a few moments...
         </div>
       )}

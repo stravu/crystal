@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { API } from '../utils/api';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Card } from './ui/Card';
+import { Search, Copy } from 'lucide-react';
 
 interface PromptHistoryItem {
   id: string;
@@ -96,15 +100,15 @@ export function PromptHistory() {
     switch (status) {
       case 'completed':
       case 'stopped':
-        return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20';
+        return 'text-status-success bg-status-success/10';
       case 'error':
-        return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20';
+        return 'text-status-error bg-status-error/10';
       case 'running':
-        return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/20';
+        return 'text-interactive bg-interactive/10';
       case 'waiting':
-        return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/20';
+        return 'text-status-warning bg-status-warning/10';
       default:
-        return 'text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700';
+        return 'text-text-tertiary bg-surface-tertiary';
     }
   };
 
@@ -113,31 +117,20 @@ export function PromptHistory() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 p-6 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Prompt History</h1>
+      <div className="border-b border-border-primary p-6 flex-shrink-0">
+        <h1 className="text-2xl font-bold text-text-primary mb-4">Prompt History</h1>
         <div className="relative">
-          <input
+          <Input
             type="text"
             placeholder="Search prompts or session names..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 pl-10 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            fullWidth
+            className="pl-10"
           />
-          <svg
-            className="absolute left-3 top-2.5 h-5 w-5 text-gray-500 dark:text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-text-tertiary pointer-events-none" />
         </div>
       </div>
 
@@ -145,15 +138,15 @@ export function PromptHistory() {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="text-gray-600 dark:text-gray-400">Loading prompt history...</div>
+            <div className="text-text-secondary">Loading prompt history...</div>
           </div>
         ) : filteredPrompts.length === 0 ? (
           <div className="flex items-center justify-center h-32">
-            <div className="text-center text-gray-600 dark:text-gray-400">
+            <div className="text-center text-text-secondary">
               <div className="text-lg mb-2">
                 {searchTerm ? 'No prompts found' : 'No prompt history yet'}
               </div>
-              <div className="text-sm">
+              <div className="text-sm text-text-tertiary">
                 {searchTerm 
                   ? 'Try adjusting your search terms'
                   : 'Create a session to start building your prompt history'
@@ -164,19 +157,20 @@ export function PromptHistory() {
         ) : (
           <div className="p-6 space-y-4">
             {filteredPrompts.map((promptItem) => (
-              <div
+              <Card
                 key={promptItem.id}
-                className={`border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                variant={selectedPromptId === promptItem.id ? 'interactive' : 'bordered'}
+                className={`cursor-pointer transition-all ${
                   selectedPromptId === promptItem.id
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
+                    ? 'border-interactive bg-interactive/10'
+                    : ''
                 }`}
                 onClick={() => handlePromptClick(promptItem)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 truncate">
+                      <h3 className="text-lg font-medium text-text-primary truncate">
                         {promptItem.sessionName}
                       </h3>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(promptItem.status)}`}>
@@ -184,11 +178,11 @@ export function PromptHistory() {
                       </span>
                     </div>
                     
-                    <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
+                    <p className="text-text-secondary mb-3 leading-relaxed">
                       {truncatePrompt(promptItem.prompt, 200)}
                     </p>
                     
-                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center justify-between text-sm text-text-tertiary">
                       <span>
                         Created {new Date(promptItem.createdAt).toLocaleDateString()} at{' '}
                         {new Date(promptItem.createdAt).toLocaleTimeString()}
@@ -197,32 +191,40 @@ export function PromptHistory() {
                   </div>
                   
                   <div className="flex flex-col space-y-2 ml-4">
-                    <button
-                      onClick={() => handleReusePrompt(promptItem)}
-                      className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReusePrompt(promptItem);
+                      }}
+                      size="sm"
                     >
                       Reuse
-                    </button>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(promptItem.prompt)}
-                      className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(promptItem.prompt);
+                      }}
+                      variant="secondary"
+                      size="sm"
                     >
+                      <Copy className="w-3 h-3 mr-1" />
                       Copy
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 
                 {promptItem.prompt.length > 200 && (
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-blue-600 dark:text-blue-400 text-sm hover:text-blue-700 dark:hover:text-blue-300">
+                    <summary className="cursor-pointer text-interactive-on-dark text-sm transition-colors">
                       Show full prompt
                     </summary>
-                    <p className="mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    <p className="mt-2 text-text-secondary whitespace-pre-wrap">
                       {promptItem.prompt}
                     </p>
                   </details>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}

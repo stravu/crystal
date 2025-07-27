@@ -1,0 +1,138 @@
+/* Effects Design Tokens for Crystal */
+
+:root {
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 0.125rem;    /* 2px */
+  --radius-default: 0.25rem; /* 4px */
+  --radius-md: 0.375rem;    /* 6px */
+  --radius-lg: 0.5rem;      /* 8px */
+  --radius-xl: 0.75rem;     /* 12px */
+  --radius-2xl: 1rem;       /* 16px */
+  --radius-3xl: 1.5rem;     /* 24px */
+  --radius-full: 9999px;
+  
+  /* Component-Specific Border Radius */
+  --button-radius: var(--radius-md);
+  --card-radius: var(--radius-lg);
+  --input-radius: var(--radius-md);
+  --modal-radius: var(--radius-lg);
+  --badge-radius: var(--radius-full);
+  
+  /* Border Widths */
+  --border-0: 0;
+  --border-1: 1px;
+  --border-2: 2px;
+  --border-4: 4px;
+  --border-8: 8px;
+  
+  /* Box Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-default: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+  --shadow-none: 0 0 #0000;
+  
+  /* Focus Ring */
+  --ring-width: 2px;
+  --ring-offset-width: 2px;
+  --ring-color: var(--color-focus-ring);
+  --ring-offset-color: var(--color-bg-primary);
+  
+  /* Component-Specific Shadows */
+  --button-shadow: var(--shadow-sm);
+  --button-shadow-hover: var(--shadow-md);
+  --card-shadow: var(--shadow-none);
+  --modal-shadow: var(--shadow-xl);
+  --dropdown-shadow: var(--shadow-lg);
+  
+  /* Interactive shadows for depth and tactile feel */
+  --shadow-tactile: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-tactile-hover: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-tactile-active: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  
+  /* Dropdown specific shadows - enhanced for visual cohesion */
+  --shadow-dropdown-elevated: 0 8px 25px rgba(0, 0, 0, 0.15), 0 3px 10px rgba(0, 0, 0, 0.1);
+  --shadow-dropdown-enhanced: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+  --shadow-dropdown-item: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-dropdown-pointer: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+  /* Glow effects for interactive elements */
+  --glow-interactive: 0 0 0 2px rgba(var(--color-interactive-rgb), 0.1);
+  --glow-interactive-hover: 0 0 0 3px rgba(var(--color-interactive-rgb), 0.15);
+  
+  /* Toggle zone shadows for subtle depth */
+  --shadow-toggle-zone: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-toggle-zone-subtle: 0 1px 1px rgba(0, 0, 0, 0.02);
+  
+  /* Transitions */
+  --transition-none: none;
+  --transition-all: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-colors: background-color, border-color, color, fill, stroke 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-opacity: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-shadow: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-transform: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Transition Durations */
+  --duration-75: 75ms;
+  --duration-100: 100ms;
+  --duration-150: 150ms;
+  --duration-200: 200ms;
+  --duration-300: 300ms;
+  --duration-500: 500ms;
+  --duration-700: 700ms;
+  --duration-1000: 1000ms;
+  
+  /* Animation Timing Functions */
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-back-out: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-dropdown: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  
+  /* Z-Index Scale */
+  --z-0: 0;
+  --z-10: 10;
+  --z-20: 20;
+  --z-30: 30;
+  --z-40: 40;
+  --z-50: 50;
+  --z-auto: auto;
+  
+  /* Component-Specific Z-Index */
+  --z-dropdown-backdrop: 9998;
+  --z-dropdown: 9999;
+  --z-sticky: 1100;
+  --z-fixed: 1200;
+  --z-modal-backdrop: 10000;
+  --z-modal: 10001;
+  --z-popover: 10002;
+  --z-tooltip: 10003;
+  
+  /* Opacity */
+  --opacity-0: 0;
+  --opacity-5: 0.05;
+  --opacity-10: 0.1;
+  --opacity-20: 0.2;
+  --opacity-25: 0.25;
+  --opacity-30: 0.3;
+  --opacity-40: 0.4;
+  --opacity-50: 0.5;
+  --opacity-60: 0.6;
+  --opacity-70: 0.7;
+  --opacity-75: 0.75;
+  --opacity-80: 0.8;
+  --opacity-90: 0.9;
+  --opacity-95: 0.95;
+  --opacity-100: 1;
+  
+  /* Component-Specific Opacity */
+  --disabled-opacity: var(--opacity-50);
+  --hover-opacity: var(--opacity-80);
+  --modal-overlay-opacity: var(--opacity-50);
+}

@@ -227,8 +227,8 @@ export class ProgrammaticCompactor {
             // Look for text content
             for (const content of message.message.content) {
               if (content.type === 'text' && content.text) {
-                // Return first 200 chars
-                return content.text.substring(0, 200) + (content.text.length > 200 ? '...' : '');
+                // Return full text content without truncation
+                return content.text;
               }
             }
           }
@@ -280,17 +280,15 @@ export class ProgrammaticCompactor {
       summary += `### Files Modified (${fileModifications.size} total)\n\n`;
       
       const sortedFiles = Array.from(fileModifications.values())
-        .sort((a: FileModification, b: FileModification) => b.changeCount - a.changeCount)
-        .slice(0, 10); // Top 10 most modified files
+        .sort((a: FileModification, b: FileModification) => b.changeCount - a.changeCount);
+        // Include all modified files without limit
       
       sortedFiles.forEach((file: FileModification) => {
         const ops = file.operations.includes('create') ? 'Created' : 'Modified';
         summary += `- \`${file.path}\` - ${ops} (${file.changeCount} changes)\n`;
       });
       
-      if (fileModifications.size > 10) {
-        summary += `- ... and ${fileModifications.size - 10} more files\n`;
-      }
+      // All files are now included above
       
       summary += '\n';
     }
@@ -316,12 +314,10 @@ export class ProgrammaticCompactor {
       
       if (pending.length > 0) {
         summary += `**Next Tasks**:\n`;
-        pending.slice(0, 5).forEach((todo: any) => {
+        pending.forEach((todo: any) => {
           summary += `- ${todo.content}\n`;
         });
-        if (pending.length > 5) {
-          summary += `- ... and ${pending.length - 5} more tasks\n`;
-        }
+        // All pending tasks are now included
         summary += '\n';
       }
     }

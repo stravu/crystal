@@ -372,7 +372,7 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 max-h-60 overflow-auto rounded-md bg-gray-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+          className="absolute z-50 max-h-60 overflow-auto rounded-md bg-surface-secondary py-1 shadow-lg ring-1 ring-black ring-opacity-5 border border-border-primary"
           style={{
             minWidth: Math.min(300, dropdownPosition?.maxWidth || 300) + 'px',
             maxWidth: dropdownPosition?.maxWidth || '800px',
@@ -388,10 +388,10 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
           {suggestions.map((suggestion, index) => (
             <div
               key={suggestion.path}
-              className={`flex items-center px-4 py-2.5 cursor-pointer min-w-0 ${
+              className={`flex items-center px-4 py-2.5 cursor-pointer min-w-0 transition-colors ${
                 index === selectedIndex
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-700'
+                  ? 'bg-interactive text-on-interactive'
+                  : 'text-text-secondary hover:bg-surface-hover'
               }`}
               onClick={() => selectSuggestion(suggestion)}
               onMouseEnter={() => setSelectedIndex(index)}

@@ -1,5 +1,7 @@
 import React, { memo } from 'react';
 import { FileText, FileCode, FileImage, File, Trash2 } from 'lucide-react';
+import { IconButton } from './ui/IconButton';
+import { cn } from '../utils/cn';
 
 interface FileInfo {
   path: string;
@@ -18,7 +20,7 @@ interface FileListProps {
 
 const getFileIcon = (fileName: string) => {
   const ext = fileName.split('.').pop()?.toLowerCase();
-  const iconClass = "w-4 h-4 text-gray-600 dark:text-gray-400";
+  const iconClass = "w-4 h-4 text-text-tertiary";
   
   if (!ext) return <File className={iconClass} />;
   
@@ -43,15 +45,15 @@ const getFileIcon = (fileName: string) => {
 const getTypeColor = (type: FileInfo['type']) => {
   switch (type) {
     case 'added':
-      return 'text-green-600 dark:text-green-400';
+      return 'text-status-success';
     case 'deleted':
-      return 'text-red-600 dark:text-red-400';
+      return 'text-status-error';
     case 'modified':
-      return 'text-blue-600 dark:text-blue-400';
+      return 'text-interactive';
     case 'renamed':
-      return 'text-purple-600 dark:text-purple-400';
+      return 'text-interactive';
     default:
-      return 'text-gray-600 dark:text-gray-400';
+      return 'text-text-tertiary';
   }
 };
 
@@ -73,7 +75,7 @@ const getTypeLabel = (type: FileInfo['type']) => {
 export const FileList: React.FC<FileListProps> = memo(({ files, onFileClick, onFileDelete, selectedFile }) => {
   if (files.length === 0) {
     return (
-      <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+      <div className="p-4 text-center text-text-tertiary text-sm">
         No files changed
       </div>
     );
@@ -81,8 +83,8 @@ export const FileList: React.FC<FileListProps> = memo(({ files, onFileClick, onF
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+      <div className="px-4 py-2 border-b border-border-secondary bg-bg-secondary">
+        <h3 className="text-sm font-semibold text-text-secondary">
           Files Changed ({files.length})
         </h3>
       </div>
@@ -92,9 +94,10 @@ export const FileList: React.FC<FileListProps> = memo(({ files, onFileClick, onF
           {files.map((file, index) => (
             <div
               key={`${file.path}-${index}`}
-              className={`w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between group ${
-                selectedFile === file.path ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-              }`}
+              className={cn(
+                'w-full px-4 py-2 hover:bg-bg-hover transition-colors flex items-center justify-between group',
+                selectedFile === file.path && 'bg-bg-accent'
+              )}
             >
               <button
                 onClick={() => onFileClick(file.path, index)}
@@ -104,24 +107,24 @@ export const FileList: React.FC<FileListProps> = memo(({ files, onFileClick, onF
                   {getTypeLabel(file.type)}
                 </span>
                 {getFileIcon(file.path)}
-                <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                <span className="text-sm text-text-primary truncate">
                   {file.path}
                 </span>
               </button>
               
               <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                 {file.additions > 0 && (
-                  <span className="text-xs text-green-600 dark:text-green-400">
+                  <span className="text-xs text-status-success">
                     +{file.additions}
                   </span>
                 )}
                 {file.deletions > 0 && (
-                  <span className="text-xs text-red-600 dark:text-red-400">
+                  <span className="text-xs text-status-error">
                     -{file.deletions}
                   </span>
                 )}
                 {onFileDelete && (
-                  <button
+                  <IconButton
                     onClick={(e) => {
                       e.stopPropagation();
                       if (file.type !== 'deleted' && window.confirm(`Are you sure you want to delete ${file.path}?`)) {
@@ -129,19 +132,16 @@ export const FileList: React.FC<FileListProps> = memo(({ files, onFileClick, onF
                       }
                     }}
                     disabled={file.type === 'deleted'}
-                    className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${
-                      file.type === 'deleted' 
-                        ? 'cursor-not-allowed' 
-                        : 'hover:bg-red-100 dark:hover:bg-red-900/30'
-                    }`}
+                    variant={file.type === 'deleted' ? 'ghost' : 'danger'}
+                    size="sm"
+                    className={cn(
+                      'opacity-0 group-hover:opacity-100 transition-opacity',
+                      file.type === 'deleted' && 'cursor-not-allowed !text-text-disabled'
+                    )}
+                    aria-label={file.type === 'deleted' ? 'File already deleted' : 'Delete file'}
                     title={file.type === 'deleted' ? 'File already deleted' : 'Delete file'}
-                  >
-                    <Trash2 className={`w-4 h-4 ${
-                      file.type === 'deleted'
-                        ? 'text-gray-400 dark:text-gray-600'
-                        : 'text-red-600 dark:text-red-400'
-                    }`} />
-                  </button>
+                    icon={<Trash2 className="w-4 h-4" />}
+                  />
                 )}
               </div>
             </div>

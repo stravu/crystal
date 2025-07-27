@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DiffEditor, type DiffEditorProps, type MonacoDiffEditor } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
 import { AlertCircle, FileText, Check, Loader2, Eye, Code } from 'lucide-react';
 import type { FileDiff } from '../types/diff';
 import { debounce } from '../utils/debounce';
@@ -47,6 +46,10 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     const ext = file.path.split('.').pop()?.toLowerCase();
     return ext === 'md' || ext === 'markdown';
   }, [file.path]);
+
+  // Debug logging
+  console.log('MonacoDiffViewer - isDarkMode:', isDarkMode);
+  console.log('MonacoDiffViewer - theme:', isDarkMode ? 'vs-dark' : 'vs');
 
   // Delay mounting editor to ensure stability
   useEffect(() => {
@@ -239,7 +242,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       const originalModel = originalEditor.getModel();
       const modifiedModel = modifiedEditor.getModel();
       
-      const lineHeight = originalEditor.getOption(monaco.editor.EditorOption.lineHeight);
+      const lineHeight = 19; // Default line height for Monaco editor
       const originalLines = originalModel ? originalModel.getLineCount() : 0;
       const modifiedLines = modifiedModel ? modifiedModel.getLineCount() : 0;
       
@@ -256,7 +259,43 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     }
   }, []);
 
-  const handleEditorDidMount: DiffEditorProps['onMount'] = useCallback((editor: MonacoDiffEditor) => {
+  const handleBeforeMount = useCallback((_monaco: any) => {
+    // Temporarily commented out to test built-in themes
+    // // Define custom themes before the editor mounts
+    // monaco.editor.defineTheme('crystal-dark', {
+    //   base: 'vs-dark',
+    //   inherit: true,
+    //   rules: [],
+    //   colors: {
+    //     'editor.background': '#111827',
+    //     'editor.foreground': '#f3f4f6',
+    //     'editorWidget.background': '#111827',
+    //     'editorWidget.foreground': '#f3f4f6',
+    //     'diffEditor.insertedTextBackground': '#10b98120',
+    //     'diffEditor.removedTextBackground': '#ef444420',
+    //     'diffEditor.insertedLineBackground': '#10b98115',
+    //     'diffEditor.removedLineBackground': '#ef444415',
+    //   }
+    // });
+    
+    // monaco.editor.defineTheme('crystal-light', {
+    //   base: 'vs',
+    //   inherit: true,
+    //   rules: [],
+    //   colors: {
+    //     'editor.background': '#ffffff',
+    //     'editor.foreground': '#1e2026',
+    //     'editorWidget.background': '#ffffff',
+    //     'editorWidget.foreground': '#1e2026',
+    //     'diffEditor.insertedTextBackground': '#16a34a15',
+    //     'diffEditor.removedTextBackground': '#dc262615',
+    //     'diffEditor.insertedLineBackground': '#16a34a10',
+    //     'diffEditor.removedLineBackground': '#dc262610',
+    //   }
+    // });
+  }, []);
+
+  const handleEditorDidMount: DiffEditorProps['onMount'] = useCallback((editor: MonacoDiffEditor, monaco: any) => {
     try {
       editorRef.current = editor;
       
@@ -264,7 +303,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       const modifiedEditor = editor.getModifiedEditor();
       
       // Store disposables for cleanup
-      const disposables: monaco.IDisposable[] = [];
+      const disposables: any[] = [];
       
       // Mark editor as ready
       setIsEditorReady(true);
@@ -349,7 +388,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
         setTimeout(() => setCanMountEditor(true), 100);
       }, 100);
     }
-  }, [isReadOnly, debouncedSave, performSave, file.newValue, isFullContentLoaded, calculateEditorHeight]);
+  }, [isReadOnly, debouncedSave, performSave, file.newValue, isFullContentLoaded, calculateEditorHeight, isDarkMode]);
 
   // Refresh content when file changes
   useEffect(() => {
@@ -403,6 +442,16 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     }
   }, [isReadOnly, isEditorReady]);
 
+  // Update theme when isDarkMode changes
+  // useEffect(() => {
+  //   if (editorRef.current && isEditorReady) {
+  //     // The monaco instance from @monaco-editor/react is available via the loader
+  //     import('monaco-editor').then((monacoModule) => {
+  //       monacoModule.editor.setTheme(isDarkMode ? 'crystal-dark' : 'crystal-light');
+  //     });
+  //   }
+  // }, [isDarkMode, isEditorReady]);
+
   // Calculate preview height when content or view mode changes
   useEffect(() => {
     if (!isMarkdownFile || viewMode === 'diff') return;
@@ -447,7 +496,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
           // Dispose event handlers first
           const editor = editorRef.current as any;
           if (editor.__disposables) {
-            editor.__disposables.forEach((d: monaco.IDisposable) => {
+            editor.__disposables.forEach((d: any) => {
               try {
                 d.dispose();
               } catch (error) {
@@ -479,18 +528,18 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     };
   }, [file.path]); // Only cleanup when file path changes
 
-  const options: monaco.editor.IStandaloneDiffEditorConstructionOptions = {
+  const options = {
     readOnly: isReadOnly,
     renderSideBySide: viewType === 'split',
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
     fontSize: 13,
-    lineNumbers: 'on',
-    renderWhitespace: 'selection',
+    lineNumbers: 'on' as const,
+    renderWhitespace: 'selection' as const,
     automaticLayout: true,
     scrollbar: {
-      vertical: 'hidden',
-      horizontal: 'hidden',
+      vertical: 'hidden' as const,
+      horizontal: 'hidden' as const,
       handleMouseWheel: false,
       alwaysConsumeMouseWheel: false,
     },
@@ -528,23 +577,23 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     switch (saveStatus) {
       case 'saving':
       case 'pending':
-        return 'text-yellow-600 dark:text-yellow-400';
+        return 'text-status-warning';
       case 'saved':
-        return 'text-green-600 dark:text-green-400';
+        return 'text-status-success';
       case 'error':
-        return 'text-red-600 dark:text-red-400';
+        return 'text-status-error';
       default:
-        return 'text-gray-500';
+        return 'text-text-tertiary';
     }
   };
 
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-primary">
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <FileText className="w-4 h-4 text-text-tertiary" />
+          <span className="text-sm font-medium text-text-primary">
             {file.path}
           </span>
         </div>
@@ -552,13 +601,13 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
         <div className="flex items-center gap-2">
           {/* Preview Toggle for Markdown Files */}
           {isMarkdownFile && (
-            <div className="flex items-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+            <div className="flex items-center rounded-lg border border-border-primary bg-surface-primary">
               <button
                 onClick={() => setViewMode('diff')}
                 className={`px-2 py-1 text-xs font-medium rounded-l-lg transition-colors flex items-center gap-1 ${
                   viewMode === 'diff'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
                 title="Show diff view"
               >
@@ -569,8 +618,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
                 onClick={() => setViewMode('split')}
                 className={`px-2 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${
                   viewMode === 'split'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
                 title="Show split view"
               >
@@ -583,8 +632,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
                 onClick={() => setViewMode('preview')}
                 className={`px-2 py-1 text-xs font-medium rounded-r-lg transition-colors flex items-center gap-1 ${
                   viewMode === 'preview'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    ? 'bg-interactive text-white'
+                    : 'text-text-secondary hover:bg-surface-hover'
                 }`}
                 title="Show markdown preview"
               >
@@ -596,7 +645,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
           
           {/* Save Status or Read-only indicator */}
           {isReadOnly ? (
-            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-1 text-xs text-text-tertiary">
               <AlertCircle className="w-3 h-3" />
               <span>Read-only (select all commits to edit)</span>
             </div>
@@ -621,10 +670,10 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       ) : viewMode === 'split' && isMarkdownFile ? (
         <div className="flex" style={{ height: `${Math.max(editorHeight, previewHeight)}px` }}>
           {/* Diff Editor */}
-          <div className="w-1/2 border-r border-gray-200 dark:border-gray-700" ref={containerRef} style={{ overflow: 'hidden' }}>
+          <div className="w-1/2 border-r border-border-primary" ref={containerRef} style={{ overflow: 'hidden' }}>
             {(!isEditorReady || !canMountEditor) && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 z-10">
-                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+              <div className="absolute inset-0 flex items-center justify-center bg-bg-primary z-10">
+                <div className="flex items-center gap-2 text-text-secondary">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>Loading editor...</span>
                 </div>
@@ -656,8 +705,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       ) : (
         <div className="relative" ref={containerRef} style={{ height: `${editorHeight}px`, overflow: 'hidden' }}>
           {(!isEditorReady || !canMountEditor) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 z-10">
-              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <div className="absolute inset-0 flex items-center justify-center bg-bg-primary z-10">
+              <div className="flex items-center gap-2 text-text-secondary">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Loading editor...</span>
               </div>
@@ -672,6 +721,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
                 modified={currentContent}
                 theme={isDarkMode ? 'vs-dark' : 'vs'}
                 options={options}
+                beforeMount={handleBeforeMount}
                 onMount={handleEditorDidMount}
               />
             </MonacoErrorBoundary>

@@ -7,8 +7,18 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Crystal</title>
+    <script>
+      // Apply theme class before React loads to prevent flash
+      const savedTheme = localStorage.getItem('theme');
+      const theme = savedTheme === 'light' ? 'light' : 'dark';
+      document.documentElement.classList.add(theme);
+    </script>
   </head>
   <body>
+    <script>
+      // Also apply to body
+      document.body.classList.add(localStorage.getItem('theme') === 'light' ? 'light' : 'dark');
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

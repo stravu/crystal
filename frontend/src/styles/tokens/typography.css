@@ -1,0 +1,86 @@
+/* Typography Design Tokens for Crystal */
+
+:root {
+  /* Font Families */
+  --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  
+  /* Font Sizes - Following Tailwind's scale */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --text-4xl: 2.25rem;    /* 36px */
+  --text-5xl: 3rem;       /* 48px */
+  
+  /* Line Heights */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
+  
+  /* Font Weights */
+  --font-thin: 100;
+  --font-extralight: 200;
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+  --font-black: 900;
+  
+  /* Letter Spacing */
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+  
+  /* Component-Specific Typography - Headings */
+  --heading-1-size: var(--text-2xl);
+  --heading-1-weight: var(--font-bold);
+  --heading-1-line-height: var(--leading-tight);
+  
+  --heading-2-size: var(--text-xl);
+  --heading-2-weight: var(--font-semibold);
+  --heading-2-line-height: var(--leading-tight);
+  
+  --heading-3-size: var(--text-lg);
+  --heading-3-weight: var(--font-semibold);
+  --heading-3-line-height: var(--leading-snug);
+  
+  /* Component-Specific Typography - Body */
+  --body-size: var(--text-base);
+  --body-weight: var(--font-normal);
+  --body-line-height: var(--leading-normal);
+  
+  --body-sm-size: var(--text-sm);
+  --body-sm-weight: var(--font-normal);
+  --body-sm-line-height: var(--leading-normal);
+  
+  /* Component-Specific Typography - UI Elements */
+  --button-size: var(--text-sm);
+  --button-weight: var(--font-medium);
+  --button-letter-spacing: var(--tracking-normal);
+  
+  --input-size: var(--text-sm);
+  --input-weight: var(--font-normal);
+  
+  --label-size: var(--text-sm);
+  --label-weight: var(--font-medium);
+  
+  --caption-size: var(--text-xs);
+  --caption-weight: var(--font-normal);
+  
+  /* Code/Monospace Typography */
+  --code-size: var(--text-sm);
+  --code-weight: var(--font-normal);
+  --code-line-height: var(--leading-normal);
+}

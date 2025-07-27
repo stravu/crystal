@@ -4,7 +4,24 @@ import { StravuConnection } from './StravuConnection';
 import { useNotifications } from '../hooks/useNotifications';
 import { API } from '../utils/api';
 import type { AppConfig } from '../types/config';
-import { Shield, ShieldOff } from 'lucide-react';
+import { 
+  Shield, 
+  ShieldOff, 
+  Sun, 
+  Moon, 
+  Settings as SettingsIcon,
+  Palette,
+  Zap,
+  RefreshCw,
+  FileText,
+  Eye
+} from 'lucide-react';
+import { Input, Textarea, Checkbox } from './ui/Input';
+import { Button } from './ui/Button';
+import { useTheme } from '../contexts/ThemeContext';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { CollapsibleCard } from './ui/CollapsibleCard';
+import { SettingsSection } from './ui/SettingsSection';
 
 interface SettingsProps {
   isOpen: boolean;
@@ -30,6 +47,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
   const { updateSettings } = useNotifications();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     if (isOpen) {
@@ -94,54 +112,43 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+      <ModalHeader 
+        title="Crystal Settings" 
+        icon={<SettingsIcon className="w-5 h-5" />}
+        onClose={onClose}
+      />
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+      <ModalBody>
+        {/* Tabs */}
+        <div className="flex border-b border-border-primary mb-8">
           <button
             onClick={() => setActiveTab('general')}
-            className={`px-4 py-2 text-sm font-medium ${
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'general'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+                ? 'text-interactive border-b-2 border-interactive bg-interactive/5'
+                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
             }`}
           >
             General
           </button>
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`px-4 py-2 text-sm font-medium ${
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'notifications'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+                ? 'text-interactive border-b-2 border-interactive bg-interactive/5'
+                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
             }`}
           >
             Notifications
           </button>
           <button
             onClick={() => setActiveTab('stravu')}
-            className={`px-4 py-2 text-sm font-medium ${
+            className={`px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'stravu'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+                ? 'text-interactive border-b-2 border-interactive bg-interactive/5'
+                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
             }`}
           >
             Stravu Integration
@@ -149,207 +156,247 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         </div>
 
         {activeTab === 'general' && (
-          <form id="settings-form" onSubmit={handleSubmit} className="space-y-4">
-
-          <div>
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={verbose}
-                onChange={(e) => setVerbose(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable verbose logging</span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Shows detailed logs for debugging session creation and Claude Code execution
-            </p>
-          </div>
-
-          {/* Theme toggle disabled - dark mode only */}
-          {/* <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Theme
-            </label>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="flex items-center space-x-3 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+          <form id="settings-form" onSubmit={handleSubmit} className="space-y-6">
+            {/* Appearance */}
+            <CollapsibleCard
+              title="Appearance & Theme"
+              subtitle="Customize how Crystal looks and feels"
+              icon={<Palette className="w-5 h-5" />}
+              defaultExpanded={true}
             >
-              {theme === 'light' ? (
-                <>
-                  <Sun className="w-5 h-5 text-yellow-400" />
-                  <span className="text-gray-700 dark:text-gray-100">Light Mode</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-5 h-5 text-blue-400" />
-                  <span className="text-gray-700 dark:text-gray-100">Dark Mode</span>
-                </>
-              )}
-            </button>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Toggle between light and dark theme
-            </p>
-          </div> */}
-
-          <div>
-            <label htmlFor="anthropicApiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Anthropic API Key (Optional)
-            </label>
-            <input
-              id="anthropicApiKey"
-              type="password"
-              value={anthropicApiKey}
-              onChange={(e) => setAnthropicApiKey(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
-              placeholder="sk-ant-..."
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Used for auto-generating session names with AI (NOT for Claude Code itself). If not provided, fallback names will be used.
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="globalSystemPrompt" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Global System Prompt (Optional)
-            </label>
-            <textarea
-              id="globalSystemPrompt"
-              value={globalSystemPrompt}
-              onChange={(e) => setGlobalSystemPrompt(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
-              placeholder="Additional instructions to append to every prompt..."
-              rows={3}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              This text will be automatically appended to every initial prompt sent to Claude Code across ALL projects. For project-specific prompts, use the project settings.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Default Permission Mode
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="defaultPermissionMode"
-                  value="ignore"
-                  checked={defaultPermissionMode === 'ignore'}
-                  onChange={(e) => setDefaultPermissionMode(e.target.value as 'ignore' | 'approve')}
-                  className="text-blue-600"
-                />
-                <div className="flex items-center gap-2">
-                  <ShieldOff className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm text-gray-700 dark:text-gray-200">Skip Permissions (Default)</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">(faster, less secure)</span>
-                </div>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="defaultPermissionMode"
-                  value="approve"
-                  checked={defaultPermissionMode === 'approve'}
-                  onChange={(e) => setDefaultPermissionMode(e.target.value as 'ignore' | 'approve')}
-                  className="text-blue-600"
-                />
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-gray-700 dark:text-gray-200">Approve Actions</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">(safer, interactive)</span>
-                </div>
-              </label>
-            </div>
-            <p className="text-xs text-gray-600 dark:text-gray-500 mt-2">
-              When enabled, Claude will ask for permission before performing potentially dangerous actions. This sets the default for new sessions.
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="claudeExecutablePath" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Claude Executable Path (Optional)
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="claudeExecutablePath"
-                type="text"
-                value={claudeExecutablePath}
-                onChange={(e) => setClaudeExecutablePath(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                placeholder="/usr/local/bin/claude"
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  const result = await API.dialog.openFile({
-                    title: 'Select Claude Executable',
-                    buttonLabel: 'Select',
-                    properties: ['openFile'],
-                    filters: [
-                      { name: 'Executables', extensions: ['*'] }
-                    ]
-                  });
-                  if (result.success && result.data) {
-                    setClaudeExecutablePath(result.data);
-                  }
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <SettingsSection
+                title="Theme Mode"
+                description="Choose between light and dark theme"
+                icon={theme === 'light' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               >
-                Browse
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Full path to the claude executable. Leave empty to use the claude command from PATH. This is useful if Claude is installed in a non-standard location.
-            </p>
-          </div>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="flex items-center gap-3 px-4 py-3 bg-surface-secondary hover:bg-surface-hover rounded-lg transition-colors border border-border-secondary w-full"
+                >
+                  {theme === 'light' ? (
+                    <>
+                      <Sun className="w-5 h-5 text-status-warning" />
+                      <span className="text-text-primary font-medium">Light Mode</span>
+                      <span className="ml-auto text-xs text-text-tertiary">Currently active</span>
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="w-5 h-5 text-interactive" />
+                      <span className="text-text-primary font-medium">Dark Mode</span>
+                      <span className="ml-auto text-xs text-text-tertiary">Currently active</span>
+                    </>
+                  )}
+                </button>
+              </SettingsSection>
+            </CollapsibleCard>
 
-          <div>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={autoCheckUpdates}
-                    onChange={(e) => setAutoCheckUpdates(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Check for updates automatically</span>
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Automatically check for new Crystal releases on GitHub every 24 hours. You'll be notified when updates are available.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const response = await API.checkForUpdates();
-                    if (response.success && response.data) {
-                      if (response.data.hasUpdate) {
-                        // Update will be shown via the version update event
-                      } else {
-                        alert('You are running the latest version of Crystal!');
+            {/* AI Integration */}
+            <CollapsibleCard
+              title="AI Integration"
+              subtitle="Configure Claude integration and smart features"
+              icon={<Zap className="w-5 h-5" />}
+              defaultExpanded={true}
+            >
+              <SettingsSection
+                title="Smart Session Names"
+                description="Let Claude automatically generate meaningful names for your sessions"
+                icon={<FileText className="w-4 h-4" />}
+              >
+                <Input
+                  label="Anthropic API Key"
+                  type="password"
+                  value={anthropicApiKey}
+                  onChange={(e) => setAnthropicApiKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  fullWidth
+                  helperText="Optional: Used only for generating session names. Your main Claude Code API key is separate."
+                />
+              </SettingsSection>
+
+              <SettingsSection
+                title="Default Security Mode"
+                description="How Claude should handle potentially risky operations"
+                icon={defaultPermissionMode === 'approve' ? <Shield className="w-4 h-4" /> : <ShieldOff className="w-4 h-4" />}
+              >
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-hover transition-colors border border-border-secondary">
+                    <input
+                      type="radio"
+                      name="defaultPermissionMode"
+                      value="ignore"
+                      checked={defaultPermissionMode === 'ignore'}
+                      onChange={(e) => setDefaultPermissionMode(e.target.value as 'ignore' | 'approve')}
+                      className="text-interactive mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <ShieldOff className="w-4 h-4 text-text-tertiary" />
+                        <span className="text-sm font-medium text-text-primary">Fast & Flexible</span>
+                        <span className="ml-auto px-2 py-0.5 text-xs bg-status-warning/20 text-status-warning rounded-full">Default</span>
+                      </div>
+                      <p className="text-xs text-text-tertiary leading-relaxed">
+                        Claude executes commands quickly without asking permission. Great for development workflows.
+                      </p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-hover transition-colors border border-border-secondary">
+                    <input
+                      type="radio"
+                      name="defaultPermissionMode"
+                      value="approve"
+                      checked={defaultPermissionMode === 'approve'}
+                      onChange={(e) => setDefaultPermissionMode(e.target.value as 'ignore' | 'approve')}
+                      className="text-interactive mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Shield className="w-4 h-4 text-status-success" />
+                        <span className="text-sm font-medium text-text-primary">Secure & Controlled</span>
+                      </div>
+                      <p className="text-xs text-text-tertiary leading-relaxed">
+                        Claude asks for your approval before running potentially risky commands. Safer for production code.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Global Instructions"
+                description="Add custom instructions that apply to all your projects"
+                icon={<FileText className="w-4 h-4" />}
+              >
+                <Textarea
+                  label="Global System Prompt"
+                  value={globalSystemPrompt}
+                  onChange={(e) => setGlobalSystemPrompt(e.target.value)}
+                  placeholder="Always use TypeScript... Follow our team's coding standards..."
+                  rows={3}
+                  fullWidth
+                  helperText="These instructions will be added to every Claude session across all projects."
+                />
+              </SettingsSection>
+            </CollapsibleCard>
+
+            {/* System Updates */}
+            <CollapsibleCard
+              title="Updates & Maintenance"
+              subtitle="Keep Crystal up to date with the latest features"
+              icon={<RefreshCw className="w-5 h-5" />}
+              defaultExpanded={false}
+            >
+              <SettingsSection
+                title="Automatic Updates"
+                description="Stay current with new features and bug fixes"
+                icon={<RefreshCw className="w-4 h-4" />}
+              >
+                <div className="flex items-center justify-between p-3 bg-surface-secondary rounded-lg border border-border-secondary">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      label="Check for updates automatically"
+                      checked={autoCheckUpdates}
+                      onChange={(e) => setAutoCheckUpdates(e.target.checked)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await API.checkForUpdates();
+                        if (response.success && response.data) {
+                          if (response.data.hasUpdate) {
+                            // Update will be shown via the version update event
+                          } else {
+                            alert('You are running the latest version of Crystal!');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Failed to check for updates:', error);
+                        alert('Failed to check for updates. Please try again later.');
                       }
-                    }
-                  } catch (error) {
-                    console.error('Failed to check for updates:', error);
-                    alert('Failed to check for updates. Please try again later.');
-                  }
-                }}
-                className="ml-4 px-3 py-1 text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 focus:outline-none"
+                    }}
+                  >
+                    Check Now
+                  </Button>
+                </div>
+                <p className="text-xs text-text-tertiary mt-2">
+                  We check GitHub for new releases every 24 hours. Updates require manual installation.
+                </p>
+              </SettingsSection>
+            </CollapsibleCard>
+
+            {/* Advanced Options */}
+            <CollapsibleCard
+              title="Advanced Options"
+              subtitle="Technical settings for power users"
+              icon={<Eye className="w-5 h-5" />}
+              defaultExpanded={false}
+              variant="subtle"
+            >
+              <SettingsSection
+                title="Debugging"
+                description="Enable detailed logging for troubleshooting"
+                icon={<FileText className="w-4 h-4" />}
               >
-                Check Now
-              </button>
-            </div>
-          </div>
+                <Checkbox
+                  label="Enable verbose logging"
+                  checked={verbose}
+                  onChange={(e) => setVerbose(e.target.checked)}
+                />
+                <p className="text-xs text-text-tertiary mt-1">
+                  Shows detailed logs for session creation and Claude Code execution. Useful for debugging issues.
+                </p>
+              </SettingsSection>
 
+              <SettingsSection
+                title="Custom Claude Installation"
+                description="Override the default Claude executable path"
+                icon={<FileText className="w-4 h-4" />}
+              >
+                <div className="flex gap-2">
+                  <input
+                    id="claudeExecutablePath"
+                    type="text"
+                    value={claudeExecutablePath}
+                    onChange={(e) => setClaudeExecutablePath(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary"
+                    placeholder="/usr/local/bin/claude"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      const result = await API.dialog.openFile({
+                        title: 'Select Claude Executable',
+                        buttonLabel: 'Select',
+                        properties: ['openFile'],
+                        filters: [
+                          { name: 'Executables', extensions: ['*'] }
+                        ]
+                      });
+                      if (result.success && result.data) {
+                        setClaudeExecutablePath(result.data);
+                      }
+                    }}
+                  >
+                    Browse
+                  </Button>
+                </div>
+                <p className="text-xs text-text-tertiary mt-1">
+                  Leave empty to use the 'claude' command from your system PATH.
+                </p>
+              </SettingsSection>
+            </CollapsibleCard>
 
-          {error && (
-            <div className="text-red-600 text-sm">{error}</div>
-          )}
+            {error && (
+              <div className="text-status-error text-sm bg-status-error/10 border border-status-error/30 rounded-lg p-4">
+                {error}
+              </div>
+            )}
           </form>
         )}
         
@@ -364,62 +411,99 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         
         {activeTab === 'stravu' && (
           <div className="space-y-6">
-            <div className="flex items-start gap-4">
-              <img 
-                src="./stravu-logo.png" 
-                alt="Stravu Logo" 
-                className="w-16 h-16 object-contain flex-shrink-0"
-              />
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  Stravu - The way AI-first teams collaborate
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Connect Crystal to your Stravu workspace to seamlessly integrate your team's knowledge and documentation into your AI-powered development workflow.
+            {/* Stravu Introduction */}
+            <CollapsibleCard
+              title="About Stravu Integration"
+              subtitle="Connect your team's knowledge to your AI workflow"
+              icon={
+                <img 
+                  src="./stravu-logo.png" 
+                  alt="Stravu Logo" 
+                  className="w-5 h-5 object-contain"
+                />
+              }
+              defaultExpanded={true}
+              variant="subtle"
+            >
+              <div className="space-y-4">
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  Stravu is the knowledge platform for AI-first teams. Connect Crystal to your Stravu workspace to give Claude access to your team's documentation, best practices, and institutional knowledge.
                 </p>
-                <a 
-                  href="https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium inline-flex items-center gap-1"
-                >
-                  Learn more about Stravu
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              </div>
-            </div>
-            <div className="border-t border-gray-700 pt-6">
-              <StravuConnection />
-            </div>
-          </div>
-        )}
-        </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="p-3 bg-surface-tertiary rounded-lg">
+                    <h4 className="font-medium text-text-primary mb-1">🚀 Smart Context</h4>
+                    <p className="text-text-tertiary">Claude automatically pulls relevant docs and standards</p>
+                  </div>
+                  <div className="p-3 bg-surface-tertiary rounded-lg">
+                    <h4 className="font-medium text-text-primary mb-1">👥 Team Alignment</h4>
+                    <p className="text-text-tertiary">Ensure AI follows your team's patterns and conventions</p>
+                  </div>
+                  <div className="p-3 bg-surface-tertiary rounded-lg">
+                    <h4 className="font-medium text-text-primary mb-1">📚 Knowledge Base</h4>
+                    <p className="text-text-tertiary">Surface relevant documentation during development</p>
+                  </div>
+                  <div className="p-3 bg-surface-tertiary rounded-lg">
+                    <h4 className="font-medium text-text-primary mb-1">🔄 Always Current</h4>
+                    <p className="text-text-tertiary">Real-time sync with your latest team knowledge</p>
+                  </div>
+                </div>
 
-        {/* Footer */}
-        {(activeTab === 'general' || activeTab === 'notifications') && (
-          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              disabled={isSubmitting}
+                <div className="flex items-center justify-between pt-2 border-t border-border-secondary">
+                  <a 
+                    href="https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-interactive hover:text-interactive-hover text-sm inline-flex items-center gap-2 font-medium transition-colors"
+                  >
+                    Learn more about Stravu
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <span className="text-xs text-text-tertiary">
+                    Made by the Crystal team
+                  </span>
+                </div>
+              </div>
+            </CollapsibleCard>
+
+            {/* Connection Management */}
+            <CollapsibleCard
+              title="Connection Management"
+              subtitle="Connect and manage your Stravu workspace integration"
+              icon={<Zap className="w-5 h-5" />}
+              defaultExpanded={true}
             >
-              Cancel
-            </button>
-            <button
-              type={activeTab === 'general' ? 'submit' : 'button'}
-              form={activeTab === 'general' ? 'settings-form' : undefined}
-              onClick={activeTab === 'notifications' ? (e) => handleSubmit(e as any) : undefined}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </button>
+              <StravuConnection />
+            </CollapsibleCard>
           </div>
         )}
-      </div>
-    </div>
+      </ModalBody>
+
+      {/* Footer */}
+      {(activeTab === 'general' || activeTab === 'notifications') && (
+        <ModalFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type={activeTab === 'general' ? 'submit' : 'button'}
+            form={activeTab === 'general' ? 'settings-form' : undefined}
+            onClick={activeTab === 'notifications' ? (e) => handleSubmit(e as any) : undefined}
+            disabled={isSubmitting}
+            loading={isSubmitting}
+            variant="primary"
+          >
+            Save Changes
+          </Button>
+        </ModalFooter>
+      )}
+    </Modal>
   );
 }

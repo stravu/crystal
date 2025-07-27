@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, Play } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -14,6 +14,11 @@ import type { Session } from '../types/session';
 import type { Project } from '../types/project';
 import type { Folder } from '../types/folder';
 import { useContextMenu } from '../contexts/ContextMenuContext';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
+import { Button } from './ui/Button';
+import { EnhancedInput } from './ui/EnhancedInput';
+import { FieldWithTooltip } from './ui/FieldWithTooltip';
+import { Card } from './ui/Card';
 
 interface ProjectWithSessions extends Project {
   sessions: Session[];
@@ -46,6 +51,7 @@ export function DraggableProjectTreeView() {
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const { setActiveSession } = useSessionStore();
   const { navigateToSessions } = useNavigationStore();
@@ -800,7 +806,10 @@ export function DraggableProjectTreeView() {
   };
 
   const handleCreateProject = async () => {
-    if (!newProject.name || !newProject.path) return;
+    if (!newProject.name || !newProject.path) {
+      setShowValidationErrors(true);
+      return;
+    }
 
     try {
       const response = await API.projects.create(newProject);
@@ -817,6 +826,8 @@ export function DraggableProjectTreeView() {
 
       setShowAddProjectDialog(false);
       setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+      setDetectedBranchForNewProject(null);
+      setShowValidationErrors(false);
       
       // Add the new project to the list without reloading everything
       const newProjectWithSessions = { ...response.data, sessions: [], folders: [] };
@@ -1312,7 +1323,7 @@ export function DraggableProjectTreeView() {
             hasMoreSiblings && (
               <div
                 key={parentLevel}
-                className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
+                className="absolute top-0 bottom-0 w-px bg-border-secondary"
                 style={{ left: `${parentLevel * 16 + 8}px` }}
               />
             )
@@ -1322,7 +1333,7 @@ export function DraggableProjectTreeView() {
           {/* Vertical line for this level (if not last and has children when expanded) */}
           {level > 0 && !isLastInLevel && (
             <div
-              className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
+              className="absolute top-0 bottom-0 w-px bg-border-secondary"
               style={{ left: `${(level - 1) * 16 + 8}px` }}
             />
           )}
@@ -1330,7 +1341,7 @@ export function DraggableProjectTreeView() {
           {/* Vertical line down from this folder if expanded and has children */}
           {isExpanded && hasChildren && (
             <div
-              className="absolute w-px bg-black/[0.06] dark:bg-white/[0.06]"
+              className="absolute w-px bg-border-secondary"
               style={{ 
                 left: `${level * 16 + 8}px`,
                 top: '24px',
@@ -1342,7 +1353,7 @@ export function DraggableProjectTreeView() {
           {/* Horizontal connector line for this folder */}
           {level > 0 && (
             <div
-              className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+              className="absolute h-px bg-border-secondary"
               style={{ 
                 left: `${(level - 1) * 16 + 8}px`,
                 right: `calc(100% - ${level * 16}px)`,
@@ -1352,8 +1363,8 @@ export function DraggableProjectTreeView() {
           )}
         </div>
         <div 
-          className={`relative group/folder flex items-center space-x-1 py-1 rounded cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-            isDraggingOverFolder ? 'bg-blue-100 dark:bg-blue-900' : ''
+          className={`relative group/folder flex items-center space-x-1 py-1 rounded cursor-pointer transition-colors hover:bg-surface-hover ${
+            isDraggingOverFolder ? 'bg-interactive/20' : ''
           }`}
           style={{ marginLeft: `${0}px`, paddingLeft: '8px', paddingRight: '8px' }}
           draggable
@@ -1365,7 +1376,7 @@ export function DraggableProjectTreeView() {
           onContextMenu={(e) => handleFolderContextMenu(e, folder, project.id)}
         >
           <div className="opacity-0 group-hover/folder:opacity-100 transition-opacity cursor-move">
-            <GripVertical className="w-3 h-3 text-gray-400" />
+            <GripVertical className="w-3 h-3 text-text-tertiary" />
           </div>
           
           <button
@@ -1373,14 +1384,14 @@ export function DraggableProjectTreeView() {
               e.stopPropagation();
               toggleFolder(folder.id);
             }}
-            className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+            className="p-0.5 hover:bg-surface-hover rounded transition-colors"
             disabled={!hasChildren}
           >
             {hasChildren ? (
               isExpanded ? (
-                <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                <ChevronDown className="w-3 h-3 text-text-tertiary" />
               ) : (
-                <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                <ChevronRight className="w-3 h-3 text-text-tertiary" />
               )
             ) : (
               <div className="w-3 h-3" />
@@ -1394,9 +1405,9 @@ export function DraggableProjectTreeView() {
             }}
           >
             {isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <FolderOpen className="w-4 h-4 text-interactive flex-shrink-0" />
             ) : (
-              <FolderIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <FolderIcon className="w-4 h-4 text-interactive flex-shrink-0" />
             )}
             {editingFolderId === folder.id ? (
               <input
@@ -1415,18 +1426,18 @@ export function DraggableProjectTreeView() {
                 }}
                 onClick={(e) => e.stopPropagation()}
                 autoFocus
-                className="flex-1 px-1 py-0 text-sm bg-white dark:bg-gray-800 border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="flex-1 px-1 py-0 text-sm bg-surface-primary border border-interactive rounded focus:outline-none focus:ring-1 focus:ring-interactive"
               />
             ) : (
               <>
-                <span className="text-sm text-gray-700 dark:text-gray-300 truncate" title={folder.name}>
+                <span className="text-sm text-text-primary truncate" title={folder.name}>
                   {folder.name}
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-500">
+                <span className="text-xs text-text-tertiary">
                   ({folderSessions.length})
                 </span>
                 {folderUnviewedCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full">
+                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-interactive text-white rounded-full animate-pulse">
                     {folderUnviewedCount}
                   </span>
                 )}
@@ -1443,10 +1454,10 @@ export function DraggableProjectTreeView() {
               setShowCreateFolderDialog(true);
               setNewFolderName('');
             }}
-            className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+            className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 hover:bg-surface-hover rounded"
             title="Add subfolder"
           >
-            <Plus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+            <Plus className="w-3 h-3 text-text-tertiary" />
           </button>
           
           {/* Delete folder button */}
@@ -1455,10 +1466,10 @@ export function DraggableProjectTreeView() {
               e.stopPropagation();
               handleDeleteFolder(folder, project.id);
             }}
-            className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-600/20"
+            className="opacity-0 group-hover/folder:opacity-100 transition-opacity p-1 rounded hover:bg-status-error/10"
             title="Delete folder"
           >
-            <span className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">🗑️</span>
+            <span className="text-status-error hover:text-status-error">🗑️</span>
           </button>
         </div>
         
@@ -1492,7 +1503,7 @@ export function DraggableProjectTreeView() {
                         hasMoreSiblings && (
                           <div
                             key={parentLevel}
-                            className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
+                            className="absolute top-0 bottom-0 w-px bg-border-secondary"
                             style={{ left: `${parentLevel * 16 + 8}px` }}
                           />
                         )
@@ -1500,7 +1511,7 @@ export function DraggableProjectTreeView() {
                       
                       {/* Horizontal connector line for this session */}
                       <div
-                        className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+                        className="absolute h-px bg-border-secondary"
                         style={{ 
                           left: `${level * 16 + 8}px`,
                           right: `calc(100% - ${(level + 1) * 16}px)`,
@@ -1511,7 +1522,7 @@ export function DraggableProjectTreeView() {
                     
                     <div
                       className={`relative group flex items-center ${
-                        isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
+                        isDraggingOverSession ? 'bg-interactive/20 rounded' : ''
                       }`}
                       style={{ marginLeft: '0px', paddingLeft: '8px' }}
                       draggable
@@ -1523,7 +1534,7 @@ export function DraggableProjectTreeView() {
                       onDragLeave={handleDragLeave}
                     >
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
-                        <GripVertical className="w-3 h-3 text-gray-400" />
+                        <GripVertical className="w-3 h-3 text-text-tertiary" />
                       </div>
                       <SessionListItem 
                         key={session.id} 
@@ -1568,10 +1579,10 @@ export function DraggableProjectTreeView() {
               <div 
                 className={`group flex items-center space-x-1 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
                   isActiveProject 
-                    ? 'bg-blue-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                    ? 'bg-interactive/10 text-interactive' 
                     : isDraggingOver 
-                      ? 'bg-blue-100 dark:bg-blue-900' 
-                      : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-interactive/20' 
+                      : 'bg-surface-secondary/50 hover:bg-surface-hover'
                 }`}
                 draggable
                 onDragStart={(e) => handleProjectDragStart(e, project)}
@@ -1582,7 +1593,7 @@ export function DraggableProjectTreeView() {
                 onDragLeave={handleDragLeave}
               >
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move">
-                  <GripVertical className="w-3 h-3 text-gray-400" />
+                  <GripVertical className="w-3 h-3 text-text-tertiary" />
                 </div>
                 
                 {(sessionCount > 0 || (project.folders && project.folders.length > 0)) ? (
@@ -1591,12 +1602,12 @@ export function DraggableProjectTreeView() {
                       e.stopPropagation();
                       toggleProject(project.id);
                     }}
-                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                    className="p-0.5 hover:bg-surface-hover rounded transition-colors"
                   >
                     {isExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                      <ChevronDown className="w-3 h-3 text-text-tertiary" />
                     ) : (
-                      <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                      <ChevronRight className="w-3 h-3 text-text-tertiary" />
                     )}
                   </button>
                 ) : (
@@ -1608,13 +1619,13 @@ export function DraggableProjectTreeView() {
                   onClick={() => handleProjectClick(project)}
                 >
                   <div className="relative" title="Git-backed project (connected to repository)">
-                    <GitBranch className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <GitBranch className="w-4 h-4 text-interactive flex-shrink-0" />
                   </div>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate text-left" title={project.name}>
+                  <span className="text-sm font-semibold text-text-primary truncate text-left" title={project.name}>
                     {project.name}
                   </span>
                   {unviewedCount > 0 && (
-                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full">
+                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-interactive text-white rounded-full animate-pulse">
                       {unviewedCount}
                     </span>
                   )}
@@ -1625,7 +1636,7 @@ export function DraggableProjectTreeView() {
                     e.stopPropagation();
                     handleCreateSession(project);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-all opacity-0 group-hover:opacity-100"
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-all opacity-0 group-hover:opacity-100"
                 >
                   <Plus className="w-3 h-3" />
                   <span>New Session</span>
@@ -1650,17 +1661,17 @@ export function DraggableProjectTreeView() {
                     setSelectedProjectForSettings(project);
                     setShowProjectSettings(true);
                   }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 hover:bg-surface-hover rounded transition-colors opacity-0 group-hover:opacity-100"
                   title="Project settings"
                 >
-                  <Settings className="w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" />
+                  <Settings className="w-3 h-3 text-text-tertiary hover:text-text-primary" />
                 </button>
               </div>
               
               {isExpanded && (sessionCount > 0 || (project.folders && project.folders.length > 0)) && (
                 <div className="relative mt-1 space-y-1">
                   {/* Main vertical line from project to all children */}
-                  <div className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]" style={{ left: '8px' }} />
+                  <div className="absolute top-0 bottom-0 w-px bg-border-secondary" style={{ left: '8px' }} />
                   {/* Render folders using recursive structure */}
                   {project.folders && (() => {
                     const folderTree = buildFolderTree(project.folders);
@@ -1693,14 +1704,14 @@ export function DraggableProjectTreeView() {
                               {/* Vertical line from parent if not last session */}
                               {!isLastSession && (
                                 <div
-                                  className="absolute top-0 bottom-0 w-px bg-black/[0.06] dark:bg-white/[0.06]"
+                                  className="absolute top-0 bottom-0 w-px bg-border-secondary"
                                   style={{ left: '8px' }}
                                 />
                               )}
                               
                               {/* Horizontal connector line for root session */}
                               <div
-                                className="absolute h-px bg-black/[0.06] dark:bg-white/[0.06]"
+                                className="absolute h-px bg-border-secondary"
                                 style={{ 
                                   left: '8px',
                                   right: 'calc(100% - 16px)',
@@ -1711,7 +1722,7 @@ export function DraggableProjectTreeView() {
                             
                             <div
                               className={`relative group flex items-center ${
-                                isDraggingOverSession ? 'bg-blue-100 dark:bg-blue-900 rounded' : ''
+                                isDraggingOverSession ? 'bg-interactive/20 rounded' : ''
                               }`}
                               style={{ marginLeft: '0px', paddingLeft: '8px' }}
                               draggable
@@ -1723,7 +1734,7 @@ export function DraggableProjectTreeView() {
                               onDragLeave={handleDragLeave}
                             >
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
-                                <GripVertical className="w-3 h-3 text-gray-400" />
+                                <GripVertical className="w-3 h-3 text-text-tertiary" />
                               </div>
                               <SessionListItem 
                                 key={session.id} 
@@ -1737,7 +1748,7 @@ export function DraggableProjectTreeView() {
                   </div>
                   
                   {/* Add folder button */}
-                  <div className="ml-6 mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <div className="ml-6 mt-2 border-t border-border-primary pt-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1745,7 +1756,7 @@ export function DraggableProjectTreeView() {
                         setShowCreateFolderDialog(true);
                         setNewFolderName('');
                       }}
-                      className="w-full px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center space-x-1"
+                      className="w-full px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors flex items-center space-x-1"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add Folder</span>
@@ -1757,10 +1768,10 @@ export function DraggableProjectTreeView() {
           );
         })}
         
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-3 pt-3 border-t border-border-primary">
               <button
                 onClick={() => setShowAddProjectDialog(true)}
-                className="w-full px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center space-x-2"
+                className="w-full px-2 py-1.5 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors flex items-center justify-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Project</span>
@@ -1770,10 +1781,10 @@ export function DraggableProjectTreeView() {
         )}
         
         {/* Archived Sessions Section */}
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-4 pt-4 border-t border-border-primary">
           <button
             onClick={toggleArchivedSessions}
-            className="w-full flex items-center space-x-2 px-2 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            className="w-full flex items-center space-x-2 px-2 py-1.5 text-sm font-medium text-text-primary hover:bg-surface-hover rounded transition-colors"
           >
             {showArchivedSessions ? (
               <ChevronDown className="w-4 h-4" />
@@ -1791,7 +1802,7 @@ export function DraggableProjectTreeView() {
                   <LoadingSpinner text="Loading archived sessions..." size="small" />
                 </div>
               ) : archivedProjectsWithSessions.length === 0 ? (
-                <div className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div className="px-4 py-4 text-center text-sm text-text-tertiary">
                   No archived sessions
                 </div>
               ) : (
@@ -1801,23 +1812,23 @@ export function DraggableProjectTreeView() {
                   
                   return (
                     <div key={`archived-${project.id}`} className="ml-2">
-                      <div className="flex items-center space-x-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <div className="flex items-center space-x-1 px-2 py-1 rounded hover:bg-surface-hover">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleArchivedProject(project.id);
                           }}
-                          className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                          className="p-0.5 hover:bg-surface-hover rounded transition-colors"
                         >
                           {isExpanded ? (
-                            <ChevronDown className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                            <ChevronDown className="w-3 h-3 text-text-tertiary" />
                           ) : (
-                            <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                            <ChevronRight className="w-3 h-3 text-text-tertiary" />
                           )}
                         </button>
                         
-                        <FolderIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400 flex-1 text-left">
+                        <FolderIcon className="w-4 h-4 text-text-tertiary" />
+                        <span className="text-sm text-text-tertiary flex-1 text-left">
                           {project.name} ({sessionCount})
                         </span>
                       </div>
@@ -1887,132 +1898,185 @@ export function DraggableProjectTreeView() {
       )}
       
       {/* Add Project Dialog */}
-      {showAddProjectDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Add New Project</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Project Name
-                </label>
-                <input
+      <Modal 
+        isOpen={showAddProjectDialog} 
+        onClose={() => {
+          setShowAddProjectDialog(false);
+          setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+          setDetectedBranchForNewProject(null);
+          setShowValidationErrors(false);
+        }}
+        size="lg"
+      >
+        <ModalHeader title="Add New Project" icon={<Plus className="w-5 h-5" />} />
+        <ModalBody>
+          <div className="space-y-8">
+            {/* Project Info Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                <FolderIcon className="w-5 h-5 text-interactive" />
+                <h3 className="text-heading-3 font-semibold text-text-primary">Project Information</h3>
+              </div>
+              
+              <FieldWithTooltip
+                label="Project Name"
+                tooltip="A descriptive name for your project that will appear in the project selector."
+                required
+              >
+                <EnhancedInput
                   type="text"
                   value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="My Project"
+                  onChange={(e) => {
+                    setNewProject({ ...newProject, name: e.target.value });
+                    if (showValidationErrors) setShowValidationErrors(false);
+                  }}
+                  placeholder="Enter project name"
+                  size="lg"
+                  fullWidth
+                  required
+                  showRequiredIndicator={showValidationErrors}
                 />
-              </div>
+              </FieldWithTooltip>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Repository Path
-                </label>
-                <div className="flex gap-2">
-                  <input
+              <FieldWithTooltip
+                label="Repository Path"
+                tooltip="Path to your git repository. This is where Crystal will create worktrees for parallel development."
+                required
+              >
+                <div className="space-y-3">
+                  <EnhancedInput
                     type="text"
                     value={newProject.path}
                     onChange={(e) => {
                       setNewProject({ ...newProject, path: e.target.value });
                       detectCurrentBranch(e.target.value);
+                      if (showValidationErrors) setShowValidationErrors(false);
                     }}
-                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
-                    placeholder="/path/to/repository"
+                    placeholder="/path/to/your/repository"
+                    size="lg"
+                    fullWidth
+                    required
+                    showRequiredIndicator={showValidationErrors}
                   />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const result = await API.dialog.openDirectory({
-                        title: 'Select Repository Directory',
-                        buttonLabel: 'Select',
-                      });
-                      if (result.success && result.data) {
-                        setNewProject({ ...newProject, path: result.data });
-                        detectCurrentBranch(result.data);
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    Browse
-                  </button>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        const result = await API.dialog.openDirectory({
+                          title: 'Select Repository Directory',
+                          buttonLabel: 'Select',
+                        });
+                        if (result.success && result.data) {
+                          setNewProject({ ...newProject, path: result.data });
+                          detectCurrentBranch(result.data);
+                        }
+                      }}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Browse
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </FieldWithTooltip>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Current Branch <span className="text-gray-500">(Auto-detected)</span>
-                </label>
-                <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200">
-                  {detectedBranchForNewProject || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  The main branch is automatically detected from the repository. This will be used for git operations.
-                </p>
+            {/* Git Info Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                <GitBranch className="w-5 h-5 text-interactive" />
+                <h3 className="text-heading-3 font-semibold text-text-primary">Git Information</h3>
               </div>
+              
+              <FieldWithTooltip
+                label="Main Branch"
+                tooltip="The main branch of your repository. Crystal will automatically detect this from your git configuration."
+              >
+                <Card variant="bordered" padding="md" className="text-text-secondary bg-surface-secondary">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="w-4 h-4" />
+                    <span className="font-mono">
+                      {detectedBranchForNewProject || (newProject.path ? 'Detecting...' : 'Select a repository path first')}
+                    </span>
+                  </div>
+                </Card>
+              </FieldWithTooltip>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Build Script <span className="text-gray-500 dark:text-gray-500">(optional)</span>
-                </label>
-                <input
+            {/* Optional Scripts Section */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
+                <Play className="w-5 h-5 text-interactive" />
+                <h3 className="text-heading-3 font-semibold text-text-primary">Optional Scripts</h3>
+              </div>
+              
+              <FieldWithTooltip
+                label="Build Script"
+                tooltip="Command to build your project. This runs automatically before each Claude Code session starts."
+              >
+                <EnhancedInput
                   type="text"
                   value={newProject.buildScript}
                   onChange={(e) => setNewProject({ ...newProject, buildScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="e.g., pnpm build or npm run build"
+                  placeholder="pnpm build"
+                  size="lg"
+                  fullWidth
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  This script will run automatically before each Claude Code session starts.
-                </p>
-              </div>
+              </FieldWithTooltip>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Run Script <span className="text-gray-500 dark:text-gray-500">(optional)</span>
-                </label>
-                <input
+              <FieldWithTooltip
+                label="Run Script"
+                tooltip="Command to start your development server. You can run this manually from the Terminal view during sessions."
+              >
+                <EnhancedInput
                   type="text"
                   value={newProject.runScript}
                   onChange={(e) => setNewProject({ ...newProject, runScript: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="e.g., pnpm dev or npm start"
+                  placeholder="pnpm dev"
+                  size="lg"
+                  fullWidth
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  This script can be run manually from the Terminal view during sessions.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowAddProjectDialog(false);
-                  setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
-                }}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateProject}
-                disabled={!newProject.name || !newProject.path}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Add Project
-              </button>
+              </FieldWithTooltip>
             </div>
           </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            onClick={() => {
+              setShowAddProjectDialog(false);
+              setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
+              setDetectedBranchForNewProject(null);
+              setShowValidationErrors(false);
+            }}
+            variant="ghost"
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (!newProject.name || !newProject.path) {
+                setShowValidationErrors(true);
+                return;
+              }
+              handleCreateProject();
+            }}
+            disabled={!newProject.name || !newProject.path}
+            variant="primary"
+            size="md"
+            className={(!newProject.name || !newProject.path) ? 'border-status-error border-2' : ''}
+          >
+            Create Project
+          </Button>
+        </ModalFooter>
+      </Modal>
       
       
       {/* Create Folder Dialog */}
       {showCreateFolderDialog && selectedProjectForFolder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">
+        <div className="fixed inset-0 bg-modal-overlay flex items-center justify-center z-50">
+          <div className="bg-surface-primary rounded-lg p-6 w-96 shadow-xl border border-border-primary">
+            <h3 className="text-lg font-semibold text-text-primary mb-4">
               {parentFolderForCreate 
                 ? `Create Subfolder in "${parentFolderForCreate.name}"`
                 : `Create Folder in ${selectedProjectForFolder.name}`
@@ -2021,14 +2085,14 @@ export function DraggableProjectTreeView() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Folder Name
                 </label>
                 <input
                   type="text"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-200 focus:outline-none focus:border-blue-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
                   placeholder="My Folder"
                   autoFocus
                   onKeyDown={(e) => {
@@ -2040,7 +2104,7 @@ export function DraggableProjectTreeView() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   Suggested Folder Types
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -2049,7 +2113,7 @@ export function DraggableProjectTreeView() {
                       key={suggestion}
                       type="button"
                       onClick={() => setNewFolderName(suggestion)}
-                      className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                      className="px-3 py-1.5 text-sm text-text-secondary bg-surface-tertiary hover:bg-surface-hover rounded-md transition-colors"
                     >
                       {suggestion}
                     </button>
@@ -2066,14 +2130,14 @@ export function DraggableProjectTreeView() {
                   setSelectedProjectForFolder(null);
                   setParentFolderForCreate(null);
                 }}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-interactive hover:bg-interactive-hover text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Create Folder
               </button>
@@ -2085,7 +2149,7 @@ export function DraggableProjectTreeView() {
       {/* Folder Context Menu */}
       {isMenuOpen('folder') && menuState.payload && menuState.position && (
         <div
-          className="context-menu fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50 min-w-[150px]"
+          className="context-menu fixed bg-surface-primary border border-border-primary rounded-md shadow-lg py-1 z-50 min-w-[150px]"
           style={{ top: menuState.position.y, left: menuState.position.x }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -2094,7 +2158,7 @@ export function DraggableProjectTreeView() {
               closeMenu();
               handleStartFolderEdit(menuState.payload);
             }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+            className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-hover hover:text-text-primary"
           >
             Rename
           </button>
@@ -2110,11 +2174,11 @@ export function DraggableProjectTreeView() {
                 setShowCreateDialog(true);
               }
             }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+            className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-hover hover:text-text-primary"
           >
             New Session Here
           </button>
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+          <div className="border-t border-border-primary my-1" />
           <button
             onClick={() => {
               closeMenu();
@@ -2127,7 +2191,7 @@ export function DraggableProjectTreeView() {
                 handleDeleteFolder(menuState.payload, projectId);
               }
             }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-700 dark:hover:text-red-300"
+            className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-surface-hover hover:text-status-error"
           >
             Delete
           </button>

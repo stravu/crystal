@@ -316,13 +316,24 @@ export class DatabaseService {
     const sessionTableInfoTimestamp = this.db.prepare("PRAGMA table_info(sessions)").all();
     const lastViewedAtColumn = sessionTableInfoTimestamp.find((col: any) => col.name === 'last_viewed_at') as any;
     
-    if (lastViewedAtColumn && lastViewedAtColumn.type === 'TEXT') {
+    // Skip this migration if last_viewed_at_new already exists (migration partially completed)
+    const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'last_viewed_at_new');
+    
+    if (lastViewedAtColumn && lastViewedAtColumn.type === 'TEXT' && !hasLastViewedAtNew) {
       console.log('[Database] Running timestamp normalization migration...');
       
       try {
-        // Create new temporary columns with DATETIME type
-        this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at_new DATETIME").run();
-        this.db.prepare("ALTER TABLE sessions ADD COLUMN run_started_at_new DATETIME").run();
+        // Check if the new columns already exist (from a previous failed migration)
+        const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'last_viewed_at_new');
+        const hasRunStartedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'run_started_at_new');
+        
+        // Create new temporary columns with DATETIME type if they don't exist
+        if (!hasLastViewedAtNew) {
+          this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at_new DATETIME").run();
+        }
+        if (!hasRunStartedAtNew) {
+          this.db.prepare("ALTER TABLE sessions ADD COLUMN run_started_at_new DATETIME").run();
+        }
         
         // Copy and convert existing data
         this.db.prepare("UPDATE sessions SET last_viewed_at_new = datetime(last_viewed_at) WHERE last_viewed_at IS NOT NULL").run();
@@ -717,13 +728,21 @@ export class DatabaseService {
     const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode_settings');
     
     if (!hasSessionCommitModeColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode TEXT").run();
-      console.log('[Database] Added commit_mode column to sessions table');
+      try {
+        this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode TEXT").run();
+        console.log('[Database] Added commit_mode column to sessions table');
+      } catch (error) {
+        console.error('[Database] Error adding commit_mode column:', error);
+      }
     }
     
     if (!hasSessionCommitModeSettingsColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode_settings TEXT").run();
-      console.log('[Database] Added commit_mode_settings column to sessions table');
+      try {
+        this.db.prepare("ALTER TABLE sessions ADD COLUMN commit_mode_settings TEXT").run();
+        console.log('[Database] Added commit_mode_settings column to sessions table');
+      } catch (error) {
+        console.error('[Database] Error adding commit_mode_settings column:', error);
+      }
     }
 
     // Migrate existing auto_commit boolean to commit_mode
@@ -1252,14 +1271,22 @@ export class DatabaseService {
       values.push(boolValue);
       console.log(`[Database] Setting skip_continue_next to ${boolValue} (from ${data.skip_continue_next}) for session ${id}`);
     }
+    if (data.commit_mode !== undefined) {
+      updates.push('commit_mode = ?');
+      values.push(data.commit_mode);
+    }
+    if (data.commit_mode_settings !== undefined) {
+      updates.push('commit_mode_settings = ?');
+      values.push(data.commit_mode_settings);
+    }
 
     if (updates.length === 0) {
       return this.getSession(id);
     }
 
-    // Only update the updated_at timestamp if we're changing something other than is_favorite, auto_commit, model, or skip_continue_next
+    // Only update the updated_at timestamp if we're changing something other than is_favorite, auto_commit, model, skip_continue_next, commit_mode, or commit_mode_settings
     // This prevents the session from showing as "unviewed" when just toggling these settings
-    const isOnlyToggleUpdate = updates.length === 1 && (updates[0] === 'is_favorite = ?' || updates[0] === 'auto_commit = ?' || updates[0] === 'model = ?' || updates[0] === 'skip_continue_next = ?');
+    const isOnlyToggleUpdate = updates.length === 1 && (updates[0] === 'is_favorite = ?' || updates[0] === 'auto_commit = ?' || updates[0] === 'model = ?' || updates[0] === 'skip_continue_next = ?' || updates[0] === 'commit_mode = ?' || updates[0] === 'commit_mode_settings = ?');
     if (!isOnlyToggleUpdate) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
     }

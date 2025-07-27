@@ -108,10 +108,10 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-modal-overlay flex items-center justify-center z-50">
+      <div className="bg-surface-primary rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-border-primary">
           <div className="flex items-center space-x-3">
             <img 
               src="/crystal-logo.svg" 
@@ -122,13 +122,13 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-text-primary">
               About Crystal
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-text-tertiary hover:text-text-secondary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -138,19 +138,19 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
         <div className="p-6 space-y-6">
           {/* App Info */}
           <div className="text-center space-y-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            <h3 className="text-lg font-medium text-text-primary">
               Crystal
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-text-secondary">
               Multi-Session Claude Code Manager
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500">
+            <p className="text-xs text-text-tertiary">
               Created by{' '}
               <a 
                 href="https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-interactive hover:underline"
               >
                 Stravu
               </a>
@@ -160,20 +160,20 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           {/* Version Info */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-medium text-text-secondary">
                 Current Version
               </span>
-              <span className="text-sm text-gray-900 dark:text-white font-mono">
+              <span className="text-sm text-text-primary font-mono">
                 {versionInfo?.current || 'Loading...'}
               </span>
             </div>
 
             {versionInfo?.workingDirectory && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-text-secondary">
                   Working Directory
                 </span>
-                <span className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={versionInfo.workingDirectory}>
+                <span className="text-sm text-text-primary font-mono truncate max-w-[200px]" title={versionInfo.workingDirectory}>
                   {versionInfo.workingDirectory.split('/').pop() || versionInfo.workingDirectory}
                 </span>
               </div>
@@ -192,10 +192,10 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
             {versionInfo?.gitCommit && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-text-secondary">
                   Git Commit
                 </span>
-                <span className="text-sm text-gray-900 dark:text-white font-mono">
+                <span className="text-sm text-text-primary font-mono">
                   {versionInfo.gitCommit}
                 </span>
               </div>
@@ -203,26 +203,26 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
             {versionInfo?.buildDate && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-text-secondary">
                   Build Date
                 </span>
-                <span className="text-sm text-gray-900 dark:text-white">
+                <span className="text-sm text-text-primary">
                   {formatDateTime(versionInfo.buildDate)}
                 </span>
               </div>
             )}
 
             {versionInfo?.hasUpdate && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="bg-interactive/10 border border-interactive/30 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
-                  <Download className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <Download className="w-5 h-5 text-interactive mt-0.5 flex-shrink-0" />
                   <div className="flex-1 space-y-3">
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      <p className="text-sm font-medium text-interactive">
                         Update Available: v{versionInfo.latest}
                       </p>
                       {versionInfo.publishedAt && (
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                        <p className="text-xs text-interactive/80">
                           Released {formatDate(versionInfo.publishedAt)}
                         </p>
                       )}
@@ -230,7 +230,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         onClick={() => setShowUpdateDialog(true)}
-                        className="inline-flex items-center justify-center space-x-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+                        className="inline-flex items-center justify-center space-x-2 px-3 py-1.5 bg-interactive hover:bg-interactive-hover text-on-interactive text-sm font-medium rounded-md transition-colors"
                       >
                         <Download className="w-4 h-4" />
                         <span>Download Update</span>
@@ -240,7 +240,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                           href={versionInfo.releaseUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center space-x-1 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                          className="inline-flex items-center justify-center space-x-1 px-3 py-1.5 text-sm text-interactive hover:underline"
                         >
                           <span>View Release Notes</span>
                           <ExternalLink className="w-3 h-3" />
@@ -253,14 +253,14 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             )}
 
             {!versionInfo?.hasUpdate && versionInfo?.current && !isChecking && (
-              <div className="flex items-center space-x-2 text-sm text-green-600 dark:text-green-400">
+              <div className="flex items-center space-x-2 text-sm text-status-success">
                 <Check className="w-4 h-4" />
                 <span>You're running the latest version</span>
               </div>
             )}
 
             {error && (
-              <div className="flex items-center space-x-2 text-sm text-red-600 dark:text-red-400">
+              <div className="flex items-center space-x-2 text-sm text-status-error">
                 <AlertCircle className="w-4 h-4" />
                 <span>{error}</span>
               </div>
@@ -270,7 +270,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <button
               onClick={checkForUpdates}
               disabled={isChecking}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors"
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-interactive hover:bg-interactive-hover disabled:bg-interactive/50 text-on-interactive text-sm font-medium rounded-lg transition-colors"
             >
               {isChecking ? (
                 <>
@@ -287,7 +287,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           </div>
 
           {/* Discord Community Button */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-4 border-t border-border-primary">
             <a
               href="https://discord.gg/XrVa6q7DPY"
               target="_blank"
@@ -307,8 +307,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               href="https://github.com/stravu/crystal"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
+              className="flex items-center justify-between w-full text-sm text-text-secondary hover:text-text-primary transition-colors">
               <span>View on GitHub</span>
               <ExternalLink className="w-4 h-4" />
             </a>
@@ -316,16 +315,15 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               href="https://docs.anthropic.com/en/docs/claude-code"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
+              className="flex items-center justify-between w-full text-sm text-text-secondary hover:text-text-primary transition-colors">
               <span>Claude Code Documentation</span>
               <ExternalLink className="w-4 h-4" />
             </a>
           </div>
 
           {/* Disclaimer */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">
+          <div className="pt-4 border-t border-border-primary">
+            <p className="text-xs text-text-tertiary leading-relaxed">
               Crystal is an independent project created by Stravu. Claude™ is a trademark of Anthropic, PBC. 
               Crystal is not affiliated with, endorsed by, or sponsored by Anthropic.
             </p>

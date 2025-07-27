@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 interface LoadingSpinnerProps {
   text?: string;
@@ -6,7 +7,7 @@ interface LoadingSpinnerProps {
   className?: string;
 }
 
-export function LoadingSpinner({ text = 'Loading...', size = 'medium', className = '' }: LoadingSpinnerProps) {
+export function LoadingSpinner({ text = 'Loading...', size = 'medium', className }: LoadingSpinnerProps) {
   const sizeClasses = {
     small: 'w-4 h-4',
     medium: 'w-6 h-6',
@@ -20,9 +21,9 @@ export function LoadingSpinner({ text = 'Loading...', size = 'medium', className
   };
 
   return (
-    <div className={`flex items-center justify-center gap-3 ${className}`}>
-      <Loader2 className={`${sizeClasses[size]} animate-spin text-blue-500`} />
-      <span className={`text-gray-600 dark:text-gray-400 ${textSizeClasses[size]}`}>{text}</span>
+    <div className={cn('flex items-center justify-center gap-3', className)}>
+      <Loader2 className={cn(sizeClasses[size], 'animate-spin text-interactive')} />
+      <span className={cn('text-text-tertiary', textSizeClasses[size])}>{text}</span>
     </div>
   );
 }

@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { GitCommit, Shield, Zap, AlertTriangle, Info } from 'lucide-react';
 import type { CommitMode, CommitModeSettings, ProjectCharacteristics } from '../../../shared/types';
 import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE, DEFAULT_COMMIT_MODE_SETTINGS } from '../../../shared/types';
+import { Card } from './ui/Card';
+import { Badge } from './ui/Badge';
+import { Input } from './ui/Input';
+import { Textarea } from './ui/Textarea';
+import { Checkbox } from './ui/Input';
+import { cn } from '../utils/cn';
 
 interface CommitModeSettingsProps {
   projectId?: number;
@@ -84,16 +90,16 @@ export function CommitModeSettings({
     <div className={`space-y-4 ${className}`}>
       {/* Mode Selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-text-primary mb-2">
           Commit Mode
         </label>
         
         {/* Recommendation Banner */}
         {characteristics && !loadingCharacteristics && (
-          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <Card variant="bordered" className="mb-3 bg-interactive/10 border-interactive/30" padding="sm">
             <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-700 dark:text-blue-300">
+              <Info className="w-4 h-4 text-interactive mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-interactive">
                 <p className="font-medium">Recommended: {characteristics.suggestedMode} mode</p>
                 <p className="text-xs mt-1 opacity-90">
                   {characteristics.hasHusky && 'Pre-commit hooks detected (.husky). '}
@@ -104,138 +110,169 @@ export function CommitModeSettings({
                 </p>
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         <div className="space-y-2">
           {/* Structured Mode */}
-          <label className="relative flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            <input
-              type="radio"
-              name="commitMode"
-              value="structured"
-              checked={localSettings.mode === 'structured'}
-              onChange={() => handleModeChange('structured')}
-              className="mt-1 mr-3"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Structured Mode</span>
-                {characteristics?.suggestedMode === 'structured' && (
-                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
-                    Recommended
-                  </span>
-                )}
+          <Card 
+            variant="interactive"
+            className={cn(
+              "cursor-pointer transition-all",
+              localSettings.mode === 'structured' 
+                ? "bg-interactive/10 border-interactive" 
+                : "hover:border-interactive/30"
+            )}
+            onClick={() => handleModeChange('structured')}
+            padding="md"
+          >
+            <label className="relative flex items-start cursor-pointer">
+              <input
+                type="radio"
+                name="commitMode"
+                value="structured"
+                checked={localSettings.mode === 'structured'}
+                onChange={() => handleModeChange('structured')}
+                className="mt-1 mr-3 text-interactive focus:ring-interactive"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-interactive" />
+                  <span className="font-medium text-text-primary">Structured Mode</span>
+                  {characteristics?.suggestedMode === 'structured' && (
+                    <Badge variant="primary" size="sm">
+                      Recommended
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  Claude creates commits with proper messages. Respects pre-commit hooks and project conventions.
+                </p>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Claude creates commits with proper messages. Respects pre-commit hooks and project conventions.
-              </p>
-            </div>
-          </label>
+            </label>
+          </Card>
 
           {/* Checkpoint Mode */}
-          <label className="relative flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            <input
-              type="radio"
-              name="commitMode"
-              value="checkpoint"
-              checked={localSettings.mode === 'checkpoint'}
-              onChange={() => handleModeChange('checkpoint')}
-              className="mt-1 mr-3"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Checkpoint Mode</span>
-                {characteristics?.suggestedMode === 'checkpoint' && (
-                  <span className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded">
-                    Recommended
-                  </span>
-                )}
+          <Card 
+            variant="interactive"
+            className={cn(
+              "cursor-pointer transition-all",
+              localSettings.mode === 'checkpoint' 
+                ? "bg-status-success/10 border-status-success" 
+                : "hover:border-status-success/30"
+            )}
+            onClick={() => handleModeChange('checkpoint')}
+            padding="md"
+          >
+            <label className="relative flex items-start cursor-pointer">
+              <input
+                type="radio"
+                name="commitMode"
+                value="checkpoint"
+                checked={localSettings.mode === 'checkpoint'}
+                onChange={() => handleModeChange('checkpoint')}
+                className="mt-1 mr-3 text-status-success focus:ring-status-success"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-status-success" />
+                  <span className="font-medium text-text-primary">Checkpoint Mode</span>
+                  {characteristics?.suggestedMode === 'checkpoint' && (
+                    <Badge variant="success" size="sm">
+                      Recommended
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  Auto-commit after each prompt. Fast and simple, bypasses hooks with --no-verify.
+                </p>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Auto-commit after each prompt. Fast and simple, bypasses hooks with --no-verify.
-              </p>
-            </div>
-          </label>
+            </label>
+          </Card>
 
           {/* Disabled Mode */}
-          <label className="relative flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            <input
-              type="radio"
-              name="commitMode"
-              value="disabled"
-              checked={localSettings.mode === 'disabled'}
-              onChange={() => handleModeChange('disabled')}
-              className="mt-1 mr-3"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <GitCommit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Disabled Mode</span>
+          <Card 
+            variant="interactive"
+            className={cn(
+              "cursor-pointer transition-all",
+              localSettings.mode === 'disabled' 
+                ? "bg-surface-tertiary border-border-secondary" 
+                : "hover:border-border-primary"
+            )}
+            onClick={() => handleModeChange('disabled')}
+            padding="md"
+          >
+            <label className="relative flex items-start cursor-pointer">
+              <input
+                type="radio"
+                name="commitMode"
+                value="disabled"
+                checked={localSettings.mode === 'disabled'}
+                onChange={() => handleModeChange('disabled')}
+                className="mt-1 mr-3 text-text-tertiary focus:ring-text-tertiary"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <GitCommit className="w-4 h-4 text-text-muted" />
+                  <span className="font-medium text-text-primary">Disabled Mode</span>
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  No auto-commits. You handle all commits manually.
+                </p>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                No auto-commits. You handle all commits manually.
-              </p>
-            </div>
-          </label>
+            </label>
+          </Card>
         </div>
       </div>
 
       {/* Warning for checkpoint mode */}
       {showWarning && localSettings.mode === 'checkpoint' && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+        <Card variant="bordered" className="bg-status-warning/10 border-status-warning/30" padding="sm">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="w-4 h-4 text-status-warning mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-status-warning">
               <p className="font-medium">Warning: Pre-commit hooks detected</p>
-              <p className="text-xs mt-1">
+              <p className="text-xs mt-1 opacity-90">
                 Checkpoint commits will bypass pre-commit hooks. This may cause CI failures.
                 Consider using Structured mode for this project.
               </p>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Mode-specific settings */}
       {localSettings.mode === 'structured' && (
         <div className="space-y-3 pt-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Commit Prompt Template
-            </label>
-            <textarea
-              value={localSettings.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE}
-              onChange={(e) => handleSettingChange('structuredPromptTemplate', e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 text-sm"
-              placeholder="Instructions for Claude on how to commit..."
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              This will be appended to Claude's prompts to guide commit behavior.
-            </p>
-          </div>
+          <Textarea
+            label="Commit Prompt Template"
+            value={localSettings.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE}
+            onChange={(e) => handleSettingChange('structuredPromptTemplate', e.target.value)}
+            rows={4}
+            placeholder="Instructions for Claude on how to commit..."
+            helperText="This will be appended to Claude's prompts to guide commit behavior."
+            fullWidth
+          />
 
+          <Checkbox
+            id="allowClaudeTools"
+            label="Allow Claude to run tools (e.g., pnpm changeset)"
+            checked={localSettings.allowClaudeTools || false}
+            onChange={(e) => handleSettingChange('allowClaudeTools', e.target.checked)}
+          />
         </div>
       )}
 
       {localSettings.mode === 'checkpoint' && (
         <div className="pt-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Commit Prefix
-          </label>
-          <input
-            type="text"
+          <Input
+            label="Commit Prefix"
             value={localSettings.checkpointPrefix || DEFAULT_COMMIT_MODE_SETTINGS.checkpointPrefix}
             onChange={(e) => handleSettingChange('checkpointPrefix', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
             placeholder="checkpoint: "
+            helperText="Prefix for automatic checkpoint commits."
+            fullWidth
           />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Prefix for automatic checkpoint commits.
-          </p>
         </div>
       )}
     </div>

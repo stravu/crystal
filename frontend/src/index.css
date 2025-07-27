@@ -1,5 +1,8 @@
 /* Import markdown styles - must come first */
-@import './styles/markdown.css';
+/* Removed conflicting markdown.css - using markdown-preview.css instead */
+
+/* Import design tokens - must come before Tailwind */
+@import './styles/tokens.css';
 
 @tailwind base;
 @tailwind components;
@@ -17,14 +20,14 @@ body {
   overflow: hidden;
 }
 
-/* Light mode body colors */
+/* Body colors using design tokens */
 body {
-  @apply bg-white text-gray-900;
+  @apply bg-bg-primary text-text-primary;
 }
 
-/* Dark mode body colors */
-body.dark {
-  @apply bg-gray-900 text-gray-100;
+/* Apply light theme when body has light class */
+body.light {
+  @apply bg-bg-primary text-text-primary;
 }
 
 /* Scrollbar styling */
@@ -33,31 +36,62 @@ body.dark {
   height: 8px;
 }
 
-/* Light mode scrollbar */
+/* Scrollbar styling with design tokens */
 ::-webkit-scrollbar-track {
-  @apply bg-gray-200;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-400;
+  @apply bg-border-secondary;
   border-radius: 4px;
+  transition: background-color 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+  @apply bg-border-primary;
 }
 
-/* Dark mode scrollbar */
-.dark ::-webkit-scrollbar-track {
-  @apply bg-gray-800;
+/* Firefox scrollbar support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-secondary) transparent;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  @apply bg-gray-600;
+/* Custom scrollbar classes for Rich Output */
+.scrollbar-thin {
+  scrollbar-width: thin;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+.scrollbar-thumb-border-secondary {
+  scrollbar-color: var(--color-border-secondary) transparent;
+}
+
+.scrollbar-thumb-border-primary {
+  scrollbar-color: var(--color-border-primary) transparent;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) - Rich Output specific */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-secondary);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-primary);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-tertiary);
 }
 
 /* Custom animations for the working indicator */
@@ -67,6 +101,17 @@ body.dark {
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
@@ -95,6 +140,21 @@ body.dark {
 
 .xterm .xterm-screen {
   margin: 6px;
+}
+
+/* Terminal specific styling */
+.xterm {
+  height: 100%;
+  width: 100%;
+}
+
+.xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* Ensure terminal text uses our color tokens */
+.xterm .xterm-screen canvas {
+  image-rendering: crisp-edges;
 }
 
 /* Custom animations for UX improvements */
@@ -158,4 +218,199 @@ body.dark {
 
 .pill-activate {
   animation: pillActivate 0.2s ease-out;
+}
+
+/* Rich Output thinking content styling */
+.thinking-content p {
+  @apply mb-1.5 text-sm;
+  color: inherit;
+}
+
+.thinking-content p:last-child {
+  @apply mb-0;
+}
+
+.thinking-content ul,
+.thinking-content ol {
+  @apply mb-1.5 text-sm;
+  color: inherit;
+}
+
+.thinking-content li {
+  @apply mb-0.5;
+}
+
+.thinking-content code {
+  @apply text-xs;
+  opacity: 0.85;
+}
+
+.thinking-content pre {
+  @apply text-xs mb-1.5;
+  opacity: 0.85;
+}
+
+.thinking-content blockquote {
+  color: inherit;
+  border-color: rgba(var(--color-interactive-rgb), 0.2);
+  @apply pl-3 py-1;
+}
+
+/* Markdown list styling fixes */
+.markdown-preview ol,
+.rich-output-markdown ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+}
+
+.markdown-preview ul,
+.rich-output-markdown ul {
+  list-style-type: disc;
+  list-style-position: outside;
+}
+
+.markdown-preview ol ol,
+.rich-output-markdown ol ol {
+  list-style-type: lower-alpha;
+}
+
+.markdown-preview ul ul,
+.rich-output-markdown ul ul {
+  list-style-type: circle;
+}
+
+.markdown-preview li > p,
+.rich-output-markdown li > p {
+  display: inline;
+  margin-bottom: 0;
+}
+
+.markdown-preview li > p:only-child,
+.rich-output-markdown li > p:only-child {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* Keep list items as block-level but allow inline content flow */
+.markdown-preview li,
+.rich-output-markdown li {
+  display: list-item;
+}
+
+/* Ensure strong/bold text flows inline */
+.markdown-preview li strong,
+.rich-output-markdown li strong {
+  display: inline;
+}
+
+.markdown-preview li > ol,
+.markdown-preview li > ul,
+.rich-output-markdown li > ol,
+.rich-output-markdown li > ul {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+/* Interactive text utilities */
+.text-interactive {
+  color: var(--color-interactive-text);
+  transition: color 150ms ease-in-out;
+}
+
+.text-interactive-hover:hover {
+  color: var(--color-interactive-hover);
+}
+
+/* High-contrast interactive text for dark backgrounds */
+.text-interactive-on-dark {
+  color: var(--color-text-interactive-on-dark);
+  transition: all 150ms ease-in-out;
+}
+
+.text-interactive-on-dark:hover {
+  color: var(--color-text-interactive-on-dark-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.text-interactive-on-dark:active {
+  color: var(--color-text-interactive-on-dark-active);
+}
+
+.text-interactive-on-dark:focus-visible {
+  color: var(--color-text-interactive-on-dark-focus);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Prompt navigation highlight effect */
+@keyframes highlightPrompt {
+  0% {
+    background-color: var(--color-interactive);
+    opacity: 0.3;
+  }
+  50% {
+    background-color: var(--color-interactive);
+    opacity: 0.5;
+  }
+  100% {
+    background-color: transparent;
+    opacity: 1;
+  }
+}
+
+.highlight-prompt {
+  animation: highlightPrompt 2s ease-out;
+  position: relative;
+}
+
+.highlight-prompt::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--color-interactive);
+  border-radius: 8px;
+  pointer-events: none;
+  animation: highlightPrompt 2s ease-out;
+}
+
+/* Monaco Editor CSS Variable Overrides */
+
+/* Dark theme overrides */
+:root.dark {
+  --vscode-editor-background: #111827 !important; /* gray-900 */
+  --vscode-editor-foreground: #f3f4f6 !important; /* gray-100 */
+  --vscode-editorWidget-background: #111827 !important;
+  --vscode-editorWidget-foreground: #f3f4f6 !important;
+  --vscode-diffEditor-insertedTextBackground: #10b98120 !important;
+  --vscode-diffEditor-removedTextBackground: #ef444420 !important;
+  --vscode-diffEditor-insertedLineBackground: #10b98115 !important;
+  --vscode-diffEditor-removedLineBackground: #ef444415 !important;
+}
+
+/* Light theme overrides */
+:root:not(.dark) {
+  --vscode-editor-background: #ffffff !important; /* white */
+  --vscode-editor-foreground: #1e2026 !important; /* gray-900 */
+  --vscode-editorWidget-background: #ffffff !important;
+  --vscode-editorWidget-foreground: #1e2026 !important;
+  --vscode-diffEditor-insertedTextBackground: #16a34a15 !important;
+  --vscode-diffEditor-removedTextBackground: #dc262615 !important;
+  --vscode-diffEditor-insertedLineBackground: #16a34a10 !important;
+  --vscode-diffEditor-removedLineBackground: #dc262610 !important;
+}
+
+/* Additional Monaco editor style overrides */
+.monaco-editor,
+.monaco-diff-editor,
+.monaco-editor-background,
+.monaco-editor .margin,
+.monaco-editor .monaco-editor-background {
+  background-color: var(--vscode-editor-background) !important;
+}
+
+.monaco-editor .view-overlays,
+.monaco-editor .margin-view-overlays {
+  background: transparent !important;
 }

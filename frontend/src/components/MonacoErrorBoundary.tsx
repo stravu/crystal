@@ -51,7 +51,7 @@ export class MonacoErrorBoundary extends Component<MonacoErrorBoundaryProps, Mon
       // Show a brief loading state while auto-recovering
       return (
         <div className="flex items-center justify-center h-full p-8">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-2 text-text-tertiary">
             <RefreshCw className="w-5 h-5 animate-spin" />
             <span>Reloading editor...</span>
           </div>
