@@ -15,8 +15,6 @@ import { CommitMessageDialog } from './session/CommitMessageDialog';
 import { FileEditor } from './FileEditor';
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
-import { Button } from './ui/Button';
-import { Card, CardContent } from './ui/Card';
 import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
 import { RichOutputSettings } from './session/RichOutputView';
 import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
@@ -239,8 +237,8 @@ export const SessionView = memo(() => {
           </div>
           <div className={`h-full ${hook.viewMode === 'dashboard' ? 'block' : 'hidden'}`}>
             <ProjectDashboard 
-              sessionId={activeSession.id}
               projectId={activeSession.projectId || 0}
+              projectName={sessionProject?.name || 'Unknown Project'}
             />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>

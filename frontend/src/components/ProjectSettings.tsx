@@ -3,7 +3,7 @@ import { Save, Trash2, FolderIcon, GitBranch, Settings, Code2, BrainCircuit } fr
 import { API } from '../utils/api';
 import type { Project } from '../types/project';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
-import { Textarea } from './ui/Input';
+import { Input, Textarea } from './ui/Input';
 import { Button } from './ui/Button';
 import { EnhancedInput } from './ui/EnhancedInput';
 import { FieldWithTooltip } from './ui/FieldWithTooltip';

@@ -24,6 +24,8 @@ interface SessionHeaderProps {
   gitCommands: GitCommands | null;
   handleSquashAndRebaseToMain: () => void;
   handleOpenIDE: () => void;
+  isOpeningIDE: boolean;
+  hasIdeCommand: boolean;
   mergeError: string | null;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -56,6 +58,8 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   gitCommands,
   handleSquashAndRebaseToMain,
   handleOpenIDE,
+  isOpeningIDE,
+  hasIdeCommand,
   mergeError,
   viewMode,
   setViewMode,
@@ -104,12 +108,12 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
     },
     {
       id: 'open-ide',
-      label: 'Open in IDE',
+      label: isOpeningIDE ? 'Opening...' : 'Open in IDE',
       icon: Code2,
       onClick: handleOpenIDE,
-      disabled: activeSession.status === 'initializing',
+      disabled: activeSession.status === 'initializing' || isOpeningIDE || !hasIdeCommand,
       variant: 'default' as const,
-      description: 'Open the worktree in your default IDE'
+      description: hasIdeCommand ? 'Open the worktree in your default IDE' : 'No IDE command configured'
     }
   ];
 
