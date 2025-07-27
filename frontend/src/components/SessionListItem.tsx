@@ -345,7 +345,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
           'w-full text-left rounded-md flex items-center space-x-2 transition-all group',
           isNested ? 'px-2 py-1.5 text-sm' : 'px-3 py-2',
           isActive 
-            ? 'bg-interactive/20 text-text-primary shadow-sm ring-1 ring-interactive/30' 
+            ? 'bg-interactive/20 text-text-primary shadow-sm ring-1 ring-interactive/20 dark:ring-interactive/30' 
             : 'hover:bg-surface-hover text-text-secondary hover:shadow-sm'
         )}
         onContextMenu={handleContextMenu}

@@ -259,7 +259,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     }
   }, []);
 
-  const handleBeforeMount = useCallback((monaco: any) => {
+  const handleBeforeMount = useCallback((_monaco: any) => {
     // Temporarily commented out to test built-in themes
     // // Define custom themes before the editor mounts
     // monaco.editor.defineTheme('crystal-dark', {

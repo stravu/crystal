@@ -191,8 +191,8 @@ export function Dropdown({
             'backdrop-blur-sm',
             // Enhanced animations based on position
             actualPosition.includes('top') ? 'animate-dropdown-enter-up' : 'animate-dropdown-enter',
-            // Add atmospheric layering
-            'ring-1 ring-white/5',
+            // Add atmospheric layering with subtle ring in dark mode
+            'ring-1 ring-border-secondary/30 dark:ring-white/5',
             // Match pill button radius exactly
             'overflow-hidden',
             positionClasses[actualPosition],

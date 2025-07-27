@@ -12,24 +12,24 @@ export interface PillProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const pillVariants = {
   default: {
-    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-tactile hover:shadow-tactile-hover border border-border-interactive-subtle hover:border-border-interactive',
-    active: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover shadow-tactile-hover border border-interactive-hover',
+    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-sm hover:shadow-md border border-border-interactive-subtle hover:border-border-interactive',
+    active: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover shadow-md border border-interactive-hover',
   },
   active: {
-    base: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover shadow-tactile-hover border border-interactive-hover',
-    active: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover shadow-tactile-hover border border-interactive-hover',
+    base: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover shadow-md border border-interactive-hover',
+    active: 'bg-interactive text-text-on-interactive hover:bg-interactive-hover shadow-md border border-interactive-hover',
   },
   success: {
-    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-tactile hover:shadow-tactile-hover border border-border-interactive-subtle hover:border-border-interactive',
-    active: 'bg-status-success text-text-on-status-success hover:bg-status-success-hover shadow-tactile-hover border border-status-success',
+    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-sm hover:shadow-md border border-border-interactive-subtle hover:border-border-interactive',
+    active: 'bg-status-success text-text-on-status-success hover:bg-status-success-hover shadow-md border border-status-success',
   },
   warning: {
-    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-tactile hover:shadow-tactile-hover border border-border-interactive-subtle hover:border-border-interactive',
-    active: 'bg-status-warning text-text-on-status-warning hover:bg-status-warning-hover shadow-tactile-hover border border-status-warning',
+    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-sm hover:shadow-md border border-border-interactive-subtle hover:border-border-interactive',
+    active: 'bg-status-warning text-text-on-status-warning hover:bg-status-warning-hover shadow-md border border-status-warning',
   },
   danger: {
-    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-tactile hover:shadow-tactile-hover border border-border-interactive-subtle hover:border-border-interactive',
-    active: 'bg-status-error text-text-on-status-error hover:bg-status-error-hover shadow-tactile-hover border border-status-error',
+    base: 'bg-surface-interactive text-text-secondary hover:bg-surface-interactive-hover hover:text-text-primary shadow-sm hover:shadow-md border border-border-interactive-subtle hover:border-border-interactive',
+    active: 'bg-status-error text-text-on-status-error hover:bg-status-error-hover shadow-md border border-status-error',
   },
 };
 

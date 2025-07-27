@@ -72,9 +72,9 @@
   --color-text-disabled: var(--gray-500);
   
   /* Semantic Tokens - Borders */
-  --color-border-primary: var(--gray-700);
-  --color-border-secondary: var(--gray-600);
-  --color-border-hover: var(--gray-500);
+  --color-border-primary: var(--gray-750);
+  --color-border-secondary: var(--gray-700);
+  --color-border-hover: var(--gray-600);
   --color-border-focus: var(--blue-500);
   
   /* Semantic Tokens - Interactive */

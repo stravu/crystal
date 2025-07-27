@@ -51,9 +51,9 @@
   --dropdown-shadow: var(--shadow-lg);
   
   /* Interactive shadows for depth and tactile feel */
-  --shadow-tactile: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-  --shadow-tactile-hover: 0 2px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.30);
-  --shadow-tactile-active: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-tactile: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-tactile-hover: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-tactile-active: inset 0 1px 2px rgba(0, 0, 0, 0.05);
   
   /* Dropdown specific shadows - enhanced for visual cohesion */
   --shadow-dropdown-elevated: 0 8px 25px rgba(0, 0, 0, 0.15), 0 3px 10px rgba(0, 0, 0, 0.1);
