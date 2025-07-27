@@ -966,8 +966,28 @@ export const useSessionView = (
   }, [activeSession?.status, viewMode]);
 
   useEffect(() => {
-    if (terminalInstance.current) terminalInstance.current.options.theme = getTerminalTheme();
-    if (scriptTerminalInstance.current) scriptTerminalInstance.current.options.theme = getScriptTerminalTheme();
+    // Add a small delay to ensure CSS has propagated
+    const timer = setTimeout(() => {
+      console.log('[Terminal Theme Update] Theme changed to:', theme);
+      console.log('[Terminal Theme Update] Root classes:', document.documentElement.className);
+      
+      if (terminalInstance.current) {
+        const newTheme = getTerminalTheme();
+        console.log('[Terminal Theme Update] New terminal theme:', newTheme);
+        terminalInstance.current.options.theme = newTheme;
+        // Force refresh to apply new colors
+        terminalInstance.current.refresh(0, terminalInstance.current.rows - 1);
+      }
+      if (scriptTerminalInstance.current) {
+        const newScriptTheme = getScriptTerminalTheme();
+        console.log('[Terminal Theme Update] New script terminal theme:', newScriptTheme);
+        scriptTerminalInstance.current.options.theme = newScriptTheme;
+        // Force refresh to apply new colors
+        scriptTerminalInstance.current.refresh(0, scriptTerminalInstance.current.rows - 1);
+      }
+    }, 50); // Small delay to ensure CSS updates have propagated
+    
+    return () => clearTimeout(timer);
   }, [theme]);
 
   useEffect(() => {

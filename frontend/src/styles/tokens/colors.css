@@ -185,25 +185,25 @@
   --color-scrollbar-thumb-hover: var(--gray-500);
   
   /* Terminal Colors - Dark Theme */
-  --color-terminal-bg: var(--gray-900);
-  --color-terminal-fg: var(--gray-100);
-  --color-terminal-cursor: var(--blue-400);
-  --color-terminal-black: var(--gray-900);
-  --color-terminal-red: #ef4444;
-  --color-terminal-green: #22c55e;
-  --color-terminal-yellow: #eab308;
-  --color-terminal-blue: #3b82f6;
-  --color-terminal-magenta: #a855f7;
-  --color-terminal-cyan: #06b6d4;
-  --color-terminal-white: var(--gray-100);
-  --color-terminal-bright-black: var(--gray-600);
-  --color-terminal-bright-red: #f87171;
-  --color-terminal-bright-green: #4ade80;
-  --color-terminal-bright-yellow: #facc15;
-  --color-terminal-bright-blue: #60a5fa;
-  --color-terminal-bright-magenta: #c084fc;
-  --color-terminal-bright-cyan: #22d3ee;
-  --color-terminal-bright-white: #ffffff;
+  --color-terminal-bg: rgb(17 24 39);              /* gray-900 */
+  --color-terminal-fg: rgb(243 244 246);           /* gray-100 */
+  --color-terminal-cursor: rgb(96 165 250);        /* blue-400 */
+  --color-terminal-black: rgb(17 24 39);           /* gray-900 */
+  --color-terminal-red: rgb(239 68 68);            /* red-500 */
+  --color-terminal-green: rgb(34 197 94);          /* green-500 */
+  --color-terminal-yellow: rgb(234 179 8);         /* yellow-500 */
+  --color-terminal-blue: rgb(59 130 246);          /* blue-500 */
+  --color-terminal-magenta: rgb(168 85 247);       /* purple-500 */
+  --color-terminal-cyan: rgb(6 182 212);           /* cyan-500 */
+  --color-terminal-white: rgb(243 244 246);        /* gray-100 */
+  --color-terminal-bright-black: rgb(75 85 99);    /* gray-600 */
+  --color-terminal-bright-red: rgb(248 113 113);   /* red-400 */
+  --color-terminal-bright-green: rgb(74 222 128);  /* green-400 */
+  --color-terminal-bright-yellow: rgb(250 204 21); /* yellow-400 */
+  --color-terminal-bright-blue: rgb(96 165 250);   /* blue-400 */
+  --color-terminal-bright-magenta: rgb(192 132 252); /* purple-400 */
+  --color-terminal-bright-cyan: rgb(34 211 238);   /* cyan-400 */
+  --color-terminal-bright-white: rgb(255 255 255); /* white */
 }
 
 /* Light Theme */
@@ -335,23 +335,23 @@
   --color-scrollbar-thumb-hover: var(--lilac-300);
   
   /* Terminal Colors - Light Theme */
-  --color-terminal-bg: var(--warm-white);
-  --color-terminal-fg: var(--color-text-primary);
+  --color-terminal-bg: rgb(255 255 255);           /* Pure white background */
+  --color-terminal-fg: rgb(30 32 38);              /* Dark gray text */
   --color-terminal-cursor: var(--lilac-500);
-  --color-terminal-black: var(--color-text-primary);
+  --color-terminal-black: rgb(30 32 38);           /* Dark gray instead of black */
   --color-terminal-red: rgb(220 38 38);
   --color-terminal-green: rgb(22 163 74);
   --color-terminal-yellow: rgb(217 119 6);
-  --color-terminal-blue: var(--lilac-600);
+  --color-terminal-blue: rgb(79 70 229);           /* Darker blue for better contrast */
   --color-terminal-magenta: rgb(147 51 234);
   --color-terminal-cyan: rgb(8 145 178);
-  --color-terminal-white: var(--color-text-secondary);
-  --color-terminal-bright-black: var(--color-text-tertiary);
+  --color-terminal-white: rgb(249 250 251);        /* Off-white */
+  --color-terminal-bright-black: rgb(107 114 128); /* Medium gray */
   --color-terminal-bright-red: rgb(239 68 68);
   --color-terminal-bright-green: rgb(34 197 94);
   --color-terminal-bright-yellow: rgb(245 158 11);
-  --color-terminal-bright-blue: var(--lilac-500);
-  --color-terminal-bright-magenta: var(--lilac-400);
+  --color-terminal-bright-blue: rgb(99 102 241);   /* Indigo for contrast */
+  --color-terminal-bright-magenta: rgb(168 85 247);
   --color-terminal-bright-cyan: rgb(6 182 212);
-  --color-terminal-bright-white: var(--color-text-primary);
+  --color-terminal-bright-white: rgb(243 244 246); /* Light gray */
 }

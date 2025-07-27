@@ -26,11 +26,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const body = document.body;
     
     if (theme === 'light') {
+      root.classList.remove('dark');
       root.classList.add('light');
+      body.classList.remove('dark');
       body.classList.add('light');
     } else {
       root.classList.remove('light');
+      root.classList.add('dark');
       body.classList.remove('light');
+      body.classList.add('dark');
     }
     
     // Save preference

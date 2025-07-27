@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Save, Trash2, FolderIcon, GitBranch, Settings, Code2, BrainCircuit, X } from 'lucide-react';
+import { Save, Trash2, FolderIcon, GitBranch, Settings, Code2, BrainCircuit } from 'lucide-react';
 import { API } from '../utils/api';
 import type { Project } from '../types/project';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
-import { Input, Textarea } from './ui/Input';
-import { Button, IconButton } from './ui/Button';
+import { Textarea } from './ui/Input';
+import { Button } from './ui/Button';
 import { EnhancedInput } from './ui/EnhancedInput';
 import { FieldWithTooltip } from './ui/FieldWithTooltip';
 import { Card } from './ui/Card';
@@ -100,28 +100,22 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       <ModalHeader 
         title="Project Settings" 
         icon={<Settings className="w-5 h-5" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || !name || !path}
-              variant="primary"
-              size="sm"
-              icon={<Save className="w-4 h-4" />}
-              loading={isSaving}
-              loadingText="Saving..."
-            >
-              Save Changes
-            </Button>
-            <IconButton
-              onClick={onClose}
-              aria-label="Close"
-              size="sm"
-              icon={<X className="w-4 h-4" />}
-            />
-          </div>
-        }
-      />
+        onClose={onClose}
+      >
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || !name || !path}
+            variant="primary"
+            size="sm"
+            icon={<Save className="w-4 h-4" />}
+            loading={isSaving}
+            loadingText="Saving..."
+          >
+            Save Changes
+          </Button>
+        </div>
+      </ModalHeader>
 
       <ModalBody>
         {error && (

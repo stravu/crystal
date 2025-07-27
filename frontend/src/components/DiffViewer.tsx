@@ -3,6 +3,7 @@ import { MonacoDiffViewer } from './MonacoDiffViewer';
 import { FileText, ChevronRight, ChevronDown } from 'lucide-react';
 import type { DiffViewerProps } from '../types/diff';
 import type { FileDiff } from '../types/diff';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Parse unified diff format to extract individual file diffs
 const parseUnifiedDiff = (diff: string): FileDiff[] => {
@@ -136,6 +137,7 @@ export interface DiffViewerHandle {
 }
 
 const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, sessionId, className = '', onFileSave, isAllCommitsSelected = true, mainBranch = 'main' }, ref) => {
+  const { theme } = useTheme();
   const [viewType, setViewType] = useState<'split' | 'inline'>('split');
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [filesWithFullContent, setFilesWithFullContent] = useState<FileDiff[]>([]);
@@ -335,7 +337,7 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
     );
   }
 
-  const isDarkMode = document.documentElement.classList.contains('dark');
+  const isDarkMode = theme === 'dark';
   
   // Show loading state while fetching full content
   if (loadingFullContent && isAllCommitsSelected) {
