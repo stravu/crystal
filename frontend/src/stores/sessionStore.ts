@@ -318,12 +318,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     });
     
-    console.log(`[SessionStore] Processed outputs - stdout: ${stdOutputs.length}, json: ${jsonMessages.length}`);
     
     // Always update the sessions array
     const updatedSessions = state.sessions.map(session => {
       if (session.id === sessionId) {
-        console.log(`[SessionStore] Updating session ${sessionId} with outputs`);
         return { ...session, output: stdOutputs, jsonMessages };
       }
       return session;

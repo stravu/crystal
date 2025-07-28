@@ -225,13 +225,6 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       } else if (msg.type === 'assistant') {
         const segments: MessageSegment[] = [];
         
-        console.log('RichOutputView: Processing assistant message:', JSON.stringify({
-          hasText: !!msg.text,
-          hasMessage: !!msg.message,
-          hasContent: !!msg.message?.content,
-          contentLength: msg.message?.content?.length,
-          sample: msg.message?.content?.[0]
-        }, null, 2));
         
         // Check for direct text field first (some messages come this way)
         if (msg.text && typeof msg.text === 'string') {

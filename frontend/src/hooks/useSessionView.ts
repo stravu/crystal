@@ -211,7 +211,6 @@ export const useSessionView = (
       
       // Verify the outputs were set
       const verifySession = useSessionStore.getState().getActiveSession();
-      console.log(`[loadOutputContent] After setSessionOutputs - activeSession output: ${verifySession?.output?.length}, jsonMessages: ${verifySession?.jsonMessages?.length}`);
       
       setOutputLoadState('loaded');
       
@@ -390,7 +389,6 @@ export const useSessionView = (
     const hasMessages = activeSession.jsonMessages && activeSession.jsonMessages.length > 0;
     const isNewSession = activeSession.status === 'initializing' || (activeSession.status === 'running' && !hasOutput && !hasMessages);
     
-    console.log(`[useSessionView] Session ${activeSession.id} - hasOutput: ${hasOutput}, hasMessages: ${hasMessages}, isNewSession: ${isNewSession}`);
     
     if (isNewSession) {
       setIsWaitingForFirstOutput(true);
@@ -417,7 +415,6 @@ export const useSessionView = (
     }
     
     if (messageCount === 0 && outputCount === 0) {
-      console.log(`[useSessionView] No messages or output to format for session ${activeSession.id}`);
       return;
     }
 
@@ -475,7 +472,6 @@ export const useSessionView = (
     const hasOutput = (activeSession.output?.length || 0) > 0;
     const hasMessages = (activeSession.jsonMessages?.length || 0) > 0;
     
-    console.log(`[Output Load Effect] Session ${activeSession.id} - hasOutput: ${hasOutput}, hasMessages: ${hasMessages}, status: ${activeSession.status}`);
     
     // Check for stuck loading state and force reset if needed
     if (loadingRef.current && outputLoadState === 'idle') {
@@ -1429,16 +1425,13 @@ export const useSessionView = (
   
   const performSquashWithCommitMessage = async (message: string) => {
     if (!activeSession) return;
-    console.log(`[performSquashWithCommitMessage] Starting ${shouldSquash ? 'squash and rebase' : 'rebase'} for session ${activeSession.id}`);
     setIsMerging(true);
     setMergeError(null);
     setShowCommitMessageDialog(false);
     try {
-      console.log(`[performSquashWithCommitMessage] Calling API with shouldSquash: ${shouldSquash}`);
       const response = shouldSquash
         ? await API.sessions.squashAndRebaseToMain(activeSession.id, message)
         : await API.sessions.rebaseToMain(activeSession.id);
-      console.log(`[performSquashWithCommitMessage] API call completed`, response);
 
       if (!response.success) {
         if ((response as any).gitError) {
@@ -1456,10 +1449,8 @@ export const useSessionView = (
           setMergeError(response.error || `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`);
         }
       } else {
-        console.log(`[performSquashWithCommitMessage] Operation successful, checking for changes to rebase`);
         // Run this in the background and don't let it block the finally block
         API.sessions.hasChangesToRebase(activeSession.id).then(changesResponse => {
-          console.log(`[performSquashWithCommitMessage] hasChangesToRebase completed`, changesResponse);
           if (changesResponse.success) setHasChangesToRebase(changesResponse.data);
         }).catch(error => {
           console.error(`[performSquashWithCommitMessage] hasChangesToRebase failed`, error);
@@ -1469,7 +1460,6 @@ export const useSessionView = (
       console.error(`[performSquashWithCommitMessage] Error in try block`, error);
       setMergeError(error instanceof Error ? error.message : `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`);
     } finally {
-      console.log(`[performSquashWithCommitMessage] Finally block executing, setting isMerging to false`);
       setIsMerging(false);
     }
   };
