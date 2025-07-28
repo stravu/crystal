@@ -35,6 +35,7 @@ export function CollapsibleCard({
       )}
     >
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
           'w-full p-4 flex items-center gap-3 text-left hover:bg-surface-hover transition-colors',
