@@ -1,13 +1,12 @@
 import React from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
 import { cn } from '../../utils/cn';
-import { MessageSquare, GitCompare, Terminal, FileEdit, LayoutDashboard, Eye, Settings } from 'lucide-react';
+import { GitCompare, Terminal, FileEdit, LayoutDashboard, Eye, Settings } from 'lucide-react';
 
 interface ViewTabsProps {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   unreadActivity: {
-    messages: boolean;
     changes: boolean;
     terminal: boolean;
     editor: boolean;
@@ -15,7 +14,6 @@ interface ViewTabsProps {
     richOutput: boolean;
   };
   setUnreadActivity: (activity: any) => void;
-  jsonMessagesCount: number;
   isTerminalRunning: boolean;
   onSettingsClick?: () => void;
   showSettings?: boolean;
@@ -26,7 +24,6 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
   setViewMode,
   unreadActivity,
   setUnreadActivity,
-  jsonMessagesCount,
   isTerminalRunning,
   onSettingsClick,
   showSettings,
@@ -44,13 +41,6 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
       label: 'Output', 
       icon: <Eye className="w-4 h-4" />,
       activity: unreadActivity.richOutput 
-    },
-    { 
-      mode: 'messages', 
-      label: 'Messages', 
-      icon: <MessageSquare className="w-4 h-4" />,
-      count: jsonMessagesCount, 
-      activity: unreadActivity.messages 
     },
     { 
       mode: 'changes', 

@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState, memo, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
-import { JsonMessageView } from './JsonMessageView';
 import { EmptyState } from './EmptyState';
 import CombinedDiffView from './CombinedDiffView';
 import { StravuFileSearch } from './StravuFileSearch';
@@ -225,9 +224,6 @@ export const SessionView = memo(() => {
           {hook.isLoadingOutput && (
             <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
           )}
-          <div className={`h-full ${hook.viewMode === 'messages' ? 'block' : 'hidden'}`}>
-            <JsonMessageView messages={activeSession.jsonMessages || []} />
-          </div>
           <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
             <RichOutputWithSidebar 
               sessionId={activeSession.id}

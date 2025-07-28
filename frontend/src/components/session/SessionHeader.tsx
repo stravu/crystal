@@ -30,7 +30,6 @@ interface SessionHeaderProps {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   unreadActivity: {
-    messages: boolean;
     changes: boolean;
     terminal: boolean;
     editor: boolean;
@@ -195,7 +194,6 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
           setViewMode={setViewMode}
           unreadActivity={unreadActivity}
           setUnreadActivity={setUnreadActivity}
-          jsonMessagesCount={activeSession.jsonMessages?.length || 0}
           isTerminalRunning={activeSession.isRunning || false}
           onSettingsClick={onSettingsClick}
           showSettings={showSettings}

@@ -9,7 +9,7 @@ import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'richOutput' | 'messages' | 'changes' | 'terminal' | 'editor' | 'dashboard';
+export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'editor' | 'dashboard';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -28,7 +28,6 @@ export const useSessionView = (
   // States
   const [viewMode, setViewMode] = useState<ViewMode>('richOutput');
   const [unreadActivity, setUnreadActivity] = useState({
-    messages: false,
     changes: false,
     terminal: false,
     editor: false,
