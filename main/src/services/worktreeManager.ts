@@ -1,7 +1,8 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { join } from 'path';
-import { mkdir } from 'fs/promises';
+import { join, isAbsolute } from 'path';
+import { mkdir, access } from 'fs/promises';
+import * as fs from 'fs/promises';
 import { getShellPath } from '../utils/shellPath';
 
 const execAsync = promisify(exec);
@@ -32,7 +33,9 @@ export class WorktreeManager {
       let baseDir: string;
       
       // Check if worktreeFolder is an absolute path
-      if (worktreeFolder && (worktreeFolder.startsWith('/') || worktreeFolder.includes(':'))) {
+      // On Windows: C:\ or \\server\share
+      // On Unix: /path
+      if (worktreeFolder && isAbsolute(worktreeFolder)) {
         baseDir = worktreeFolder;
       } else {
         baseDir = join(projectPath, folderName);
@@ -169,16 +172,92 @@ export class WorktreeManager {
     const worktreePath = join(baseDir, name);
     
     try {
-      await execWithShellPath(`git worktree remove "${worktreePath}" --force`, { cwd: projectPath });
+      console.log(`[WorktreeManager] Attempting to remove worktree: ${worktreePath}`);
+      
+      // On Windows, check if the directory is locked before attempting removal
+      if (process.platform === 'win32') {
+        try {
+          // Try to access the directory to see if it's locked
+          await fs.access(worktreePath);
+          console.log(`[WorktreeManager] Worktree directory exists and is accessible`);
+          
+          // Check if any process has this as its working directory
+          const currentDir = process.cwd();
+          if (currentDir.toLowerCase().startsWith(worktreePath.toLowerCase())) {
+            console.log(`[WorktreeManager] Current process is in worktree directory, changing to project root`);
+            process.chdir(projectPath);
+          }
+        } catch (accessError) {
+          console.log(`[WorktreeManager] Worktree directory not accessible: ${accessError}`);
+        }
+      }
+      
+      // First, check if git knows about this worktree
+      console.log(`[WorktreeManager] Checking if git knows about worktree: ${worktreePath}`);
+      const listResult = await execWithShellPath(`git worktree list`, { cwd: projectPath });
+      console.log(`[WorktreeManager] Current worktrees:`, listResult.stdout);
+      
+      const removeCommand = `git worktree remove "${worktreePath}" --force`;
+      console.log(`[WorktreeManager] Executing: ${removeCommand}`);
+      const result = await execWithShellPath(removeCommand, { cwd: projectPath });
+      console.log(`[WorktreeManager] Command output:`, result.stdout || '(no output)');
+      console.log(`[WorktreeManager] Command stderr:`, result.stderr || '(no stderr)');
+      console.log(`[WorktreeManager] Successfully removed worktree: ${worktreePath}`);
     } catch (error: any) {
       const errorMessage = error.stderr || error.stdout || error.message || String(error);
+      console.error(`[WorktreeManager] Git worktree remove failed with error:`, errorMessage);
+      console.error(`[WorktreeManager] Full error object:`, error);
       
       // If the worktree is not found, that's okay - it might have been manually deleted
       if (errorMessage.includes('is not a working tree') || 
           errorMessage.includes('does not exist') ||
           errorMessage.includes('No such file or directory')) {
-        console.log(`Worktree ${worktreePath} already removed or doesn't exist, skipping...`);
+        console.log(`[WorktreeManager] Worktree ${worktreePath} already removed or doesn't exist, skipping...`);
         return;
+      }
+      
+      // On Windows, provide more specific error handling
+      if (process.platform === 'win32' && 
+          (errorMessage.includes('cannot remove') || 
+           errorMessage.includes('Permission denied') ||
+           errorMessage.includes('being used by another process'))) {
+        console.error(`[WorktreeManager] Windows file lock detected. The worktree directory may be in use by another process.`);
+        console.error(`[WorktreeManager] Worktree path: ${worktreePath}`);
+        console.error(`[WorktreeManager] You may need to manually delete this directory after closing all programs using it.`);
+        
+        // Try to find what's locking the directory (Windows only)
+        try {
+          console.log(`[WorktreeManager] Attempting to find processes using the directory...`);
+          const handleResult = await execWithShellPath(`handle.exe "${worktreePath}" 2>nul`, { cwd: projectPath });
+          if (handleResult.stdout) {
+            console.log(`[WorktreeManager] Processes using directory:`, handleResult.stdout);
+          }
+        } catch (handleError) {
+          // handle.exe might not be available, that's ok
+          console.log(`[WorktreeManager] Could not run handle.exe (may not be installed)`);
+        }
+        
+        // Try alternative removal method on Windows
+        try {
+          console.log(`[WorktreeManager] Attempting alternative removal using rmdir...`);
+          const rmdirCommand = `rmdir /s /q "${worktreePath}"`;
+          console.log(`[WorktreeManager] Executing: ${rmdirCommand}`);
+          const rmdirResult = await execWithShellPath(rmdirCommand, { cwd: projectPath });
+          console.log(`[WorktreeManager] rmdir output:`, rmdirResult.stdout || '(no output)');
+          console.log(`[WorktreeManager] rmdir stderr:`, rmdirResult.stderr || '(no stderr)');
+          console.log(`[WorktreeManager] Successfully removed worktree directory using rmdir`);
+          
+          // Clean up git's worktree tracking
+          try {
+            await execWithShellPath(`git worktree prune`, { cwd: projectPath });
+          } catch (pruneError) {
+            console.warn(`[WorktreeManager] Failed to prune worktree tracking: ${pruneError}`);
+          }
+          
+          return;
+        } catch (rmdirError: any) {
+          console.error(`[WorktreeManager] Alternative removal also failed: ${rmdirError.message}`);
+        }
       }
       
       // For other errors, still throw

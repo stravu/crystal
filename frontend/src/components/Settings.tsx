@@ -46,7 +46,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
-  const { updateSettings } = useNotifications();
+  const { updateSettings, reloadSettings } = useNotifications();
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -101,6 +101,12 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
       // Update the useNotifications hook with new settings
       updateSettings(notificationSettings);
+      
+      // Reload settings from backend to ensure all instances are synced
+      await reloadSettings();
+      
+      // Dispatch event to notify all instances to reload settings
+      window.dispatchEvent(new Event('notification-settings-updated'));
 
       // Refresh config from server
       await fetchConfig();
