@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Check, Edit, CircleArrowDown, AlertTriangle, HelpCircle, GitMerge, Loader2 } from 'lucide-react';
 import type { GitStatus } from '../types/session';
 

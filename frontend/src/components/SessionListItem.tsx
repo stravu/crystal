@@ -45,13 +45,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       const previousSession = prevState.sessions.find(s => s.id === session.id) || 
         (prevState.activeMainRepoSession?.id === session.id ? prevState.activeMainRepoSession : null);
       
-      // Debug: Compare store status with prop status
-      if (currentSession) {
-        console.log(`[SessionListItem] Session ${session.id} - Store status: ${currentSession.status}, Prop status: ${session.status}`);
-        if (currentSession.status !== session.status) {
-          console.warn(`[SessionListItem] Session ${session.id} status mismatch! Store: ${currentSession.status}, Prop: ${session.status}`);
-        }
-      }
+      // Compare store status with prop status
       
       // Force component update if status changed
       if (currentSession && previousSession && currentSession.status !== previousSession.status) {
@@ -210,7 +204,6 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     e.stopPropagation();
     
     try {
-      console.log('Stopping script...');
       // Set closing state for this session
       setIsClosing(true);
       const response = await API.sessions.stopScript();
@@ -219,7 +212,6 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
         throw new Error(response.error || 'Failed to stop script');
       }
 
-      console.log('Script stop request successful');
       // Clear closing state
       setIsClosing(false);
       // Update running state for all sessions

@@ -490,7 +490,13 @@ export function DraggableProjectTreeView() {
     }
   };
 
-  const toggleProject = useCallback((projectId: number) => {
+  const toggleProject = useCallback((projectId: number, event?: React.MouseEvent) => {
+    // Prevent event from bubbling to parent handlers
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
     setExpandedProjects(prev => {
       const newSet = new Set(prev);
       if (newSet.has(projectId)) {
@@ -508,7 +514,13 @@ export function DraggableProjectTreeView() {
     });
   }, []);
 
-  const toggleFolder = useCallback((folderId: string) => {
+  const toggleFolder = useCallback((folderId: string, event?: React.MouseEvent) => {
+    // Prevent event from bubbling to parent handlers
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
       if (newSet.has(folderId)) {
@@ -613,7 +625,13 @@ export function DraggableProjectTreeView() {
     return rootFolders;
   }, []);
 
-  const toggleArchivedProject = (projectId: number) => {
+  const toggleArchivedProject = useCallback((projectId: number, event?: React.MouseEvent) => {
+    // Prevent event from bubbling to parent handlers
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
     setExpandedArchivedProjects(prev => {
       const newSet = new Set(prev);
       if (newSet.has(projectId)) {
@@ -623,7 +641,7 @@ export function DraggableProjectTreeView() {
       }
       return newSet;
     });
-  };
+  }, []);
 
   const toggleArchivedSessions = useCallback(
     debounce(() => {
@@ -1382,9 +1400,14 @@ export function DraggableProjectTreeView() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              toggleFolder(folder.id);
+              e.preventDefault();
+              toggleFolder(folder.id, e);
             }}
-            className="p-0.5 hover:bg-surface-hover rounded transition-colors"
+            onMouseDown={(e) => {
+              // Prevent drag start when clicking the toggle button
+              e.stopPropagation();
+            }}
+            className="p-0.5 hover:bg-surface-hover rounded transition-colors z-10"
             disabled={!hasChildren}
           >
             {hasChildren ? (
@@ -1577,7 +1600,7 @@ export function DraggableProjectTreeView() {
           return (
             <div key={project.id} className="mb-1">
               <div 
-                className={`group flex items-center space-x-1 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+                className={`group flex items-center space-x-1 px-2 py-2 rounded-lg transition-colors ${
                   isActiveProject 
                     ? 'bg-interactive/10 text-interactive' 
                     : isDraggingOver 
@@ -1600,9 +1623,14 @@ export function DraggableProjectTreeView() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleProject(project.id);
+                      e.preventDefault();
+                      toggleProject(project.id, e);
                     }}
-                    className="p-0.5 hover:bg-surface-hover rounded transition-colors"
+                    onMouseDown={(e) => {
+                      // Prevent drag start when clicking the toggle button
+                      e.stopPropagation();
+                    }}
+                    className="p-0.5 hover:bg-surface-hover rounded transition-colors z-10"
                   >
                     {isExpanded ? (
                       <ChevronDown className="w-3 h-3 text-text-tertiary" />
@@ -1615,7 +1643,7 @@ export function DraggableProjectTreeView() {
                 )}
                 
                 <div 
-                  className="flex items-center space-x-2 flex-1 min-w-0"
+                  className="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer"
                   onClick={() => handleProjectClick(project)}
                 >
                   <div className="relative" title="Git-backed project (connected to repository)">
@@ -1816,9 +1844,10 @@ export function DraggableProjectTreeView() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleArchivedProject(project.id);
+                            e.preventDefault();
+                            toggleArchivedProject(project.id, e);
                           }}
-                          className="p-0.5 hover:bg-surface-hover rounded transition-colors"
+                          className="p-0.5 hover:bg-surface-hover rounded transition-colors z-10"
                         >
                           {isExpanded ? (
                             <ChevronDown className="w-3 h-3 text-text-tertiary" />
