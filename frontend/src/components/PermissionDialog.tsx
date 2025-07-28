@@ -127,7 +127,7 @@ export const PermissionDialog: React.FC<PermissionDialogProps> = ({ request, onR
   };
 
   return (
-    <Modal isOpen={true} onClose={() => handleDeny()} size="lg">
+    <Modal isOpen={true} onClose={() => handleDeny()} size="lg" showCloseButton={false}>
       <ModalHeader onClose={() => handleDeny()}>
         <div className="flex items-center gap-3">
           <Shield className={`w-6 h-6 ${isHighRisk(request.toolName) ? 'text-status-error' : 'text-status-warning'}`} />

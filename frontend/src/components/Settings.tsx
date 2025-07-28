@@ -113,7 +113,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} size="xl" showCloseButton={false}>
       <ModalHeader 
         title="Crystal Settings" 
         icon={<SettingsIcon className="w-5 h-5" />}

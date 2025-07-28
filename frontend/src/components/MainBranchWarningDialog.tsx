@@ -26,7 +26,7 @@ export function MainBranchWarningDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} size="lg" showCloseButton={false}>
       <ModalHeader title={`Working in the ${mainBranch} branch`} onClose={onClose} />
         
       <ModalBody className="space-y-4">

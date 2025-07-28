@@ -152,7 +152,7 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} size="lg" showCloseButton={false}>
       <ModalHeader onClose={updateState === 'downloading' ? undefined : onClose}>
         <div className="flex items-center gap-3">
           <Download className="w-6 h-6 text-interactive" />

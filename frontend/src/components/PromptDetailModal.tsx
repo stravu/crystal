@@ -58,7 +58,7 @@ export function PromptDetailModal({ prompt, promptIndex, onClose }: PromptDetail
   // No need for manual escape handling - Modal component handles it
 
   return (
-    <Modal isOpen={true} onClose={onClose} size="lg">
+    <Modal isOpen={true} onClose={onClose} size="lg" showCloseButton={false}>
       <ModalHeader onClose={onClose}>
         <div className="flex items-center justify-between flex-1 pr-2">
           <div className="flex items-center space-x-3">

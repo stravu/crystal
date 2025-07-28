@@ -139,7 +139,7 @@ export function PromptHistoryModal({ isOpen, onClose }: PromptHistoryModalProps)
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} size="xl" showCloseButton={false}>
       <ModalHeader title="Prompt History" onClose={onClose} />
       
       <div className="p-6 border-b border-border-primary">
