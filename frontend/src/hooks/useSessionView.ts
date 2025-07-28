@@ -209,8 +209,7 @@ export const useSessionView = (
       console.log(`[loadOutputContent] Setting outputs in store for session ${sessionId}, count: ${outputs.length}`);
       useSessionStore.getState().setSessionOutputs(sessionId, outputs);
       
-      // Verify the outputs were set
-      const verifySession = useSessionStore.getState().getActiveSession();
+      // Outputs have been set
       
       setOutputLoadState('loaded');
       
@@ -330,11 +329,9 @@ export const useSessionView = (
     
     // Reset unread activity indicators
     setUnreadActivity({
-      messages: false,
       changes: false,
       terminal: false,
       editor: false,
-      dashboard: false,
       richOutput: false,
     });
     
@@ -469,8 +466,7 @@ export const useSessionView = (
       return;
     }
     
-    const hasOutput = (activeSession.output?.length || 0) > 0;
-    const hasMessages = (activeSession.jsonMessages?.length || 0) > 0;
+    // Check if session has output data
     
     
     // Check for stuck loading state and force reset if needed
@@ -609,37 +605,7 @@ export const useSessionView = (
     }
   }, [theme, activeSession]);
 
-  useEffect(() => {
-    console.log(`[useSessionView] Terminal initialization effect - viewMode: ${viewMode}, terminalRef.current: ${!!terminalRef.current}`);
-    if (false && terminalRef.current) { // Disabled - output view removed
-      initTerminal(terminalRef, terminalInstance, fitAddon, false);
-      
-      // After terminal is initialized, trigger a check for loading output
-      if (activeSession && !terminalInstance.current) {
-        // Check less frequently and with a maximum number of attempts
-        let attempts = 0;
-        const maxAttempts = 50; // 5 seconds maximum wait
-        const checkInterval = setInterval(() => {
-          attempts++;
-          if (terminalInstance.current) {
-            console.log(`[useSessionView] Terminal initialized, checking if output needs to be loaded`);
-            clearInterval(checkInterval);
-            // Force a re-evaluation of whether to load output
-            if (activeSession && activeSession.status !== 'initializing') {
-              loadOutputContent(activeSession.id);
-            }
-          } else if (attempts >= maxAttempts) {
-            console.log(`[useSessionView] Terminal initialization timed out, loading output anyway`);
-            clearInterval(checkInterval);
-            // Try to load output even without terminal
-            if (activeSession && activeSession.status !== 'initializing') {
-              loadOutputContent(activeSession.id);
-            }
-          }
-        }, 100);
-      }
-    }
-  }, [viewMode, terminalRef, initTerminal, activeSession, loadOutputContent]);  
+  // Terminal output view has been removed - no terminal initialization needed  
   // Pre-initialize script terminal when session becomes active
   useEffect(() => {
     if (activeSession && scriptTerminalRef.current && !scriptTerminalInstance.current) {
@@ -948,16 +914,7 @@ export const useSessionView = (
     return () => observer.disconnect();
   }, [terminalRef, viewMode]);
 
-  // Trigger terminal resize when session status changes (for padding adjustment)
-  useEffect(() => {
-    if (false && fitAddon.current && activeSession) { // Output view removed
-      // Small delay to ensure DOM updates have completed
-      const timer = setTimeout(() => {
-        fitAddon.current?.fit();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [activeSession?.status, viewMode]);
+  // Terminal output view has been removed - no resize needed
 
   useEffect(() => {
     // Add a small delay to ensure CSS has propagated
@@ -1005,9 +962,6 @@ export const useSessionView = (
     if (!activeSession) return;
     const currentMessageCount = activeSession.jsonMessages?.length || 0;
     if (currentMessageCount > previousMessageCountRef.current) {
-      if (viewMode !== 'messages') {
-        setUnreadActivity(prev => ({ ...prev, messages: true }));
-      }
       if (viewMode !== 'richOutput') {
         setUnreadActivity(prev => ({ ...prev, richOutput: true }));
       }
