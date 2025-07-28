@@ -67,7 +67,10 @@ export function useNotifications() {
   };
 
   const showNotification = (title: string, body: string, icon?: string) => {
-    if (!settings.enabled) return;
+    if (!settings.enabled) {
+      console.log('[useNotifications] Notifications disabled, skipping:', title);
+      return;
+    }
 
     requestPermission().then((hasPermission) => {
       if (hasPermission) {
@@ -125,6 +128,9 @@ export function useNotifications() {
       return;
     }
     
+    // Debug log current settings state
+    console.log('[useNotifications] Current settings:', settings);
+    
     // Compare current sessions with previous sessions to detect changes
     sessions.forEach((currentSession) => {
       const prevSession = prevSessions.find(s => s.id === currentSession.id);
@@ -174,28 +180,56 @@ export function useNotifications() {
     prevSessionsRef.current = sessions;
   }, [sessions, settings]);
 
-  // Load settings on first mount
+  // Load settings on first mount and listen for updates
   useEffect(() => {
-    if (!settingsLoaded.current) {
-      settingsLoaded.current = true;
-      
-      API.config.get().then(response => {
+    const loadSettings = async () => {
+      try {
+        const response = await API.config.get();
         if (response.success && response.data?.notifications) {
           setSettings(response.data.notifications);
         }
-      }).catch(error => {
+      } catch (error) {
         console.error('Failed to load notification settings:', error);
-      });
-      
+      }
+    };
+
+    if (!settingsLoaded.current) {
+      settingsLoaded.current = true;
+      loadSettings();
       requestPermission();
     }
+
+    // Listen for settings update events
+    const handleSettingsUpdate = () => {
+      console.log('[useNotifications] Settings updated, reloading...');
+      loadSettings();
+    };
+
+    window.addEventListener('notification-settings-updated', handleSettingsUpdate);
+    
+    return () => {
+      window.removeEventListener('notification-settings-updated', handleSettingsUpdate);
+    };
   }, []);
+
+  // Reload settings from backend
+  const reloadSettings = async () => {
+    try {
+      const response = await API.config.get();
+      if (response.success && response.data?.notifications) {
+        setSettings(response.data.notifications);
+      }
+    } catch (error) {
+      console.error('Failed to reload notification settings:', error);
+    }
+  };
 
   return {
     settings,
     updateSettings: (newSettings: Partial<NotificationSettings>) => {
       setSettings(prev => ({ ...prev, ...newSettings }));
     },
+    reloadSettings,
     requestPermission,
     showNotification,
   };

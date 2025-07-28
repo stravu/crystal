@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
 
 export class DatabaseService {
@@ -181,7 +181,7 @@ export class DatabaseService {
         const gitRepoPath = configManager.getGitRepoPath();
         
         if (gitRepoPath) {
-          const projectName = gitRepoPath.split('/').pop() || 'Default Project';
+          const projectName = basename(gitRepoPath) || 'Default Project';
           const result = this.db.prepare(`
             INSERT INTO projects (name, path, active)
             VALUES (?, ?, 1)
