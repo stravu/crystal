@@ -9,7 +9,7 @@ import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'editor' | 'dashboard';
+export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'editor';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -31,7 +31,6 @@ export const useSessionView = (
     changes: false,
     terminal: false,
     editor: false,
-    dashboard: false,
     richOutput: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1041,7 +1040,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ messages: false, changes: false, terminal: false, editor: false, dashboard: false, richOutput: false });
+    setUnreadActivity({ changes: false, terminal: false, editor: false, richOutput: false });
   }, [activeSessionId]);
 
 

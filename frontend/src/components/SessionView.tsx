@@ -17,7 +17,6 @@ import { API } from '../utils/api';
 import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
 import { RichOutputSettings } from './session/RichOutputView';
 import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
-import { ProjectDashboard } from './ProjectDashboard';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
@@ -229,12 +228,6 @@ export const SessionView = memo(() => {
               sessionId={activeSession.id}
               settings={richOutputSettings}
               onSettingsChange={handleRichOutputSettingsChange}
-            />
-          </div>
-          <div className={`h-full ${hook.viewMode === 'dashboard' ? 'block' : 'hidden'}`}>
-            <ProjectDashboard 
-              projectId={activeSession.projectId || 0}
-              projectName={sessionProject?.name || 'Unknown Project'}
             />
           </div>
           <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>

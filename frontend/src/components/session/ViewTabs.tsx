@@ -1,7 +1,7 @@
 import React from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
 import { cn } from '../../utils/cn';
-import { GitCompare, Terminal, FileEdit, LayoutDashboard, Eye, Settings, GitBranch, MoreVertical } from 'lucide-react';
+import { GitCompare, Terminal, FileEdit, Eye, Settings, GitBranch, MoreVertical } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Dropdown } from '../ui/Dropdown';
 
@@ -12,7 +12,6 @@ interface ViewTabsProps {
     changes: boolean;
     terminal: boolean;
     editor: boolean;
-    dashboard: boolean;
     richOutput: boolean;
   };
   setUnreadActivity: (activity: any) => void;
@@ -74,12 +73,6 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
       label: 'Editor', 
       icon: <FileEdit className="w-4 h-4" />,
       activity: unreadActivity.editor 
-    },
-    { 
-      mode: 'dashboard', 
-      label: 'Dashboard', 
-      icon: <LayoutDashboard className="w-4 h-4" />,
-      activity: unreadActivity.dashboard 
     },
   ];
 
