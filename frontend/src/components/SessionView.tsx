@@ -316,6 +316,7 @@ export const SessionView = memo(() => {
           handleCompactContext={hook.handleCompactContext}
           hasConversationHistory={hook.hasConversationHistory}
           contextCompacted={hook.contextCompacted}
+          handleCancelRequest={hook.handleStopSession}
         />
       )}
 

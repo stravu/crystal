@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
-import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { API } from '../../utils/api';
 import { CommitModePill, AutoCommitSwitch } from '../CommitModeToggle';
@@ -36,6 +36,7 @@ interface SessionInputWithImagesProps {
   handleCompactContext?: () => void;
   hasConversationHistory?: boolean;
   contextCompacted?: boolean;
+  handleCancelRequest?: () => void;
 }
 
 export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = memo(({
@@ -57,6 +58,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   handleCompactContext,
   hasConversationHistory,
   contextCompacted = false,
+  handleCancelRequest,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -164,7 +166,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     const shouldSend = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
-    if (shouldSend) {
+    const shouldCancel = e.key === 'Escape' && activeSession.status === 'running' && handleCancelRequest;
+    
+    if (shouldCancel) {
+      e.preventDefault();
+      handleCancelRequest();
+    } else if (shouldSend) {
       e.preventDefault();
       if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
         handleTerminalCommand();
@@ -540,36 +547,63 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 </button>
               )}
               
-              {/* Main Action Button */}
-              <button 
-                onClick={onClickSend}
-                className={`
-                  px-4 py-2 font-medium group
-                  flex items-center gap-2 transition-all duration-200
-                  rounded-lg border
-                  active:scale-[0.98]
-                  focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
-                  ${buttonConfig.isPrimary 
-                    ? `bg-gradient-to-r from-interactive to-interactive-hover hover:from-interactive-hover hover:to-interactive 
-                       text-white border-interactive shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
-                       focus:ring-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
-                    : buttonConfig.color === 'green' 
-                      ? 'bg-surface-secondary hover:bg-surface-hover text-status-success hover:text-status-success/90 border-border-primary focus:ring-status-success' 
-                      : 'bg-surface-secondary hover:bg-surface-hover text-interactive hover:text-interactive-hover border-border-primary focus:ring-interactive'
-                  }
-                `}
-              >
-                <ButtonIcon className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                <span className="font-semibold">{buttonConfig.text}</span>
-                
-                {/* Inline keyboard shortcut */}
-                <span 
-                  className="ml-2 text-xs font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-80 group-hover:opacity-100 transition-opacity"
-                  title="Keyboard Shortcut: ⌘ + Enter"
+              {/* Main Action Button / Cancel Button */}
+              {activeSession.status === 'running' && handleCancelRequest ? (
+                <button 
+                  onClick={handleCancelRequest}
+                  className={`
+                    px-4 py-2 font-medium group
+                    flex items-center gap-2 transition-all duration-200
+                    rounded-lg border
+                    active:scale-[0.98]
+                    focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
+                    bg-gradient-to-r from-status-error to-status-error/90 hover:from-status-error/90 hover:to-status-error
+                    text-white border-status-error shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]
+                    focus:ring-status-error hover:shadow-[0_4px_12px_rgba(239,68,68,0.3)]
+                  `}
                 >
-                  ⌘⏎
-                </span>
-              </button>
+                  <Square className="w-4 h-4 fill-current" />
+                  <span className="font-semibold">Cancel</span>
+                  
+                  {/* Inline keyboard shortcut */}
+                  <span 
+                    className="ml-2 text-xs font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-80 group-hover:opacity-100 transition-opacity"
+                    title="Cancel Request"
+                  >
+                    ESC
+                  </span>
+                </button>
+              ) : (
+                <button 
+                  onClick={onClickSend}
+                  className={`
+                    px-4 py-2 font-medium group
+                    flex items-center gap-2 transition-all duration-200
+                    rounded-lg border
+                    active:scale-[0.98]
+                    focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
+                    ${buttonConfig.isPrimary 
+                      ? `bg-gradient-to-r from-interactive to-interactive-hover hover:from-interactive-hover hover:to-interactive 
+                         text-white border-interactive shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
+                         focus:ring-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
+                      : buttonConfig.color === 'green' 
+                        ? 'bg-surface-secondary hover:bg-surface-hover text-status-success hover:text-status-success/90 border-border-primary focus:ring-status-success' 
+                        : 'bg-surface-secondary hover:bg-surface-hover text-interactive hover:text-interactive-hover border-border-primary focus:ring-interactive'
+                    }
+                  `}
+                >
+                  <ButtonIcon className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  <span className="font-semibold">{buttonConfig.text}</span>
+                  
+                  {/* Inline keyboard shortcut */}
+                  <span 
+                    className="ml-2 text-xs font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-80 group-hover:opacity-100 transition-opacity"
+                    title="Keyboard Shortcut: ⌘ + Enter"
+                  >
+                    ⌘⏎
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>
