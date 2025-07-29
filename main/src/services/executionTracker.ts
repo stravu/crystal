@@ -168,6 +168,21 @@ export class ExecutionTracker extends EventEmitter {
         this.logger?.verbose(`Captured diff between commits ${context.beforeCommitHash} and ${afterCommitHash}`);
       }
       
+      // Get the commit message if a commit was made
+      let commitMessage = '';
+      if (afterCommitHash !== context.beforeCommitHash && afterCommitHash !== 'UNCOMMITTED') {
+        try {
+          // Get the commit message from git log
+          commitMessage = execSync(`git log -1 --format=%s ${afterCommitHash}`, {
+            cwd: context.worktreePath,
+            encoding: 'utf8'
+          }).trim();
+          this.logger?.verbose(`Retrieved commit message: ${commitMessage}`);
+        } catch (error) {
+          this.logger?.warn(`Failed to get commit message: ${error}`);
+        }
+      }
+
       // Always create execution diff record, even if there are no changes
       const diffData: CreateExecutionDiffData = {
         session_id: sessionId,
@@ -179,7 +194,8 @@ export class ExecutionTracker extends EventEmitter {
         stats_deletions: executionDiff.stats.deletions,
         stats_files_changed: executionDiff.stats.filesChanged,
         before_commit_hash: executionDiff.beforeHash,
-        after_commit_hash: executionDiff.afterHash
+        after_commit_hash: executionDiff.afterHash,
+        commit_message: commitMessage || undefined
       };
 
       const createdDiff = await this.sessionManager.createExecutionDiff(diffData);

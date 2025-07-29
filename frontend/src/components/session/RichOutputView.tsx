@@ -260,7 +260,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                     type: 'commit_summary',
                     commit: {
                       hash: execution.after_commit_hash,
-                      message: execution.prompt_text || 'Autocommit',
+                      message: execution.commit_message || 'Autocommit',
                       stats: {
                         additions: execution.stats_additions || 0,
                         deletions: execution.stats_deletions || 0,
@@ -505,9 +505,21 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   // Auto-scroll to bottom when messages change or view loads
   useEffect(() => {
     if (settings.autoScroll && messagesEndRef.current) {
-      // Use instant scroll on initial load, smooth scroll for updates
-      const behavior = loading ? 'instant' : 'smooth';
-      messagesEndRef.current.scrollIntoView({ behavior: behavior as ScrollBehavior });
+      // Only scroll if we're not currently loading
+      if (!loading) {
+        // Check if we're already near the bottom (within 100px)
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
+          // Only auto-scroll if we're already near the bottom
+          if (isNearBottom) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
+          }
+        } else {
+          // Fallback if no scroll container
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
+        }
+      }
     }
   }, [messages, settings.autoScroll, loading]);
 
