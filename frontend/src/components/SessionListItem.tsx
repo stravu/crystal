@@ -8,6 +8,7 @@ import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
 import type { Session, GitStatus } from '../types/session';
 import { useContextMenu } from '../contexts/ContextMenuContext';
+import { getBasename } from '../utils/pathUtils';
 import { IconButton } from './ui/IconButton';
 import { cn } from '../utils/cn';
 
@@ -501,7 +502,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
         onClose={() => setShowArchiveConfirm(false)}
         onConfirm={handleConfirmArchive}
         title={`Archive Session`}
-        message={`Archive session "${session.name}"? This will:\n\n• Move the session to the archived sessions list\n• Preserve all session history and outputs\n${session.isMainRepo ? '• Close the active Claude Code connection' : `• Remove the git worktree locally (${session.worktreePath?.split('/').pop() || 'worktree'})`}`}
+        message={`Archive session "${session.name}"? This will:\n\n• Move the session to the archived sessions list\n• Preserve all session history and outputs\n${session.isMainRepo ? '• Close the active Claude Code connection' : `• Remove the git worktree locally (${session.worktreePath ? getBasename(session.worktreePath) : 'worktree'})`}`}
         confirmText="Archive"
         confirmButtonClass="bg-amber-600 hover:bg-amber-700 text-white"
         icon={<Archive className="w-6 h-6 text-amber-500 flex-shrink-0" />}

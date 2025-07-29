@@ -1626,7 +1626,7 @@ export const useSessionView = (
     setShouldSquash,
     isWaitingForFirstOutput,
     elapsedTime,
-    textareaRef,
+    textareaRef: textareaRef as React.RefObject<HTMLTextAreaElement>,
     handleSendInput,
     handleContinueConversation,
     handleTerminalCommand,
