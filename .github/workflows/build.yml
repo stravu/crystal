@@ -11,8 +11,8 @@ jobs:
   build:
     strategy:
       matrix:
-        # Build both platforms for validation, but use different commands for speed
-        os: [macos-latest, ubuntu-latest]
+        # Build all platforms for validation, but use different commands for speed
+        os: [macos-latest, ubuntu-latest, windows-latest]
         include:
           - os: macos-latest
             build_cmd: build:mac:ci
@@ -24,6 +24,10 @@ jobs:
             artifact_path: |
               dist-electron/*.deb
               dist-electron/*.AppImage
+          - os: windows-latest
+            build_cmd: build:win:ci
+            artifact_name: crystal-windows
+            artifact_path: dist-electron/*.exe
     
     runs-on: ${{ matrix.os }}
     
@@ -89,6 +93,7 @@ jobs:
 
     # Build frontend and main process in parallel for faster builds (skip if cached)
     - name: Build frontend and main process
+      shell: bash
       run: |
         # Check if builds exist from cache
         if [ ! -d "frontend/dist" ] || [ ! -d "main/dist" ]; then
@@ -102,6 +107,7 @@ jobs:
         fi
 
     - name: Rebuild native modules (if needed)
+      shell: bash
       run: |
         # Only rebuild if native modules cache missed or build files changed
         if [ ! -f "main/node_modules/.bin/electron-rebuild" ] || [ ! -f "main/build/Release/better_sqlite3.node" ]; then
