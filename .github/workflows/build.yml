@@ -138,6 +138,7 @@ jobs:
         CSC_DISABLE: ${{ (matrix.os == 'macos-latest' && !secrets.APPLE_CERTIFICATE) && 'true' || 'false' }}
 
     - name: List build artifacts
+      shell: bash
       run: ls -la dist-electron/
 
     # Skip Flatpak build for CI speed - saves 4+ minutes

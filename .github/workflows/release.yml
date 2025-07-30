@@ -80,6 +80,7 @@ jobs:
         CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'true' || 'false' }}
 
     - name: List release artifacts
+      shell: bash
       run: ls -la dist-electron/
 
     # - name: Build Flatpak
