@@ -4,6 +4,10 @@ Thank you for your interest in contributing to Crystal! We welcome contributions
 
 Crystal is an open source project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1).  Stravu is the way AI-first teams collaborate.
 
+## Right to Contribute this Code
+- You represent and warrant that You are legally entitled to contribute the code you contribute to Crystal
+- You represent and warrant that each of Your Contributions is Your original creation. You represent and warrant that, to Your knowledge, none of Your Contributions infringe, violate, or misappropriate any third party intellectual property or other proprietary rights.
+
 ## Getting Started
 
 1. Fork the repository on GitHub
