@@ -118,6 +118,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
   const userMessageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const wasAtBottomRef = useRef(true);
 
   // Save local settings to localStorage when they change
   useEffect(() => {
@@ -249,8 +250,13 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                      execution.after_commit_hash && execution.after_commit_hash !== 'UNCOMMITTED';
             });
             
+            if (relevantCommits.length > 0) {
+              console.log('[RichOutputView] Found relevant commits for user message:', relevantCommits);
+            }
+            
             // Add commit summary for each relevant commit
             relevantCommits.forEach((execution: any, commitIndex: number) => {
+              console.log('[RichOutputView] commitDisplay setting:', settings.commitDisplay);
               if (settings.commitDisplay !== 'hidden') {
                 const commitMessage: ConversationMessage = {
                   id: `commit-${execution.execution_sequence}-${commitIndex}`,
@@ -463,6 +469,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         ? executionsResponse.data 
         : [];
       
+      if (executionData.length > 0) {
+        console.log('[RichOutputView] Execution data loaded:', executionData);
+      }
+      
       const conversationMessages = transformMessages(allMessages, executionData);
       setMessages(conversationMessages);
     } catch (err) {
@@ -502,23 +512,30 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     loadMessages();
   }, [sessionId, loadMessages]);
 
+  // Track if user is at bottom before messages change
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const checkIfAtBottom = () => {
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+      wasAtBottomRef.current = isAtBottom;
+    };
+
+    container.addEventListener('scroll', checkIfAtBottom);
+    return () => container.removeEventListener('scroll', checkIfAtBottom);
+  }, []);
+
   // Auto-scroll to bottom when messages change or view loads
   useEffect(() => {
-    if (settings.autoScroll && messagesEndRef.current) {
-      // Only scroll if we're not currently loading
-      if (!loading) {
-        // Check if we're already near the bottom (within 100px)
-        const scrollContainer = scrollContainerRef.current;
-        if (scrollContainer) {
-          const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
-          // Only auto-scroll if we're already near the bottom
-          if (isNearBottom) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
-          }
-        } else {
-          // Fallback if no scroll container
-          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
-        }
+    if (settings.autoScroll && messagesEndRef.current && !loading) {
+      // Scroll if we were at the bottom before the update
+      if (wasAtBottomRef.current) {
+        // Use requestAnimationFrame to ensure DOM has updated
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
+          wasAtBottomRef.current = true; // Reset to true after scrolling
+        });
       }
     }
   }, [messages, settings.autoScroll, loading]);
