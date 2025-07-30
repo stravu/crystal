@@ -58,7 +58,7 @@ export function CommitsPanel({ sessionId }: CommitsPanelProps) {
 
   if (loading) {
     return (
-      <div className="p-4 text-sm text-text-tertiary">
+      <div className="h-full flex items-center justify-center p-4 text-sm text-text-tertiary">
         Loading commits...
       </div>
     );
@@ -66,14 +66,14 @@ export function CommitsPanel({ sessionId }: CommitsPanelProps) {
 
   if (commits.length === 0) {
     return (
-      <div className="p-4 text-sm text-text-tertiary text-center">
+      <div className="h-full flex items-center justify-center p-4 text-sm text-text-tertiary text-center">
         No commits yet
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full overflow-y-auto">
       {commits.map((commit) => {
         const isExpanded = expandedCommits.has(commit.id);
         const timeAgo = formatDistanceToNow(parseTimestamp(commit.timestamp));
