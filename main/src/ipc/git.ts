@@ -4,7 +4,7 @@ import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager } = services;
+  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService } = services;
 
   // Helper function to refresh git status after operations that only affect one session
   const refreshGitStatusForSession = async (sessionId: string, isUserInitiated = false) => {
@@ -34,65 +34,16 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
   ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
     try {
-      // Get session to find worktree path
-      const session = await sessionManager.getSession(sessionId);
-      if (!session || !session.worktreePath) {
-        return { success: false, error: 'Session or worktree path not found' };
-      }
-
-      // Get git commit history from the worktree
-      const project = sessionManager.getProjectForSession(sessionId);
-      // Get the main branch from the project directory's current branch
-      if (!project?.path) {
-        throw new Error('Project path not found for session');
-      }
-      const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
+      // Get execution diffs from the database
+      const executionDiffs = databaseService.getExecutionDiffs(sessionId);
       
-      console.log(`[IPC:git] Getting commits for session ${sessionId}`);
-      console.log(`[IPC:git] Project path: ${project?.path || 'not found'}`);
-      console.log(`[IPC:git] Using main branch: ${mainBranch}`);
-      
-      const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
-
-      // Check for uncommitted changes
-      const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
-      const hasUncommittedChanges = uncommittedDiff.stats.filesChanged > 0;
-
-      // Transform commits to execution diff format for compatibility
-      const executions: any[] = commits.map((commit, index) => ({
-        id: index + 1,
-        session_id: sessionId,
-        prompt_text: commit.message,
-        execution_sequence: index + 1,
-        git_diff: null, // Will be loaded on demand
-        files_changed: [],
-        stats_additions: commit.stats.additions,
-        stats_deletions: commit.stats.deletions,
-        stats_files_changed: commit.stats.filesChanged,
-        before_commit_hash: `${commit.hash}~1`,
-        after_commit_hash: commit.hash,
-        timestamp: commit.date.toISOString()
-      }));
-
-      // Add uncommitted changes as the first item if they exist
-      if (hasUncommittedChanges) {
-        executions.unshift({
-          id: 0, // Special ID for uncommitted changes
-          session_id: sessionId,
-          prompt_text: 'Uncommitted changes',
-          execution_sequence: 0,
-          git_diff: null,
-          files_changed: uncommittedDiff.changedFiles || [],
-          stats_additions: uncommittedDiff.stats.additions,
-          stats_deletions: uncommittedDiff.stats.deletions,
-          stats_files_changed: uncommittedDiff.stats.filesChanged,
-          before_commit_hash: commits.length > 0 ? commits[0].hash : 'HEAD',
-          after_commit_hash: 'UNCOMMITTED',
-          timestamp: new Date().toISOString()
-        });
+      console.log(`[IPC:git] Getting execution diffs for session ${sessionId}`);
+      console.log(`[IPC:git] Found ${executionDiffs.length} execution diffs`);
+      if (executionDiffs.length > 0) {
+        console.log(`[IPC:git] First execution diff:`, executionDiffs[0]);
       }
-
-      return { success: true, data: executions };
+      
+      return { success: true, data: executionDiffs };
     } catch (error) {
       console.error('Failed to get executions:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to get executions';

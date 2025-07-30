@@ -25,6 +25,7 @@ export class CommitManager extends EventEmitter {
     promptText?: string,
     executionSequence?: number
   ): Promise<CommitResult> {
+    console.log(`[CommitManager] Handling post-prompt commit for session ${sessionId} with mode: ${settings.mode}`);
     this.logger?.verbose(`Handling post-prompt commit for session ${sessionId} with mode: ${settings.mode}`);
 
     switch (settings.mode) {
@@ -65,11 +66,15 @@ export class CommitManager extends EventEmitter {
         encoding: 'utf8',
       }).trim();
 
+      console.log(`[CommitManager] Git status output: "${statusOutput}"`);
+
       if (!statusOutput) {
+        console.log(`[CommitManager] No uncommitted changes found`);
         this.logger?.verbose(`No uncommitted changes found`);
         return { success: true };
       }
 
+      console.log(`[CommitManager] Found uncommitted changes, creating checkpoint commit...`);
       this.logger?.verbose(`Found uncommitted changes, creating checkpoint commit...`);
 
       // Stage all changes

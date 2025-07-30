@@ -34,6 +34,7 @@ export class ExecutionTracker extends EventEmitter {
    */
   async startExecution(sessionId: string, worktreePath: string, promptMarkerId?: number, prompt?: string): Promise<void> {
     try {
+      console.log(`[ExecutionTracker] Starting execution tracking for session ${sessionId}`);
       this.logger?.verbose(`Starting execution tracking for session ${sessionId}`);
       
       // Get next execution sequence
@@ -41,6 +42,7 @@ export class ExecutionTracker extends EventEmitter {
       
       // Capture the current commit hash as the starting point
       const beforeCommitHash = this.gitDiffManager.getCurrentCommitHash(worktreePath);
+      console.log(`[ExecutionTracker] Starting from commit: ${beforeCommitHash}, sequence: ${executionSequence}`);
       this.logger?.verbose(`Starting from commit: ${beforeCommitHash}`);
       
       const context: ExecutionContext = {
@@ -66,8 +68,10 @@ export class ExecutionTracker extends EventEmitter {
    */
   async endExecution(sessionId: string): Promise<void> {
     try {
+      console.log(`[ExecutionTracker] Ending execution tracking for session ${sessionId}`);
       const context = this.activeExecutions.get(sessionId);
       if (!context) {
+        console.log(`[ExecutionTracker] No active execution found for session ${sessionId}`);
         this.logger?.warn(`No active execution found for session ${sessionId}`);
         return;
       }
@@ -76,6 +80,11 @@ export class ExecutionTracker extends EventEmitter {
       
       // Get session details for commit mode
       const session = this.sessionManager.getSession(sessionId);
+      console.log(`[ExecutionTracker] Session details:`, {
+        found: !!session,
+        commitMode: session?.commitMode,
+        autoCommit: session?.autoCommit
+      });
       this.logger?.verbose(`Retrieved session for ${sessionId}: ${session ? 'found' : 'not found'}`);
       
       // Determine commit mode - default to checkpoint for backwards compatibility
@@ -87,6 +96,7 @@ export class ExecutionTracker extends EventEmitter {
       
       if (session?.commitMode) {
         commitMode = session.commitMode;
+        console.log(`[ExecutionTracker] Using session.commitMode: ${commitMode}`);
         this.logger?.verbose(`Using session.commitMode: ${commitMode}`);
         
         // Update the commitModeSettings.mode to match the actual mode
@@ -108,6 +118,7 @@ export class ExecutionTracker extends EventEmitter {
         this.logger?.verbose(`Using legacy autoCommit (${session.autoCommit}) -> commit mode: ${commitMode}`);
       }
       
+      console.log(`[ExecutionTracker] Final commit mode for session ${sessionId}: ${commitMode}`);
       this.logger?.verbose(`Final commit mode for session ${sessionId}: ${commitMode}`);
       
       // Handle post-prompt commit based on mode
@@ -118,6 +129,8 @@ export class ExecutionTracker extends EventEmitter {
         context.prompt,
         context.executionSequence
       );
+      
+      console.log(`[ExecutionTracker] Commit result:`, commitResult);
       
       if (!commitResult.success && commitResult.error) {
         // Add error to session output so users can see what went wrong
@@ -168,6 +181,21 @@ export class ExecutionTracker extends EventEmitter {
         this.logger?.verbose(`Captured diff between commits ${context.beforeCommitHash} and ${afterCommitHash}`);
       }
       
+      // Get the commit message if a commit was made
+      let commitMessage = '';
+      if (afterCommitHash !== context.beforeCommitHash && afterCommitHash !== 'UNCOMMITTED') {
+        try {
+          // Get the commit message from git log
+          commitMessage = execSync(`git log -1 --format=%s ${afterCommitHash}`, {
+            cwd: context.worktreePath,
+            encoding: 'utf8'
+          }).trim();
+          this.logger?.verbose(`Retrieved commit message: ${commitMessage}`);
+        } catch (error) {
+          this.logger?.warn(`Failed to get commit message: ${error}`);
+        }
+      }
+
       // Always create execution diff record, even if there are no changes
       const diffData: CreateExecutionDiffData = {
         session_id: sessionId,
@@ -179,10 +207,20 @@ export class ExecutionTracker extends EventEmitter {
         stats_deletions: executionDiff.stats.deletions,
         stats_files_changed: executionDiff.stats.filesChanged,
         before_commit_hash: executionDiff.beforeHash,
-        after_commit_hash: executionDiff.afterHash
+        after_commit_hash: executionDiff.afterHash,
+        commit_message: commitMessage || undefined
       };
 
       const createdDiff = await this.sessionManager.createExecutionDiff(diffData);
+      
+      // Always log execution diff creation
+      console.log(`[ExecutionTracker] Created execution diff for session ${sessionId}:`, {
+        id: createdDiff.id,
+        execution_sequence: createdDiff.execution_sequence,
+        files_changed: createdDiff.stats_files_changed,
+        commit_message: createdDiff.commit_message,
+        after_commit_hash: createdDiff.after_commit_hash
+      });
       
       if (executionDiff.stats.filesChanged > 0) {
         this.logger?.verbose(`Created execution diff ${createdDiff.id}: ${createdDiff.stats_files_changed} files, +${createdDiff.stats_additions} -${createdDiff.stats_deletions}`);

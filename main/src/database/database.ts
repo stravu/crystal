@@ -132,6 +132,13 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN last_viewed_at TEXT").run();
     }
 
+    // Add commit_message column to execution_diffs if it doesn't exist
+    const executionDiffsTableInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all();
+    const hasCommitMessageColumn = executionDiffsTableInfo.some((col: any) => col.name === 'commit_message');
+    if (!hasCommitMessageColumn) {
+      this.db.prepare("ALTER TABLE execution_diffs ADD COLUMN commit_message TEXT").run();
+    }
+
     // Check if claude_session_id column exists
     const sessionTableInfoClaude = this.db.prepare("PRAGMA table_info(sessions)").all();
     const hasClaudeSessionIdColumn = sessionTableInfoClaude.some((col: any) => col.name === 'claude_session_id');
@@ -1484,9 +1491,9 @@ export class DatabaseService {
       INSERT INTO execution_diffs (
         session_id, prompt_marker_id, execution_sequence, git_diff, 
         files_changed, stats_additions, stats_deletions, stats_files_changed,
-        before_commit_hash, after_commit_hash
+        before_commit_hash, after_commit_hash, commit_message
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.session_id,
       data.prompt_marker_id || null,
@@ -1497,7 +1504,8 @@ export class DatabaseService {
       data.stats_deletions || 0,
       data.stats_files_changed || 0,
       data.before_commit_hash || null,
-      data.after_commit_hash || null
+      data.after_commit_hash || null,
+      data.commit_message || null
     );
 
     const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
@@ -1542,6 +1550,7 @@ export class DatabaseService {
       stats_files_changed: row.stats_files_changed,
       before_commit_hash: row.before_commit_hash,
       after_commit_hash: row.after_commit_hash,
+      commit_message: row.commit_message,
       timestamp: row.timestamp
     };
   }
