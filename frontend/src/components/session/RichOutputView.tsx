@@ -4,7 +4,6 @@ import { MarkdownPreview } from '../MarkdownPreview';
 import { User, Bot, ChevronDown, ChevronRight, Eye, EyeOff, Settings2, Wrench, CheckCircle, XCircle, Clock, ArrowDown } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from './ThinkingPlaceholder';
-import { CommitSummaryCard } from './CommitSummaryCard';
 
 // Agent-agnostic message types for flexibility
 interface RawMessage {
@@ -42,8 +41,7 @@ type MessageSegment =
   | { type: 'text'; content: string }
   | { type: 'tool_call'; tool: ToolCall }
   | { type: 'system_info'; info: any }
-  | { type: 'thinking'; content: string }
-  | { type: 'commit_summary'; commit: CommitData };
+  | { type: 'thinking'; content: string };
 
 interface ToolCall {
   id: string;
@@ -53,17 +51,6 @@ interface ToolCall {
   status: 'pending' | 'success' | 'error';
 }
 
-interface CommitData {
-  hash: string;
-  message: string;
-  stats: {
-    additions: number;
-    deletions: number;
-    filesChanged: number;
-  };
-  timestamp: string;
-  executionSequence: number;
-}
 
 interface ToolResult {
   content: string;
@@ -84,7 +71,6 @@ export interface RichOutputSettings {
   showThinking: boolean;
   autoScroll: boolean;
   showSessionInit: boolean;
-  commitDisplay: 'hidden' | 'compact' | 'expanded';
 }
 
 const defaultSettings: RichOutputSettings = {
@@ -94,7 +80,6 @@ const defaultSettings: RichOutputSettings = {
   showThinking: true,
   autoScroll: true,
   showSessionInit: false, // Hide by default - it's developer info
-  commitDisplay: 'compact', // Show compact commit summaries by default
 };
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
@@ -191,7 +176,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   };
 
   // Transform raw messages into structured conversation messages
-  const transformMessages = (rawMessages: RawMessage[], executionData: any[] = []): ConversationMessage[] => {
+  const transformMessages = (rawMessages: RawMessage[]): ConversationMessage[] => {
     const transformed: ConversationMessage[] = [];
     
     // First pass: Build tool result map
@@ -238,48 +223,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             
             transformed.push(userMessage);
             
-            // Look for any commits that happened after this user message
-            // We'll inject commit summaries between user prompts and assistant responses
-            const messageTime = new Date(msg.timestamp).getTime();
-            const relevantCommits = executionData.filter((execution: any) => {
-              const executionTime = new Date(execution.timestamp).getTime();
-              // Find commits that happened after this user message but before the next message
-              const nextMsg = rawMessages[i + 1];
-              const nextMessageTime = nextMsg ? new Date(nextMsg.timestamp).getTime() : Date.now();
-              return executionTime >= messageTime && executionTime < nextMessageTime && 
-                     execution.after_commit_hash && execution.after_commit_hash !== 'UNCOMMITTED';
-            });
-            
-            if (relevantCommits.length > 0) {
-              console.log('[RichOutputView] Found relevant commits for user message:', relevantCommits);
-            }
-            
-            // Add commit summary for each relevant commit
-            relevantCommits.forEach((execution: any, commitIndex: number) => {
-              console.log('[RichOutputView] commitDisplay setting:', settings.commitDisplay);
-              if (settings.commitDisplay !== 'hidden') {
-                const commitMessage: ConversationMessage = {
-                  id: `commit-${execution.execution_sequence}-${commitIndex}`,
-                  role: 'system',
-                  timestamp: execution.timestamp,
-                  segments: [{
-                    type: 'commit_summary',
-                    commit: {
-                      hash: execution.after_commit_hash,
-                      message: execution.commit_message || 'Autocommit',
-                      stats: {
-                        additions: execution.stats_additions || 0,
-                        deletions: execution.stats_deletions || 0,
-                        filesChanged: execution.stats_files_changed || 0
-                      },
-                      timestamp: execution.timestamp,
-                      executionSequence: execution.execution_sequence
-                    }
-                  }]
-                };
-                transformed.push(commitMessage);
-              }
-            });
+            // Removed: Commit summaries are now shown in the dedicated Commits panel
           }
         }
         // Skip tool result messages - they're attached to assistant messages
@@ -425,11 +369,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     try {
       setError(null);
       
-      // Load conversation messages, JSON messages, and execution data
-      const [conversationResponse, outputResponse, executionsResponse] = await Promise.all([
+      // Load conversation messages and JSON messages
+      const [conversationResponse, outputResponse] = await Promise.all([
         API.sessions.getConversation(sessionId),
-        API.sessions.getJsonMessages(sessionId),
-        API.sessions.getExecutions(sessionId)
+        API.sessions.getJsonMessages(sessionId)
       ]);
       
       // Combine both sources - conversation messages have the actual user prompts
@@ -464,16 +407,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       });
       
       
-      // Extract execution data for commit summaries
-      const executionData = executionsResponse.success && Array.isArray(executionsResponse.data) 
-        ? executionsResponse.data 
-        : [];
-      
-      if (executionData.length > 0) {
-        console.log('[RichOutputView] Execution data loaded:', executionData);
-      }
-      
-      const conversationMessages = transformMessages(allMessages, executionData);
+      const conversationMessages = transformMessages(allMessages);
       setMessages(conversationMessages);
     } catch (err) {
       console.error('Failed to load messages:', err);
@@ -1002,27 +936,6 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             })
           }
           
-          {/* Commit summaries */}
-          {message.segments
-            .filter(seg => seg.type === 'commit_summary')
-            .map((seg, idx) => {
-              if (seg.type === 'commit_summary') {
-                return (
-                  <div key={`${message.id}-commit-${idx}`}>
-                    <CommitSummaryCard
-                      hash={seg.commit.hash}
-                      message={seg.commit.message}
-                      stats={seg.commit.stats}
-                      timestamp={seg.commit.timestamp}
-                      mode={settings.commitDisplay}
-                      executionSequence={seg.commit.executionSequence}
-                    />
-                  </div>
-                );
-              }
-              return null;
-            })
-          }
         </div>
       </div>
     );

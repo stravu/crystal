@@ -1550,6 +1550,7 @@ export class DatabaseService {
       stats_files_changed: row.stats_files_changed,
       before_commit_hash: row.before_commit_hash,
       after_commit_hash: row.after_commit_hash,
+      commit_message: row.commit_message,
       timestamp: row.timestamp
     };
   }

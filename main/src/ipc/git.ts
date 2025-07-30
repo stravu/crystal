@@ -39,6 +39,9 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       
       console.log(`[IPC:git] Getting execution diffs for session ${sessionId}`);
       console.log(`[IPC:git] Found ${executionDiffs.length} execution diffs`);
+      if (executionDiffs.length > 0) {
+        console.log(`[IPC:git] First execution diff:`, executionDiffs[0]);
+      }
       
       return { success: true, data: executionDiffs };
     } catch (error) {
