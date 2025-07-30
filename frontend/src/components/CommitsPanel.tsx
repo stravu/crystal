@@ -34,11 +34,8 @@ export function CommitsPanel({ sessionId }: CommitsPanelProps) {
       setLoading(true);
       const response = await API.sessions.getExecutions(sessionId);
       if (response.success && response.data) {
-        // Filter to only show actual commits
-        const actualCommits = response.data.filter(
-          (exec: ExecutionDiff) => exec.after_commit_hash && exec.after_commit_hash !== 'UNCOMMITTED'
-        );
-        setCommits(actualCommits);
+        // Show all execution diffs, including failed commits
+        setCommits(response.data);
       }
     } catch (error) {
       console.error('Failed to load commits:', error);
@@ -80,6 +77,13 @@ export function CommitsPanel({ sessionId }: CommitsPanelProps) {
       {commits.map((commit) => {
         const isExpanded = expandedCommits.has(commit.id);
         const timeAgo = formatDistanceToNow(parseTimestamp(commit.timestamp));
+        const isFailedCommit = !commit.after_commit_hash || commit.after_commit_hash === 'UNCOMMITTED';
+        const hasChanges = commit.stats_files_changed > 0;
+        
+        // Skip executions with no changes and no commit
+        if (!hasChanges && isFailedCommit) {
+          return null;
+        }
         
         return (
           <div
@@ -101,11 +105,18 @@ export function CommitsPanel({ sessionId }: CommitsPanelProps) {
                 )}
               </div>
               
-              <GitCommit className="w-4 h-4 text-status-success mt-0.5 flex-shrink-0" />
+              <GitCommit className={cn(
+                "w-4 h-4 mt-0.5 flex-shrink-0",
+                isFailedCommit ? "text-status-error" : "text-status-success"
+              )} />
               
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-text-primary truncate">
-                  {commit.commit_message || 'Autocommit'}
+                  {isFailedCommit ? (
+                    <span className="text-status-error">Uncommitted changes</span>
+                  ) : (
+                    commit.commit_message || 'Autocommit'
+                  )}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-text-secondary">
                   <span className="flex items-center gap-1">
@@ -129,12 +140,21 @@ export function CommitsPanel({ sessionId }: CommitsPanelProps) {
             {isExpanded && (
               <div className="px-4 pl-14 pb-3 bg-surface-secondary">
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-text-tertiary">Hash:</span>
-                    <code className="font-mono text-xs text-text-primary">
-                      {commit.after_commit_hash?.substring(0, 7)}
-                    </code>
-                  </div>
+                  {isFailedCommit ? (
+                    <div className="text-status-error text-sm">
+                      <p className="font-medium">⚠️ Changes were not committed</p>
+                      <p className="text-xs mt-1 text-text-secondary">
+                        Check the Terminal tab for error details. You may need to commit manually.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-text-tertiary">Hash:</span>
+                      <code className="font-mono text-xs text-text-primary">
+                        {commit.after_commit_hash?.substring(0, 7)}
+                      </code>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-text-tertiary">Execution:</span>
                     <span className="text-text-primary">#{commit.execution_sequence}</span>
