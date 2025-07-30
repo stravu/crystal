@@ -195,6 +195,34 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         return { success: false, error: 'Session is already archived' };
       }
 
+      // Stop Claude Code process if it's running (important for Windows to release file locks)
+      if (claudeCodeManager.isSessionRunning(sessionId)) {
+        console.log(`[Main] Stopping Claude Code process for session ${sessionId} before archiving`);
+        try {
+          await claudeCodeManager.stopSession(sessionId);
+          // Give Windows time to release file locks
+          if (process.platform === 'win32') {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(`[Main] Failed to stop Claude Code process for session ${sessionId}:`, error);
+        }
+      }
+      
+      // Close terminal session if it exists (important for Windows to release directory locks)
+      // This is done here in addition to archiveSession to ensure it happens BEFORE worktree removal
+      try {
+        console.log(`[Main] Closing terminal session for ${sessionId} before worktree removal`);
+        await sessionManager.closeTerminalSession(sessionId);
+        // Give Windows extra time to release directory locks after terminal closure
+        if (process.platform === 'win32') {
+          console.log(`[Main] Waiting 2 seconds for Windows to release terminal directory locks...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (error) {
+        console.error(`[Main] Failed to close terminal session for ${sessionId}:`, error);
+      }
+
       // Add a message to session output about archiving
       const timestamp = new Date().toLocaleTimeString();
       let archiveMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 📦 ARCHIVING SESSION \x1b[0m\r\n`;

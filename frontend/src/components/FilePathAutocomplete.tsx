@@ -15,7 +15,7 @@ interface FilePathAutocompleteProps {
   projectId?: string;
   placeholder?: string;
   className?: string;
-  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  textareaRef?: React.RefObject<HTMLTextAreaElement>;
   isTextarea?: boolean;
   rows?: number;
   disabled?: boolean;

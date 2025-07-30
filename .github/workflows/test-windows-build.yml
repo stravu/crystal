@@ -1,0 +1,73 @@
+name: Test Windows Build
+
+on:
+  push:
+    branches: 
+      - windows-compatibility-clean
+  workflow_dispatch:
+
+jobs:
+  test-build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.15.1'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build frontend and main process
+      shell: bash
+      run: |
+        echo "Building frontend and main process..."
+        pnpm run build:frontend &
+        pnpm run build:main &
+        wait
+
+    - name: Rebuild native modules
+      run: pnpm run electron:rebuild
+
+    - name: Generate NOTICES file
+      run: pnpm run generate-notices
+
+    - name: Build Windows application
+      run: pnpm run build:win:ci
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: List build artifacts
+      shell: bash
+      run: ls -la dist-electron/
+
+    - name: Check for exe file
+      shell: pwsh
+      run: |
+        $exeFiles = Get-ChildItem -Path "dist-electron" -Filter "*.exe"
+        if ($exeFiles.Count -eq 0) {
+          Write-Error "No .exe file found!"
+          exit 1
+        }
+        Write-Host "Found .exe files:"
+        $exeFiles | ForEach-Object { Write-Host $_.FullName }
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: crystal-windows-test
+        path: dist-electron/*.exe
+        if-no-files-found: error
