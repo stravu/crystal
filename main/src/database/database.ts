@@ -1335,7 +1335,7 @@ export class DatabaseService {
   }
 
   // Session output operations
-  addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json', data: string): void {
+  addSessionOutput(sessionId: string, type: 'stdout' | 'stderr' | 'system' | 'json' | 'error', data: string): void {
     this.db.prepare(`
       INSERT INTO session_outputs (session_id, type, data)
       VALUES (?, ?, ?)

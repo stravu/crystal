@@ -511,7 +511,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           // If no output format can be generated, skip this JSON message
           return null;
         }
-        return output; // Non-JSON outputs pass through
+        // Pass through all other output types including 'error'
+        return output; 
       }).filter(Boolean); // Remove any null entries
       return { success: true, data: transformedOutputs };
     } catch (error) {
@@ -615,13 +616,28 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const outputs = await sessionManager.getSessionOutputs(sessionId);
       console.log(`[IPC] Retrieved ${outputs.length} total outputs for session ${sessionId}`);
       
-      // Filter to only JSON messages and include timestamp
+      // Filter to JSON messages and error messages, include timestamp
       const jsonMessages = outputs
-        .filter(output => output.type === 'json')
-        .map(output => ({
-          ...output.data,
-          timestamp: output.timestamp.toISOString()
-        }));
+        .filter(output => output.type === 'json' || output.type === 'error')
+        .map(output => {
+          if (output.type === 'error') {
+            // Transform error outputs to a format that RichOutputView can handle
+            return {
+              type: 'system',
+              subtype: 'error',
+              timestamp: output.timestamp.toISOString(),
+              error: output.data.error,
+              details: output.data.details,
+              message: `${output.data.error}${output.data.details ? '\n\n' + output.data.details : ''}`
+            };
+          } else {
+            // Regular JSON messages
+            return {
+              ...output.data,
+              timestamp: output.timestamp.toISOString()
+            };
+          }
+        });
       
       console.log(`[IPC] Found ${jsonMessages.length} JSON messages for session ${sessionId}`);
       return { success: true, data: jsonMessages };
@@ -837,4 +853,5 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       return { success: false, error: 'Failed to get table structure' };
     }
   });
+
 } 

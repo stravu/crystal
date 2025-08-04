@@ -334,6 +334,25 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           }
         });
         
+      } else if (msg.type === 'system' && msg.subtype === 'error') {
+        // Handle error messages from session manager
+        transformed.push({
+          id: msg.id || `error-${i}-${msg.timestamp}`,
+          role: 'system',
+          timestamp: msg.timestamp,
+          segments: [{ 
+            type: 'system_info', 
+            info: {
+              error: msg.error,
+              details: msg.details,
+              message: msg.message
+            }
+          }],
+          metadata: {
+            systemSubtype: 'error'
+          }
+        });
+        
       } else if (msg.type === 'result') {
         // Handle execution result messages - especially errors
         if (msg.is_error && msg.result) {
@@ -755,13 +774,18 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           );
         }
       } else if (message.metadata?.systemSubtype === 'error') {
-        // Render error messages
+        // Render error messages - get error info from system_info segment
+        const errorInfo = message.segments.find(seg => seg.type === 'system_info')?.info;
+        const errorMessage = errorInfo?.message || textContent;
+        const errorTitle = errorInfo?.error || 'Session Error';
+        
         return (
           <div
             key={message.id}
             className={`
               rounded-lg transition-all bg-status-error/10 border border-status-error/30
               ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
             `}
           >
             <div className="flex items-start gap-3">
@@ -770,7 +794,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="font-semibold text-status-error">Session Error</span>
+                  <span className="font-semibold text-status-error">{errorTitle}</span>
                   <span className="text-sm text-text-tertiary">
                     {formatDistanceToNow(parseTimestamp(message.timestamp))}
                   </span>
@@ -780,8 +804,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-text-primary whitespace-pre-wrap font-mono">
-                  {textContent}
+                <div className="text-sm text-text-primary whitespace-pre-wrap">
+                  {errorMessage}
                 </div>
               </div>
             </div>

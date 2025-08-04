@@ -317,13 +317,31 @@ export class SessionManager extends EventEmitter {
     this.emit('session-updated', session);
   }
 
+  addSessionError(id: string, error: string, details?: string): void {
+    const errorData = {
+      error: error,
+      details: details,
+      timestamp: new Date().toISOString()
+    };
+    
+    this.addSessionOutput(id, {
+      type: 'error',
+      data: errorData,
+      timestamp: new Date()
+    });
+    
+    // Mark the session as having an error
+    this.updateSession(id, { status: 'error', error: error });
+  }
+
+
   addSessionOutput(id: string, output: Omit<SessionOutput, 'sessionId'>): void {
     // Check if this is the first output for this session
     const existingOutputs = this.db.getSessionOutputs(id, 1);
     const isFirstOutput = existingOutputs.length === 0;
     
-    // Store in database (stringify JSON objects)
-    const dataToStore = output.type === 'json' ? JSON.stringify(output.data) : output.data;
+    // Store in database (stringify JSON objects and error objects)
+    const dataToStore = (output.type === 'json' || output.type === 'error') ? JSON.stringify(output.data) : output.data;
     this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Emit the output so it shows immediately in the UI
@@ -443,8 +461,8 @@ export class SessionManager extends EventEmitter {
     const dbOutputs = this.db.getSessionOutputs(id, limit);
     return dbOutputs.map(dbOutput => ({
       sessionId: dbOutput.session_id,
-      type: dbOutput.type as 'stdout' | 'stderr' | 'json',
-      data: dbOutput.type === 'json' ? JSON.parse(dbOutput.data) : dbOutput.data,
+      type: dbOutput.type as 'stdout' | 'stderr' | 'json' | 'error',
+      data: (dbOutput.type === 'json' || dbOutput.type === 'error') ? JSON.parse(dbOutput.data) : dbOutput.data,
       timestamp: new Date(dbOutput.timestamp)
     }));
   }

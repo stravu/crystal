@@ -122,12 +122,20 @@ export class ClaudeCodeManager extends EventEmitter {
           }
         };
         
+        // Emit both the styled error message and add to session manager
         this.emit('output', {
           sessionId,
           type: 'json',
           data: errorMessage,
           timestamp: new Date()
         });
+        
+        // Add a dedicated error output that will be displayed in its own box
+        this.sessionManager.addSessionError(
+          sessionId, 
+          'Claude Code not available', 
+          availability.error + '\nPlease install Claude Code or verify it is in your PATH.'
+        );
         
         throw new Error(`Claude Code CLI not available: ${availability.error}`);
       }
@@ -577,6 +585,13 @@ export class ClaudeCodeManager extends EventEmitter {
             timestamp: new Date()
           });
           
+          // Add a dedicated error output that will be displayed in its own box
+          this.sessionManager.addSessionError(
+            sessionId, 
+            'Claude Code executable not found', 
+            'Claude Code CLI not found in PATH. Please ensure claude is installed and in your PATH.'
+          );
+          
           throw new Error('Claude Code CLI not found in PATH. Please ensure claude is installed and in your PATH.');
         }
         claudeCommand = foundPath;
@@ -705,6 +720,13 @@ export class ClaudeCodeManager extends EventEmitter {
           data: errorMessage,
           timestamp: new Date()
         });
+        
+        // Add a dedicated error output that will be displayed in its own box
+        this.sessionManager.addSessionError(
+          sessionId, 
+          'Failed to start Claude Code', 
+          `${errorMsg}\nPlease check that Claude Code is installed and accessible.`
+        );
         
         throw new Error(`Failed to spawn Claude Code: ${errorMsg}`);
       }
