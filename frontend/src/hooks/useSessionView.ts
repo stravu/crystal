@@ -13,7 +13,7 @@ export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'editor';
 
 export const useSessionView = (
   activeSession: Session | undefined,
-  terminalRef: React.RefObject<HTMLDivElement | null>,
+  terminalRef: React.RefObject<HTMLDivElement | null> | undefined,
   scriptTerminalRef: React.RefObject<HTMLDivElement | null>
 ) => {
   const { theme } = useTheme();
@@ -540,10 +540,10 @@ export const useSessionView = (
     return () => window.removeEventListener('session-output-available', handleOutputAvailable as EventListener);
   }, [activeSession?.id, outputLoadState]);
 
-  const initTerminal = useCallback((termRef: React.RefObject<HTMLDivElement | null>, instanceRef: React.MutableRefObject<Terminal | null>, fitAddonRef: React.MutableRefObject<FitAddon | null>, isScript: boolean) => {
-    console.log(`[initTerminal] Called - termRef.current: ${!!termRef.current}, instanceRef.current: ${!!instanceRef.current}, isScript: ${isScript}`);
+  const initTerminal = useCallback((termRef: React.RefObject<HTMLDivElement | null> | undefined, instanceRef: React.MutableRefObject<Terminal | null>, fitAddonRef: React.MutableRefObject<FitAddon | null>, isScript: boolean) => {
+    console.log(`[initTerminal] Called - termRef.current: ${!!termRef?.current}, instanceRef.current: ${!!instanceRef.current}, isScript: ${isScript}`);
     
-    if (!termRef.current) {
+    if (!termRef?.current) {
       console.log(`[initTerminal] No terminal ref element, cannot initialize`);
       return;
     }
@@ -724,7 +724,7 @@ export const useSessionView = (
     if (!terminalInstance.current) {
       console.log(`[Terminal Write Effect] No terminal instance yet`);
       // If we have formatted output but no terminal, retry after a delay
-      if (formattedOutput && formattedOutput.length > 0 && terminalRef.current) {
+      if (formattedOutput && formattedOutput.length > 0 && terminalRef?.current) {
         console.log(`[Terminal Write Effect] Have output but no terminal, attempting init`);
         initTerminal(terminalRef, terminalInstance, fitAddon, false);
         // Give terminal time to initialize then write
@@ -906,7 +906,7 @@ export const useSessionView = (
   }, [viewMode]);
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    if (!terminalRef?.current) return;
     const observer = new ResizeObserver(() => {
       // Output view removed
     });
