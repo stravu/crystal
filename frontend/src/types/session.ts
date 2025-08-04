@@ -67,7 +67,7 @@ export interface CreateSessionRequest {
 
 export interface SessionOutput {
   sessionId: string;
-  type: 'stdout' | 'stderr' | 'json';
+  type: 'stdout' | 'stderr' | 'json' | 'error';
   data: string | any;
   timestamp: string;
 }

@@ -143,6 +143,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>): Promise<string[]> => ipcRenderer.invoke('sessions:save-images', sessionId, images),
+    
   },
 
   // Project management

@@ -71,7 +71,7 @@ export interface Session {
 export interface SessionOutput {
   id: number;
   session_id: string;
-  type: 'stdout' | 'stderr' | 'system' | 'json';
+  type: 'stdout' | 'stderr' | 'system' | 'json' | 'error';
   data: string;
   timestamp: string;
 }
@@ -142,6 +142,7 @@ export interface ExecutionDiff {
   stats_files_changed: number;
   before_commit_hash?: string;
   after_commit_hash?: string;
+  commit_message?: string;
   timestamp: string;
 }
 
@@ -156,4 +157,5 @@ export interface CreateExecutionDiffData {
   stats_files_changed?: number;
   before_commit_hash?: string;
   after_commit_hash?: string;
+  commit_message?: string;
 }

@@ -51,6 +51,7 @@ interface ToolCall {
   status: 'pending' | 'success' | 'error';
 }
 
+
 interface ToolResult {
   content: string;
   isError?: boolean;
@@ -102,6 +103,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
   const userMessageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const wasAtBottomRef = useRef(true);
 
   // Save local settings to localStorage when they change
   useEffect(() => {
@@ -211,13 +213,17 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           const textContent = extractTextContent(msg);
           
           if (textContent) {
-            transformed.push({
+            const userMessage = {
               id: msg.id || `user-${i}-${msg.timestamp}`,
-              role: 'user',
+              role: 'user' as const,
               timestamp: msg.timestamp,
-              segments: [{ type: 'text', content: textContent }],
+              segments: [{ type: 'text', content: textContent } as MessageSegment],
               metadata: { agent: detectAgent(msg) }
-            });
+            };
+            
+            transformed.push(userMessage);
+            
+            // Removed: Commit summaries are now shown in the dedicated Commits panel
           }
         }
         // Skip tool result messages - they're attached to assistant messages
@@ -328,6 +334,25 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           }
         });
         
+      } else if (msg.type === 'system' && msg.subtype === 'error') {
+        // Handle error messages from session manager
+        transformed.push({
+          id: msg.id || `error-${i}-${msg.timestamp}`,
+          role: 'system',
+          timestamp: msg.timestamp,
+          segments: [{ 
+            type: 'system_info', 
+            info: {
+              error: msg.error,
+              details: msg.details,
+              message: msg.message
+            }
+          }],
+          metadata: {
+            systemSubtype: 'error'
+          }
+        });
+        
       } else if (msg.type === 'result') {
         // Handle execution result messages - especially errors
         if (msg.is_error && msg.result) {
@@ -363,7 +388,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     try {
       setError(null);
       
-      // Load both conversation messages (for user prompts) and JSON messages (for detailed responses)
+      // Load conversation messages and JSON messages
       const [conversationResponse, outputResponse] = await Promise.all([
         API.sessions.getConversation(sessionId),
         API.sessions.getJsonMessages(sessionId)
@@ -440,12 +465,31 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     loadMessages();
   }, [sessionId, loadMessages]);
 
+  // Track if user is at bottom before messages change
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const checkIfAtBottom = () => {
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+      wasAtBottomRef.current = isAtBottom;
+    };
+
+    container.addEventListener('scroll', checkIfAtBottom);
+    return () => container.removeEventListener('scroll', checkIfAtBottom);
+  }, []);
+
   // Auto-scroll to bottom when messages change or view loads
   useEffect(() => {
-    if (settings.autoScroll && messagesEndRef.current) {
-      // Use instant scroll on initial load, smooth scroll for updates
-      const behavior = loading ? 'instant' : 'smooth';
-      messagesEndRef.current.scrollIntoView({ behavior: behavior as ScrollBehavior });
+    if (settings.autoScroll && messagesEndRef.current && !loading) {
+      // Scroll if we were at the bottom before the update
+      if (wasAtBottomRef.current) {
+        // Use requestAnimationFrame to ensure DOM has updated
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
+          wasAtBottomRef.current = true; // Reset to true after scrolling
+        });
+      }
     }
   }, [messages, settings.autoScroll, loading]);
 
@@ -730,13 +774,18 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           );
         }
       } else if (message.metadata?.systemSubtype === 'error') {
-        // Render error messages
+        // Render error messages - get error info from system_info segment
+        const errorInfo = message.segments.find(seg => seg.type === 'system_info')?.info;
+        const errorMessage = errorInfo?.message || textContent;
+        const errorTitle = errorInfo?.error || 'Session Error';
+        
         return (
           <div
             key={message.id}
             className={`
               rounded-lg transition-all bg-status-error/10 border border-status-error/30
               ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
             `}
           >
             <div className="flex items-start gap-3">
@@ -745,7 +794,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="font-semibold text-status-error">Session Error</span>
+                  <span className="font-semibold text-status-error">{errorTitle}</span>
                   <span className="text-sm text-text-tertiary">
                     {formatDistanceToNow(parseTimestamp(message.timestamp))}
                   </span>
@@ -755,8 +804,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-text-primary whitespace-pre-wrap font-mono">
-                  {textContent}
+                <div className="text-sm text-text-primary whitespace-pre-wrap">
+                  {errorMessage}
                 </div>
               </div>
             </div>
@@ -910,6 +959,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               return null;
             })
           }
+          
         </div>
       </div>
     );

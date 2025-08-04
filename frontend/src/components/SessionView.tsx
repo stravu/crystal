@@ -145,6 +145,7 @@ export const SessionView = memo(() => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
   };
+
   
   // Memoize props to prevent unnecessary re-renders
   const emptySelectedExecutions = useMemo(() => [], []);
@@ -355,6 +356,7 @@ export const SessionView = memo(() => {
           onClose={() => setShowRichOutputSettings(false)}
         />
       )}
+
     </div>
   );
 });
