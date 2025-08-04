@@ -1,17 +1,17 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ProjectDashboard } from './ProjectDashboard';
 import { FileEditor } from './FileEditor';
-import { SessionInputWithImages } from './session/SessionInputWithImages';
 import { API } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSessionStore } from '../stores/sessionStore';
 import { Session } from '../types/session';
-import { useSessionView } from '../hooks/useSessionView';
+import { LayoutDashboard, FolderTree, Terminal as TerminalIcon } from 'lucide-react';
+import { cn } from '../utils/cn';
 import '@xterm/xterm/css/xterm.css';
 
-export type ProjectViewMode = 'dashboard' | 'output' | 'files' | 'terminal';
+export type ProjectViewMode = 'dashboard' | 'files' | 'terminal';
 
 interface ProjectViewProps {
   projectId: number;
@@ -28,30 +28,60 @@ interface ProjectViewTabsProps {
 }
 
 const ProjectViewTabs: React.FC<ProjectViewTabsProps> = ({ viewMode, setViewMode }) => {
-  const tabs: { mode: ProjectViewMode; label: string }[] = [
-    { mode: 'dashboard', label: 'Dashboard' },
-    { mode: 'output', label: 'Output' },
-    { mode: 'files', label: 'File Tree' },
-    { mode: 'terminal', label: 'Terminal' },
+  const tabs: { 
+    mode: ProjectViewMode; 
+    label: string; 
+    icon: React.ReactNode;
+  }[] = [
+    { 
+      mode: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <LayoutDashboard className="w-4 h-4" />
+    },
+    { 
+      mode: 'files', 
+      label: 'Files', 
+      icon: <FolderTree className="w-4 h-4" />
+    },
+    { 
+      mode: 'terminal', 
+      label: 'Terminal', 
+      icon: <TerminalIcon className="w-4 h-4" />
+    },
   ];
 
   return (
-    <div className="flex flex-col gap-2 relative z-10 mt-6">
-      <div className="flex bg-surface-secondary rounded-lg border border-border-primary overflow-hidden flex-shrink-0">
-        {tabs.map(({ mode, label }) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block transition-colors ${
-              viewMode === mode
-                ? 'bg-interactive text-interactive-on-dark'
-                : 'text-text-primary hover:bg-surface-hover'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center bg-surface-secondary" role="tablist">
+      {tabs.map(({ mode, label, icon }) => (
+        <button
+          key={mode}
+          role="tab"
+          aria-selected={viewMode === mode}
+          onClick={() => setViewMode(mode)}
+          className={cn(
+            "relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all",
+            "border-b-2 hover:text-text-primary",
+            viewMode === mode ? [
+              "text-text-primary border-interactive",
+              "bg-gradient-to-t from-interactive/5 to-transparent"
+            ] : [
+              "text-text-secondary border-transparent",
+              "hover:border-border-secondary hover:bg-surface-hover/50"
+            ]
+          )}
+        >
+          {/* Icon */}
+          <span className={cn(
+            "transition-colors",
+            viewMode === mode ? "text-interactive" : "text-text-tertiary"
+          )}>
+            {icon}
+          </span>
+          
+          {/* Label */}
+          <span>{label}</span>
+        </button>
+      ))}
     </div>
   );
 };
@@ -69,7 +99,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   const [mainRepoSessionId, setMainRepoSessionId] = useState<string | null>(null);
   const [mainRepoSession, setMainRepoSession] = useState<Session | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
-  const [isStravuConnected, setIsStravuConnected] = useState(false);
   
   // Notify parent component when view mode changes
   useEffect(() => {
@@ -78,32 +107,25 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     }
   }, [viewMode, onViewModeChange]);
   
-  // Set main repo session as active when output tab is selected
+  // Set main repo session as active when terminal tab is selected
   useEffect(() => {
-    if (viewMode === 'output' && mainRepoSession) {
+    if (viewMode === 'terminal' && mainRepoSession) {
       useSessionStore.getState().setActiveSession(mainRepoSession.id);
     }
   }, [viewMode, mainRepoSession]);
   
-  // Wrapped git operations that switch to output tab
+  // Wrapped git operations that switch to terminal tab
   const handleGitPull = useCallback(() => {
-    setViewMode('output');
+    setViewMode('terminal');
     onGitPull();
   }, [onGitPull]);
   
   const handleGitPush = useCallback(() => {
-    setViewMode('output');
+    setViewMode('terminal');
     onGitPush();
   }, [onGitPush]);
   
-  // Handle terminal command
-  const handleTerminalCommand = useCallback(() => {
-    if (!mainRepoSessionId) return;
-    setViewMode('terminal');
-  }, [mainRepoSessionId]);
   const terminalRef = useRef<HTMLDivElement>(null);
-  const outputTerminalRef = useRef<HTMLDivElement>(null);
-  const scriptTerminalRef = useRef<HTMLDivElement>(null);
   
   // Terminal state
   const terminalInstance = useRef<Terminal | null>(null);
@@ -111,8 +133,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   const [scriptOutput, setScriptOutput] = useState<string[]>([]);
   const lastProcessedOutputLength = useRef(0);
   
-  // Use the same hook as SessionView for output handling
-  const hook = useSessionView(mainRepoSession || undefined, outputTerminalRef, scriptTerminalRef);
   
   // Debug logging
   useEffect(() => {
@@ -203,8 +223,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
             setMainRepoSession(mainSession);
           }
           
-          // Set as active session if currently on output tab
-          if (viewMode === 'output') {
+          // Set as active session if currently on terminal tab
+          if (viewMode === 'terminal') {
             useSessionStore.getState().setActiveSession(response.data.id);
           }
         }
@@ -293,20 +313,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   
   // Elapsed time tracking is now handled by useSessionView hook
   
-  // Check Stravu connection status
-  useEffect(() => {
-    const checkStravuConnection = async () => {
-      try {
-        const response = await API.stravu.getConnectionStatus();
-        setIsStravuConnected(response.success && response.data.status === 'connected');
-      } catch (err) {
-        setIsStravuConnected(false);
-      }
-    };
-    checkStravuConnection();
-    const interval = setInterval(checkStravuConnection, 30000);
-    return () => clearInterval(interval);
-  }, []);
   
   // formatElapsedTime is now provided by useSessionView hook
 
@@ -323,53 +329,57 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       {/* Project Header */}
-      <div className="bg-surface-primary border-b border-border-primary px-4 py-3 flex-shrink-0">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0 relative">
-            <h2 className="font-bold text-xl text-text-primary truncate">
-              {projectName}
-            </h2>
-            
-            {/* Git Actions for Main Project */}
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <div className="flex flex-wrap items-center gap-2 relative z-20">
-                <div className="group relative">
-                  <button 
-                    onClick={handleGitPull} 
-                    disabled={isMerging} 
-                    className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
-                      isMerging 
-                        ? 'bg-surface-secondary border-border-secondary text-text-disabled cursor-not-allowed' 
-                        : 'bg-surface-secondary border-status-info text-status-info hover:bg-status-info/10 hover:border-status-info/70'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
-                    </svg>
-                    <span className="text-sm font-medium">{isMerging ? 'Pulling...' : 'Pull'}</span>
-                  </button>
-                </div>
-                <div className="group relative">
-                  <button 
-                    onClick={handleGitPush} 
-                    disabled={isMerging} 
-                    className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
-                      isMerging 
-                        ? 'bg-surface-secondary border-border-secondary text-text-disabled cursor-not-allowed' 
-                        : 'bg-surface-secondary border-status-success text-status-success hover:bg-status-success/10 hover:border-status-success/70'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
-                    </svg>
-                    <span className="text-sm font-medium">{isMerging ? 'Pushing...' : 'Push'}</span>
-                  </button>
+      <div className="bg-surface-primary border-b border-border-primary flex-shrink-0">
+        <div className="px-4 py-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0 relative">
+              <h2 className="font-bold text-xl text-text-primary truncate">
+                {projectName}
+              </h2>
+              
+              {/* Git Actions for Main Project */}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <div className="flex flex-wrap items-center gap-2 relative z-20">
+                  <div className="group relative">
+                    <button 
+                      onClick={handleGitPull} 
+                      disabled={isMerging} 
+                      className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
+                        isMerging 
+                          ? 'bg-surface-secondary border-border-secondary text-text-disabled cursor-not-allowed' 
+                          : 'bg-surface-secondary border-status-info text-status-info hover:bg-status-info/10 hover:border-status-info/70'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
+                      </svg>
+                      <span className="text-sm font-medium">{isMerging ? 'Pulling...' : 'Pull'}</span>
+                    </button>
+                  </div>
+                  <div className="group relative">
+                    <button 
+                      onClick={handleGitPush} 
+                      disabled={isMerging} 
+                      className={`px-3 py-1.5 rounded-full border transition-all flex items-center space-x-2 ${
+                        isMerging 
+                          ? 'bg-surface-secondary border-border-secondary text-text-disabled cursor-not-allowed' 
+                          : 'bg-surface-secondary border-status-success text-status-success hover:bg-status-success/10 hover:border-status-success/70'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
+                      </svg>
+                      <span className="text-sm font-medium">{isMerging ? 'Pushing...' : 'Push'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <ProjectViewTabs viewMode={viewMode} setViewMode={setViewMode} />
         </div>
+        
+        {/* Project View Tabs */}
+        <ProjectViewTabs viewMode={viewMode} setViewMode={setViewMode} />
       </div>
 
       {/* Project Content */}
@@ -437,63 +447,9 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
             )}
           </div>
           
-          {/* Output View */}
-          <div className={`h-full ${viewMode === 'output' ? 'flex flex-col' : 'hidden'} bg-gray-50 dark:bg-black relative`}>
-            {hook.isLoadingOutput && (
-              <div className="absolute top-4 left-4 text-gray-600 dark:text-gray-400 z-10">Loading output...</div>
-            )}
-            <div 
-              ref={outputTerminalRef} 
-              className="flex-1 min-h-0"
-            />
-            {mainRepoSession && (mainRepoSession.status === 'running' || mainRepoSession.status === 'initializing') && (
-              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 flex-shrink-0">
-                <div className="flex items-center justify-between text-gray-700 dark:text-gray-300">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot"></div>
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-                    <span className="text-sm font-medium">
-                      {mainRepoSession.status === 'initializing' ? 'Starting Claude Code...' : 'Claude is working...'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                      {mainRepoSession.status === 'initializing' ? '⚡' : hook.formatElapsedTime(hook.elapsedTime)}
-                    </div>
-                    <button onClick={hook.handleStopSession} className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
       
-      {viewMode === 'output' && mainRepoSession && (
-        <SessionInputWithImages
-          activeSession={mainRepoSession}
-          viewMode="richOutput"
-          input={hook.input}
-          setInput={hook.setInput}
-          textareaRef={hook.textareaRef}
-          handleTerminalCommand={handleTerminalCommand}
-          handleSendInput={hook.handleSendInput}
-          handleContinueConversation={hook.handleContinueConversation}
-          isStravuConnected={isStravuConnected}
-          setShowStravuSearch={hook.setShowStravuSearch}
-          ultrathink={hook.ultrathink}
-          setUltrathink={hook.setUltrathink}
-          gitCommands={hook.gitCommands}
-          handleCompactContext={hook.handleCompactContext}
-          hasConversationHistory={hook.hasConversationHistory}
-          contextCompacted={hook.contextCompacted}
-        />
-      )}
     </div>
   );
 };
