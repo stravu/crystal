@@ -49,7 +49,7 @@ test.describe('Smoke Tests', () => {
     await settingsButton.click();
     
     // Wait for settings to appear - use a simple text selector
-    await expect(page.locator('text="Settings"').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text="Crystal Settings"').first()).toBeVisible({ timeout: 10000 });
     
     // Check that some settings content is visible
     await expect(page.locator('text=/Verbose|API Key|System Prompt/i').first()).toBeVisible({ timeout: 5000 });
