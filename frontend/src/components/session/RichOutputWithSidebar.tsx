@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, History, GitCommit } from 'lucide-react';
 import { RichOutputView } from './RichOutputView';
 import { PromptNavigation } from '../PromptNavigation';
+import { CommitsPanel } from '../CommitsPanel';
 import { cn } from '../../utils/cn';
 import { RichOutputSettings } from './RichOutputView';
 
@@ -16,6 +17,9 @@ interface RichOutputWithSidebarProps {
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'crystal-rich-output-sidebar-collapsed';
+const SIDEBAR_TAB_KEY = 'crystal-rich-output-sidebar-tab';
+
+type SidebarTab = 'prompts' | 'commits';
 
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionId,
@@ -28,12 +32,23 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
     return stored === 'true';
   });
   
+  // Load active tab from localStorage
+  const [activeTab, setActiveTab] = useState<SidebarTab>(() => {
+    const stored = localStorage.getItem(SIDEBAR_TAB_KEY);
+    return (stored as SidebarTab) || 'prompts';
+  });
+  
   const richOutputRef = useRef<{ scrollToPrompt: (promptIndex: number) => void }>(null);
 
   // Save collapsed state to localStorage when it changes
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
   }, [isCollapsed]);
+  
+  // Save active tab to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_TAB_KEY, activeTab);
+  }, [activeTab]);
   
   // Override the navigation handler to scroll within rich output
   const handleNavigateToPrompt = useCallback((marker: any) => {
@@ -66,11 +81,15 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           'flex items-center gap-1 group',
           isCollapsed ? 'right-0 rounded-r-lg' : 'right-64 -mr-px'
         )}
-        title={isCollapsed ? 'Show prompt history' : 'Hide prompt history'}
+        title={isCollapsed ? 'Show sidebar' : 'Hide sidebar'}
       >
         {isCollapsed ? (
           <>
-            <History className="w-4 h-4 text-text-secondary group-hover:text-text-primary" />
+            {activeTab === 'prompts' ? (
+              <History className="w-4 h-4 text-text-secondary group-hover:text-text-primary" />
+            ) : (
+              <GitCommit className="w-4 h-4 text-text-secondary group-hover:text-text-primary" />
+            )}
             <ChevronLeft className="w-4 h-4 text-text-secondary group-hover:text-text-primary" />
           </>
         ) : (
@@ -86,11 +105,46 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
         )}
       >
         {!isCollapsed && (
-          <div className="w-64 h-full border-l border-border-primary">
-            <PromptNavigation
-              sessionId={sessionId}
-              onNavigateToPrompt={handleNavigateToPrompt}
-            />
+          <div className="w-64 h-full border-l border-border-primary flex flex-col">
+            {/* Tab Header */}
+            <div className="flex border-b border-border-primary">
+              <button
+                onClick={() => setActiveTab('prompts')}
+                className={cn(
+                  'flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2',
+                  activeTab === 'prompts'
+                    ? 'text-interactive border-b-2 border-interactive bg-interactive/5'
+                    : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
+                )}
+              >
+                <History className="w-4 h-4" />
+                <span>Prompts</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('commits')}
+                className={cn(
+                  'flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2',
+                  activeTab === 'commits'
+                    ? 'text-interactive border-b-2 border-interactive bg-interactive/5'
+                    : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
+                )}
+              >
+                <GitCommit className="w-4 h-4" />
+                <span>Commits</span>
+              </button>
+            </div>
+            
+            {/* Tab Content */}
+            <div className="flex-1 overflow-hidden">
+              {activeTab === 'prompts' ? (
+                <PromptNavigation
+                  sessionId={sessionId}
+                  onNavigateToPrompt={handleNavigateToPrompt}
+                />
+              ) : (
+                <CommitsPanel sessionId={sessionId} />
+              )}
+            </div>
           </div>
         )}
       </div>
