@@ -221,7 +221,7 @@ export const SessionView = memo(() => {
       
       <div className="flex-1 flex relative min-h-0">
         <div className="flex-1 relative">
-          {hook.isLoadingOutput && (
+          {hook.isLoadingOutput && hook.viewMode !== 'richOutput' && (
             <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
           )}
           <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
