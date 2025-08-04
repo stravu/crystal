@@ -353,6 +353,36 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           }
         });
         
+      } else if (msg.type === 'system' && msg.subtype === 'git_operation') {
+        // Handle git operation messages
+        transformed.push({
+          id: msg.id || `git-operation-${i}-${msg.timestamp}`,
+          role: 'system',
+          timestamp: msg.timestamp,
+          segments: [{ 
+            type: 'text', 
+            content: msg.message || msg.raw_output || ''
+          }],
+          metadata: {
+            systemSubtype: 'git_operation'
+          }
+        });
+        
+      } else if (msg.type === 'system' && msg.subtype === 'git_error') {
+        // Handle git error messages
+        transformed.push({
+          id: msg.id || `git-error-${i}-${msg.timestamp}`,
+          role: 'system',
+          timestamp: msg.timestamp,
+          segments: [{ 
+            type: 'text', 
+            content: msg.message || msg.raw_output || ''
+          }],
+          metadata: {
+            systemSubtype: 'git_error'
+          }
+        });
+        
       } else if (msg.type === 'result') {
         // Handle execution result messages - especially errors
         if (msg.is_error && msg.result) {
@@ -854,6 +884,148 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                   <div className="text-sm text-text-primary">
                     <span className="font-medium">Ready to continue!</span> {helpMessage}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      } else if (message.metadata?.systemSubtype === 'git_operation') {
+        // Render git operation messages
+        const rawOutput = message.segments.find(seg => seg.type === 'text')?.content || textContent;
+        const isSuccess = rawOutput.includes('✓') || rawOutput.includes('Successfully');
+        
+        // Parse the git operation message for better formatting
+        const lines = rawOutput.split('\n');
+        const mainMessage = lines.filter(line => !line.includes('🔄 GIT OPERATION') && line.trim()).join('\n');
+        
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all border 
+              ${isSuccess 
+                ? 'bg-status-success/10 border-status-success/30' 
+                : 'bg-interactive/10 border-interactive/30'
+              }
+              ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`
+                rounded-full p-2 
+                ${isSuccess 
+                  ? 'bg-status-success/20 text-status-success' 
+                  : 'bg-interactive/20 text-interactive-on-dark'
+                }
+              `}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`
+                    font-semibold 
+                    ${isSuccess ? 'text-status-success' : 'text-interactive-on-dark'}
+                  `}>
+                    🔄 Git Operation
+                  </span>
+                  <span className="text-sm text-text-tertiary">
+                    {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {mainMessage.split('\n').map((line, idx) => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return null;
+                    
+                    if (trimmedLine.startsWith('✓')) {
+                      return (
+                        <div key={idx} className="flex items-center gap-2 text-status-success font-medium">
+                          <span className="text-base">✓</span>
+                          <span>{trimmedLine.substring(1).trim()}</span>
+                        </div>
+                      );
+                    } else if (trimmedLine.startsWith('Commit message:')) {
+                      return (
+                        <div key={idx} className="text-sm text-text-secondary italic">
+                          {trimmedLine}
+                        </div>
+                      );
+                    } else if (trimmedLine.includes('Git output:')) {
+                      return (
+                        <div key={idx} className="text-sm text-text-secondary font-medium border-t border-border-primary pt-2 mt-2">
+                          {trimmedLine}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div key={idx} className="text-text-primary">
+                          {trimmedLine}
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      } else if (message.metadata?.systemSubtype === 'git_error') {
+        // Render git error messages
+        const rawOutput = message.segments.find(seg => seg.type === 'text')?.content || textContent;
+        
+        // Parse the git error message for better formatting
+        const lines = rawOutput.split('\n');
+        const mainMessage = lines.filter(line => line.trim()).join('\n');
+        
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all bg-status-error/10 border border-status-error/30
+              ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-start gap-3">
+              <div className="rounded-full p-2 bg-status-error/20 text-status-error">
+                <XCircle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-semibold text-status-error">Git Operation Failed</span>
+                  <span className="text-sm text-text-tertiary">
+                    {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {mainMessage.split('\n').map((line, idx) => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return null;
+                    
+                    if (trimmedLine.startsWith('✗')) {
+                      return (
+                        <div key={idx} className="flex items-center gap-2 text-status-error font-medium">
+                          <span className="text-base">✗</span>
+                          <span>{trimmedLine.substring(1).trim()}</span>
+                        </div>
+                      );
+                    } else if (trimmedLine.includes('Git output:')) {
+                      return (
+                        <div key={idx} className="text-sm text-text-secondary font-medium border-t border-status-error/20 pt-2 mt-2">
+                          {trimmedLine}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div key={idx} className="text-sm text-status-error font-mono bg-surface-secondary/50 p-2 rounded border border-status-error/20">
+                          {trimmedLine}
+                        </div>
+                      );
+                    }
+                  })}
                 </div>
               </div>
             </div>

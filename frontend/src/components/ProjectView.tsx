@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ProjectDashboard } from './ProjectDashboard';
 import { FileEditor } from './FileEditor';
 import { SessionInputWithImages } from './session/SessionInputWithImages';
+import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
+import { RichOutputSettings } from './session/RichOutputView';
 import { API } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -9,6 +11,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSessionStore } from '../stores/sessionStore';
 import { Session } from '../types/session';
 import { useSessionView } from '../hooks/useSessionView';
+import { cn } from '../utils/cn';
+import { BarChart3, Eye, FolderTree, Terminal as TerminalIcon } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 
 export type ProjectViewMode = 'dashboard' | 'output' | 'files' | 'terminal';
@@ -28,30 +32,65 @@ interface ProjectViewTabsProps {
 }
 
 const ProjectViewTabs: React.FC<ProjectViewTabsProps> = ({ viewMode, setViewMode }) => {
-  const tabs: { mode: ProjectViewMode; label: string }[] = [
-    { mode: 'dashboard', label: 'Dashboard' },
-    { mode: 'output', label: 'Output' },
-    { mode: 'files', label: 'File Tree' },
-    { mode: 'terminal', label: 'Terminal' },
+  const tabs: { 
+    mode: ProjectViewMode; 
+    label: string; 
+    icon: React.ReactNode;
+  }[] = [
+    { 
+      mode: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <BarChart3 className="w-4 h-4" />
+    },
+    { 
+      mode: 'output', 
+      label: 'Output', 
+      icon: <Eye className="w-4 h-4" />
+    },
+    { 
+      mode: 'files', 
+      label: 'Files', 
+      icon: <FolderTree className="w-4 h-4" />
+    },
+    { 
+      mode: 'terminal', 
+      label: 'Terminal', 
+      icon: <TerminalIcon className="w-4 h-4" />
+    },
   ];
 
   return (
-    <div className="flex flex-col gap-2 relative z-10 mt-6">
-      <div className="flex bg-surface-secondary rounded-lg border border-border-primary overflow-hidden flex-shrink-0">
-        {tabs.map(({ mode, label }) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={`px-3 py-3 text-sm whitespace-nowrap flex-shrink-0 relative block transition-colors ${
-              viewMode === mode
-                ? 'bg-interactive text-interactive-on-dark'
-                : 'text-text-primary hover:bg-surface-hover'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center bg-surface-secondary" role="tablist">
+      {tabs.map(({ mode, label, icon }) => (
+        <button
+          key={mode}
+          role="tab"
+          aria-selected={viewMode === mode}
+          onClick={() => setViewMode(mode)}
+          className={cn(
+            "relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all",
+            "border-b-2 hover:text-text-primary",
+            viewMode === mode ? [
+              "text-text-primary border-interactive",
+              "bg-gradient-to-t from-interactive/5 to-transparent"
+            ] : [
+              "text-text-secondary border-transparent",
+              "hover:border-border-secondary hover:bg-surface-hover/50"
+            ]
+          )}
+        >
+          {/* Icon */}
+          <span className={cn(
+            "transition-colors",
+            viewMode === mode ? "text-interactive" : "text-text-tertiary"
+          )}>
+            {icon}
+          </span>
+          
+          {/* Label */}
+          <span>{label}</span>
+        </button>
+      ))}
     </div>
   );
 };
@@ -70,6 +109,24 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   const [mainRepoSession, setMainRepoSession] = useState<Session | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isStravuConnected, setIsStravuConnected] = useState(false);
+  
+  // Rich Output settings state (similar to SessionView)
+  const [richOutputSettings, setRichOutputSettings] = useState<RichOutputSettings>(() => {
+    const saved = localStorage.getItem('richOutputSettings');
+    return saved ? JSON.parse(saved) : {
+      showToolCalls: true,
+      compactMode: false,
+      collapseTools: false,
+      showThinking: true,
+      autoScroll: true,
+      showSessionInit: false,
+    };
+  });
+  
+  const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
+    setRichOutputSettings(newSettings);
+    localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
+  };
   
   // Notify parent component when view mode changes
   useEffect(() => {
@@ -102,7 +159,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     setViewMode('terminal');
   }, [mainRepoSessionId]);
   const terminalRef = useRef<HTMLDivElement>(null);
-  const outputTerminalRef = useRef<HTMLDivElement>(null);
   const scriptTerminalRef = useRef<HTMLDivElement>(null);
   
   // Terminal state
@@ -112,7 +168,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   const lastProcessedOutputLength = useRef(0);
   
   // Use the same hook as SessionView for output handling
-  const hook = useSessionView(mainRepoSession || undefined, outputTerminalRef, scriptTerminalRef);
+  const hook = useSessionView(mainRepoSession || undefined, undefined, scriptTerminalRef);
   
   // Debug logging
   useEffect(() => {
@@ -368,9 +424,11 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
               </div>
             </div>
           </div>
-          <ProjectViewTabs viewMode={viewMode} setViewMode={setViewMode} />
         </div>
       </div>
+
+      {/* View Tabs */}
+      <ProjectViewTabs viewMode={viewMode} setViewMode={setViewMode} />
 
       {/* Project Content */}
       <div className="flex-1 flex relative min-h-0">
@@ -438,37 +496,21 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
           </div>
           
           {/* Output View */}
-          <div className={`h-full ${viewMode === 'output' ? 'flex flex-col' : 'hidden'} bg-gray-50 dark:bg-black relative`}>
-            {hook.isLoadingOutput && (
-              <div className="absolute top-4 left-4 text-gray-600 dark:text-gray-400 z-10">Loading output...</div>
-            )}
-            <div 
-              ref={outputTerminalRef} 
-              className="flex-1 min-h-0"
-            />
-            {mainRepoSession && (mainRepoSession.status === 'running' || mainRepoSession.status === 'initializing') && (
-              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 flex-shrink-0">
-                <div className="flex items-center justify-between text-gray-700 dark:text-gray-300">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot"></div>
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-typing-dot" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-                    <span className="text-sm font-medium">
-                      {mainRepoSession.status === 'initializing' ? 'Starting Claude Code...' : 'Claude is working...'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                      {mainRepoSession.status === 'initializing' ? '⚡' : hook.formatElapsedTime(hook.elapsedTime)}
-                    </div>
-                    <button onClick={hook.handleStopSession} className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md">
-                      Cancel
-                    </button>
-                  </div>
+          <div className={`h-full ${viewMode === 'output' ? 'block' : 'hidden'}`}>
+            {isLoadingSession || !mainRepoSessionId ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-interactive mx-auto mb-4"></div>
+                  <p className="text-text-secondary">Loading output...</p>
                 </div>
               </div>
+            ) : (
+              <RichOutputWithSidebar 
+                sessionId={mainRepoSessionId}
+                sessionStatus={mainRepoSession?.status}
+                settings={richOutputSettings}
+                onSettingsChange={handleRichOutputSettingsChange}
+              />
             )}
           </div>
         </div>
