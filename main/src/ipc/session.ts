@@ -588,9 +588,27 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const outputs = await sessionManager.getSessionOutputs(sessionId);
       console.log(`[IPC] Retrieved ${outputs.length} total outputs for session ${sessionId}`);
       
-      // Filter to JSON messages and error messages, include timestamp
+      // Helper function to check if stdout/stderr contains git operation output
+      const isGitOperation = (data: string): boolean => {
+        return data.includes('🔄 GIT OPERATION') || 
+               data.includes('Successfully rebased') ||
+               data.includes('Successfully squashed and rebased') ||
+               data.includes('Successfully pulled latest changes') ||
+               data.includes('Successfully pushed changes to remote') ||
+               data.includes('Rebase failed:') ||
+               data.includes('Squash and rebase failed:') ||
+               data.includes('Pull failed:') ||
+               data.includes('Push failed:') ||
+               data.includes('Aborted rebase successfully');
+      };
+      
+      // Filter to JSON messages, error messages, and git operation stdout/stderr messages
       const jsonMessages = outputs
-        .filter(output => output.type === 'json' || output.type === 'error')
+        .filter(output => 
+          output.type === 'json' || 
+          output.type === 'error' ||
+          ((output.type === 'stdout' || output.type === 'stderr') && isGitOperation(output.data))
+        )
         .map(output => {
           if (output.type === 'error') {
             // Transform error outputs to a format that RichOutputView can handle
@@ -602,6 +620,17 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               details: output.data.details,
               message: `${output.data.error}${output.data.details ? '\n\n' + output.data.details : ''}`
             };
+          } else if (output.type === 'stdout' || output.type === 'stderr') {
+            // Transform git operation stdout/stderr to system messages that RichOutputView can display
+            const isError = output.type === 'stderr' || output.data.includes('failed:') || output.data.includes('✗');
+            return {
+              type: 'system',
+              subtype: isError ? 'git_error' : 'git_operation',
+              timestamp: output.timestamp.toISOString(),
+              message: output.data,
+              // Add raw data for processing
+              raw_output: output.data
+            };
           } else {
             // Regular JSON messages
             return {
@@ -611,7 +640,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           }
         });
       
-      console.log(`[IPC] Found ${jsonMessages.length} JSON messages for session ${sessionId}`);
+      console.log(`[IPC] Found ${jsonMessages.length} messages (including git operations) for session ${sessionId}`);
       return { success: true, data: jsonMessages };
     } catch (error) {
       console.error('Failed to get JSON messages:', error);

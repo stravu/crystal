@@ -4,7 +4,7 @@ import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService } = services;
+  const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService, executionTracker } = services;
 
   // Helper function to refresh git status after operations that only affect one session
   const refreshGitStatusForSession = async (sessionId: string, isUserInitiated = false) => {
@@ -168,21 +168,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: false, error: 'Session or worktree path not found' };
       }
 
-      // Handle uncommitted changes request
+      // Handle uncommitted changes request (execution ID 0)
       if (executionIds && executionIds.length === 1 && executionIds[0] === 0) {
         console.log('Handling uncommitted changes request for session:', sessionId);
         console.log('Session worktree path:', session.worktreePath);
-        
-        // Verify the worktree exists and has uncommitted changes
-        try {
-          const status = execSync('git status --porcelain', { 
-            cwd: session.worktreePath, 
-            encoding: 'utf8' 
-          });
-          console.log('Git status before getting diff:', status || '(no changes)');
-        } catch (error) {
-          console.error('Error checking git status:', error);
-        }
         
         const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
         console.log('Uncommitted diff result:', {
@@ -194,231 +183,17 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: true, data: uncommittedDiff };
       }
 
-      // Get git commit history
-      const project = sessionManager.getProjectForSession(sessionId);
-      // Get the main branch from the project directory's current branch
-      if (!project?.path) {
-        throw new Error('Project path not found for session');
-      }
-      const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
-      const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
-
-      if (!commits.length) {
-        return {
-          success: true,
-          data: {
-            diff: '',
-            stats: { additions: 0, deletions: 0, filesChanged: 0 },
-            changedFiles: []
-          }
-        };
-      }
-
-      // If we have a range selection (2 IDs), use git diff between them
-      if (executionIds && executionIds.length === 2) {
-        const sortedIds = [...executionIds].sort((a, b) => a - b);
-
-        // Handle range that includes uncommitted changes
-        if (sortedIds[0] === 0 || sortedIds[1] === 0) {
-          // If uncommitted is in the range, get diff from the other commit to working directory
-          const commitId = sortedIds[0] === 0 ? sortedIds[1] : sortedIds[0];
-          const commitIndex = commitId - 1;
-
-          if (commitIndex >= 0 && commitIndex < commits.length) {
-            const fromCommit = commits[commitIndex];
-            // Get diff from commit to working directory (includes uncommitted changes)
-            const diff = execSync(
-              `git diff ${fromCommit.hash}`,
-              { cwd: session.worktreePath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
-            );
-
-            const stats = gitDiffManager.parseDiffStats(
-              execSync(`git diff --stat ${fromCommit.hash}`, { cwd: session.worktreePath, encoding: 'utf8' })
-            );
-
-            const changedFiles = execSync(
-              `git diff --name-only ${fromCommit.hash}`,
-              { cwd: session.worktreePath, encoding: 'utf8' }
-            ).trim().split('\n').filter(Boolean);
-
-            return {
-              success: true,
-              data: {
-                diff,
-                stats,
-                changedFiles,
-                beforeHash: fromCommit.hash,
-                afterHash: 'UNCOMMITTED'
-              }
-            };
-          }
-        }
-
-        // For regular commit ranges, we want to show all changes introduced by the selected commits
-        // - Commits are stored newest first (index 0 = newest)
-        // - User selects from older to newer visually
-        // - We need to go back one commit before the older selection to show all changes
-        const newerIndex = sortedIds[0] - 1;   // Lower ID = newer commit
-        const olderIndex = sortedIds[1] - 1;   // Higher ID = older commit
-
-        if (newerIndex >= 0 && newerIndex < commits.length && olderIndex >= 0 && olderIndex < commits.length) {
-          const newerCommit = commits[newerIndex]; // Newer commit
-          const olderCommit = commits[olderIndex]; // Older commit
-
-          // To show all changes introduced by the selected commits, we diff from
-          // the parent of the older commit to the newer commit
-          let fromCommitHash: string;
-
-          try {
-            // Try to get the parent of the older commit
-            const parentHash = execSync(`git rev-parse ${olderCommit.hash}^`, {
-              cwd: session.worktreePath,
-              encoding: 'utf8'
-            }).trim();
-            fromCommitHash = parentHash;
-          } catch (error) {
-            // If there's no parent (initial commit), use git's empty tree hash
-            fromCommitHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-          }
-
-          // Use git diff to show all changes from before the range to the newest selected commit
-          const diff = await gitDiffManager.captureCommitDiff(
-            session.worktreePath,
-            fromCommitHash,
-            newerCommit.hash
-          );
-          return { success: true, data: diff };
-        }
-      }
-
-      // If no specific execution IDs are provided, get all diffs including uncommitted changes
-      if (!executionIds || executionIds.length === 0) {
-        if (commits.length === 0) {
-          // No commits, but there might be uncommitted changes
-          const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
-          return { success: true, data: uncommittedDiff };
-        }
-
-        // For a single commit, show changes from before the commit to working directory
-        if (commits.length === 1) {
-          let fromCommitHash: string;
-          try {
-            // Try to get the parent of the commit
-            fromCommitHash = execSync(`git rev-parse ${commits[0].hash}^`, {
-              cwd: session.worktreePath,
-              encoding: 'utf8'
-            }).trim();
-          } catch (error) {
-            // If there's no parent (initial commit), use git's empty tree hash
-            fromCommitHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-          }
-
-          // Get diff from parent to working directory (includes the commit and any uncommitted changes)
-          const diff = execSync(
-            `git diff ${fromCommitHash}`,
-            { cwd: session.worktreePath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
-          );
-          
-          const stats = gitDiffManager.parseDiffStats(
-            execSync(`git diff --stat ${fromCommitHash}`, { cwd: session.worktreePath, encoding: 'utf8' })
-          );
-          
-          const changedFiles = execSync(
-            `git diff --name-only ${fromCommitHash}`,
-            { cwd: session.worktreePath, encoding: 'utf8' }
-          ).trim().split('\n').filter(f => f);
-
-          return { 
-            success: true, 
-            data: {
-              diff,
-              stats,
-              changedFiles
-            }
-          };
-        }
-
-        // For multiple commits, get diff from parent of first commit to working directory (all changes including uncommitted)
-        const firstCommit = commits[commits.length - 1]; // Oldest commit
-        let fromCommitHash: string;
-
-        try {
-          // Try to get the parent of the first commit
-          fromCommitHash = execSync(`git rev-parse ${firstCommit.hash}^`, {
-            cwd: session.worktreePath,
-            encoding: 'utf8'
-          }).trim();
-        } catch (error) {
-          // If there's no parent (initial commit), use git's empty tree hash
-          fromCommitHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-        }
-
-        // Get diff from the parent of first commit to working directory (includes uncommitted changes)
-        const diff = execSync(
-          `git diff ${fromCommitHash}`,
-          { cwd: session.worktreePath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
-        );
-        
-        const stats = gitDiffManager.parseDiffStats(
-          execSync(`git diff --stat ${fromCommitHash}`, { cwd: session.worktreePath, encoding: 'utf8' })
-        );
-        
-        const changedFiles = execSync(
-          `git diff --name-only ${fromCommitHash}`,
-          { cwd: session.worktreePath, encoding: 'utf8' }
-        ).trim().split('\n').filter(f => f);
-
-        return { 
-          success: true, 
-          data: {
-            diff,
-            stats,
-            changedFiles
-          }
-        };
-      }
-
-      // For multiple individual selections, we need to create a range from first to last
-      if (executionIds.length > 2) {
-        const sortedIds = [...executionIds].sort((a, b) => a - b);
-        const firstId = sortedIds[sortedIds.length - 1]; // Highest ID = oldest commit
-        const lastId = sortedIds[0]; // Lowest ID = newest commit
-
-        const fromIndex = firstId - 1;
-        const toIndex = lastId - 1;
-
-        if (fromIndex >= 0 && fromIndex < commits.length && toIndex >= 0 && toIndex < commits.length) {
-          const fromCommit = commits[fromIndex]; // Oldest selected
-          const toCommit = commits[toIndex]; // Newest selected
-
-          const diff = await gitDiffManager.captureCommitDiff(
-            session.worktreePath,
-            fromCommit.hash,
-            toCommit.hash
-          );
-          return { success: true, data: diff };
-        }
-      }
-
-      // Single commit selection (but not uncommitted changes)
-      if (executionIds.length === 1 && executionIds[0] !== 0) {
-        const commitIndex = executionIds[0] - 1;
-        if (commitIndex >= 0 && commitIndex < commits.length) {
-          const commit = commits[commitIndex];
-          const diff = gitDiffManager.getCommitDiff(session.worktreePath, commit.hash);
-          return { success: true, data: diff };
-        }
-      }
-
-      // Fallback to empty diff
-      return {
-        success: true,
-        data: {
-          diff: '',
-          stats: { additions: 0, deletions: 0, filesChanged: 0 },
-          changedFiles: []
-        }
-      };
+      // Use ExecutionTracker to get combined diff from database
+      // ExecutionTracker properly handles execution diff data stored in the database
+      const combinedDiff = await executionTracker.getCombinedDiff(sessionId, executionIds);
+      console.log('ExecutionTracker combined diff result:', {
+        hasDiff: !!combinedDiff.diff,
+        diffLength: combinedDiff.diff?.length,
+        stats: combinedDiff.stats,
+        changedFiles: combinedDiff.changedFiles?.length || 0
+      });
+      
+      return { success: true, data: combinedDiff };
     } catch (error) {
       console.error('Failed to get combined diff:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to get combined diff';
@@ -457,9 +232,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.log(`[IPC:git] Main branch: ${mainBranch}`);
 
       // Add message to session output about starting the rebase
-      const timestamp = new Date().toLocaleTimeString();
-      const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
-                          `\x1b[1m\x1b[94mRebasing from ${mainBranch}...\x1b[0m\r\n\r\n`;
+      const startMessage = `🔄 GIT OPERATION\nRebasing from ${mainBranch}...`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: startMessage,
@@ -474,7 +247,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.log(`[IPC:git] Rebase operation completed for session ${sessionId}`);
 
       // Add success message to session output
-      const successMessage = `\x1b[32m✓ Successfully rebased ${mainBranch} into worktree\x1b[0m\r\n\r\n`;
+      const successMessage = `✓ Successfully rebased ${mainBranch} into worktree`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: successMessage,
@@ -494,9 +267,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.error(`[IPC:git] Failed to rebase main into worktree for session ${sessionId}:`, error);
 
       // Add error message to session output
-      const errorMessage = `\x1b[31m✗ Rebase failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
-                          (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
-                          `\r\n`;
+      const errorMessage = `✗ Rebase failed: ${error.message || 'Unknown error'}` +
+                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
       
       // Don't let this block the error response either
       try {
@@ -548,9 +320,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         await worktreeManager.abortRebase(session.worktreePath);
 
         // Add message to session output about aborting the rebase
-        const timestamp = new Date().toLocaleTimeString();
-        const abortMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
-                            `\x1b[1m\x1b[94mAborted rebase successfully\x1b[0m\r\n\r\n`;
+        const abortMessage = `🔄 GIT OPERATION\nAborted rebase successfully`;
         sessionManager.addSessionOutput(sessionId, {
           type: 'stdout',
           data: abortMessage,
@@ -646,10 +416,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.log(`[IPC:git] Main branch: ${mainBranch}`);
 
       // Add message to session output about starting the squash and rebase
-      const timestamp = new Date().toLocaleTimeString();
-      const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
-                          `\x1b[1m\x1b[94mSquashing commits and rebasing to ${mainBranch}...\x1b[0m\r\n` +
-                          `\x1b[90mCommit message: ${commitMessage.split('\n')[0]}${commitMessage.includes('\n') ? '...' : ''}\x1b[0m\r\n\r\n`;
+      const startMessage = `🔄 GIT OPERATION\nSquashing commits and rebasing to ${mainBranch}...\nCommit message: ${commitMessage.split('\n')[0]}${commitMessage.includes('\n') ? '...' : ''}`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: startMessage,
@@ -664,7 +431,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.log(`[IPC:git] Squash and rebase operation completed for session ${sessionId}`);
 
       // Add success message to session output
-      const successMessage = `\x1b[32m✓ Successfully squashed and rebased worktree to ${mainBranch}\x1b[0m\r\n\r\n`;
+      const successMessage = `✓ Successfully squashed and rebased worktree to ${mainBranch}`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: successMessage,
@@ -686,9 +453,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.error(`[IPC:git] Failed to squash and rebase worktree to main for session ${sessionId}:`, error);
 
       // Add error message to session output
-      const errorMessage = `\x1b[31m✗ Squash and rebase failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
-                          (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
-                          `\r\n`;
+      const errorMessage = `✗ Squash and rebase failed: ${error.message || 'Unknown error'}` +
+                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
       
       // Don't let this block the error response either
       try {
@@ -737,9 +503,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
 
       // Add message to session output about starting the rebase
-      const timestamp = new Date().toLocaleTimeString();
-      const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
-                          `\x1b[1m\x1b[94mRebasing to ${mainBranch} (preserving all commits)...\x1b[0m\r\n\r\n`;
+      const startMessage = `🔄 GIT OPERATION\nRebasing to ${mainBranch} (preserving all commits)...`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: startMessage,
@@ -749,7 +513,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       await worktreeManager.rebaseWorktreeToMain(project.path, session.worktreePath, mainBranch);
 
       // Add success message to session output
-      const successMessage = `\x1b[32m✓ Successfully rebased worktree to ${mainBranch}\x1b[0m\r\n\r\n`;
+      const successMessage = `✓ Successfully rebased worktree to ${mainBranch}`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: successMessage,
@@ -761,9 +525,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.error('Failed to rebase worktree to main:', error);
 
       // Add error message to session output
-      const errorMessage = `\x1b[31m✗ Rebase failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
-                          (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
-                          `\r\n`;
+      const errorMessage = `✗ Rebase failed: ${error.message || 'Unknown error'}` +
+                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stderr',
         data: errorMessage,
@@ -797,9 +560,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }
 
       // Add message to session output about starting the pull
-      const timestamp = new Date().toLocaleTimeString();
-      const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
-                          `\x1b[1m\x1b[94mPulling latest changes from remote...\x1b[0m\r\n\r\n`;
+      const startMessage = `🔄 GIT OPERATION\nPulling latest changes from remote...`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: startMessage,
@@ -810,9 +571,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const result = await worktreeManager.gitPull(session.worktreePath);
 
       // Add success message to session output
-      const successMessage = `\x1b[32m✓ Successfully pulled latest changes\x1b[0m\r\n` +
-                            (result.output ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${result.output}\r\n` : '') +
-                            `\r\n`;
+      const successMessage = `✓ Successfully pulled latest changes` +
+                            (result.output ? `\n\nGit output:\n${result.output}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: successMessage,
@@ -833,9 +593,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.error('Failed to pull from remote:', error);
 
       // Add error message to session output
-      const errorMessage = `\x1b[31m✗ Pull failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
-                          (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
-                          `\r\n`;
+      const errorMessage = `✗ Pull failed: ${error.message || 'Unknown error'}` +
+                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stderr',
         data: errorMessage,
@@ -878,9 +637,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }
 
       // Add message to session output about starting the push
-      const timestamp = new Date().toLocaleTimeString();
-      const startMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 🔄 GIT OPERATION \x1b[0m\r\n` +
-                          `\x1b[1m\x1b[94mPushing changes to remote...\x1b[0m\r\n\r\n`;
+      const startMessage = `🔄 GIT OPERATION\nPushing changes to remote...`;
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: startMessage,
@@ -891,9 +648,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const result = await worktreeManager.gitPush(session.worktreePath);
 
       // Add success message to session output
-      const successMessage = `\x1b[32m✓ Successfully pushed changes to remote\x1b[0m\r\n` +
-                            (result.output ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${result.output}\r\n` : '') +
-                            `\r\n`;
+      const successMessage = `✓ Successfully pushed changes to remote` +
+                            (result.output ? `\n\nGit output:\n${result.output}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stdout',
         data: successMessage,
@@ -914,9 +670,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       console.error('Failed to push to remote:', error);
 
       // Add error message to session output
-      const errorMessage = `\x1b[31m✗ Push failed: ${error.message || 'Unknown error'}\x1b[0m\r\n` +
-                          (error.gitOutput ? `\r\n\x1b[90mGit output:\x1b[0m\r\n${error.gitOutput}\r\n` : '') +
-                          `\r\n`;
+      const errorMessage = `✗ Push failed: ${error.message || 'Unknown error'}` +
+                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stderr',
         data: errorMessage,
