@@ -31,15 +31,27 @@ try {
   gitCommit = 'unknown';
 }
 
+// Check if this is a canary build
+const isCanaryBuild = process.env.CANARY_BUILD === 'true';
+let version = packageJson.version;
+
+if (isCanaryBuild) {
+  // For canary builds, append -canary.{git-hash}
+  const shortHash = gitCommit.includes('(modified)') ? gitCommit.split(' ')[0] : gitCommit;
+  version = `${packageJson.version}-canary.${shortHash}`;
+  console.log(`Canary build detected, using version: ${version}`);
+}
+
 // Create build info
 const buildInfo = {
-  version: packageJson.version,
+  version: version,
   buildDate: buildDate,
   gitCommit: gitCommit,
   buildTimestamp: Date.now(),
   nodeVersion: process.version,
   platform: process.platform,
-  arch: process.arch
+  arch: process.arch,
+  isCanary: isCanaryBuild
 };
 
 // Write build info to a file in the main dist directory

@@ -1,4 +1,4 @@
-name: Build Crystal
+name: Build and Publish Canary
 
 on:
   push:
@@ -15,20 +15,24 @@ jobs:
         os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
-            build_cmd: build:mac:ci
-            artifact_name: crystal-macos
-            artifact_path: dist-electron/*.dmg
+            build_cmd: canary:mac
+            artifact_name: crystal-macos-canary
+            artifact_path: |
+              dist-electron/*.dmg
+              dist-electron/*.zip
+              dist-electron/latest-mac.yml
           - os: ubuntu-latest
-            build_cmd: build:linux:ci
-            artifact_name: crystal-linux
+            build_cmd: canary:linux
+            artifact_name: crystal-linux-canary
             artifact_path: |
               dist-electron/*.deb
               dist-electron/*.AppImage
+              dist-electron/latest-linux.yml
     
     runs-on: ${{ matrix.os }}
     
     permissions:
-      contents: read  # Required for accessing repository contents
+      contents: write  # Required for creating releases and accessing repository contents
 
     steps:
     - name: Checkout code
@@ -114,11 +118,13 @@ jobs:
     - name: Generate NOTICES file
       run: pnpm run generate-notices
 
-    - name: Build application
+    - name: Build and publish canary release
       run: pnpm run ${{ matrix.build_cmd }}
       env:
-        # GitHub token (required by electron-builder even for non-publish builds)
+        # GitHub token (required by electron-builder for publishing)
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Mark this as a canary build
+        CANARY_BUILD: true
         # macOS code signing (optional for CI builds)
         CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
         CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
@@ -146,5 +152,5 @@ jobs:
         name: ${{ matrix.artifact_name }}
         path: ${{ matrix.artifact_path }}
         if-no-files-found: error
-        retention-days: 7
+        retention-days: 30
 

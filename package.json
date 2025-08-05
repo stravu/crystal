@@ -37,6 +37,8 @@
     "release:mac": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --publish always",
     "release:mac:universal": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --universal --publish always",
     "release:linux": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish always",
+    "canary:mac": "node scripts/prepare-canary.js && CANARY_BUILD=true pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --publish always --config.releaseInfo.releaseNotes=\"Canary build from main branch\" && node scripts/restore-version.js",
+    "canary:linux": "node scripts/prepare-canary.js && CANARY_BUILD=true pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish always --config.releaseInfo.releaseNotes=\"Canary build from main branch\" && node scripts/restore-version.js",
     "preview": "pnpm run --filter frontend preview",
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
