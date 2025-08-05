@@ -2,7 +2,7 @@ name: Build and Publish Canary
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, canary-release ]  # Temporarily include canary-release for testing
   pull_request:
     branches: [ main ]
   workflow_dispatch:
