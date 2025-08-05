@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wrench, Brain, Terminal, Maximize2, Package, ScrollText } from 'lucide-react';
+import { Wrench, Brain, Terminal, Maximize2, Package } from 'lucide-react';
 import { SwitchSimple } from '../ui/SwitchSimple';
 import { RichOutputSettings } from './RichOutputView';
 
@@ -105,17 +105,6 @@ export const RichOutputSettingsPanel: React.FC<RichOutputSettingsPanelProps> = (
                   />
                 </div>
                 
-                <div className="flex items-center justify-between py-1.5 hover:bg-surface-hover rounded px-2 -mx-2 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <ScrollText className="w-3.5 h-3.5 text-text-tertiary" />
-                    <span className="text-sm text-text-primary">Auto Scroll</span>
-                  </div>
-                  <SwitchSimple
-                    checked={settings.autoScroll}
-                    onCheckedChange={() => toggleSetting('autoScroll')}
-                    size="sm"
-                  />
-                </div>
               </div>
             </div>
           </div>

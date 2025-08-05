@@ -118,7 +118,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       compactMode: false,
       collapseTools: false,
       showThinking: true,
-      autoScroll: true,
       showSessionInit: false,
     };
   });

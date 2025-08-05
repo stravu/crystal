@@ -69,7 +69,6 @@ export interface RichOutputSettings {
   compactMode: boolean;
   collapseTools: boolean;
   showThinking: boolean;
-  autoScroll: boolean;
   showSessionInit: boolean;
 }
 
@@ -78,7 +77,6 @@ const defaultSettings: RichOutputSettings = {
   compactMode: false,
   collapseTools: false,
   showThinking: true,
-  autoScroll: true,
   showSessionInit: false, // Hide by default - it's developer info
 };
 
@@ -103,7 +101,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
   const userMessageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const wasAtBottomRef = useRef(true);
+  const wasAtBottomRef = useRef(false);
 
   // Save local settings to localStorage when they change
   useEffect(() => {
@@ -495,33 +493,48 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     loadMessages();
   }, [sessionId, loadMessages]);
 
-  // Track if user is at bottom before messages change
+  // Track if user is at bottom - set up once when container is available
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+    let cleanup: (() => void) | undefined;
+    
+    // Use a small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
 
-    const checkIfAtBottom = () => {
-      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
-      wasAtBottomRef.current = isAtBottom;
+      const checkIfAtBottom = () => {
+        const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+        wasAtBottomRef.current = isAtBottom;
+      };
+
+      // Check initial position
+      checkIfAtBottom();
+
+      container.addEventListener('scroll', checkIfAtBottom);
+      
+      // Store cleanup function
+      cleanup = () => container.removeEventListener('scroll', checkIfAtBottom);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      if (cleanup) cleanup();
     };
-
-    container.addEventListener('scroll', checkIfAtBottom);
-    return () => container.removeEventListener('scroll', checkIfAtBottom);
-  }, []);
+  }, []); // Empty array - set up only once
 
   // Auto-scroll to bottom when messages change or view loads
   useEffect(() => {
-    if (settings.autoScroll && messagesEndRef.current && !loading) {
+    if (messagesEndRef.current && !loading) {
       // Scroll if we were at the bottom before the update
       if (wasAtBottomRef.current) {
         // Use requestAnimationFrame to ensure DOM has updated
         requestAnimationFrame(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
-          wasAtBottomRef.current = true; // Reset to true after scrolling
+          // Don't set wasAtBottomRef here - let the scroll event handler determine actual position
         });
       }
     }
-  }, [messages, settings.autoScroll, loading]);
+  }, [messages, loading]);
 
   // Handle scroll events to show/hide scroll button
   useEffect(() => {
