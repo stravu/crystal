@@ -162,8 +162,7 @@ export class ClaudeCodeManager extends EventEmitter {
       }
       
       // Build the command arguments
-      // Need --verbose for Claude to output anything in plain text mode
-      const args: string[] = ['--verbose'];
+      const args: string[] = [];
       
       // Add model argument if specified
       if (model) {
@@ -755,12 +754,6 @@ export class ClaudeCodeManager extends EventEmitter {
         hasReceivedOutput = true;
         lastOutput += data;
         buffer += data;
-        
-        // Debug: Log raw data to see what Claude is sending
-        console.log(`\x1b[36m${'='.repeat(80)}\x1b[0m`);
-        console.log(`\x1b[36m[ClaudeManager DEBUG] Raw data from Claude (first 500 chars):\x1b[0m`);
-        console.log(`\x1b[33m${data.substring(0, 500).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}\x1b[0m`);
-        console.log(`\x1b[36m${'='.repeat(80)}\x1b[0m`);
         
         // Claude sends streaming JSON that can be split across chunks
         // We need to detect complete JSON objects by counting braces

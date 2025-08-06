@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { API } from '../utils/api';
+import { debugLog } from '../contexts/DebugContext';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -68,7 +69,7 @@ export function useNotifications() {
 
   const showNotification = (title: string, body: string, icon?: string) => {
     if (!settings.enabled) {
-      console.log('[useNotifications] Notifications disabled, skipping:', title);
+      debugLog('useNotifications', '[useNotifications] Notifications disabled, skipping:', title);
       return;
     }
 
@@ -117,7 +118,7 @@ export function useNotifications() {
     // If this is the initial load (prevSessions is empty and we have sessions),
     // just update the ref without triggering notifications
     if (!initialLoadComplete.current && prevSessions.length === 0 && sessions.length > 0) {
-      console.log('[useNotifications] Initial session load detected, skipping notifications for', sessions.length, 'sessions');
+      debugLog('useNotifications', `[useNotifications] Initial session load detected, skipping notifications for ${sessions.length} sessions`);
       prevSessionsRef.current = sessions;
       initialLoadComplete.current = true;
       return;
@@ -129,7 +130,7 @@ export function useNotifications() {
     }
     
     // Debug log current settings state
-    console.log('[useNotifications] Current settings:', settings);
+    debugLog('useNotifications', 'Current settings:', settings);
     
     // Compare current sessions with previous sessions to detect changes
     sessions.forEach((currentSession) => {
@@ -201,7 +202,7 @@ export function useNotifications() {
 
     // Listen for settings update events
     const handleSettingsUpdate = () => {
-      console.log('[useNotifications] Settings updated, reloading...');
+      debugLog('useNotifications', '[useNotifications] Settings updated, reloading...');
       loadSettings();
     };
 

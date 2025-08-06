@@ -1,5 +1,7 @@
-// Simple console wrapper to reduce logging in production
+// Simple console wrapper to reduce logging based on verbose setting
 // This follows the existing pattern in the codebase
+
+import { ConfigManager } from '../services/configManager';
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !(global as any).isPackaged;
 
@@ -12,17 +14,49 @@ const originalConsole = {
   debug: console.debug
 };
 
+// ConfigManager instance will be set after initialization
+let configManager: ConfigManager | null = null;
+
+// Helper to check if verbose logging is enabled
+function isVerboseEnabled(): boolean {
+  // If ConfigManager is not yet initialized, check for verbose in stored config
+  if (!configManager) {
+    try {
+      // Try to read the config file directly during startup
+      const Store = require('electron-store');
+      const store = new Store({ name: 'crystal-settings' });
+      const config = store.get('config', {});
+      return config.verbose || false;
+    } catch {
+      // If we can't read config, default to NOT verbose (shut up the logs!)
+      return false;
+    }
+  }
+  
+  try {
+    const config = configManager.getConfig();
+    return config?.verbose || false;
+  } catch {
+    // If config can't be read, default to not verbose
+    return false;
+  }
+}
+
 // Helper to check if a message should be logged
 function shouldLog(level: 'log' | 'info' | 'debug', args: any[]): boolean {
   if (args.length === 0) return false;
+  
   const firstArg = args[0];
   if (typeof firstArg === 'string') {
-    // Always log [Main] messages as they're important startup info
-    if (firstArg.includes('[Main]')) return true;
     // Always log errors from any component
     if (firstArg.includes('Error') || firstArg.includes('Failed')) return true;
     
-    // Skip verbose logging from these components in both dev and production
+    // If verbose is disabled, block EVERYTHING except errors
+    if (!isVerboseEnabled()) {
+      return false; // Block ALL non-error logs when verbose is off
+    }
+    
+    // When verbose is enabled, still skip these extremely noisy logs
     if (firstArg.includes('[CommandExecutor]')) return false;
     if (firstArg.includes('[ShellPath]')) return false;
     if (firstArg.includes('[Database] Getting folders')) return false;
@@ -40,13 +74,11 @@ function shouldLog(level: 'log' | 'info' | 'debug', args: any[]): boolean {
     if (firstArg.includes('[IPC:git] Project path:')) return false;
     if (firstArg.includes('[IPC:git] Using main branch:')) return false;
     
-    // In development, log everything else
-    if (isDevelopment) {
-      return true;
-    }
+    // Log everything else when verbose is enabled
+    return true;
   }
   
-  return !isDevelopment; // In production, default to not logging
+  return isVerboseEnabled(); // Default to verbose setting
 }
 
 // Override console methods
@@ -72,6 +104,11 @@ export function setupConsoleWrapper() {
   // Always log warnings and errors
   console.warn = originalConsole.warn;
   console.error = originalConsole.error;
+}
+
+// Function to update the config manager after it's initialized
+export function updateConfigManager(cm: ConfigManager) {
+  configManager = cm;
 }
 
 // Export original console for critical logging

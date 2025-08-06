@@ -19,6 +19,7 @@ import {
 import { Input, Textarea, Checkbox } from './ui/Input';
 import { Button } from './ui/Button';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDebug } from '../contexts/DebugContext';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
 import { CollapsibleCard } from './ui/CollapsibleCard';
 import { SettingsSection } from './ui/SettingsSection';
@@ -31,6 +32,7 @@ interface SettingsProps {
 export function Settings({ isOpen, onClose }: SettingsProps) {
   const [_config, setConfig] = useState<AppConfig | null>(null);
   const [verbose, setVerbose] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
@@ -48,6 +50,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
   const { updateSettings, reloadSettings } = useNotifications();
   const { theme, toggleTheme } = useTheme();
+  const { setDebugMode: setGlobalDebugMode } = useDebug();
 
   useEffect(() => {
     if (isOpen) {
@@ -62,6 +65,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       const data = response.data;
       setConfig(data);
       setVerbose(data.verbose || false);
+      setDebugMode(data.debugMode || false);
       setAnthropicApiKey(data.anthropicApiKey || '');
       setGlobalSystemPrompt(data.systemPromptAppend || '');
       setClaudeExecutablePath(data.claudeExecutablePath || '');
@@ -86,7 +90,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
     try {
       const response = await API.config.update({ 
-        verbose, 
+        verbose,
+        debugMode, 
         anthropicApiKey, 
         systemPromptAppend: globalSystemPrompt, 
         claudeExecutablePath,
@@ -347,14 +352,32 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 description="Enable detailed logging for troubleshooting"
                 icon={<FileText className="w-4 h-4" />}
               >
-                <Checkbox
-                  label="Enable verbose logging"
-                  checked={verbose}
-                  onChange={(e) => setVerbose(e.target.checked)}
-                />
-                <p className="text-xs text-text-tertiary mt-1">
-                  Shows detailed logs for session creation and Claude Code execution. Useful for debugging issues.
-                </p>
+                <div className="space-y-3">
+                  <div>
+                    <Checkbox
+                      label="Enable verbose logging"
+                      checked={verbose}
+                      onChange={(e) => setVerbose(e.target.checked)}
+                    />
+                    <p className="text-xs text-text-tertiary mt-1 ml-6">
+                      Shows main process logs in the developer console. Helps troubleshoot session and Claude Code issues.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Checkbox
+                      label="Enable debug mode"
+                      checked={debugMode}
+                      onChange={(e) => {
+                        setDebugMode(e.target.checked);
+                        setGlobalDebugMode(e.target.checked);
+                      }}
+                    />
+                    <p className="text-xs text-text-tertiary mt-1 ml-6">
+                      Shows detailed component debug logs, re-render warnings, and performance metrics. For advanced debugging only.
+                    </p>
+                  </div>
+                </div>
               </SettingsSection>
 
               <SettingsSection
