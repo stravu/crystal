@@ -11,12 +11,17 @@ export function escapeShellArg(arg: string): string {
   // If the argument is empty, return empty quotes
   if (!arg) return "''";
   
-  // For Windows, wrap in double quotes and escape internal quotes
+  // For Windows, we need to handle both cmd.exe and PowerShell
+  // The safest approach is to use double quotes and escape properly
   if (process.platform === 'win32') {
-    // Escape existing double quotes and backslashes
-    const escaped = arg
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"');
+    // For Windows, we need to escape quotes and special characters
+    // This works for both cmd.exe and PowerShell when executed through exec()
+    let escaped = arg;
+    
+    // First, escape any existing double quotes by doubling them (works for both shells)
+    escaped = escaped.replace(/"/g, '""');
+    
+    // Wrap the whole thing in double quotes
     return `"${escaped}"`;
   }
   

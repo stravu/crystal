@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { debounce } from '../utils/debounce';
 import { MarkdownPreview } from './MarkdownPreview';
 import { useResizablePanel } from '../hooks/useResizablePanel';
+import { getParentPath } from '../utils/pathUtils';
 
 interface FileItem {
   name: string;
@@ -218,7 +219,7 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
       
       if (result.success) {
         // Refresh the parent directory
-        const parentPath = file.path.split('/').slice(0, -1).join('/') || '';
+        const parentPath = getParentPath(file.path);
         loadFiles(parentPath);
         
         // If the deleted file was selected, clear the selection

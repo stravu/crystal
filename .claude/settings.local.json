@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pnpm run build:main:*)"
+    ],
+    "deny": []
+  }
+}

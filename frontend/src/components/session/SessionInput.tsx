@@ -3,13 +3,14 @@ import { Session } from '../../types/session';
 import { ViewMode } from '../../hooks/useSessionView';
 import { Cpu } from 'lucide-react';
 import { API } from '../../utils/api';
+import { getModifierKeyWithEnter } from '../../utils/platform';
 
 interface SessionInputProps {
   activeSession: Session;
   viewMode: ViewMode;
   input: string;
   setInput: (input: string) => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
   handleTerminalCommand: () => void;
   handleSendInput: () => void;
   handleContinueConversation: (model?: string) => void;
@@ -71,9 +72,10 @@ export const SessionInput: React.FC<SessionInputProps> = ({
     }
   };
 
+  const modifierKey = getModifierKeyWithEnter();
   const placeholder = viewMode === 'terminal'
-    ? (activeSession.isRunning ? "Script is running..." : (activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Enter terminal command... (⌘↵ to send)"))
-    : (activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Continue conversation... (⌘↵ to send)");
+    ? (activeSession.isRunning ? "Script is running..." : (activeSession.status === 'waiting' ? `Enter your response... (${modifierKey} to send)` : `Enter terminal command... (${modifierKey} to send)`))
+    : (activeSession.status === 'waiting' ? `Enter your response... (${modifierKey} to send)` : `Continue conversation... (${modifierKey} to send)`);
 
   return (
     <div className="border-t border-border-primary p-4 bg-surface-primary flex-shrink-0">

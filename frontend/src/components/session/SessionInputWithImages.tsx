@@ -8,6 +8,8 @@ import { CommitModePill, AutoCommitSwitch } from '../CommitModeToggle';
 import { Dropdown, type DropdownItem } from '../ui/Dropdown';
 import { Pill } from '../ui/Pill';
 import { SwitchSimple as Switch } from '../ui/SwitchSimple';
+import { getPathTail } from '../../utils/pathUtils';
+import { getModifierKeyWithEnter } from '../../utils/platform';
 
 interface AttachedImage {
   id: string;
@@ -22,7 +24,7 @@ interface SessionInputWithImagesProps {
   viewMode: ViewMode;
   input: string;
   setInput: (input: string) => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
   handleTerminalCommand: () => void;
   handleSendInput: (attachedImages?: AttachedImage[]) => void;
   handleContinueConversation: (attachedImages?: AttachedImage[], model?: string) => void;
@@ -295,7 +297,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <span className="leading-none">
-                  {activeSession.worktreePath.split('/').slice(-3, -2)[0] || 'Project'}
+                  {getPathTail(activeSession.worktreePath, 3).split(/[/\\]/)[0] || 'Project'}
                 </span>
               </div>
               
@@ -593,6 +595,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                         : 'bg-surface-secondary hover:bg-surface-hover text-interactive hover:text-interactive-hover border-border-primary focus:ring-interactive'
                     }
                   `}
+                  title={`${buttonConfig.text} (${getModifierKeyWithEnter()})`}
                 >
                   <ButtonIcon className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                   <span className="font-semibold">{buttonConfig.text}</span>
@@ -600,9 +603,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   {/* Inline keyboard shortcut */}
                   <span 
                     className="ml-2 text-xs font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-80 group-hover:opacity-100 transition-opacity"
-                    title="Keyboard Shortcut: ⌘ + Enter"
                   >
-                    ⌘⏎
+                    {getModifierKeyWithEnter()}
                   </span>
                 </button>
               )}

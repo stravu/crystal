@@ -104,3 +104,4 @@ shared/*.js
 shared/*.js.map
 shared/*.d.ts
 shared/*.d.ts.map
+.grok/

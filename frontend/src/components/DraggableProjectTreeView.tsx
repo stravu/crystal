@@ -101,8 +101,9 @@ export function DraggableProjectTreeView() {
     const now = Date.now();
     const timeSinceLastRender = now - lastRenderTimeRef.current;
     
-    // Log if we're getting too many rapid re-renders (only in development)
-    if (process.env.NODE_ENV === 'development' && timeSinceLastRender < 100) {
+    // Only log rapid re-renders if debug mode is enabled
+    const debugMode = localStorage.getItem('crystal-debug-mode') === 'true';
+    if (debugMode && timeSinceLastRender < 100) {
       console.warn('[DraggableProjectTreeView] Rapid re-render detected:', {
         renderCount: renderCountRef.current,
         timeSinceLastRender,

@@ -5,6 +5,7 @@ import { ShellDetector } from '../utils/shellDetector';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getAllDescendantPids as getDescendantPids } from '../utils/processUtils';
 
 interface TerminalSession {
   pty: pty.IPty;
@@ -154,49 +155,8 @@ export class TerminalSessionManager extends EventEmitter {
    * This is critical for ensuring all child processes are killed
    */
   private getAllDescendantPids(parentPid: number): number[] {
-    const descendants: number[] = [];
-    const platform = os.platform();
-    
-    try {
-      if (platform === 'win32') {
-        // Windows: Use WMIC to get child processes
-        const result = require('child_process').execSync(
-          `wmic process where (ParentProcessId=${parentPid}) get ProcessId`,
-          { encoding: 'utf8' }
-        );
-        
-        const lines = result.split('\n').filter((line: string) => line.trim());
-        for (let i = 1; i < lines.length; i++) { // Skip header
-          const pid = parseInt(lines[i].trim());
-          if (!isNaN(pid) && pid !== parentPid) {
-            descendants.push(pid);
-            // Recursively get children of this process
-            descendants.push(...this.getAllDescendantPids(pid));
-          }
-        }
-      } else {
-        // Unix/Linux/macOS: Use ps command
-        const result = require('child_process').execSync(
-          `ps -o pid= --ppid ${parentPid} 2>/dev/null || true`,
-          { encoding: 'utf8' }
-        );
-        
-        const pids = result.split('\n')
-          .map((line: string) => parseInt(line.trim()))
-          .filter((pid: number) => !isNaN(pid) && pid !== parentPid);
-        
-        for (const pid of pids) {
-          descendants.push(pid);
-          // Recursively get children of this process
-          descendants.push(...this.getAllDescendantPids(pid));
-        }
-      }
-    } catch (error) {
-      console.warn(`Error getting descendant PIDs for ${parentPid}:`, error);
-    }
-    
-    // Remove duplicates
-    return [...new Set(descendants)];
+    // Use the shared utility function that handles Windows 11 compatibility
+    return getDescendantPids(parentPid);
   }
 
   /**

@@ -270,22 +270,27 @@ export class GitStatusManager extends EventEmitter {
 
     // Create a promise that will be resolved after debounce
     this.gitLogger.logDebounce(sessionId, 'start');
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const timer = setTimeout(async () => {
         this.refreshDebounceTimers.delete(sessionId);
         this.gitLogger.logDebounce(sessionId, 'complete');
         
-        // Only emit loading event for user-initiated refreshes
-        if (isUserInitiated) {
-          this.emitThrottled(sessionId, 'loading');
+        try {
+          // Only emit loading event for user-initiated refreshes
+          if (isUserInitiated) {
+            this.emitThrottled(sessionId, 'loading');
+          }
+          
+          const status = await this.fetchGitStatus(sessionId);
+          if (status) {
+            this.updateCache(sessionId, status);
+            this.emitThrottled(sessionId, 'updated', status);
+          }
+          resolve(status);
+        } catch (error) {
+          this.logger?.error(`[GitStatus] Error refreshing git status for session ${sessionId}:`, error as Error);
+          reject(error);
         }
-        
-        const status = await this.fetchGitStatus(sessionId);
-        if (status) {
-          this.updateCache(sessionId, status);
-          this.emitThrottled(sessionId, 'updated', status);
-        }
-        resolve(status);
       }, this.DEBOUNCE_MS);
 
       this.refreshDebounceTimers.set(sessionId, timer);

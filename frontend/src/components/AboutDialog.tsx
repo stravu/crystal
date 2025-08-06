@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, ExternalLink, Download, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { UpdateDialog } from './UpdateDialog';
+import { getBasename } from '../utils/pathUtils';
 
 interface VersionInfo {
   current: string;
@@ -174,7 +175,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                   Working Directory
                 </span>
                 <span className="text-sm text-text-primary font-mono truncate max-w-[200px]" title={versionInfo.workingDirectory}>
-                  {versionInfo.workingDirectory.split('/').pop() || versionInfo.workingDirectory}
+                  {getBasename(versionInfo.workingDirectory) || versionInfo.workingDirectory}
                 </span>
               </div>
             )}

@@ -8,7 +8,7 @@
     "dev": "tsc -w",
     "build": "rimraf dist && tsc && npm run copy:assets && npm run bundle:mcp",
     "bundle:mcp": "node build-mcp-bridge.js",
-    "copy:assets": "mkdirp dist/main/src/database/migrations && cp src/database/*.sql dist/main/src/database/ && cp src/database/migrations/*.sql dist/main/src/database/migrations/",
+    "copy:assets": "shx mkdir -p dist/main/src/database/migrations && shx cp src/database/*.sql dist/main/src/database/ && shx cp src/database/migrations/*.sql dist/main/src/database/migrations/",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
@@ -41,6 +41,7 @@
     "eslint": "^9.17.0",
     "mkdirp": "^3.0.1",
     "rimraf": "^6.0.1",
+    "shx": "^0.3.4",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

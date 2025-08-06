@@ -13,21 +13,13 @@ interface ShellInfo {
  * Detects the user's default shell in a robust, cross-platform way
  */
 export class ShellDetector {
-  private static cachedShell: ShellInfo | null = null;
-
   /**
    * Get the user's default shell
-   * @param forceRefresh Force re-detection instead of using cache
+   * @param forceRefresh Ignored - kept for compatibility
    * @returns Shell information including path and name
    */
   static getDefaultShell(forceRefresh = false): ShellInfo {
-    if (!forceRefresh && this.cachedShell) {
-      return this.cachedShell;
-    }
-
-    const shell = this.detectShell();
-    this.cachedShell = shell;
-    return shell;
+    return this.detectShell();
   }
 
   private static detectShell(): ShellInfo {
@@ -41,26 +33,36 @@ export class ShellDetector {
   }
 
   private static detectWindowsShell(): ShellInfo {
-    // Check for PowerShell Core first
-    const pwshPath = this.findExecutable('pwsh.exe');
-    if (pwshPath) {
-      return { path: pwshPath, name: 'pwsh' };
+    // First try PowerShell Core (pwsh.exe) - the modern PowerShell
+    const pwshPaths = [
+      path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'PowerShell', '7', 'pwsh.exe'),
+      path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'PowerShell', '6', 'pwsh.exe'),
+      'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+      'C:\\Program Files\\PowerShell\\6\\pwsh.exe'
+    ];
+    
+    for (const pwshPath of pwshPaths) {
+      if (fs.existsSync(pwshPath)) {
+        return { path: pwshPath, name: 'pwsh' };
+      }
     }
-
-    // Check for Windows PowerShell
-    const powershellPath = this.findExecutable('powershell.exe');
-    if (powershellPath) {
+    
+    // Fall back to Windows PowerShell if Core isn't installed
+    const powershellPath = path.join(
+      process.env.SYSTEMROOT || 'C:\\Windows',
+      'System32',
+      'WindowsPowerShell',
+      'v1.0',
+      'powershell.exe'
+    );
+    
+    if (fs.existsSync(powershellPath)) {
       return { path: powershellPath, name: 'powershell' };
     }
-
-    // Fall back to cmd.exe
+    
+    // Last resort: cmd.exe
     const cmdPath = path.join(process.env.SYSTEMROOT || 'C:\\Windows', 'System32', 'cmd.exe');
-    if (fs.existsSync(cmdPath)) {
-      return { path: cmdPath, name: 'cmd' };
-    }
-
-    // Last resort
-    return { path: 'cmd.exe', name: 'cmd' };
+    return { path: cmdPath, name: 'cmd' };
   }
 
   private static detectUnixShell(): ShellInfo {
@@ -139,10 +141,17 @@ export class ShellDetector {
       const fullPath = path.join(dir, name);
       if (fs.existsSync(fullPath)) {
         try {
-          fs.accessSync(fullPath, fs.constants.X_OK);
-          return fullPath;
+          // On Windows, fs.constants.X_OK doesn't work properly
+          // Just check if the file exists
+          if (process.platform === 'win32') {
+            fs.accessSync(fullPath, fs.constants.F_OK);
+            return fullPath;
+          } else {
+            fs.accessSync(fullPath, fs.constants.X_OK);
+            return fullPath;
+          }
         } catch {
-          // Not executable, continue searching
+          // Not accessible, continue searching
         }
       }
     }
@@ -193,7 +202,13 @@ export class ShellDetector {
    */
   static isShellAvailable(shellPath: string): boolean {
     try {
-      fs.accessSync(shellPath, fs.constants.X_OK);
+      // On Windows, fs.constants.X_OK doesn't work properly
+      // Just check if the file exists
+      if (process.platform === 'win32') {
+        fs.accessSync(shellPath, fs.constants.F_OK);
+      } else {
+        fs.accessSync(shellPath, fs.constants.X_OK);
+      }
       return true;
     } catch {
       return false;
