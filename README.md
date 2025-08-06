@@ -1,4 +1,4 @@
-# Crystal - Multi-Session Claude Code Manager
+# Crystal - Agent Management Platform for Claude Code
 
 <div align="center">
   <h3><a href="https://github.com/stravu/crystal/releases/latest">**Get the Latest Release Here**</a></h3>
@@ -12,11 +12,15 @@
 
 </div>
 
-Crystal is an Electron desktop application that lets you run, inspect, and test multiple Claude Code instances simultaneously using git worktrees. Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
+Crystal is a desktop application that lets you run, inspect, and test multiple Claude Code instances simultaneously using git worktrees. Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
 
 
 
-https://github.com/user-attachments/assets/e32f0ee7-c25a-43d6-a704-8a39878032eb
+
+
+https://github.com/user-attachments/assets/c1181542-c5d2-439e-a2d7-17edaef61366
+
+
 
 
 
