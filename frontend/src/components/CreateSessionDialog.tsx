@@ -25,7 +25,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     worktreeTemplate: '',
     count: 1,
     permissionMode: 'ignore',
-    model: 'claude-sonnet-4-20250514' // Default to Sonnet 4
+    model: 'claude-sonnet-4-20250514' // Default to Sonnet
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
@@ -309,7 +309,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Target className={`w-5 h-5 ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`}>Sonnet 4</span>
+                      <span className={`text-sm font-medium ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`}>Sonnet</span>
                       <span className="text-xs opacity-75">Balanced</span>
                     </div>
                     {formData.model === 'claude-sonnet-4-20250514' && (
@@ -329,7 +329,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Brain className={`w-5 h-5 ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`}>Opus 4</span>
+                      <span className={`text-sm font-medium ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`}>Opus</span>
                       <span className="text-xs opacity-75">Maximum</span>
                     </div>
                     {formData.model === 'claude-opus-4-20250514' && (
@@ -349,7 +349,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Zap className={`w-5 h-5 ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`}>Haiku 3.5</span>
+                      <span className={`text-sm font-medium ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`}>Haiku</span>
                       <span className="text-xs opacity-75">Fast</span>
                     </div>
                     {formData.model === 'claude-3-5-haiku-20241022' && (
