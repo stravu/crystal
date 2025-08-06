@@ -727,7 +727,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               // Skip if this exactly matches what the user just typed (Claude echoing)
               const lastInput = lastUserInputs.get(sessionId);
               if (lastInput && !lastInput.filtered && cleanText === lastInput.text) {
-                console.log(`[FILTER] Skipping Claude's echo of user input: "${cleanText}"`);
                 lastInput.filtered = true;
                 return null;
               }
@@ -741,27 +740,14 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               if (cleanText.includes('No commits were made')) return null;
               
               // Clean up any MCP server launch commands that might still appear
-              // Sometimes it's "pm exec @..." and sometimes just "exec @..."
               if (cleanText.includes('exec @')) {
-                // More precise MCP command removal - only remove the actual MCP commands
-                // Match the full package names to avoid removing parts of actual messages
-                cleanText = cleanText.replace(/pm exec @modelcontextprotocol\/[a-zA-Z0-9\-]+\s*/g, '');
-                cleanText = cleanText.replace(/exec @modelcontextprotocol\/[a-zA-Z0-9\-]+\s*/g, '');
-                cleanText = cleanText.replace(/pm exec @playwright\/[a-zA-Z0-9\-@]+\s*/g, '');
-                cleanText = cleanText.replace(/exec @playwright\/[a-zA-Z0-9\-@]+\s*/g, '');
-                cleanText = cleanText.replace(/pm exec @upstash\/[a-zA-Z0-9\-]+\s*/g, '');
-                cleanText = cleanText.replace(/exec @upstash\/[a-zA-Z0-9\-]+\s*/g, '');
-                cleanText = cleanText.replace(/pm exec @21st-dev\/[a-zA-Z0-9\-]+\s*/g, '');
-                cleanText = cleanText.replace(/exec @21st-dev\/[a-zA-Z0-9\-]+\s*/g, '');
-                
-                // Remove any leading non-printable characters or Unicode boxes
-                cleanText = cleanText.replace(/^[\x00-\x1F\x7F-\x9F\u2000-\u200F\uFEFF]+/, '');
+                // Simple pattern to remove all MCP commands
+                cleanText = cleanText.replace(/\b(pm )?exec @[a-zA-Z0-9\-\/]+(@[a-zA-Z0-9\-\.]+)?\s*/g, '');
                 cleanText = cleanText.trim();
               }
               
               // If we still see Windows paths, clean them
               if (cleanText.includes(':\\Windows\\')) {
-                console.warn(`[WARNING] Still seeing Windows paths despite direct spawning`);
                 cleanText = cleanText.replace(/[A-Z]?:\\Windows\\System32\\cmd\.exe\s*/g, '');
                 cleanText = cleanText.trim();
               }
@@ -771,9 +757,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               
               // Skip if we have nothing left
               if (!cleanText || cleanText.length < 2) return null;
-              
-              console.log(`[CLAUDE OUTPUT]: "${cleanText}"`);
-              
               
               return {
                 type: 'assistant',
