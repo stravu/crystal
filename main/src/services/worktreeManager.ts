@@ -485,13 +485,23 @@ export class WorktreeManager {
       lastOutput = resetResult.stdout || resetResult.stderr || '';
       console.log(`[WorktreeManager] Reset to base commit`);
       
-      // Properly escape commit message for cross-platform compatibility
-      const escapedMessage = commitMessage.replace(/"/g, '\\"');
-      command = `git commit -m "${escapedMessage}"`;
-      executedCommands.push(`git commit -m "..." (in ${worktreePath})`);
+      // Write commit message to a temporary file to avoid shell escaping issues
+      // Note: Write to worktree root, not .git folder (which is a file in worktrees, not a directory)
+      const tempFile = join(worktreePath, 'SQUASH_MSG');
+      await fs.writeFile(tempFile, commitMessage, 'utf8');
+      
+      command = `git commit -F "${tempFile}"`;
+      executedCommands.push(`git commit -F SQUASH_MSG (in ${worktreePath})`);
       const commitResult = await execWithShellPath(command, { cwd: worktreePath });
       lastOutput = commitResult.stdout || commitResult.stderr || '';
       console.log(`[WorktreeManager] Created squashed commit`);
+      
+      // Clean up temp file
+      try {
+        await fs.unlink(tempFile);
+      } catch {
+        // Ignore cleanup errors
+      }
       
       // Switch to main branch in the main repository
       command = `git checkout ${mainBranch}`;
