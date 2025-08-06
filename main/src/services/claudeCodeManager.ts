@@ -162,7 +162,8 @@ export class ClaudeCodeManager extends EventEmitter {
       }
       
       // Build the command arguments
-      const args = ['--verbose', '--output-format', 'stream-json'];
+      // Need --verbose for Claude to output anything in plain text mode
+      const args: string[] = ['--verbose'];
       
       // Add model argument if specified
       if (model) {
@@ -607,6 +608,7 @@ export class ClaudeCodeManager extends EventEmitter {
         try {
           console.log(`[ClaudeManager] Spawning Claude process (attempt ${spawnAttempt + 1})...`);
           console.log(`[ClaudeManager] Command: ${claudeCommand}`);
+          console.log(`[ClaudeManager] Arguments: ${args.join(' ')}`);
           console.log(`[ClaudeManager] Working directory: ${worktreePath}`);
           console.log(`[ClaudeManager] PATH entries: ${pathWithNode.split(pathSeparator).length}`);
           const startTime = Date.now();
@@ -619,6 +621,8 @@ export class ClaudeCodeManager extends EventEmitter {
           
           if (spawnAttempt === 0) {
             // First attempt: normal spawn
+            // DON'T specify a shell - let node-pty run Claude directly
+            // This avoids shell prompts polluting the output
             ptyProcess = pty.spawn(claudeCommand, args, {
               name: 'xterm-color',
               cols: 80,
@@ -752,41 +756,150 @@ export class ClaudeCodeManager extends EventEmitter {
         lastOutput += data;
         buffer += data;
         
-        // Process complete JSON lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        // Debug: Log raw data to see what Claude is sending
+        console.log(`\x1b[36m${'='.repeat(80)}\x1b[0m`);
+        console.log(`\x1b[36m[ClaudeManager DEBUG] Raw data from Claude (first 500 chars):\x1b[0m`);
+        console.log(`\x1b[33m${data.substring(0, 500).replace(/\n/g, '\\n').replace(/\r/g, '\\r')}\x1b[0m`);
+        console.log(`\x1b[36m${'='.repeat(80)}\x1b[0m`);
         
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const jsonMessage = JSON.parse(line.trim());
-              this.logger?.verbose(`JSON message from session ${sessionId}: ${JSON.stringify(jsonMessage)}`);
+        // Claude sends streaming JSON that can be split across chunks
+        // We need to detect complete JSON objects by counting braces
+        
+        // Process the buffer to extract complete JSON objects
+        while (buffer.length > 0) {
+          // Skip leading whitespace
+          const trimStart = buffer.search(/\S/);
+          if (trimStart > 0) {
+            buffer = buffer.substring(trimStart);
+          } else if (trimStart === -1) {
+            // Only whitespace in buffer
+            buffer = '';
+            break;
+          }
+          
+          // Check if buffer starts with JSON
+          if (buffer[0] === '{') {
+            // Count braces to find the end of the JSON object
+            let depth = 0;
+            let inString = false;
+            let escape = false;
+            let jsonEnd = -1;
+            
+            for (let i = 0; i < buffer.length; i++) {
+              const char = buffer[i];
               
-              // Emit JSON message only - terminal formatting will be done on the fly
-              this.emit('output', {
-                sessionId,
-                type: 'json',
-                data: jsonMessage,
-                timestamp: new Date()
-              });
-            } catch (error) {
-              // If not valid JSON, treat as regular output
-              this.logger?.verbose(`Raw output from session ${sessionId}: ${line.substring(0, 200)}`);
+              if (escape) {
+                escape = false;
+                continue;
+              }
               
-              // Check if this looks like an error message
-              const isError = line.includes('ERROR') || 
-                            line.includes('Error:') || 
-                            line.includes('error:') ||
-                            line.includes('Command failed:') ||
-                            line.includes('aborted') ||
-                            line.includes('fatal:');
+              if (char === '\\') {
+                escape = true;
+                continue;
+              }
               
-              this.emit('output', {
-                sessionId,
-                type: isError ? 'stderr' : 'stdout',
-                data: line + '\n',
-                timestamp: new Date()
-              });
+              if (char === '"') {
+                inString = !inString;
+                continue;
+              }
+              
+              if (!inString) {
+                if (char === '{') {
+                  depth++;
+                } else if (char === '}') {
+                  depth--;
+                  if (depth === 0) {
+                    jsonEnd = i + 1;
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (jsonEnd > 0) {
+              // Found complete JSON object
+              const jsonStr = buffer.substring(0, jsonEnd);
+              buffer = buffer.substring(jsonEnd);
+              
+              try {
+                const jsonMessage = JSON.parse(jsonStr);
+                
+                console.log(`\x1b[32m✅ [ClaudeManager DEBUG] Successfully parsed JSON: type=${jsonMessage.type || jsonMessage.object || jsonMessage.role}\x1b[0m`);
+                
+                // Special highlight for assistant messages
+                if (jsonMessage.type === 'assistant' || jsonMessage.role === 'assistant') {
+                  console.log(`\x1b[35m\x1b[1m🤖 CLAUDE RESPONSE DETECTED!\x1b[0m`);
+                  console.log(`\x1b[35mContent: ${JSON.stringify(jsonMessage.content || jsonMessage.message || jsonMessage).substring(0, 300)}\x1b[0m`);
+                }
+                
+                // Check for streaming chunks
+                if (jsonMessage.object === 'chat.completion.chunk') {
+                  console.log(`\x1b[34m📨 STREAMING CHUNK DETECTED! Delta: ${JSON.stringify(jsonMessage.choices?.[0]?.delta).substring(0, 200)}\x1b[0m`);
+                }
+                
+                // Emit JSON message
+                this.emit('output', {
+                  sessionId,
+                  type: 'json',
+                  data: jsonMessage,
+                  timestamp: new Date()
+                });
+              } catch (error) {
+                console.log(`\x1b[31m❌ [ClaudeManager DEBUG] Failed to parse JSON: ${error}\x1b[0m`);
+                console.log(`\x1b[31mJSON string (first 200 chars): ${jsonStr.substring(0, 200)}\x1b[0m`);
+                
+                // Emit as stdout if parse fails
+                this.emit('output', {
+                  sessionId,
+                  type: 'stdout',
+                  data: jsonStr + '\n',
+                  timestamp: new Date()
+                });
+              }
+            } else {
+              // Incomplete JSON, wait for more data
+              console.log(`\x1b[33m⏳ [ClaudeManager DEBUG] Incomplete JSON, buffering... (depth=${depth}, buffer size=${buffer.length})\x1b[0m`);
+              break;
+            }
+          } else {
+            // Not JSON, look for next JSON object or newline
+            const nextJson = buffer.indexOf('{');
+            const nextNewline = buffer.indexOf('\n');
+            
+            let splitPoint = -1;
+            if (nextJson >= 0 && (nextNewline === -1 || nextJson < nextNewline)) {
+              splitPoint = nextJson;
+            } else if (nextNewline >= 0) {
+              splitPoint = nextNewline + 1;
+            }
+            
+            if (splitPoint > 0) {
+              const text = buffer.substring(0, splitPoint);
+              buffer = buffer.substring(splitPoint);
+              
+              if (text.trim()) {
+                // Emit non-JSON text as stdout
+                this.emit('output', {
+                  sessionId,
+                  type: 'stdout',
+                  data: text,
+                  timestamp: new Date()
+                });
+              }
+            } else {
+              // No more JSON or newlines, emit rest as stdout if it's getting long
+              if (buffer.length > 1000) {
+                this.emit('output', {
+                  sessionId,
+                  type: 'stdout',
+                  data: buffer,
+                  timestamp: new Date()
+                });
+                buffer = '';
+              } else {
+                // Keep buffering
+                break;
+              }
             }
           }
         }
@@ -980,6 +1093,8 @@ export class ClaudeCodeManager extends EventEmitter {
       throw new Error(`No Claude Code process found for session ${sessionId}`);
     }
 
+    console.log(`\x1b[33m📝 [ClaudeManager] Sending input to session ${sessionId}:\x1b[0m`);
+    console.log(`\x1b[33m${input.substring(0, 200)}${input.length > 200 ? '...' : ''}\x1b[0m`);
     claudeProcess.process.write(input);
   }
 
