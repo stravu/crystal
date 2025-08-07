@@ -241,8 +241,14 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
 
   // Remove output terminal initialization - now handled by useSessionView
 
-  // Get or create main repo session for file operations
+  // Get or create main repo session only when needed (not for dashboard)
   useEffect(() => {
+    // Only create main repo session when switching to tabs that need it
+    if (viewMode === 'dashboard') {
+      // Don't create session for dashboard view
+      return;
+    }
+    
     const getMainRepoSession = async () => {
       setIsLoadingSession(true);
       try {

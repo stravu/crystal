@@ -503,7 +503,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       if (!container) return;
 
       const checkIfAtBottom = () => {
-        const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+        // Consider "at bottom" if within 30% of viewport height or 300px (whichever is larger)
+        const threshold = Math.max(container.clientHeight * 0.3, 300);
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        const isAtBottom = distanceFromBottom < threshold;
         wasAtBottomRef.current = isAtBottom;
       };
 
@@ -529,7 +532,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       if (wasAtBottomRef.current) {
         // Use requestAnimationFrame to ensure DOM has updated
         requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' as ScrollBehavior });
+          // Use instant scrolling for better responsiveness during active output
+          // Smooth scrolling can be too slow and cause users to miss content
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
           // Don't set wasAtBottomRef here - let the scroll event handler determine actual position
         });
       }
