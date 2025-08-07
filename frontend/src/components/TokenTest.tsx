@@ -864,9 +864,9 @@ export function TokenTest() {
                       </Pill>
                     }
                     items={[
-                      { id: 'sonnet', label: 'Sonnet 4', icon: Zap },
-                      { id: 'opus', label: 'Opus 4', icon: Brain },
-                      { id: 'haiku', label: 'Haiku 3.5', icon: Settings },
+                      { id: 'sonnet', label: 'Sonnet', icon: Zap },
+                      { id: 'opus', label: 'Opus', icon: Brain },
+                      { id: 'haiku', label: 'Haiku', icon: Settings },
                     ]}
                     selectedId="opus"
                   />
@@ -946,13 +946,13 @@ export function TokenTest() {
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>Large Models</SelectLabel>
-                        <SelectItem value="opus">Opus 4</SelectItem>
-                        <SelectItem value="sonnet">Sonnet 4</SelectItem>
+                        <SelectItem value="opus">Opus</SelectItem>
+                        <SelectItem value="sonnet">Sonnet</SelectItem>
                       </SelectGroup>
                       <SelectSeparator />
                       <SelectGroup>
                         <SelectLabel>Fast Models</SelectLabel>
-                        <SelectItem value="haiku">Haiku 3.5</SelectItem>
+                        <SelectItem value="haiku">Haiku</SelectItem>
                         <SelectItem value="claude-instant">Claude Instant</SelectItem>
                       </SelectGroup>
                     </SelectContent>

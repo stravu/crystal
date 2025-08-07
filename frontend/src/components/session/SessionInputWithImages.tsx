@@ -641,19 +641,19 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   // Model configurations
   const modelConfigs = {
     'claude-sonnet-4-20250514': {
-      label: 'Sonnet 4',
+      label: 'Sonnet',
       icon: Target,
       iconColor: 'text-interactive',
       description: 'Balanced',
     },
     'claude-opus-4-20250514': {
-      label: 'Opus 4',
+      label: 'Opus',
       icon: Brain,
       iconColor: 'text-interactive',
       description: 'Maximum',
     },
     'claude-3-5-haiku-20241022': {
-      label: 'Haiku 3.5',
+      label: 'Haiku',
       icon: Zap,
       iconColor: 'text-status-success',
       description: 'Fast',

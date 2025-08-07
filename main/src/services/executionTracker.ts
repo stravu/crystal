@@ -276,16 +276,13 @@ export class ExecutionTracker extends EventEmitter {
   async getCombinedDiff(sessionId: string, executionIds?: number[]): Promise<GitDiffResult> {
     const executions = await this.sessionManager.getExecutionDiffs(sessionId);
     
-    console.log(`[ExecutionTracker] getCombinedDiff for session ${sessionId}, found ${executions.length} executions`);
-    if (executions.length > 0) {
-      console.log(`[ExecutionTracker] Available execution IDs:`, executions.map((e: any) => e.id));
-    }
+    // Commented out verbose logging
+    // console.log(`[ExecutionTracker] getCombinedDiff for session ${sessionId}, found ${executions.length} executions`);
     
     let filteredExecutions = executions;
     if (executionIds && executionIds.length > 0) {
-      console.log(`[ExecutionTracker] Filtering by execution IDs:`, executionIds);
       filteredExecutions = executions.filter((exec: any) => executionIds.includes(exec.id));
-      console.log(`[ExecutionTracker] Filtered to ${filteredExecutions.length} executions`);
+      // console.log(`[ExecutionTracker] Filtered to ${filteredExecutions.length} executions`);
     }
     
     const diffs: GitDiffResult[] = filteredExecutions
@@ -302,7 +299,7 @@ export class ExecutionTracker extends EventEmitter {
         afterHash: exec.after_commit_hash
       }));
     
-    console.log(`[ExecutionTracker] Found ${diffs.length} diffs to combine`);
+    // console.log(`[ExecutionTracker] Found ${diffs.length} diffs to combine`);
     
     return this.gitDiffManager.combineDiffs(diffs);
   }

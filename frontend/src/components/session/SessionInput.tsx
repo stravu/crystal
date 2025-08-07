@@ -140,9 +140,9 @@ export const SessionInput: React.FC<SessionInputProps> = ({
               className="text-sm px-2 py-1 border border-border-primary rounded focus:outline-none focus:ring-1 focus:ring-interactive text-text-primary bg-surface-secondary"
               title="AI model to use for continuing the conversation"
             >
-              <option value="claude-sonnet-4-20250514">Sonnet 4: Best for most coding tasks</option>
-              <option value="claude-opus-4-20250514">Opus 4: Complex architecture, large refactors</option>
-              <option value="claude-3-5-haiku-20241022">Haiku 3.5: Fast & cost-effective for simple tasks</option>
+              <option value="claude-sonnet-4-20250514">Sonnet: Best for most coding tasks</option>
+              <option value="claude-opus-4-20250514">Opus: Complex architecture, large refactors</option>
+              <option value="claude-3-5-haiku-20241022">Haiku: Fast & cost-effective for simple tasks</option>
             </select>
           </div>
         )}

@@ -146,7 +146,7 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
                 disabled={isMerging}
               >
                 <GitBranch className="w-4 h-4" />
-                <span>Branch Actions</span>
+                <span>Git Branch Actions</span>
                 <MoreVertical className="w-3 h-3" />
               </Button>
             }

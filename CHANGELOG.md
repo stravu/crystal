@@ -1,6 +1,27 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.2.0] - 2025-08-05
+
+### Added
+- Rich Output for Claude Code to replace text-only output
+- Light/Dark modes
+- Compact context
+- AWS Bedrock model support
+- Git status indicators in session sidebar
+- Always use the latest versions of Opus/Sonnet/Haiku, including Opus 4.1
+
+### Changed
+- Terminal scrollback increased to 100,000 lines for better debugging
+- Project dashboard loading improvements
+- Enhanced IDE integration with loading states and command validation
+
+### Fixed
+- Duplicate right-click context menus issue
+- IDE button not opening IDE properly
+- Context compaction now actually restarts conversations instead of just showing status
+- GTK 3 forced on Linux to resolve Electron 36 compatibility issues
+
 ## [0.1.17] - 2025-07-23
 
 ### Added
