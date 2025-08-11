@@ -57,7 +57,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         id: index + 1, // 1-based index for commits
         session_id: sessionId,
         execution_sequence: index + 1,
-        commit_hash: commit.hash,
+        after_commit_hash: commit.hash,
         commit_message: commit.message,
         timestamp: commit.date.toISOString(),
         stats_additions: commit.stats.additions,
@@ -77,7 +77,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           id: 0,
           session_id: sessionId,
           execution_sequence: 0,
-          commit_hash: 'UNCOMMITTED',
+          after_commit_hash: 'UNCOMMITTED',
           commit_message: 'Uncommitted changes',
           timestamp: new Date().toISOString(),
           stats_additions: uncommittedDiff.stats.additions,
