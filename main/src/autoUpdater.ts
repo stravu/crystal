@@ -10,8 +10,11 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   // TEST MODE: Use local server for testing
   if (process.env.TEST_UPDATES === 'true') {
-    const { setupTestUpdater } = require('./test-updater');
-    setupTestUpdater();
+    // Dynamic import to avoid ESLint warning
+    void (async () => {
+      const { setupTestUpdater } = await import('./test-updater');
+      setupTestUpdater();
+    })();
     console.log('[AutoUpdater] Using test update server at:', process.env.UPDATE_SERVER_URL || 'http://localhost:8080');
   } else {
     // Configure electron-updater for production
