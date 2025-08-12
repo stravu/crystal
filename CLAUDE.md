@@ -713,6 +713,40 @@ In development mode, Crystal automatically captures all frontend console logs an
 
 Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Claude™ is a trademark of Anthropic, PBC. Crystal is not affiliated with, endorsed by, or sponsored by Anthropic. This tool is designed to work with Claude Code, which must be installed separately.
 
+## File Deletion Syntax Reference
+
+⚠️ **IMPORTANT**: Use the correct syntax for deleting files based on the shell environment:
+
+### In Git Bash (Windows)
+```bash
+# Use forward slashes and rm command
+rm "path/to/file.txt"
+rm path/to/file.txt
+
+# For directories
+rm -rf "path/to/directory"
+
+# DO NOT USE:
+# - del (Windows cmd command)
+# - backslashes in paths
+# - C:\path\to\file (use C:/path/to/file or just relative paths)
+```
+
+### Examples
+```bash
+# ✅ CORRECT in Git Bash:
+rm "tests/windows-binary-e2e.spec.ts"
+rm playwright.windows-binary.config.ts
+rm -rf test-artifacts/
+
+# ❌ WRONG in Git Bash:
+del "C:\Users\frank\Projects\crystal\tests\file.ts"  # del command not found
+rm "C:\Users\frank\Projects\crystal\tests\file.ts"  # backslashes cause issues
+```
+
+### Best Practice
+Always use relative paths from the current directory when possible to avoid path separator issues.
+
 ## important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.

@@ -58,8 +58,19 @@ export class ConfigManager extends EventEmitter {
   }
 
   private async saveConfig(): Promise<void> {
-    await fs.mkdir(this.configDir, { recursive: true });
-    await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
+    try {
+      await fs.mkdir(this.configDir, { recursive: true });
+      const configString = JSON.stringify(this.config, null, 2);
+      console.log('[ConfigManager] Saving config to:', this.configPath);
+      console.log('[ConfigManager] Config size:', configString.length, 'bytes');
+      await fs.writeFile(this.configPath, configString);
+      console.log('[ConfigManager] Config saved successfully');
+    } catch (error) {
+      console.error('[ConfigManager] Failed to save config:', error);
+      console.error('[ConfigManager] Config path:', this.configPath);
+      console.error('[ConfigManager] Config dir:', this.configDir);
+      throw error;
+    }
   }
 
   getConfig(): AppConfig {

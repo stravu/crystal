@@ -92,6 +92,22 @@ const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 // Set up console wrapper to reduce logging in production
 setupConsoleWrapper();
 
+// NUCLEAR OPTION: If verbose is off, silence everything except errors
+try {
+  const Store = require('electron-store');
+  const store = new Store({ name: 'crystal-settings' });
+  const config = store.get('config', {});
+  if (!config.verbose) {
+    // Override ALL console methods to be silent except errors
+    console.log = () => {};
+    console.info = () => {};
+    console.debug = () => {};
+    // Keep warn and error for important messages
+  }
+} catch (e) {
+  // If we can't read config, keep normal logging
+}
+
 // Parse command-line arguments for custom Crystal directory
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
@@ -243,13 +259,23 @@ async function createWindow() {
       originalLog.apply(console, args);
     }
 
-    // Forward to renderer
+    // Forward to renderer only if verbose mode is enabled or it's an important message
     if (mainWindow && !mainWindow.isDestroyed()) {
-      try {
-        mainWindow.webContents.send('main-log', 'log', message);
-      } catch (e) {
-        // If sending to renderer fails, use original console to avoid recursion
-        originalLog('[Main] Failed to send log to renderer:', e);
+      // Check if we should send this log to the renderer
+      const shouldSendToRenderer = configManager?.isVerbose() || 
+        message.includes('Error') || 
+        message.includes('Failed') ||
+        message.includes('[Main] Window created') ||
+        message.includes('[Main] Starting app') ||
+        message.includes('[Main] Performing startup');
+      
+      if (shouldSendToRenderer) {
+        try {
+          mainWindow.webContents.send('main-log', 'log', message);
+        } catch (e) {
+          // If sending to renderer fails, use original console to avoid recursion
+          originalLog('[Main] Failed to send log to renderer:', e);
+        }
       }
     }
   };
@@ -331,6 +357,7 @@ async function createWindow() {
       originalWarn.apply(console, args);
     }
 
+    // Always send warnings to renderer (they're important)
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         mainWindow.webContents.send('main-log', 'warn', message);
@@ -363,7 +390,8 @@ async function createWindow() {
       originalInfo.apply(console, args);
     }
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    // Forward to renderer only if verbose mode is enabled
+    if (mainWindow && !mainWindow.isDestroyed() && configManager?.isVerbose()) {
       try {
         mainWindow.webContents.send('main-log', 'info', message);
       } catch (e) {
@@ -395,6 +423,10 @@ async function createWindow() {
 async function initializeServices() {
   configManager = new ConfigManager();
   await configManager.initialize();
+  
+  // Update console wrapper with configManager to respect verbose setting
+  const { updateConfigManager } = require('./utils/consoleWrapper');
+  updateConfigManager(configManager);
 
   // Initialize logger early so it can capture all logs
   logger = new Logger(configManager);

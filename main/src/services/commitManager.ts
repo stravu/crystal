@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import type { Logger } from '../utils/logger';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand } from '../utils/shellEscape';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import {
   CommitModeSettings,
   CommitResult,
@@ -93,10 +95,20 @@ export class CommitManager extends EventEmitter {
       const fullMessage = prefix + commitMessage;
 
       // For checkpoint mode, use a simple commit without the extra signature
-      // Escape the message properly for the shell
-      const escapedMessage = fullMessage.replace(/'/g, "'\\''");
-      const commitCommand = `git commit -m '${escapedMessage}' --no-verify`;
+      // Write commit message to a temporary file to avoid shell escaping issues
+      // Note: Write to worktree root, not .git folder (which is a file in worktrees, not a directory)
+      const tempFile = join(worktreePath, 'COMMIT_MSG_TEMP');
+      writeFileSync(tempFile, fullMessage, 'utf8');
+      
+      const commitCommand = `git commit -F "${tempFile}" --no-verify`;
       const result = execSync(commitCommand, { cwd: worktreePath, encoding: 'utf8' });
+      
+      // Clean up temp file
+      try {
+        unlinkSync(tempFile);
+      } catch {
+        // Ignore cleanup errors
+      }
 
       // Extract commit hash from output
       const commitHashMatch = result.match(/\[[\w-]+ ([a-f0-9]+)\]/);

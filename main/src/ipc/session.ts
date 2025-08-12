@@ -6,6 +6,7 @@ import type { AppServices } from './types';
 import type { CreateSessionRequest } from '../types/session';
 import { getCrystalSubdirectory } from '../utils/crystalDirectory';
 import { convertDbFolderToFolder } from './folders';
+import stripAnsi from 'strip-ansi';
 
 export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices): void {
   const {
@@ -195,6 +196,34 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         return { success: false, error: 'Session is already archived' };
       }
 
+      // Stop Claude Code process if it's running (important for Windows to release file locks)
+      if (claudeCodeManager.isSessionRunning(sessionId)) {
+        console.log(`[Main] Stopping Claude Code process for session ${sessionId} before archiving`);
+        try {
+          await claudeCodeManager.stopSession(sessionId);
+          // Give Windows time to release file locks
+          if (process.platform === 'win32') {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(`[Main] Failed to stop Claude Code process for session ${sessionId}:`, error);
+        }
+      }
+      
+      // Close terminal session if it exists (important for Windows to release directory locks)
+      // This is done here in addition to archiveSession to ensure it happens BEFORE worktree removal
+      try {
+        console.log(`[Main] Closing terminal session for ${sessionId} before worktree removal`);
+        await sessionManager.closeTerminalSession(sessionId);
+        // Give Windows extra time to release directory locks after terminal closure
+        if (process.platform === 'win32') {
+          console.log(`[Main] Waiting 2 seconds for Windows to release terminal directory locks...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (error) {
+        console.error(`[Main] Failed to close terminal session for ${sessionId}:`, error);
+      }
+
       // Add a message to session output about archiving
       const timestamp = new Date().toLocaleTimeString();
       let archiveMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 📦 ARCHIVING SESSION \x1b[0m\r\n`;
@@ -257,8 +286,14 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  // Store last user inputs per session to filter out echoes (with flag if already filtered)
+  const lastUserInputs = new Map<string, { text: string, filtered: boolean }>();
+
   ipcMain.handle('sessions:input', async (_event, sessionId: string, input: string) => {
     try {
+      // Store the raw input to filter out Claude's echo later (reset filtered flag)
+      lastUserInputs.set(sessionId, { text: input.trim(), filtered: false });
+      
       // Update session status back to running when user sends input
       const currentSession = await sessionManager.getSession(sessionId);
       if (currentSession && currentSession.status === 'waiting') {
@@ -602,12 +637,52 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
                data.includes('Aborted rebase successfully');
       };
       
-      // Filter to JSON messages, error messages, and git operation stdout/stderr messages
-      const jsonMessages = outputs
+      // Group consecutive stdout messages that come within 100ms of each other
+      const groupedOutputs: any[] = [];
+      let currentGroup: any = null;
+      
+      for (const output of outputs) {
+        if (output.type === 'stdout' && !isGitOperation(output.data)) {
+          // Check if we should combine with previous stdout
+          if (currentGroup && currentGroup.type === 'stdout' && 
+              (new Date(output.timestamp).getTime() - new Date(currentGroup.timestamp).getTime()) < 100) {
+            // Append to current group
+            // Check if the previous data ends with a sentence-ending punctuation
+            const prevEndsComplete = currentGroup.data.match(/[.!?:]\s*$/);
+            const currStartsCapital = output.data.match(/^[A-Z]/);
+            
+            if (prevEndsComplete || currStartsCapital) {
+              // Previous line is complete or current starts with capital - add newline
+              currentGroup.data += '\n' + output.data;
+            } else {
+              // Lines seem to continue - add space
+              currentGroup.data += ' ' + output.data;
+            }
+            currentGroup.timestamp = output.timestamp; // Update to latest timestamp
+          } else {
+            // Start new group
+            if (currentGroup) groupedOutputs.push(currentGroup);
+            currentGroup = { ...output };
+          }
+        } else {
+          // Not stdout or is git operation - flush current group and add this output
+          if (currentGroup) {
+            groupedOutputs.push(currentGroup);
+            currentGroup = null;
+          }
+          groupedOutputs.push(output);
+        }
+      }
+      // Don't forget the last group
+      if (currentGroup) groupedOutputs.push(currentGroup);
+      
+      // Filter to JSON messages, error messages, and ALL stdout/stderr messages
+      const jsonMessages = groupedOutputs
         .filter(output => 
           output.type === 'json' || 
           output.type === 'error' ||
-          ((output.type === 'stdout' || output.type === 'stderr') && isGitOperation(output.data))
+          output.type === 'stdout' ||  // Show ALL stdout, not just git operations
+          output.type === 'stderr'      // Show ALL stderr too
         )
         .map(output => {
           if (output.type === 'error') {
@@ -621,16 +696,79 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               message: `${output.data.error}${output.data.details ? '\n\n' + output.data.details : ''}`
             };
           } else if (output.type === 'stdout' || output.type === 'stderr') {
-            // Transform git operation stdout/stderr to system messages that RichOutputView can display
+            // Check if this is a git operation or Claude's response
+            const isGitOp = isGitOperation(output.data);
             const isError = output.type === 'stderr' || output.data.includes('failed:') || output.data.includes('✗');
-            return {
-              type: 'system',
-              subtype: isError ? 'git_error' : 'git_operation',
-              timestamp: output.timestamp.toISOString(),
-              message: output.data,
-              // Add raw data for processing
-              raw_output: output.data
-            };
+            
+            if (isGitOp) {
+              // Git operation - treat as system message
+              return {
+                type: 'system',
+                subtype: isError ? 'git_error' : 'git_operation',
+                timestamp: output.timestamp.toISOString(),
+                message: output.data,
+                // Add raw data for processing
+                raw_output: output.data
+              };
+            } else {
+              // Claude's plain text response - treat as assistant message
+              // Since we're spawning Claude directly (no shell), we shouldn't get shell prompts
+              // But --verbose flag might still cause echoing
+              
+              // Strip ANSI codes and terminal control sequences
+              let cleanText = stripAnsi(output.data).trim();
+              
+              // Skip empty lines
+              if (!cleanText) return null;
+              
+              // Skip user input echoes (from --verbose flag)
+              if (cleanText.startsWith('> ')) return null;
+              
+              // Skip if this exactly matches what the user just typed (Claude echoing)
+              const lastInput = lastUserInputs.get(sessionId);
+              if (lastInput && !lastInput.filtered && cleanText === lastInput.text) {
+                lastInput.filtered = true;
+                return null;
+              }
+              
+              // Skip separator lines
+              if (cleanText.match(/^[─\-_═]{10,}$/)) return null;
+              
+              // Skip Claude's internal logging (if any)
+              if (cleanText.includes('👤 USER PROMPT')) return null;
+              if (cleanText.includes('SESSION SUMMARY')) return null;
+              if (cleanText.includes('No commits were made')) return null;
+              
+              // Clean up any MCP server launch commands that might still appear
+              if (cleanText.includes('exec @')) {
+                // Simple pattern to remove all MCP commands
+                cleanText = cleanText.replace(/\b(pm )?exec @[a-zA-Z0-9\-\/]+(@[a-zA-Z0-9\-\.]+)?\s*/g, '');
+                cleanText = cleanText.trim();
+              }
+              
+              // If we still see Windows paths, clean them
+              if (cleanText.includes(':\\Windows\\')) {
+                cleanText = cleanText.replace(/[A-Z]?:\\Windows\\System32\\cmd\.exe\s*/g, '');
+                cleanText = cleanText.trim();
+              }
+              
+              // Final cleanup - remove any remaining box characters or non-printable chars at the start
+              cleanText = cleanText.replace(/^[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F\u2000-\u200F\uFEFF]+/, '');
+              
+              // Skip if we have nothing left
+              if (!cleanText || cleanText.length < 2) return null;
+              
+              return {
+                type: 'assistant',
+                timestamp: output.timestamp.toISOString(),
+                message: {
+                  content: [{
+                    type: 'text',
+                    text: cleanText
+                  }]
+                }
+              };
+            }
           } else {
             // Regular JSON messages
             return {
@@ -638,7 +776,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               timestamp: output.timestamp.toISOString()
             };
           }
-        });
+        })
+        .filter(message => message !== null); // Remove null entries (empty messages)
       
       console.log(`[IPC] Found ${jsonMessages.length} messages (including git operations) for session ${sessionId}`);
       return { success: true, data: jsonMessages };

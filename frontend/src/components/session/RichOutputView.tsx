@@ -413,6 +413,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
     
+    console.log('[RichOutputView] Loading messages for session:', sessionId);
+    
     try {
       setError(null);
       
@@ -421,6 +423,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         API.sessions.getConversation(sessionId),
         API.sessions.getJsonMessages(sessionId)
       ]);
+      
+      console.log('[RichOutputView] Conversation response:', conversationResponse);
+      console.log('[RichOutputView] Output response:', outputResponse);
       
       // Combine both sources - conversation messages have the actual user prompts
       const userPrompts: RawMessage[] = [];

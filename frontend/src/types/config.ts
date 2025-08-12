@@ -1,6 +1,7 @@
 export interface AppConfig {
   gitRepoPath: string;
   verbose?: boolean;
+  debugMode?: boolean;
   anthropicApiKey?: string;
   systemPromptAppend?: string;
   runScript?: string[];
