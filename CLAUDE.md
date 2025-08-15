@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Crystal - Multi-Session Claude Code Manager
 
 Created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1)
@@ -569,73 +573,193 @@ The react-diff-viewer-continued library uses emotion/styled-components internall
 5. **Real-time Updates**: IPC streams session status and terminal output
 6. **Session Management**: Users can switch between sessions, continue conversations
 
-## Available Commands
+## Development Commands
+
+### Essential Commands for Development
 
 ```bash
-# One-time setup (install, build, and rebuild native modules)
+# One-time setup (install, build, and rebuild native modules) - REQUIRED FIRST
 pnpm run setup
 
-# Run as Electron app in development mode
+# Development mode - Run Electron app with live reload
 pnpm electron-dev
 # Or use the shorthand:
 pnpm run dev
 
-# Run frontend only (without Electron shell)
-pnpm dev
+# Build main process only (required after changes to main/ directory)
+pnpm run build:main
 
-# Build for production
+# Build frontend only 
+pnpm run build:frontend
+
+# Run frontend in browser (without Electron shell) - for UI development
+pnpm --filter frontend dev
+
+# Full production build
 pnpm build
-
-# Type checking
-pnpm typecheck
-
-# Linting
-pnpm lint
 ```
 
-**Note:** You must run `pnpm run build:main` at least once before running `pnpm electron-dev` to compile the main process.
-
-### Building Packaged Electron App
+### Code Quality Commands
 
 ```bash
-# Build for macOS
-pnpm build:mac    # macOS (only works on macOS)
+# Type checking across all packages
+pnpm typecheck
+
+# Linting across all packages
+pnpm lint
+
+# Type check individual packages
+pnpm --filter frontend typecheck
+pnpm --filter main typecheck
+
+# Lint individual packages  
+pnpm --filter frontend lint
+pnpm --filter main lint
 ```
 
-## Project Structure
+### Testing Commands
+
+```bash
+# Run Playwright tests
+pnpm test
+
+# Run tests with UI
+pnpm test:ui
+
+# Run tests in headed mode (see browser)
+pnpm test:headed
+
+# Main process unit tests
+pnpm --filter main test
+```
+
+### Building for Production
+
+```bash
+# macOS builds (universal binary - works on both Intel and Apple Silicon)
+pnpm build:mac
+
+# macOS specific architectures
+pnpm build:mac:x64      # Intel only
+pnpm build:mac:arm64    # Apple Silicon only
+
+# Linux builds
+pnpm build:linux        # All Linux formats (deb, AppImage, pacman)
+pnpm build:arch         # Arch Linux only (pacman)
+
+# Release builds (with publishing to GitHub)
+pnpm release:mac
+pnpm release:linux      # All Linux formats
+pnpm release:arch       # Arch Linux only
+```
+
+### Database and Development Tools
+
+```bash
+# Rebuild native dependencies (if you get node-pty or better-sqlite3 errors)
+pnpm run electron:rebuild
+
+# Generate third-party license notices
+pnpm run generate-notices
+
+# Inject build information (used by CI)
+pnpm run inject-build-info
+```
+
+**Critical Notes:**
+- You MUST run `pnpm run setup` at least once before development
+- You MUST run `pnpm run build:main` after changes to main/ directory before running `pnpm electron-dev`
+- The main process must be compiled before Electron can start
+- Use separate terminals for main process compilation (`pnpm --filter main dev`) and Electron runtime during development
+- **For Arch Linux builds**: Install `bsdtar` package before building: `sudo pacman -S bsdtar` (Arch) or `sudo apt-get install bsdtar` (Ubuntu/Debian)
+
+## Project Architecture and Structure
+
+### High-Level Architecture
+
+Crystal is a modular Electron application with clear separation between the main process (Node.js backend) and renderer process (React frontend), connected via secure IPC communication.
 
 ```
 crystal/
-├── frontend/         # React renderer process
+├── frontend/                 # React 19 renderer process (Vite + TypeScript)
 │   ├── src/
-│   │   ├── components/      # React components
-│   │   │   ├── Help.tsx    # Help dialog
-│   │   │   └── ...        # Other UI components
-│   │   ├── hooks/          # Custom React hooks
-│   │   │   └── useSessionView.ts # Session view logic (941 lines)
-│   │   ├── stores/         # Zustand state stores
-│   │   └── utils/          # Utility functions
-├── main/            # Electron main process
+│   │   ├── components/       # React UI components
+│   │   │   ├── Help.tsx     # Comprehensive help dialog
+│   │   │   ├── SessionView.tsx        # Main session interface
+│   │   │   ├── DraggableProjectTreeView.tsx # Project/session tree
+│   │   │   ├── DiffViewer.tsx         # Git diff visualization
+│   │   │   └── CombinedDiffView.tsx   # Combined diff viewer
+│   │   ├── hooks/           # Custom React hooks
+│   │   │   ├── useSessionView.ts      # Session view logic (941 lines)
+│   │   │   └── useProjects.ts         # Project management state
+│   │   ├── stores/          # Zustand state management
+│   │   │   ├── useSessionStore.ts     # Session state
+│   │   │   └── useAppStore.ts         # Global app state
+│   │   └── utils/           # Frontend utilities
+│   │       ├── timestampUtils.ts      # Timezone-safe timestamp handling
+│   │       └── ipcRenderer.ts         # IPC communication helpers
+│
+├── main/                     # Electron main process (Node.js + TypeScript)
 │   ├── src/
-│   │   ├── index.ts         # Main entry point (reduced to 414 lines)
-│   │   ├── preload.ts       # Preload script
-│   │   ├── events.ts        # Event handling (359 lines)
-│   │   ├── database/        # SQLite database
-│   │   ├── ipc/            # IPC handlers (modular)
-│   │   │   ├── git.ts      # Git operation handlers (843 lines)
-│   │   │   ├── session.ts  # Session operation handlers (428 lines)
-│   │   │   └── ...         # Other IPC handlers
-│   │   ├── services/        # Business logic services
-│   │   │   ├── taskQueue.ts # Bull queue for async tasks
-│   │   │   └── ...         # Other service modules
-│   │   ├── routes/          # API routes
-│   │   └── types/           # TypeScript types
-│   └── dist/               # Compiled output
-├── shared/          # Shared TypeScript types
-├── dist-electron/   # Packaged Electron app
-├── package.json     # Root workspace configuration
-└── pnpm-workspace.yaml
+│   │   ├── index.ts          # Main entry point (414 lines)
+│   │   ├── preload.ts        # Secure IPC bridge
+│   │   ├── events.ts         # Event coordination (359 lines)
+│   │   │
+│   │   ├── ipc/              # Modular IPC handlers
+│   │   │   ├── git.ts        # Git operations (843 lines)
+│   │   │   ├── session.ts    # Session management (428 lines)
+│   │   │   ├── project.ts    # Project operations
+│   │   │   ├── config.ts     # Configuration management
+│   │   │   └── index.ts      # IPC handler registration
+│   │   │
+│   │   ├── services/         # Core business logic
+│   │   │   ├── sessionManager.ts      # Claude Code process management
+│   │   │   ├── worktreeManager.ts     # Git worktree operations
+│   │   │   ├── claudeCodeManager.ts   # Claude Code SDK integration
+│   │   │   ├── gitDiffManager.ts      # Diff generation and parsing
+│   │   │   ├── taskQueue.ts           # Async task management (Bull)
+│   │   │   └── configManager.ts       # Application configuration
+│   │   │
+│   │   ├── database/         # SQLite database layer
+│   │   │   ├── database.ts   # Database connection and setup
+│   │   │   ├── models.ts     # Database models and queries
+│   │   │   ├── schema.sql    # Database schema
+│   │   │   └── migrations/   # Schema migrations
+│   │   │
+│   │   └── utils/            # Backend utilities
+│   │       ├── timestampUtils.ts      # Database timestamp handling
+│   │       └── fileUtils.ts           # File system operations
+│   │
+├── shared/                   # Shared TypeScript types
+│   ├── types.ts             # Core type definitions
+│   └── ipcTypes.ts          # IPC message types
+│
+├── package.json             # Root workspace config (pnpm workspace)
+├── pnpm-workspace.yaml      # Workspace definition
+└── dist-electron/           # Built Electron app
 ```
+
+### Key Architectural Patterns
+
+**IPC Communication Pattern:**
+- All backend operations are exposed via IPC handlers in `main/src/ipc/`
+- Frontend uses typed IPC calls through `utils/ipcRenderer.ts`
+- Events flow from main process to renderer for real-time updates
+
+**Service Layer Architecture:**
+- Business logic is encapsulated in service classes in `main/src/services/`
+- Services are stateful and manage their own lifecycle
+- Database operations are centralized in the database layer
+
+**State Management:**
+- Frontend uses Zustand for reactive state management
+- State updates follow targeted update patterns (avoid global refreshes)
+- Backend state is the single source of truth
+
+**Database Schema:**
+- SQLite database with tables: sessions, session_outputs, conversation_messages, execution_diffs, prompt_markers, projects
+- UTC timestamp storage with frontend timezone conversion
+- Migration system for schema evolution
 
 ## User Guide
 
@@ -712,6 +836,56 @@ In development mode, Crystal automatically captures all frontend console logs an
 ## Disclaimer
 
 Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Claude™ is a trademark of Anthropic, PBC. Crystal is not affiliated with, endorsed by, or sponsored by Anthropic. This tool is designed to work with Claude Code, which must be installed separately.
+
+## Common Development Workflows
+
+### Adding New Features
+1. **Create a git worktree or branch** for your feature development
+2. **Understand the architecture**: Features typically span IPC handlers, services, and React components
+3. **Update TypeScript types** in `shared/types.ts` if adding new data structures
+4. **Add IPC handlers** in `main/src/ipc/` for backend operations
+5. **Implement business logic** in appropriate service classes in `main/src/services/`
+6. **Create React components** in `frontend/src/components/` for UI
+7. **Update state management** in Zustand stores if needed
+8. **Run tests** with `pnpm test` to ensure nothing breaks
+9. **Test the feature** with `pnpm electron-dev`
+
+### Debugging Session Issues
+- **Check main process logs**: Enable verbose logging in settings
+- **Inspect SQLite database**: Located in `~/.crystal/crystal.db` (use DB Browser for SQLite)
+- **Review IPC communication**: Add console.logs in IPC handlers and frontend
+- **Monitor Claude Code processes**: Sessions spawn separate Claude Code processes via node-pty
+- **Frontend debugging logs**: Development mode writes to `crystal-frontend-debug.log`
+
+### Working with Git Worktrees
+- **Worktree creation**: Handled by `worktreeManager.ts` service
+- **Branch naming**: Generated by `worktreeNameGenerator.ts`
+- **Git operations**: All git commands go through `ipc/git.ts` handlers
+- **Cleanup**: Worktrees are automatically cleaned up when sessions are deleted
+
+### Database Changes
+1. **Create migration** in `main/src/database/migrations/`
+2. **Update schema.sql** with the new structure
+3. **Update TypeScript types** in `shared/types.ts`
+4. **Update database queries** in `main/src/database/models.ts`
+5. **Test migration** by deleting `~/.crystal/crystal.db` and restarting
+
+### Performance Considerations
+- **Targeted updates**: Never reload entire lists when only one item changes (see State Management Guidelines)
+- **Session output handling**: The session output system is fragile - avoid modifications without explicit permission
+- **IPC efficiency**: Batch IPC calls when possible, avoid rapid successive calls
+- **Database queries**: Use proper indexes and limit result sets for large datasets
+
+## Important Development Reminders
+
+- **NEVER modify session output handling** without explicit permission - it's complex and fragile
+- **ALWAYS use timestamp utility functions** instead of raw Date parsing for timezone safety
+- **PREFER targeted state updates** over global refreshes for better performance
+- **RUN `pnpm run build:main`** after any changes to the main process before testing
+- **USE the existing service layer** rather than creating new architectural patterns
+- **FOLLOW the modular IPC pattern** - keep related handlers together in appropriate files
+- **TEST timestamp handling** across different timezones when working with time-based features
+- **VALIDATE database operations** with proper error handling and transactions where needed
 
 ## important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
