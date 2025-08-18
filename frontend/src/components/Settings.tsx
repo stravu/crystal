@@ -4,6 +4,7 @@ import { StravuConnection } from './StravuConnection';
 import { useNotifications } from '../hooks/useNotifications';
 import { API } from '../utils/api';
 import type { AppConfig } from '../types/config';
+import { useConfigStore } from '../stores/configStore';
 import { 
   Shield, 
   ShieldOff, 
@@ -36,6 +37,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [claudeExecutablePath, setClaudeExecutablePath] = useState('');
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [devMode, setDevMode] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: true,
     playSound: true,
@@ -48,6 +50,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
   const { updateSettings } = useNotifications();
   const { theme, toggleTheme } = useTheme();
+  const { fetchConfig: refreshConfigStore } = useConfigStore();
 
   useEffect(() => {
     if (isOpen) {
@@ -67,6 +70,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setClaudeExecutablePath(data.claudeExecutablePath || '');
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
       setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
+      setDevMode(data.devMode || false);
       
       // Load notification settings
       if (data.notifications) {
@@ -92,6 +96,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         claudeExecutablePath,
         defaultPermissionMode,
         autoCheckUpdates,
+        devMode,
         notifications: notificationSettings
       });
 
@@ -104,6 +109,10 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
       // Refresh config from server
       await fetchConfig();
+      
+      // Also refresh the global config store
+      await refreshConfigStore();
+      
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update configuration');
@@ -349,6 +358,17 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 <p className="text-xs text-text-tertiary mt-1">
                   Shows detailed logs for session creation and Claude Code execution. Useful for debugging issues.
                 </p>
+                
+                <div className="mt-4">
+                  <Checkbox
+                    label="Enable dev mode"
+                    checked={devMode}
+                    onChange={(e) => setDevMode(e.target.checked)}
+                  />
+                  <p className="text-xs text-text-tertiary mt-1">
+                    Adds a "Messages" tab to each session showing raw JSON responses from Claude Code. Useful for debugging and development.
+                  </p>
+                </div>
               </SettingsSection>
 
               <SettingsSection

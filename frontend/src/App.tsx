@@ -15,6 +15,7 @@ import { PermissionDialog } from './components/PermissionDialog';
 import { DiscordPopup } from './components/DiscordPopup';
 import { useErrorStore } from './stores/errorStore';
 import { useSessionStore } from './stores/sessionStore';
+import { useConfigStore } from './stores/configStore';
 import { API } from './utils/api';
 import { ContextMenuProvider } from './contexts/ContextMenuContext';
 import { TokenTest } from './components/TokenTest';
@@ -40,6 +41,7 @@ function App() {
   const [isTokenTestOpen, setIsTokenTestOpen] = useState(false);
   const { currentError, clearError } = useErrorStore();
   const { sessions, isLoaded } = useSessionStore();
+  const { fetchConfig } = useConfigStore();
   
   const { width: sidebarWidth, startResize } = useResizable({
     defaultWidth: 500,  // Increased to show git status labels without truncation
@@ -50,6 +52,11 @@ function App() {
   
   useIPCEvents();
   const { showNotification } = useNotifications();
+  
+  // Load config on app startup
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   // Add keyboard shortcut for prompt history
   useEffect(() => {

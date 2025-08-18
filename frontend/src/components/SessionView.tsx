@@ -18,6 +18,7 @@ import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
 import { RichOutputSettings } from './session/RichOutputView';
 import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
 import { LogView } from './session/LogView';
+import { MessagesView } from './session/MessagesView';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
@@ -298,6 +299,9 @@ export const SessionView = memo(() => {
           </div>
           <div className={`h-full ${hook.viewMode === 'editor' ? 'block' : 'hidden'}`}>
             <FileEditor sessionId={activeSession.id} />
+          </div>
+          <div className={`h-full ${hook.viewMode === 'messages' ? 'block' : 'hidden'}`}>
+            <MessagesView sessionId={activeSession.id} />
           </div>
         </div>
       </div>

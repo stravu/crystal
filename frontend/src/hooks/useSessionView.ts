@@ -9,7 +9,7 @@ import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'logs' | 'editor';
+export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'logs' | 'editor' | 'messages';
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -33,6 +33,7 @@ export const useSessionView = (
     logs: false,
     editor: false,
     richOutput: false,
+    messages: false,
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -334,6 +335,7 @@ export const useSessionView = (
       logs: false,
       editor: false,
       richOutput: false,
+      messages: false,
     });
     
     // Reset context compaction state when switching sessions
@@ -977,7 +979,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ changes: false, terminal: false, logs: false, editor: false, richOutput: false });
+    setUnreadActivity({ changes: false, terminal: false, logs: false, editor: false, richOutput: false, messages: false });
   }, [activeSessionId]);
 
 

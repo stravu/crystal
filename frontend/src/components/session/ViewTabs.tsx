@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
 import { cn } from '../../utils/cn';
-import { GitCompare, Terminal, FileEdit, Eye, Settings, GitBranch, MoreVertical, ScrollText } from 'lucide-react';
+import { GitCompare, Terminal, FileEdit, Eye, Settings, GitBranch, MoreVertical, ScrollText, Code } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Dropdown } from '../ui/Dropdown';
+import { useConfigStore } from '../../stores/configStore';
 
 interface ViewTabsProps {
   viewMode: ViewMode;
@@ -14,6 +15,7 @@ interface ViewTabsProps {
     logs: boolean;
     editor: boolean;
     richOutput: boolean;
+    messages?: boolean;
   };
   setUnreadActivity: (activity: any) => void;
   isTerminalRunning: boolean;
@@ -42,6 +44,14 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
   branchActions,
   isMerging,
 }) => {
+  const { config, fetchConfig } = useConfigStore();
+  
+  // Fetch config on mount if not loaded
+  useEffect(() => {
+    if (!config) {
+      fetchConfig();
+    }
+  }, [config, fetchConfig]);
   const tabs: { 
     mode: ViewMode; 
     label: string; 
@@ -82,6 +92,16 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
       activity: unreadActivity.editor 
     },
   ];
+  
+  // Add Messages tab if dev mode is enabled
+  if (config?.devMode) {
+    tabs.push({
+      mode: 'messages' as ViewMode,
+      label: 'Messages',
+      icon: <Code className="w-4 h-4" />,
+      activity: unreadActivity.messages
+    });
+  }
 
   return (
     <div className="flex items-center px-4 bg-surface-secondary" role="tablist">
