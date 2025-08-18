@@ -81,6 +81,10 @@ When everything looks good:
   - Open the DMG file and drag Crystal to your Applications folder
   - On first launch, you may need to right-click and select "Open" due to macOS security settings
 
+### Homebrew 
+```bash
+brew install --cask stravu-crystal
+```
 
 ## Building from Source
 
