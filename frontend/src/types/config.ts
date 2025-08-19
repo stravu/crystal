@@ -17,4 +17,5 @@ export interface AppConfig {
     notifyOnWaiting: boolean;
     notifyOnComplete: boolean;
   };
+  devMode?: boolean;
 }

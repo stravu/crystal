@@ -26,6 +26,8 @@ export interface AppConfig {
     notifyOnWaiting: boolean;
     notifyOnComplete: boolean;
   };
+  // Dev mode for debugging
+  devMode?: boolean;
 }
 
 export interface UpdateConfigRequest {
@@ -46,4 +48,5 @@ export interface UpdateConfigRequest {
     notifyOnWaiting: boolean;
     notifyOnComplete: boolean;
   };
+  devMode?: boolean;
 }

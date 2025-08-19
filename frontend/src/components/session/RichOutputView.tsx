@@ -16,6 +16,8 @@ interface RawMessage {
   name?: string;
   input?: any;
   tool_use_id?: string;
+  parent_tool_use_id?: string; // For sub-agent tool calls
+  session_id?: string; // Sub-agent session ID
   [key: string]: any;
 }
 
@@ -49,6 +51,10 @@ interface ToolCall {
   input?: any;
   result?: ToolResult;
   status: 'pending' | 'success' | 'error';
+  isSubAgent?: boolean; // Is this a Task sub-agent call
+  subAgentType?: string; // Type of sub-agent (e.g., 'test-runner')
+  parentToolId?: string; // Parent Task tool call ID
+  childToolCalls?: ToolCall[]; // Child tool calls for Task agents
 }
 
 
@@ -177,9 +183,21 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const transformMessages = (rawMessages: RawMessage[]): ConversationMessage[] => {
     const transformed: ConversationMessage[] = [];
     
-    // First pass: Build tool result map
+    // First pass: Build tool result map and identify sub-agent relationships
     const toolResults = new Map<string, ToolResult>();
+    const parentToolMap = new Map<string, string>(); // Map tool ID to parent tool ID
+    
+    // Identify all tool calls and their parent relationships first
     rawMessages.forEach(msg => {
+      // Check for parent_tool_use_id to identify sub-agent tool calls
+      if (msg.parent_tool_use_id && msg.message?.content && Array.isArray(msg.message.content)) {
+        msg.message.content.forEach((block: any) => {
+          if (block.type === 'tool_use' && block.id) {
+            parentToolMap.set(block.id, msg.parent_tool_use_id!);
+          }
+        });
+      }
+      
       if (msg.type === 'user' && msg.message?.content && Array.isArray(msg.message.content)) {
         msg.message.content.forEach((block: any) => {
           if (block.type === 'tool_result' && block.tool_use_id) {
@@ -192,7 +210,41 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
     });
     
-    // Second pass: Build conversation messages
+    // Second pass: Build all tool calls to prepare for hierarchy
+    const allToolCalls = new Map<string, ToolCall>();
+    rawMessages.forEach(msg => {
+      if (msg.type === 'assistant' && msg.message?.content && Array.isArray(msg.message.content)) {
+        msg.message.content.forEach((block: any) => {
+          if (block.type === 'tool_use') {
+            const isTaskAgent = block.name === 'Task';
+            const toolCall: ToolCall = {
+              id: block.id,
+              name: block.name,
+              input: block.input,
+              status: toolResults.has(block.id) ? 'success' : 'pending',
+              result: toolResults.get(block.id),
+              isSubAgent: isTaskAgent,
+              subAgentType: isTaskAgent ? block.input?.subagent_type : undefined,
+              parentToolId: parentToolMap.get(block.id),
+              childToolCalls: []
+            };
+            allToolCalls.set(block.id, toolCall);
+          }
+        });
+      }
+    });
+    
+    // Build parent-child relationships
+    allToolCalls.forEach((toolCall) => {
+      if (toolCall.parentToolId) {
+        const parentTool = allToolCalls.get(toolCall.parentToolId);
+        if (parentTool && parentTool.childToolCalls) {
+          parentTool.childToolCalls.push(toolCall);
+        }
+      }
+    });
+    
+    // Third pass: Build conversation messages
     for (let i = 0; i < rawMessages.length; i++) {
       const msg = rawMessages[i];
       
@@ -244,14 +296,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 segments.push({ type: 'thinking', content: thinkingContent.trim() });
               }
             } else if (block.type === 'tool_use') {
-              const toolCall: ToolCall = {
-                id: block.id,
-                name: block.name,
-                input: block.input,
-                status: toolResults.has(block.id) ? 'success' : 'pending',
-                result: toolResults.get(block.id)
-              };
-              segments.push({ type: 'tool_call', tool: toolCall });
+              const toolCall = allToolCalls.get(block.id);
+              // Only add top-level tools (those without parents)
+              if (toolCall && !toolCall.parentToolId) {
+                segments.push({ type: 'tool_call', tool: toolCall });
+              }
             }
           });
         } else {
@@ -590,21 +639,47 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
 
 
   // Render a tool call segment
-  const renderToolCall = (tool: ToolCall) => {
+  const renderToolCall = (tool: ToolCall, depth: number = 0) => {
     const isExpanded = !settings.collapseTools || expandedTools.has(tool.id);
+    const isTaskAgent = tool.isSubAgent && tool.name === 'Task';
+    const hasChildTools = tool.childToolCalls && tool.childToolCalls.length > 0;
+    
+    // Different styling for Task sub-agents
+    const bgColor = isTaskAgent 
+      ? 'bg-interactive/10' 
+      : depth > 0 
+        ? 'bg-surface-tertiary/30' 
+        : 'bg-surface-tertiary/50';
+    
+    const borderColor = isTaskAgent
+      ? 'border-interactive/30'
+      : 'border-border-primary/50';
     
     return (
-      <div className="rounded-md bg-surface-tertiary/50 overflow-hidden border border-border-primary/50">
+      <div className={`rounded-md ${bgColor} overflow-hidden border ${borderColor} ${depth > 0 ? 'ml-4' : ''}`}>
         <button
           onClick={() => toggleToolExpand(tool.id)}
           className="w-full px-3 py-2 bg-surface-tertiary/30 flex items-center gap-2 hover:bg-surface-tertiary/50 transition-colors text-left"
         >
-          <Wrench className="w-3.5 h-3.5 text-interactive-on-dark flex-shrink-0" />
-          <span className="font-mono text-xs text-text-primary flex-1">{tool.name}</span>
+          {isTaskAgent ? (
+            <svg className="w-3.5 h-3.5 text-interactive flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          ) : (
+            <Wrench className="w-3.5 h-3.5 text-interactive-on-dark flex-shrink-0" />
+          )}
+          <span className="font-mono text-xs text-text-primary flex-1">
+            {isTaskAgent ? 'Sub-Agent' : tool.name}
+            {isTaskAgent && tool.subAgentType && (
+              <span className="ml-2 text-interactive font-semibold">
+                [{tool.subAgentType}]
+              </span>
+            )}
+          </span>
           {tool.status === 'success' && <CheckCircle className="w-3.5 h-3.5 text-status-success flex-shrink-0" />}
           {tool.status === 'error' && <XCircle className="w-3.5 h-3.5 text-status-error flex-shrink-0" />}
           {tool.status === 'pending' && <Clock className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0 animate-pulse" />}
-          {settings.collapseTools && (
+          {(settings.collapseTools || hasChildTools) && (
             isExpanded ? <ChevronDown className="w-3 h-3 text-text-tertiary" /> : <ChevronRight className="w-3 h-3 text-text-tertiary" />
           )}
         </button>
@@ -619,9 +694,28 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               </div>
             )}
             
+            {/* Child tool calls for Task agents */}
+            {hasChildTools && (
+              <div className="mt-2">
+                <div className="text-text-secondary text-xs font-semibold mb-2 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  Sub-agent Actions:
+                </div>
+                <div className="space-y-2">
+                  {tool.childToolCalls!.map((childTool, idx) => (
+                    <div key={`${tool.id}-child-${idx}`}>
+                      {renderToolCall(childTool, depth + 1)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             {/* Tool Result */}
             {tool.result && (
-              <div>
+              <div className="mt-2">
                 <div className="text-text-tertiary mb-1">
                   {tool.result.isError ? 'Error:' : 'Result:'}
                 </div>
@@ -632,7 +726,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             )}
             
             {/* Pending state */}
-            {tool.status === 'pending' && (
+            {tool.status === 'pending' && !hasChildTools && (
               <div className="text-text-tertiary italic">Waiting for result...</div>
             )}
           </div>
@@ -694,6 +788,34 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           </div>
         );
       
+      case 'Task':
+        return (
+          <div className="text-sm space-y-1.5">
+            {input.description && (
+              <div className="flex items-start gap-2">
+                <span className="text-text-tertiary">Task:</span>
+                <span className="text-interactive font-medium">{input.description}</span>
+              </div>
+            )}
+            {input.subagent_type && (
+              <div className="flex items-start gap-2">
+                <span className="text-text-tertiary">Agent Type:</span>
+                <span className="text-status-warning font-mono text-xs">{input.subagent_type}</span>
+              </div>
+            )}
+            {input.prompt && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-text-secondary hover:text-text-primary text-xs">
+                  View Prompt
+                </summary>
+                <div className="mt-1 p-2 bg-surface-secondary rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
+                  {input.prompt}
+                </div>
+              </details>
+            )}
+          </div>
+        );
+      
       case 'TodoWrite':
         return (
           <div className="text-sm space-y-1">
@@ -722,7 +844,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   };
 
   // Format tool result for display
-  const formatToolResult = (_toolName: string, result: string): React.ReactNode => {
+  const formatToolResult = (toolName: string, result: string): React.ReactNode => {
     if (!result) {
       return <div className="text-sm text-text-tertiary italic">No result</div>;
     }
@@ -730,6 +852,23 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     try {
       // Check if result is JSON
       const parsed = JSON.parse(result);
+      
+      // Handle Task tool results (array with text objects)
+      if (toolName === 'Task' && Array.isArray(parsed)) {
+        // Extract text content from Task results
+        const textContent = parsed
+          .filter(item => item.type === 'text' && item.text)
+          .map(item => item.text)
+          .join('\n\n');
+        
+        if (textContent) {
+          return (
+            <div className="text-sm text-text-primary whitespace-pre-wrap max-h-64 overflow-y-auto">
+              {textContent}
+            </div>
+          );
+        }
+      }
       
       // Handle image reads
       if (Array.isArray(parsed) && parsed[0]?.type === 'image') {
