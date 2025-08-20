@@ -108,6 +108,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const isLoadingRef = useRef(false);
   const userMessageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const wasAtBottomRef = useRef(false);
+  const loadMessagesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Save local settings to localStorage when they change
   useEffect(() => {
@@ -514,6 +515,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     }
   }, [sessionId]);
 
+  // Store loadMessages in ref to avoid dependency cycles
+  useEffect(() => {
+    loadMessagesRef.current = loadMessages;
+  }, [loadMessages]);
+
   // Listen for real-time output updates - debounced to prevent performance issues
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
@@ -523,7 +529,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          loadMessages();
+          loadMessagesRef.current?.();
         }, 500); // Wait 500ms after last event
       }
     };
@@ -534,7 +540,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       clearTimeout(debounceTimer);
       window.removeEventListener('session-output-available', handleOutputAvailable as any);
     };
-  }, [sessionId, loadMessages]);
+  }, [sessionId]); // Only depend on sessionId, not loadMessages
 
   // Initial load
   useEffect(() => {
