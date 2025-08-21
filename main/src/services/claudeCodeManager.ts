@@ -164,8 +164,8 @@ export class ClaudeCodeManager extends EventEmitter {
       // Build the command arguments
       const args = ['--verbose', '--output-format', 'stream-json'];
       
-      // Add model argument if specified
-      if (model) {
+      // Add model argument if specified and not 'auto'
+      if (model && model !== 'auto') {
         // Map full model identifiers to shorthand for Bedrock compatibility
         // Only opus and sonnet have shorthand versions, haiku passes through
         let modelOrAlias = model;
@@ -177,6 +177,8 @@ export class ClaudeCodeManager extends EventEmitter {
 
         args.push('--model', modelOrAlias);
         this.logger?.verbose(`Using model: ${model}`);
+      } else if (model === 'auto') {
+        this.logger?.verbose(`Using auto model selection (Claude Code's default)`);
       }
       
       // Log commit mode for debugging (but don't pass to Claude Code)

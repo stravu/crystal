@@ -35,7 +35,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
   setUltrathink,
   handleToggleAutoCommit,
 }) => {
-  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
+  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'auto');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
       model: activeSession.model,
       name: activeSession.name
     });
-    setSelectedModel(activeSession.model || 'claude-sonnet-4-20250514');
+    setSelectedModel(activeSession.model || 'auto');
   }, [activeSession.id]); // Only reset when session ID changes, not when model updates
 
   const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -173,6 +173,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
               className="text-sm px-2 py-1 border border-border-primary rounded focus:outline-none focus:ring-1 focus:ring-interactive text-text-primary bg-surface-secondary"
               title="AI model to use for continuing the conversation"
             >
+              <option value="auto">Auto: Claude Code's default selection</option>
               <option value="claude-sonnet-4-20250514">Sonnet: Best for most coding tasks</option>
               <option value="claude-opus-4-20250514">Opus: Complex architecture, large refactors</option>
               <option value="claude-3-5-haiku-20241022">Haiku: Fast & cost-effective for simple tasks</option>

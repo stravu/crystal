@@ -25,7 +25,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     worktreeTemplate: '',
     count: 1,
     permissionMode: 'ignore',
-    model: 'claude-sonnet-4-20250514' // Default to Sonnet
+    model: 'auto' // Default to auto (Claude Code's default selection)
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
@@ -296,7 +296,27 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <label className="block text-sm font-medium text-text-primary mb-2">
                   Model
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
+                  <Card
+                    variant={formData.model === 'auto' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
+                      formData.model === 'auto'
+                        ? 'border-interactive bg-interactive/10'
+                        : ''
+                    }`}
+                    onClick={() => setFormData({ ...formData, model: 'auto' })}
+                  >
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Sparkles className={`w-5 h-5 ${formData.model === 'auto' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'auto' ? 'text-interactive' : ''}`}>Auto</span>
+                      <span className="text-xs opacity-75">Default</span>
+                    </div>
+                    {formData.model === 'auto' && (
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+                    )}
+                  </Card>
+                  
                   <Card
                     variant={formData.model === 'claude-sonnet-4-20250514' ? 'interactive' : 'bordered'}
                     padding="sm"
@@ -358,6 +378,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   </Card>
                 </div>
                 <p className="text-xs text-text-tertiary mt-2">
+                  {formData.model === 'auto' && 'Uses Claude Code\'s default model selection'}
                   {formData.model?.includes('opus') && 'Best for complex architecture and challenging problems'}
                   {formData.model?.includes('haiku') && 'Fast and cost-effective for simple tasks'}
                   {formData.model?.includes('sonnet') && 'Excellent balance of speed and capability for most tasks'}

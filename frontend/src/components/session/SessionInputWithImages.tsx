@@ -64,7 +64,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
+  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'auto');
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +75,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
   useEffect(() => {
     // Update selected model when switching to a different session
-    setSelectedModel(activeSession.model || 'claude-sonnet-4-20250514');
+    setSelectedModel(activeSession.model || 'auto');
   }, [activeSession.id]); // Only reset when session ID changes, not when model updates
 
   const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -671,6 +671,12 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   // Model configurations
   const modelConfigs = {
+    'auto': {
+      label: 'Auto',
+      icon: CheckCircle,
+      iconColor: 'text-interactive',
+      description: 'Default',
+    },
     'claude-sonnet-4-20250514': {
       label: 'Sonnet',
       icon: Target,
