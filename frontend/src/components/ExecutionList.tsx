@@ -130,7 +130,7 @@ const ExecutionList: React.FC<ExecutionListProps> = memo(({
                       {isUncommitted ? (
                         <span className="text-status-warning">Uncommitted changes</span>
                       ) : (
-                        <span>{truncateMessage(execution.prompt_text || `Commit ${execution.execution_sequence}`)}</span>
+                        <span>{truncateMessage(execution.commit_message || execution.prompt_text || `Commit ${execution.execution_sequence}`)}</span>
                       )}
                     </div>
                     {isUncommitted && (
