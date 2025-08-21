@@ -227,7 +227,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ sessionId }) => {
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto bg-surface-primary p-4 font-mono text-sm"
+      className="h-full overflow-y-auto overflow-x-hidden bg-surface-primary p-4 font-mono text-sm scrollbar-thin scrollbar-thumb-border-secondary"
     >
       <div className="space-y-2">
         {/* Session Info Card */}
