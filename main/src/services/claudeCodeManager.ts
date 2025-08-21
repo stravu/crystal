@@ -743,6 +743,24 @@ export class ClaudeCodeManager extends EventEmitter {
       // Emit spawned event to update session status
       this.emit('spawned', { sessionId });
 
+      // Emit initial session info message with prompt and command
+      const sessionInfoMessage = {
+        type: 'session_info',
+        initial_prompt: prompt,
+        claude_command: `${claudeCommand || 'claude'} ${args.join(' ')}`,
+        worktree_path: worktreePath,
+        model: model || 'default',
+        permission_mode: permissionMode || 'default',
+        timestamp: new Date().toISOString()
+      };
+      
+      this.emit('output', {
+        sessionId,
+        type: 'json',
+        data: sessionInfoMessage,
+        timestamp: new Date()
+      });
+
       let hasReceivedOutput = false;
       let lastOutput = '';
       let buffer = '';
