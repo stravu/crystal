@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@anthropic-ai/claude-code':
-        specifier: ^1.0.33
-        version: 1.0.56
+        specifier: ^1.0.86
+        version: 1.0.86
       '@anthropic-ai/sdk':
-        specifier: ^0.53.0
-        version: 0.53.0
+        specifier: ^0.60.0
+        version: 0.60.0
       '@homebridge/node-pty-prebuilt-multiarch':
         specifier: ^0.12.0
         version: 0.12.0
@@ -221,11 +221,11 @@ importers:
   main:
     dependencies:
       '@anthropic-ai/claude-code':
-        specifier: ^1.0.33
-        version: 1.0.56
+        specifier: ^1.0.86
+        version: 1.0.86
       '@anthropic-ai/sdk':
-        specifier: ^0.53.0
-        version: 0.53.0
+        specifier: ^0.60.0
+        version: 0.60.0
       '@homebridge/node-pty-prebuilt-multiarch':
         specifier: ^0.12.0
         version: 0.12.0
@@ -318,13 +318,13 @@ packages:
   '@antfu/utils@8.1.1':
     resolution: {integrity: sha512-Mex9nXf9vR6AhcXmMrlz/HVgYYZpVGJ6YlPgwl7UnaFpnshXs6EK/oa5Gpf3CzENMjkvEx2tQtntGnb7UtSTOQ==}
 
-  '@anthropic-ai/claude-code@1.0.56':
-    resolution: {integrity: sha512-LYOlv9uXtLrJcJqSLvQlhy7shhC6MHEXuSGZ/+BazM4LY36ng3cmKjTCDny0kZQxa+u/+MYOXUrkmkJm2qR75Q==}
+  '@anthropic-ai/claude-code@1.0.86':
+    resolution: {integrity: sha512-js1h6JUnFJ1dHvFPBiCxwFChaWjh28XOFamrwebmhOIUBVhQZwMfDJYsNfRyv0qEwpxKxYedvK4nv4WqMCwu9Q==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  '@anthropic-ai/sdk@0.53.0':
-    resolution: {integrity: sha512-bl2frVo0cgHCXTzQEIHXPH329uQXC4YKBaLBkZmUc59tNiR3GgcGpBZU7mwfyv5tPuU/yT7tGHyoe5AnjN02QA==}
+  '@anthropic-ai/sdk@0.60.0':
+    resolution: {integrity: sha512-9zu/TXaUy8BZhXedDtt1wT3H4LOlpKDO1/ftiFpeR3N1PCr3KJFKkxxlQWWt1NNp08xSwUNJ3JNY8yhl8av6eQ==}
     hasBin: true
 
   '@babel/code-frame@7.27.1':
@@ -5056,7 +5056,7 @@ snapshots:
 
   '@antfu/utils@8.1.1': {}
 
-  '@anthropic-ai/claude-code@1.0.56':
+  '@anthropic-ai/claude-code@1.0.86':
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.33.5
       '@img/sharp-darwin-x64': 0.33.5
@@ -5065,7 +5065,7 @@ snapshots:
       '@img/sharp-linux-x64': 0.33.5
       '@img/sharp-win32-x64': 0.33.5
 
-  '@anthropic-ai/sdk@0.53.0': {}
+  '@anthropic-ai/sdk@0.60.0': {}
 
   '@babel/code-frame@7.27.1':
     dependencies:
