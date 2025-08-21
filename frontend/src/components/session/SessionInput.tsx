@@ -36,6 +36,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
   handleToggleAutoCommit,
 }) => {
   const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     // Update selected model when switching to a different session
@@ -47,27 +48,54 @@ export const SessionInput: React.FC<SessionInputProps> = ({
     setSelectedModel(activeSession.model || 'claude-sonnet-4-20250514');
   }, [activeSession.id]); // Only reset when session ID changes, not when model updates
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const shouldSend = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
     if (shouldSend) {
       e.preventDefault();
-      if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
-        handleTerminalCommand();
-      } else if (activeSession.status === 'waiting') {
-        handleSendInput();
-      } else {
-        handleContinueConversation(selectedModel);
+      
+      // Prevent duplicate submissions
+      if (isSubmitting) {
+        console.log('[SessionInput] Ignoring duplicate submission attempt');
+        return;
+      }
+      
+      setIsSubmitting(true);
+      
+      try {
+        if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
+          await handleTerminalCommand();
+        } else if (activeSession.status === 'waiting') {
+          await handleSendInput();
+        } else {
+          await handleContinueConversation(selectedModel);
+        }
+      } finally {
+        // Reset submission state after a short delay to prevent rapid resubmissions
+        setTimeout(() => setIsSubmitting(false), 500);
       }
     }
   };
   
-  const onClickSend = () => {
-    if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
-      handleTerminalCommand();
-    } else if (activeSession.status === 'waiting') {
-      handleSendInput();
-    } else {
-      handleContinueConversation(selectedModel);
+  const onClickSend = async () => {
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+      console.log('[SessionInput] Ignoring duplicate submission attempt');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
+        await handleTerminalCommand();
+      } else if (activeSession.status === 'waiting') {
+        await handleSendInput();
+      } else {
+        await handleContinueConversation(selectedModel);
+      }
+    } finally {
+      // Reset submission state after a short delay to prevent rapid resubmissions
+      setTimeout(() => setIsSubmitting(false), 500);
     }
   };
 
@@ -102,10 +130,15 @@ export const SessionInput: React.FC<SessionInputProps> = ({
         </div>
         <button 
           onClick={onClickSend} 
-          className="px-4 bg-interactive text-white rounded-md hover:bg-interactive-hover min-w-[100px] font-medium transition-colors"
+          disabled={isSubmitting}
+          className={`px-4 text-white rounded-md min-w-[100px] font-medium transition-colors ${
+            isSubmitting 
+              ? 'bg-gray-500 cursor-not-allowed' 
+              : 'bg-interactive hover:bg-interactive-hover'
+          }`}
           style={{ height: '67px' }}
         >
-          {viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting' ? 'Run' : (activeSession.status === 'waiting' ? 'Send' : 'Continue')}
+          {isSubmitting ? 'Processing...' : (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting' ? 'Run' : (activeSession.status === 'waiting' ? 'Send' : 'Continue'))}
         </button>
       </div>
       <div className="mt-2 flex items-center gap-4">

@@ -363,6 +363,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         throw new Error('Session not found');
       }
 
+      // Check if Claude is already running for this session to prevent duplicate starts
+      if (claudeCodeManager.isSessionRunning(sessionId)) {
+        console.log(`[IPC] Session ${sessionId} is already running, preventing duplicate continue`);
+        return { success: false, error: 'Session is already processing a request' };
+      }
+
       // Get conversation history
       const conversationHistory = sessionManager.getConversationMessages(sessionId);
 

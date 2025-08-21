@@ -66,6 +66,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'claude-sonnet-4-20250514');
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate auto-commit enabled state
@@ -164,7 +165,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     setAttachedImages(prev => prev.filter(img => img.id !== id));
   }, []);
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+  const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     const shouldSend = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
     const shouldCancel = e.key === 'Escape' && activeSession.status === 'running' && handleCancelRequest;
     
@@ -173,27 +174,54 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       handleCancelRequest();
     } else if (shouldSend) {
       e.preventDefault();
-      if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
-        handleTerminalCommand();
-      } else if (activeSession.status === 'waiting') {
-        handleSendInput(attachedImages);
-        setAttachedImages([]);
-      } else {
-        handleContinueConversation(attachedImages, selectedModel);
-        setAttachedImages([]);
+      
+      // Prevent duplicate submissions
+      if (isSubmitting) {
+        console.log('[SessionInputWithImages] Ignoring duplicate submission attempt');
+        return;
+      }
+      
+      setIsSubmitting(true);
+      
+      try {
+        if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
+          await handleTerminalCommand();
+        } else if (activeSession.status === 'waiting') {
+          await handleSendInput(attachedImages);
+          setAttachedImages([]);
+        } else {
+          await handleContinueConversation(attachedImages, selectedModel);
+          setAttachedImages([]);
+        }
+      } finally {
+        // Reset submission state after a short delay to prevent rapid resubmissions
+        setTimeout(() => setIsSubmitting(false), 500);
       }
     }
   };
   
-  const onClickSend = () => {
-    if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
-      handleTerminalCommand();
-    } else if (activeSession.status === 'waiting') {
-      handleSendInput(attachedImages);
-      setAttachedImages([]);
-    } else {
-      handleContinueConversation(attachedImages, selectedModel);
-      setAttachedImages([]);
+  const onClickSend = async () => {
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+      console.log('[SessionInputWithImages] Ignoring duplicate submission attempt');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
+        await handleTerminalCommand();
+      } else if (activeSession.status === 'waiting') {
+        await handleSendInput(attachedImages);
+        setAttachedImages([]);
+      } else {
+        await handleContinueConversation(attachedImages, selectedModel);
+        setAttachedImages([]);
+      }
+    } finally {
+      // Reset submission state after a short delay to prevent rapid resubmissions
+      setTimeout(() => setIsSubmitting(false), 500);
     }
   };
 
@@ -578,24 +606,27 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
               ) : (
                 <button 
                   onClick={onClickSend}
+                  disabled={isSubmitting}
                   className={`
                     px-4 py-2 font-medium group
                     flex items-center gap-2 transition-all duration-200
                     rounded-lg border
                     active:scale-[0.98]
                     focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-0
-                    ${buttonConfig.isPrimary 
-                      ? `bg-gradient-to-r from-interactive to-interactive-hover hover:from-interactive-hover hover:to-interactive 
-                         text-white border-interactive shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
-                         focus:ring-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
-                      : buttonConfig.color === 'green' 
-                        ? 'bg-surface-secondary hover:bg-surface-hover text-status-success hover:text-status-success/90 border-border-primary focus:ring-status-success' 
-                        : 'bg-surface-secondary hover:bg-surface-hover text-interactive hover:text-interactive-hover border-border-primary focus:ring-interactive'
+                    ${isSubmitting 
+                      ? 'bg-gray-500 text-gray-300 border-gray-500 cursor-not-allowed opacity-60'
+                      : buttonConfig.isPrimary 
+                        ? `bg-gradient-to-r from-interactive to-interactive-hover hover:from-interactive-hover hover:to-interactive 
+                           text-white border-interactive shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] 
+                           focus:ring-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]`
+                        : buttonConfig.color === 'green' 
+                          ? 'bg-surface-secondary hover:bg-surface-hover text-status-success hover:text-status-success/90 border-border-primary focus:ring-status-success' 
+                          : 'bg-surface-secondary hover:bg-surface-hover text-interactive hover:text-interactive-hover border-border-primary focus:ring-interactive'
                     }
                   `}
                 >
                   <ButtonIcon className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  <span className="font-semibold">{buttonConfig.text}</span>
+                  <span className="font-semibold">{isSubmitting ? 'Processing...' : buttonConfig.text}</span>
                   
                   {/* Inline keyboard shortcut */}
                   <span 

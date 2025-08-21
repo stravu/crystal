@@ -1092,7 +1092,16 @@ export class ClaudeCodeManager extends EventEmitter {
   async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
     // Kill any existing process for this session first
     if (this.processes.has(sessionId)) {
+      console.log(`[ClaudeCodeManager] Killing existing process for session ${sessionId} before continuing`);
       await this.killProcess(sessionId);
+      // Add a small delay to ensure the process is fully cleaned up
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Double-check that the process was actually killed
+    if (this.processes.has(sessionId)) {
+      console.error(`[ClaudeCodeManager] Process ${sessionId} still exists after kill attempt, aborting continue`);
+      throw new Error('Failed to stop previous session instance');
     }
     
     // Get the session's permission mode from database
