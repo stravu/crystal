@@ -1,6 +1,11 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.2.2] - 2025-08-22
+
+### Changed
+- **Performance improvements** - Optimized application performance for faster response times and smoother operation
+
 ## [0.2.1] - 2025-08-21
 
 ### Added
