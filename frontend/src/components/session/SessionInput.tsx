@@ -174,9 +174,9 @@ export const SessionInput: React.FC<SessionInputProps> = ({
               title="AI model to use for continuing the conversation"
             >
               <option value="auto">Auto: Claude Code's default selection</option>
-              <option value="claude-sonnet-4-20250514">Sonnet: Best for most coding tasks</option>
-              <option value="claude-opus-4-20250514">Opus: Complex architecture, large refactors</option>
-              <option value="claude-3-5-haiku-20241022">Haiku: Fast & cost-effective for simple tasks</option>
+              <option value="sonnet">Sonnet: Best for most coding tasks</option>
+              <option value="opus">Opus: Complex architecture, large refactors</option>
+              <option value="haiku">Haiku: Fast & cost-effective for simple tasks</option>
             </select>
           </div>
         )}

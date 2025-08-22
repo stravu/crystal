@@ -632,7 +632,7 @@ export class DatabaseService {
     const hasModelColumn = sessionTableInfoModel.some((col: any) => col.name === 'model');
     
     if (!hasModelColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN model TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN model TEXT DEFAULT 'sonnet'").run();
       console.log('[Database] Added model column to sessions table');
     }
 
@@ -689,7 +689,7 @@ export class DatabaseService {
     const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
     
     if (!hasLastUsedModelColumn) {
-      this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'claude-sonnet-4-20250514'").run();
+      this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'sonnet'").run();
       console.log('[Database] Added lastUsedModel column to projects table');
     }
 
@@ -1174,7 +1174,7 @@ export class DatabaseService {
     this.db.prepare(`
       INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch, commit_mode, commit_mode_settings)
       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'claude-sonnet-4-20250514', data.base_commit || null, data.base_branch || null, data.commit_mode || null, data.commit_mode_settings || null);
+    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'sonnet', data.base_commit || null, data.base_branch || null, data.commit_mode || null, data.commit_mode_settings || null);
     
     const session = this.getSession(data.id);
     if (!session) {

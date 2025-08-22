@@ -318,61 +318,61 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   </Card>
                   
                   <Card
-                    variant={formData.model === 'claude-sonnet-4-20250514' ? 'interactive' : 'bordered'}
+                    variant={formData.model === 'sonnet' ? 'interactive' : 'bordered'}
                     padding="sm"
                     className={`relative cursor-pointer transition-all ${
-                      formData.model === 'claude-sonnet-4-20250514'
+                      formData.model === 'sonnet'
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setFormData({ ...formData, model: 'claude-sonnet-4-20250514' })}
+                    onClick={() => setFormData({ ...formData, model: 'sonnet' })}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
-                      <Target className={`w-5 h-5 ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'claude-sonnet-4-20250514' ? 'text-interactive' : ''}`}>Sonnet</span>
+                      <Target className={`w-5 h-5 ${formData.model === 'sonnet' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'sonnet' ? 'text-interactive' : ''}`}>Sonnet</span>
                       <span className="text-xs opacity-75">Balanced</span>
                     </div>
-                    {formData.model === 'claude-sonnet-4-20250514' && (
+                    {formData.model === 'sonnet' && (
                       <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
                     )}
                   </Card>
                   
                   <Card
-                    variant={formData.model === 'claude-opus-4-20250514' ? 'interactive' : 'bordered'}
+                    variant={formData.model === 'opus' ? 'interactive' : 'bordered'}
                     padding="sm"
                     className={`relative cursor-pointer transition-all ${
-                      formData.model === 'claude-opus-4-20250514'
+                      formData.model === 'opus'
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setFormData({ ...formData, model: 'claude-opus-4-20250514' })}
+                    onClick={() => setFormData({ ...formData, model: 'opus' })}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
-                      <Brain className={`w-5 h-5 ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'claude-opus-4-20250514' ? 'text-interactive' : ''}`}>Opus</span>
+                      <Brain className={`w-5 h-5 ${formData.model === 'opus' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'opus' ? 'text-interactive' : ''}`}>Opus</span>
                       <span className="text-xs opacity-75">Maximum</span>
                     </div>
-                    {formData.model === 'claude-opus-4-20250514' && (
+                    {formData.model === 'opus' && (
                       <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
                     )}
                   </Card>
                   
                   <Card
-                    variant={formData.model === 'claude-3-5-haiku-20241022' ? 'interactive' : 'bordered'}
+                    variant={formData.model === 'haiku' ? 'interactive' : 'bordered'}
                     padding="sm"
                     className={`relative cursor-pointer transition-all ${
-                      formData.model === 'claude-3-5-haiku-20241022'
+                      formData.model === 'haiku'
                         ? 'border-status-success bg-status-success/10'
                         : ''
                     }`}
-                    onClick={() => setFormData({ ...formData, model: 'claude-3-5-haiku-20241022' })}
+                    onClick={() => setFormData({ ...formData, model: 'haiku' })}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
-                      <Zap className={`w-5 h-5 ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'claude-3-5-haiku-20241022' ? 'text-status-success' : ''}`}>Haiku</span>
+                      <Zap className={`w-5 h-5 ${formData.model === 'haiku' ? 'text-status-success' : ''}`} />
+                      <span className={`text-sm font-medium ${formData.model === 'haiku' ? 'text-status-success' : ''}`}>Haiku</span>
                       <span className="text-xs opacity-75">Fast</span>
                     </div>
-                    {formData.model === 'claude-3-5-haiku-20241022' && (
+                    {formData.model === 'haiku' && (
                       <div className="absolute top-1 right-1 w-2 h-2 bg-status-success rounded-full" />
                     )}
                   </Card>

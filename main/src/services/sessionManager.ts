@@ -266,7 +266,7 @@ export class SessionManager extends EventEmitter {
       true, // isMainRepo = true
       true, // autoCommit = true (default for main repo sessions)
       undefined, // folderId
-      'claude-sonnet-4-20250514', // default model for main repo sessions
+      'sonnet', // default model for main repo sessions
       project.commit_mode, // Use project's commit mode
       undefined // commit_mode_settings - let it use project defaults
     );

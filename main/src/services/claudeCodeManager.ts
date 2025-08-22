@@ -166,16 +166,8 @@ export class ClaudeCodeManager extends EventEmitter {
       
       // Add model argument if specified and not 'auto'
       if (model && model !== 'auto') {
-        // Map full model identifiers to shorthand for Bedrock compatibility
-        // Only opus and sonnet have shorthand versions, haiku passes through
-        let modelOrAlias = model;
-        if (model.includes('opus')) {
-          modelOrAlias = 'opus';
-        } else if (model.includes('sonnet')) {
-          modelOrAlias = 'sonnet';
-        }
-
-        args.push('--model', modelOrAlias);
+        // Pass the model shorthand directly (opus, sonnet, or haiku)
+        args.push('--model', model);
         this.logger?.verbose(`Using model: ${model}`);
       } else if (model === 'auto') {
         this.logger?.verbose(`Using auto model selection (Claude Code's default)`);

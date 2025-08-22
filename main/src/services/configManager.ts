@@ -21,7 +21,7 @@ export class ConfigManager extends EventEmitter {
       systemPromptAppend: undefined,
       runScript: undefined,
       defaultPermissionMode: 'ignore',
-      defaultModel: 'claude-sonnet-4-20250514',
+      defaultModel: 'sonnet',
       stravuApiKey: undefined,
       stravuServerUrl: 'https://api.stravu.com',
       notifications: {
@@ -109,6 +109,6 @@ export class ConfigManager extends EventEmitter {
   }
 
   getDefaultModel(): string {
-    return this.config.defaultModel || 'claude-sonnet-4-20250514';
+    return this.config.defaultModel || 'sonnet';
   }
 }

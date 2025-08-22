@@ -433,7 +433,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
         // Start Claude Code with the user's prompt
         // Use the provided model if specified, otherwise fall back to the session's original model
-        const modelToUse = model || dbSession?.model || 'claude-sonnet-4-20250514';
+        const modelToUse = model || dbSession?.model || 'sonnet';
         await claudeCodeManager.startSession(sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode, modelToUse);
       } else {
         // Normal continue for existing sessions
@@ -443,7 +443,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
         // Continue the session with the existing conversation
         // Use the provided model if specified, otherwise fall back to the session's original model
-        const modelToUse = model || dbSession?.model || 'claude-sonnet-4-20250514';
+        const modelToUse = model || dbSession?.model || 'sonnet';
         
         console.log(`[IPC] Continue session ${sessionId} - provided model: ${model}, current model: ${dbSession?.model}, modelToUse: ${modelToUse}`);
         

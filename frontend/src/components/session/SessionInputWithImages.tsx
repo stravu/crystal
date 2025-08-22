@@ -677,19 +677,19 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       iconColor: 'text-interactive',
       description: 'Default',
     },
-    'claude-sonnet-4-20250514': {
+    'sonnet': {
       label: 'Sonnet',
       icon: Target,
       iconColor: 'text-interactive',
       description: 'Balanced',
     },
-    'claude-opus-4-20250514': {
+    'opus': {
       label: 'Opus',
       icon: Brain,
       iconColor: 'text-interactive',
       description: 'Maximum',
     },
-    'claude-3-5-haiku-20241022': {
+    'haiku': {
       label: 'Haiku',
       icon: Zap,
       iconColor: 'text-status-success',
