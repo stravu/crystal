@@ -1,6 +1,6 @@
 {
   "name": "crystal",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Crystal - Claude Code Commander for managing multiple Claude Code instances",
   "author": {
