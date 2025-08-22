@@ -35,26 +35,9 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   const gitStatusLoading = useSessionStore((state) => state.gitStatusLoading.has(session.id));
   
   
-  // Subscribe to session status updates specifically for this session
-  useEffect(() => {
-    const unsubscribe = useSessionStore.subscribe((state, prevState) => {
-      // Check if this session's status changed
-      const currentSession = state.sessions.find(s => s.id === session.id) || 
-        (state.activeMainRepoSession?.id === session.id ? state.activeMainRepoSession : null);
-      
-      const previousSession = prevState.sessions.find(s => s.id === session.id) || 
-        (prevState.activeMainRepoSession?.id === session.id ? prevState.activeMainRepoSession : null);
-      
-      // Compare store status with prop status
-      
-      // Force component update if status changed
-      if (currentSession && previousSession && currentSession.status !== previousSession.status) {
-        // Status changed - component will re-render due to prop change
-      }
-    });
-    
-    return unsubscribe;
-  }, [session.id, session.status]);
+  // Performance optimization: Remove unnecessary subscription
+  // The component already receives the session as a prop, which will cause re-render when it changes
+  // No need for an additional store subscription that runs for every session item on every store change
   
   useEffect(() => {
     // Check if this session's project has a run script

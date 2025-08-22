@@ -41,7 +41,7 @@ interface ElectronAPI {
     delete: (sessionId: string) => Promise<IPCResponse>;
     sendInput: (sessionId: string, input: string) => Promise<IPCResponse>;
     continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
-    getOutput: (sessionId: string) => Promise<IPCResponse>;
+    getOutput: (sessionId: string, limit?: number) => Promise<IPCResponse>;
     getJsonMessages: (sessionId: string) => Promise<IPCResponse>;
     getConversation: (sessionId: string) => Promise<IPCResponse>;
     getConversationMessages: (sessionId: string) => Promise<IPCResponse>;

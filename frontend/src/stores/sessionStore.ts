@@ -132,10 +132,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       ? null 
       : state.activeMainRepoSession;
     
+    // Clean up terminal output for deleted session to free memory
+    const newTerminalOutput = { ...state.terminalOutput };
+    delete newTerminalOutput[deletedSession.id];
+    
     return {
       sessions: state.sessions.filter(session => session.id !== deletedSession.id),
       activeSessionId: state.activeSessionId === deletedSession.id ? null : state.activeSessionId,
-      activeMainRepoSession: newActiveMainRepoSession
+      activeMainRepoSession: newActiveMainRepoSession,
+      terminalOutput: newTerminalOutput
     };
   }),
   
@@ -306,32 +311,54 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   setSessionOutputs: (sessionId, outputs) => set((state) => {
     console.log(`[SessionStore] Setting ${outputs.length} outputs for session ${sessionId}`);
     
-    // Separate outputs and JSON messages
+    // Performance optimization: Use simple loops instead of array methods for large datasets
     const stdOutputs: string[] = [];
     const jsonMessages: any[] = [];
     
-    outputs.forEach(output => {
+    // Use a simple for loop to avoid iterator overhead
+    for (let i = 0; i < outputs.length; i++) {
+      const output = outputs[i];
       if (output.type === 'json') {
         jsonMessages.push({ ...output.data, timestamp: output.timestamp });
       } else if (output.type === 'stdout' || output.type === 'stderr') {
         stdOutputs.push(output.data);
       }
-    });
+    }
     
+    // Memory optimization: Limit stored outputs to prevent unbounded growth
+    const MAX_STORED_OUTPUTS = 10000;
+    const MAX_STORED_MESSAGES = 5000;
     
-    // Always update the sessions array
-    const updatedSessions = state.sessions.map(session => {
-      if (session.id === sessionId) {
-        return { ...session, output: stdOutputs, jsonMessages };
+    const trimmedOutputs = stdOutputs.length > MAX_STORED_OUTPUTS 
+      ? stdOutputs.slice(-MAX_STORED_OUTPUTS) 
+      : stdOutputs;
+    
+    const trimmedMessages = jsonMessages.length > MAX_STORED_MESSAGES
+      ? jsonMessages.slice(-MAX_STORED_MESSAGES)
+      : jsonMessages;
+    
+    if (stdOutputs.length > MAX_STORED_OUTPUTS) {
+      console.warn(`[SessionStore] Trimmed outputs from ${stdOutputs.length} to ${MAX_STORED_OUTPUTS} for performance`);
+    }
+    
+    // Performance optimization: Only update the specific session instead of mapping all sessions
+    let updatedSessions = state.sessions;
+    
+    // Use a for loop for better performance with large arrays
+    for (let i = 0; i < state.sessions.length; i++) {
+      if (state.sessions[i].id === sessionId) {
+        const newSession = { ...state.sessions[i], output: trimmedOutputs, jsonMessages: trimmedMessages };
+        updatedSessions = [...state.sessions];
+        updatedSessions[i] = newSession;
+        break;
       }
-      return session;
-    });
+    }
     
     // Also update activeMainRepoSession if it matches
     let updatedActiveMainRepoSession = state.activeMainRepoSession;
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === sessionId) {
       console.log(`[SessionStore] Also updating activeMainRepoSession`);
-      updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: stdOutputs, jsonMessages };
+      updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: trimmedOutputs, jsonMessages: trimmedMessages };
     }
     
     return {
@@ -377,15 +404,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  addTerminalOutput: (output) => set((state) => ({
-    terminalOutput: {
-      ...state.terminalOutput,
-      [output.sessionId]: [
-        ...(state.terminalOutput[output.sessionId] || []),
-        output.data
-      ]
-    }
-  })),
+  addTerminalOutput: (output) => set((state) => {
+    // Performance optimization: Use direct array mutation for terminal output
+    const existingOutput = state.terminalOutput[output.sessionId] || [];
+    const newOutput = [...existingOutput, output.data];
+    
+    // Limit terminal output to prevent memory issues
+    const MAX_TERMINAL_LINES = 10000;
+    const trimmedOutput = newOutput.length > MAX_TERMINAL_LINES
+      ? newOutput.slice(-MAX_TERMINAL_LINES)
+      : newOutput;
+    
+    return {
+      terminalOutput: {
+        ...state.terminalOutput,
+        [output.sessionId]: trimmedOutput
+      }
+    };
+  }),
 
   clearTerminalOutput: (sessionId: string) => set((state) => ({
     terminalOutput: {
