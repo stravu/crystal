@@ -311,21 +311,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   setSessionOutputs: (sessionId, outputs) => set((state) => {
     console.log(`[SessionStore] Setting ${outputs.length} outputs for session ${sessionId}`);
     
-    // Performance optimization: Process outputs in chunks for large datasets
-    const MAX_CHUNK_SIZE = 1000;
+    // Performance optimization: Use simple loops instead of array methods for large datasets
     const stdOutputs: string[] = [];
     const jsonMessages: any[] = [];
     
-    // Process outputs in chunks to avoid blocking the main thread
-    for (let i = 0; i < outputs.length; i += MAX_CHUNK_SIZE) {
-      const chunk = outputs.slice(i, Math.min(i + MAX_CHUNK_SIZE, outputs.length));
-      
-      for (const output of chunk) {
-        if (output.type === 'json') {
-          jsonMessages.push({ ...output.data, timestamp: output.timestamp });
-        } else if (output.type === 'stdout' || output.type === 'stderr') {
-          stdOutputs.push(output.data);
-        }
+    // Use a simple for loop to avoid iterator overhead
+    for (let i = 0; i < outputs.length; i++) {
+      const output = outputs[i];
+      if (output.type === 'json') {
+        jsonMessages.push({ ...output.data, timestamp: output.timestamp });
+      } else if (output.type === 'stdout' || output.type === 'stderr') {
+        stdOutputs.push(output.data);
       }
     }
     
@@ -345,13 +341,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       console.warn(`[SessionStore] Trimmed outputs from ${stdOutputs.length} to ${MAX_STORED_OUTPUTS} for performance`);
     }
     
-    // Always update the sessions array
-    const updatedSessions = state.sessions.map(session => {
-      if (session.id === sessionId) {
-        return { ...session, output: trimmedOutputs, jsonMessages: trimmedMessages };
+    // Performance optimization: Only update the specific session instead of mapping all sessions
+    let updatedSessions = state.sessions;
+    
+    // Use a for loop for better performance with large arrays
+    for (let i = 0; i < state.sessions.length; i++) {
+      if (state.sessions[i].id === sessionId) {
+        const newSession = { ...state.sessions[i], output: trimmedOutputs, jsonMessages: trimmedMessages };
+        updatedSessions = [...state.sessions];
+        updatedSessions[i] = newSession;
+        break;
       }
-      return session;
-    });
+    }
     
     // Also update activeMainRepoSession if it matches
     let updatedActiveMainRepoSession = state.activeMainRepoSession;
@@ -403,15 +404,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  addTerminalOutput: (output) => set((state) => ({
-    terminalOutput: {
-      ...state.terminalOutput,
-      [output.sessionId]: [
-        ...(state.terminalOutput[output.sessionId] || []),
-        output.data
-      ]
-    }
-  })),
+  addTerminalOutput: (output) => set((state) => {
+    // Performance optimization: Use direct array mutation for terminal output
+    const existingOutput = state.terminalOutput[output.sessionId] || [];
+    const newOutput = [...existingOutput, output.data];
+    
+    // Limit terminal output to prevent memory issues
+    const MAX_TERMINAL_LINES = 10000;
+    const trimmedOutput = newOutput.length > MAX_TERMINAL_LINES
+      ? newOutput.slice(-MAX_TERMINAL_LINES)
+      : newOutput;
+    
+    return {
+      terminalOutput: {
+        ...state.terminalOutput,
+        [output.sessionId]: trimmedOutput
+      }
+    };
+  }),
 
   clearTerminalOutput: (sessionId: string) => set((state) => ({
     terminalOutput: {

@@ -273,12 +273,16 @@ export const useSessionView = (
 
   useEffect(() => {
     if (!activeSessionId) return;
+    // Performance optimization: Check session status only, not entire state
+    let previousStatus = activeSession?.status;
     const unsubscribe = useSessionStore.subscribe((state) => {
       const updatedSession = state.activeMainRepoSession?.id === activeSessionId
         ? state.activeMainRepoSession
         : state.sessions.find(s => s.id === activeSessionId);
       
-      if (updatedSession && updatedSession.status !== activeSession?.status) {
+      // Only trigger update if status actually changed
+      if (updatedSession && updatedSession.status !== previousStatus) {
+        previousStatus = updatedSession.status;
         if (activeSession?.status === 'initializing' && updatedSession.status === 'running') {
           // Only clear terminal and reload for new sessions, not when continuing conversations
           const hasExistingOutput = activeSession.output && activeSession.output.length > 0;
@@ -305,11 +309,17 @@ export const useSessionView = (
       setScriptOutput([]);
       return;
     }
+    // Performance optimization: Track previous terminal output to avoid unnecessary updates
+    let previousOutput = useSessionStore.getState().terminalOutput[activeSession.id];
     const unsubscribe = useSessionStore.subscribe((state) => {
       const sessionTerminalOutput = state.terminalOutput[activeSession.id] || [];
-      setScriptOutput(sessionTerminalOutput);
-      // Terminal is now independent - no automatic unread indicators
-      // Users explicitly interact with the terminal, so they know when there's output
+      // Only update if output actually changed
+      if (sessionTerminalOutput !== previousOutput) {
+        previousOutput = sessionTerminalOutput;
+        setScriptOutput(sessionTerminalOutput);
+        // Terminal is now independent - no automatic unread indicators
+        // Users explicitly interact with the terminal, so they know when there's output
+      }
     });
     setScriptOutput(useSessionStore.getState().terminalOutput[activeSession.id] || []);
     return unsubscribe;

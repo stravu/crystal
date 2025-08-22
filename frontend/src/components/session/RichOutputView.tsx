@@ -184,38 +184,47 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const transformMessages = (rawMessages: RawMessage[]): ConversationMessage[] => {
     const transformed: ConversationMessage[] = [];
     
+    // Performance optimization: Use traditional for loops instead of forEach for large arrays
     // First pass: Build tool result map and identify sub-agent relationships
     const toolResults = new Map<string, ToolResult>();
     const parentToolMap = new Map<string, string>(); // Map tool ID to parent tool ID
     
     // Identify all tool calls and their parent relationships first
-    rawMessages.forEach(msg => {
+    for (let i = 0; i < rawMessages.length; i++) {
+      const msg = rawMessages[i];
       // Check for parent_tool_use_id to identify sub-agent tool calls
       if (msg.parent_tool_use_id && msg.message?.content && Array.isArray(msg.message.content)) {
-        msg.message.content.forEach((block: any) => {
+        const content = msg.message.content;
+        for (let j = 0; j < content.length; j++) {
+          const block = content[j];
           if (block.type === 'tool_use' && block.id) {
             parentToolMap.set(block.id, msg.parent_tool_use_id!);
           }
-        });
+        }
       }
       
       if (msg.type === 'user' && msg.message?.content && Array.isArray(msg.message.content)) {
-        msg.message.content.forEach((block: any) => {
+        const content = msg.message.content;
+        for (let j = 0; j < content.length; j++) {
+          const block = content[j];
           if (block.type === 'tool_result' && block.tool_use_id) {
             toolResults.set(block.tool_use_id, {
               content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
               isError: block.is_error || false
             });
           }
-        });
+        }
       }
-    });
+    }
     
     // Second pass: Build all tool calls to prepare for hierarchy
     const allToolCalls = new Map<string, ToolCall>();
-    rawMessages.forEach(msg => {
+    for (let i = 0; i < rawMessages.length; i++) {
+      const msg = rawMessages[i];
       if (msg.type === 'assistant' && msg.message?.content && Array.isArray(msg.message.content)) {
-        msg.message.content.forEach((block: any) => {
+        const content = msg.message.content;
+        for (let j = 0; j < content.length; j++) {
+          const block = content[j];
           if (block.type === 'tool_use') {
             const isTaskAgent = block.name === 'Task';
             const toolCall: ToolCall = {
@@ -231,19 +240,21 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             };
             allToolCalls.set(block.id, toolCall);
           }
-        });
+        }
       }
-    });
+    }
     
     // Build parent-child relationships
-    allToolCalls.forEach((toolCall) => {
+    const toolCallsArray = Array.from(allToolCalls.values());
+    for (let i = 0; i < toolCallsArray.length; i++) {
+      const toolCall = toolCallsArray[i];
       if (toolCall.parentToolId) {
         const parentTool = allToolCalls.get(toolCall.parentToolId);
         if (parentTool && parentTool.childToolCalls) {
           parentTool.childToolCalls.push(toolCall);
         }
       }
-    });
+    }
     
     // Third pass: Build conversation messages
     for (let i = 0; i < rawMessages.length; i++) {
@@ -255,8 +266,18 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         let hasOnlyText = true;
         
         if (msg.message?.content && Array.isArray(msg.message.content)) {
-          hasToolResult = msg.message.content.some((block: any) => block.type === 'tool_result');
-          hasOnlyText = msg.message.content.every((block: any) => block.type === 'text');
+          // Performance optimization: Use for loops instead of array methods
+          const content = msg.message.content;
+          for (let j = 0; j < content.length; j++) {
+            if (content[j].type === 'tool_result') {
+              hasToolResult = true;
+              hasOnlyText = false;
+              break;
+            }
+            if (content[j].type !== 'text') {
+              hasOnlyText = false;
+            }
+          }
         }
         
         // Only show real user prompts (text-only messages without tool results)
@@ -287,8 +308,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         if (msg.text && typeof msg.text === 'string') {
           segments.push({ type: 'text', content: msg.text.trim() });
         } else if (msg.message?.content && Array.isArray(msg.message.content)) {
-          // Process each content block
-          msg.message.content.forEach((block: any) => {
+          // Process each content block - use for loop for better performance
+          const content = msg.message.content;
+          for (let j = 0; j < content.length; j++) {
+            const block = content[j];
             if (block.type === 'text' && block.text?.trim()) {
               segments.push({ type: 'text', content: block.text.trim() });
             } else if (block.type === 'thinking') {
@@ -303,7 +326,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 segments.push({ type: 'tool_call', tool: toolCall });
               }
             }
-          });
+          }
         } else {
           // Fallback for other formats
           const textContent = extractTextContent(msg);

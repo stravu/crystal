@@ -280,13 +280,16 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     getMainRepoSession();
   }, [projectId, viewMode]);
   
-  // Subscribe to session updates
+  // Subscribe to session updates - optimized to check for actual changes
   useEffect(() => {
     if (!mainRepoSessionId) return;
     
+    let previousSession = useSessionStore.getState().sessions.find(s => s.id === mainRepoSessionId);
     const unsubscribe = useSessionStore.subscribe((state) => {
       const session = state.sessions.find(s => s.id === mainRepoSessionId);
-      if (session) {
+      // Only update if session actually changed
+      if (session && session !== previousSession) {
+        previousSession = session;
         setMainRepoSession(session);
       }
     });
@@ -312,13 +315,18 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
 
   // Output loading is now handled by useSessionView hook
 
-  // Subscribe to script output for this session
+  // Subscribe to script output for this session - optimized to check for actual changes
   useEffect(() => {
     if (!mainRepoSessionId) return;
 
+    let previousOutput = useSessionStore.getState().terminalOutput[mainRepoSessionId];
     const unsubscribe = useSessionStore.subscribe((state) => {
       const sessionOutput = state.terminalOutput[mainRepoSessionId] || [];
-      setScriptOutput(sessionOutput);
+      // Only update if output actually changed
+      if (sessionOutput !== previousOutput) {
+        previousOutput = sessionOutput;
+        setScriptOutput(sessionOutput);
+      }
     });
 
     // Get initial state
