@@ -524,8 +524,10 @@ export const useSessionView = (
     forceResetLoadingState
   ]);
   
-  // Listen for output available events
+  // Listen for output available events with debouncing for performance
   useEffect(() => {
+    let reloadDebounceTimer: NodeJS.Timeout | null = null;
+    
     const handleOutputAvailable = (event: CustomEvent) => {
       const { sessionId } = event.detail;
       
@@ -534,13 +536,26 @@ export const useSessionView = (
         // Trigger reload if we're loaded or if we're continuing a conversation
         if (outputLoadState === 'loaded' || isContinuingConversationRef.current) {
           console.log(`[Output Available] New output for active session ${sessionId}, requesting reload (state: ${outputLoadState}, continuing: ${isContinuingConversationRef.current})`);
-          setShouldReloadOutput(true);
+          
+          // Debounce rapid output updates to avoid excessive re-renders
+          if (reloadDebounceTimer) {
+            clearTimeout(reloadDebounceTimer);
+          }
+          reloadDebounceTimer = setTimeout(() => {
+            setShouldReloadOutput(true);
+            reloadDebounceTimer = null;
+          }, 100);
         }
       }
     };
     
     window.addEventListener('session-output-available', handleOutputAvailable as EventListener);
-    return () => window.removeEventListener('session-output-available', handleOutputAvailable as EventListener);
+    return () => {
+      window.removeEventListener('session-output-available', handleOutputAvailable as EventListener);
+      if (reloadDebounceTimer) {
+        clearTimeout(reloadDebounceTimer);
+      }
+    };
   }, [activeSession?.id, outputLoadState]);
 
   const initTerminal = useCallback((termRef: React.RefObject<HTMLDivElement | null> | undefined, instanceRef: React.MutableRefObject<Terminal | null>, fitAddonRef: React.MutableRefObject<FitAddon | null>, isScript: boolean) => {
@@ -561,7 +576,7 @@ export const useSessionView = (
         convertEol: true,
         rows: 30,
         cols: 80,
-        scrollback: 100000, // Unlimited terminal output support
+        scrollback: 50000, // Reduced from 100000 for better performance
         fastScrollModifier: 'ctrl',
         fastScrollSensitivity: 5,
         scrollSensitivity: 1,

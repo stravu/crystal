@@ -458,10 +458,14 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('sessions:get-output', async (_event, sessionId: string) => {
+  ipcMain.handle('sessions:get-output', async (_event, sessionId: string, limit?: number) => {
     try {
-      console.log(`[IPC] sessions:get-output called for session: ${sessionId}`);
-      const outputs = await sessionManager.getSessionOutputs(sessionId);
+      // Performance optimization: Default to loading only recent outputs
+      const DEFAULT_OUTPUT_LIMIT = 5000;
+      const outputLimit = limit || DEFAULT_OUTPUT_LIMIT;
+      
+      console.log(`[IPC] sessions:get-output called for session: ${sessionId} with limit: ${outputLimit}`);
+      const outputs = await sessionManager.getSessionOutputs(sessionId, outputLimit);
       console.log(`[IPC] Retrieved ${outputs.length} outputs for session ${sessionId}`);
       
       // Refresh git status when session is loaded/viewed
@@ -472,26 +476,35 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         });
       }
 
-      // Transform JSON messages to formatted stdout on the fly
+      // Performance optimization: Process outputs in batches to avoid blocking
       const { formatJsonForOutputEnhanced } = await import('../utils/toolFormatter');
-      const transformedOutputs = outputs.map(output => {
-        if (output.type === 'json') {
-          // Generate formatted output from JSON
-          const outputText = formatJsonForOutputEnhanced(output.data);
-          if (outputText) {
-            // Return as stdout for the Output view
-            return {
-              ...output,
-              type: 'stdout' as const,
-              data: outputText
-            };
+      const BATCH_SIZE = 100;
+      const transformedOutputs = [];
+      
+      for (let i = 0; i < outputs.length; i += BATCH_SIZE) {
+        const batch = outputs.slice(i, Math.min(i + BATCH_SIZE, outputs.length));
+        
+        const transformedBatch = batch.map(output => {
+          if (output.type === 'json') {
+            // Generate formatted output from JSON
+            const outputText = formatJsonForOutputEnhanced(output.data);
+            if (outputText) {
+              // Return as stdout for the Output view
+              return {
+                ...output,
+                type: 'stdout' as const,
+                data: outputText
+              };
+            }
+            // If no output format can be generated, skip this JSON message
+            return null;
           }
-          // If no output format can be generated, skip this JSON message
-          return null;
-        }
-        // Pass through all other output types including 'error'
-        return output; 
-      }).filter(Boolean); // Remove any null entries
+          // Pass through all other output types including 'error'
+          return output; 
+        }).filter(Boolean);
+        
+        transformedOutputs.push(...transformedBatch);
+      } // Remove any null entries
       return { success: true, data: transformedOutputs };
     } catch (error) {
       console.error('Failed to get session outputs:', error);

@@ -31,11 +31,14 @@ export const SessionView = memo(() => {
   const [sessionProject, setSessionProject] = useState<any>(null);
 
   // Define activeSession early so it can be used in effects
-  const activeSession = activeSessionId 
-    ? (activeMainRepoSession && activeMainRepoSession.id === activeSessionId 
-        ? activeMainRepoSession 
-        : sessions.find(s => s.id === activeSessionId))
-    : undefined;
+  // Memoize to avoid recomputing on every render
+  const activeSession = useMemo(() => {
+    if (!activeSessionId) return undefined;
+    if (activeMainRepoSession && activeMainRepoSession.id === activeSessionId) {
+      return activeMainRepoSession;
+    }
+    return sessions.find(s => s.id === activeSessionId);
+  }, [activeSessionId, activeMainRepoSession, sessions]);
 
 
   // Load project data for active session
@@ -225,22 +228,26 @@ export const SessionView = memo(() => {
           {hook.isLoadingOutput && hook.viewMode !== 'richOutput' && (
             <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
           )}
-          <div className={`h-full ${hook.viewMode === 'richOutput' ? 'block' : 'hidden'}`}>
-            <RichOutputWithSidebar 
-              sessionId={activeSession.id}
-              settings={richOutputSettings}
-              onSettingsChange={handleRichOutputSettingsChange}
-            />
-          </div>
-          <div className={`h-full ${hook.viewMode === 'changes' ? 'block' : 'hidden'} overflow-hidden`}>
-            <CombinedDiffView 
-              sessionId={activeSession.id} 
-              selectedExecutions={emptySelectedExecutions} 
-              isGitOperationRunning={hook.isMerging}
-              isMainRepo={isMainRepo}
-              isVisible={hook.viewMode === 'changes'}
-            />
-          </div>
+          {hook.viewMode === 'richOutput' && (
+            <div className="h-full block">
+              <RichOutputWithSidebar 
+                sessionId={activeSession.id}
+                settings={richOutputSettings}
+                onSettingsChange={handleRichOutputSettingsChange}
+              />
+            </div>
+          )}
+          {hook.viewMode === 'changes' && (
+            <div className="h-full block overflow-hidden">
+              <CombinedDiffView 
+                sessionId={activeSession.id} 
+                selectedExecutions={emptySelectedExecutions} 
+                isGitOperationRunning={hook.isMerging}
+                isMainRepo={isMainRepo}
+                isVisible={true}
+              />
+            </div>
+          )}
           <div className={`h-full ${hook.viewMode === 'terminal' ? 'flex flex-col' : 'hidden'} bg-bg-primary`}>
             <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-primary">
               <div className="text-sm text-text-secondary">
@@ -294,15 +301,21 @@ export const SessionView = memo(() => {
               </>
             )}
           </div>
-          <div className={`h-full ${hook.viewMode === 'logs' ? 'block' : 'hidden'}`}>
-            <LogView sessionId={activeSession.id} isVisible={hook.viewMode === 'logs'} />
-          </div>
-          <div className={`h-full ${hook.viewMode === 'editor' ? 'block' : 'hidden'}`}>
-            <FileEditor sessionId={activeSession.id} />
-          </div>
-          <div className={`h-full ${hook.viewMode === 'messages' ? 'flex flex-col' : 'hidden'} overflow-hidden`}>
-            <MessagesView sessionId={activeSession.id} />
-          </div>
+          {hook.viewMode === 'logs' && (
+            <div className="h-full block">
+              <LogView sessionId={activeSession.id} isVisible={true} />
+            </div>
+          )}
+          {hook.viewMode === 'editor' && (
+            <div className="h-full block">
+              <FileEditor sessionId={activeSession.id} />
+            </div>
+          )}
+          {hook.viewMode === 'messages' && (
+            <div className="h-full flex flex-col overflow-hidden">
+              <MessagesView sessionId={activeSession.id} />
+            </div>
+          )}
         </div>
       </div>
       
