@@ -300,7 +300,7 @@ export const SessionView = memo(() => {
           <div className={`h-full ${hook.viewMode === 'editor' ? 'block' : 'hidden'}`}>
             <FileEditor sessionId={activeSession.id} />
           </div>
-          <div className={`h-full ${hook.viewMode === 'messages' ? 'block' : 'hidden'}`}>
+          <div className={`h-full ${hook.viewMode === 'messages' ? 'flex flex-col' : 'hidden'} overflow-hidden`}>
             <MessagesView sessionId={activeSession.id} />
           </div>
         </div>

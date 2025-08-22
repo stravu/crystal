@@ -1,6 +1,34 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.2.1] - 2025-08-21
+
+### Added
+- **'Auto' model selection** - New automatic model selection option that lets Claude Code choose the best model
+- **Sub-agent output visualization** - Enhanced UX for displaying sub-agent task outputs
+- **Terminal/Logs separation** - Logs from run scripts now have their own dedicated tab with filter and search
+- **Dev mode for debugging** - New developer mode to view raw Claude Code messages in the Messages tab
+- **Canary channel publishing** - Automatic canary builds from main branch for early testing
+
+### Changed
+- **Performance improvements** - Various optimizations for better responsiveness
+- **Auto-scroll reliability** - More reliable auto-scrolling behavior that only activates when at bottom of output
+- **Project panel usage** - Now uses project panel instead of special (main) session
+- **Git branch actions labeling** - Renamed "Branch Actions" to "Git Branch Actions" for clarity
+
+### Fixed
+- **Double prompt submission prevention** - Fixed issue where prompts could be submitted twice
+- **Commit message display** - Fixed showing commit messages in diff viewer
+- **Worktree file references** - Don't show worktree files when using @ to reference files
+- **Git status indicators** - Fixed "Behind Only - No unique changes" status marker
+- **Revert button backend** - Updated backend to use after_commit_hash for revert button functionality
+- **Run script log clearing** - Clear logs on fresh run script execution
+- **Canary build process** - Fixed canary build issues
+
+### Documentation
+- **Demo video updated** - Updated demo video to showcase latest features
+- **Markdown cleanup** - Cleaned up and reorganized documentation structure
+
 ## [0.2.0] - 2025-08-05
 
 ### Added

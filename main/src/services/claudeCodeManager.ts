@@ -164,19 +164,13 @@ export class ClaudeCodeManager extends EventEmitter {
       // Build the command arguments
       const args = ['--verbose', '--output-format', 'stream-json'];
       
-      // Add model argument if specified
-      if (model) {
-        // Map full model identifiers to shorthand for Bedrock compatibility
-        // Only opus and sonnet have shorthand versions, haiku passes through
-        let modelOrAlias = model;
-        if (model.includes('opus')) {
-          modelOrAlias = 'opus';
-        } else if (model.includes('sonnet')) {
-          modelOrAlias = 'sonnet';
-        }
-
-        args.push('--model', modelOrAlias);
+      // Add model argument if specified and not 'auto'
+      if (model && model !== 'auto') {
+        // Pass the model shorthand directly (opus, sonnet, or haiku)
+        args.push('--model', model);
         this.logger?.verbose(`Using model: ${model}`);
+      } else if (model === 'auto') {
+        this.logger?.verbose(`Using auto model selection (Claude Code's default)`);
       }
       
       // Log commit mode for debugging (but don't pass to Claude Code)
@@ -743,6 +737,24 @@ export class ClaudeCodeManager extends EventEmitter {
       // Emit spawned event to update session status
       this.emit('spawned', { sessionId });
 
+      // Emit initial session info message with prompt and command
+      const sessionInfoMessage = {
+        type: 'session_info',
+        initial_prompt: prompt,
+        claude_command: `${claudeCommand || 'claude'} ${args.join(' ')}`,
+        worktree_path: worktreePath,
+        model: model || 'default',
+        permission_mode: permissionMode || 'default',
+        timestamp: new Date().toISOString()
+      };
+      
+      this.emit('output', {
+        sessionId,
+        type: 'json',
+        data: sessionInfoMessage,
+        timestamp: new Date()
+      });
+
       let hasReceivedOutput = false;
       let lastOutput = '';
       let buffer = '';
@@ -1092,7 +1104,16 @@ export class ClaudeCodeManager extends EventEmitter {
   async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
     // Kill any existing process for this session first
     if (this.processes.has(sessionId)) {
+      console.log(`[ClaudeCodeManager] Killing existing process for session ${sessionId} before continuing`);
       await this.killProcess(sessionId);
+      // Add a small delay to ensure the process is fully cleaned up
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Double-check that the process was actually killed
+    if (this.processes.has(sessionId)) {
+      console.error(`[ClaudeCodeManager] Process ${sessionId} still exists after kill attempt, aborting continue`);
+      throw new Error('Failed to stop previous session instance');
     }
     
     // Get the session's permission mode from database

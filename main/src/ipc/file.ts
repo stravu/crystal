@@ -563,11 +563,58 @@ EOF
         return { success: true, files: [] };
       }
 
+      // Get list of tracked files (not gitignored) using git
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      let gitTrackedFiles = new Set<string>();
+      let isGitRepo = true;
+      try {
+        // Get list of all tracked files in the repository
+        const { stdout: trackedStdout } = await execAsync('git ls-files', {
+          cwd: searchDirectory,
+          maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        });
+        
+        if (trackedStdout) {
+          trackedStdout.split('\n').forEach((file: string) => {
+            if (file.trim()) {
+              gitTrackedFiles.add(file.trim());
+            }
+          });
+        }
+        
+        // Also get untracked files that are not ignored
+        const { stdout: untrackedStdout } = await execAsync('git ls-files --others --exclude-standard', {
+          cwd: searchDirectory,
+          maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        });
+        
+        if (untrackedStdout) {
+          untrackedStdout.split('\n').forEach((file: string) => {
+            if (file.trim()) {
+              gitTrackedFiles.add(file.trim());
+            }
+          });
+        }
+      } catch (err) {
+        // Git command failed, likely not a git repo
+        isGitRepo = false;
+        console.log('Could not get git tracked files:', err);
+      }
+
       // Use glob to find matching files
       const globPattern = filePattern ? `**/*${filePattern}*` : '**/*';
       const files = await glob(globPattern, {
         cwd: searchDir,
-        ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+        ignore: [
+          '**/node_modules/**', 
+          '**/.git/**', 
+          '**/dist/**', 
+          '**/build/**',
+          '**/worktrees/**' // Exclude worktree folders
+        ],
         nodir: false,
         dot: true,
         absolute: false,
@@ -579,6 +626,24 @@ EOF
         files.map(async (file) => {
           const fullPath = path.join(searchDir, file);
           const relativePath = path.relative(searchDirectory, fullPath);
+          
+          // Skip worktree directories
+          if (relativePath.includes('worktrees/') || relativePath.startsWith('worktrees/')) {
+            return null;
+          }
+          
+          // If we're in a git repo, only include tracked/untracked-but-not-ignored files
+          if (isGitRepo && gitTrackedFiles.size > 0 && !gitTrackedFiles.has(relativePath)) {
+            // Check if it's a directory - directories might not be in git ls-files
+            try {
+              const stats = await fs.stat(fullPath);
+              if (!stats.isDirectory()) {
+                return null; // Skip non-directory files that aren't tracked
+              }
+            } catch {
+              return null;
+            }
+          }
           
           try {
             const stats = await fs.stat(fullPath);
