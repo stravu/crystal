@@ -57,6 +57,50 @@ function App() {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+  
+  // CRITICAL PERFORMANCE FIX: Very aggressive cleanup to prevent V8 array iteration issues
+  useEffect(() => {
+    // Run cleanup every 30 seconds to prevent array buildup that causes CPU spikes
+    const cleanupInterval = setInterval(() => {
+      const store = useSessionStore.getState();
+      // Always cleanup when we have multiple sessions to prevent memory issues
+      if (store.sessions.length > 0) {
+        console.log('[Performance] Running aggressive periodic session cleanup');
+        store.cleanupInactiveSessions();
+      }
+    }, 30 * 1000); // 30 seconds - much more frequent to prevent V8 optimization failures
+    
+    // Immediate cleanup when switching sessions
+    const handleSessionSwitch = () => {
+      // Immediate cleanup to free memory right away
+      const store = useSessionStore.getState();
+      if (store.sessions.length > 0) {
+        console.log('[Performance] Immediate cleanup on session switch');
+        store.cleanupInactiveSessions();
+      }
+    };
+    
+    window.addEventListener('session-switched', handleSessionSwitch);
+    
+    // Also cleanup on visibility change to free memory when app is in background
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        const store = useSessionStore.getState();
+        if (store.sessions.length > 0) {
+          console.log('[Performance] Cleanup on app background');
+          store.cleanupInactiveSessions();
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(cleanupInterval);
+      window.removeEventListener('session-switched', handleSessionSwitch);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Add keyboard shortcut for prompt history
   useEffect(() => {

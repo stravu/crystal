@@ -52,6 +52,9 @@ interface SessionStore {
   setGitStatusLoadingBatch: (updates: Array<{ sessionId: string; loading: boolean }>) => void;
   updateSessionGitStatusBatch: (updates: Array<{ sessionId: string; status: GitStatus }>) => void;
   processPendingGitStatusUpdates: () => void;
+  
+  // Performance cleanup methods
+  cleanupInactiveSessions: () => void;
 }
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
@@ -153,6 +156,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (!sessionId) {
       set({ activeSessionId: null, activeMainRepoSession: null });
       return;
+    }
+    
+    // Emit session-switched event for cleanup
+    if (get().activeSessionId !== sessionId) {
+      window.dispatchEvent(new CustomEvent('session-switched', { detail: { sessionId } }));
     }
     
     // First check if the session is already in our local store
@@ -257,15 +265,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const sessions = state.sessions.slice();
     const session = sessions[sessionIndex];
     
+    // CRITICAL PERFORMANCE FIX: Much stricter limits to prevent V8 array iteration issues
+    const MAX_OUTPUTS = 300; // Drastically reduced from 1000
+    const MAX_MESSAGES = 100; // Drastically reduced from 500
+    
     if (output.type === 'json') {
-      // Update jsonMessages array
-      const newJsonMessages = [...(session.jsonMessages || [])];
-      newJsonMessages.push({...output.data, timestamp: output.timestamp});
+      // Update jsonMessages array with limit
+      const currentMessages = session.jsonMessages || [];
+      const newMessage = {...output.data, timestamp: output.timestamp};
+      const newJsonMessages = currentMessages.length >= MAX_MESSAGES
+        ? [...currentMessages.slice(1), newMessage] // Remove oldest when at limit
+        : [...currentMessages, newMessage];
       sessions[sessionIndex] = { ...session, jsonMessages: newJsonMessages };
     } else {
-      // Add stdout/stderr to output array
-      const newOutput = [...(session.output || [])];
-      newOutput.push(output.data);
+      // Add stdout/stderr to output array with limit
+      const currentOutput = session.output || [];
+      const newOutput = currentOutput.length >= MAX_OUTPUTS
+        ? [...currentOutput.slice(1), output.data] // Remove oldest when at limit
+        : [...currentOutput, output.data];
       sessions[sessionIndex] = { ...session, output: newOutput };
     }
     
@@ -273,12 +290,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     let updatedActiveMainRepoSession = state.activeMainRepoSession;
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === output.sessionId) {
       if (output.type === 'json') {
-        const newJsonMessages = [...(state.activeMainRepoSession.jsonMessages || [])];
-        newJsonMessages.push({...output.data, timestamp: output.timestamp});
+        const currentMessages = state.activeMainRepoSession.jsonMessages || [];
+        const newMessage = {...output.data, timestamp: output.timestamp};
+        const newJsonMessages = currentMessages.length >= MAX_MESSAGES
+          ? [...currentMessages.slice(1), newMessage]
+          : [...currentMessages, newMessage];
         updatedActiveMainRepoSession = { ...state.activeMainRepoSession, jsonMessages: newJsonMessages };
       } else {
-        const newOutput = [...(state.activeMainRepoSession.output || [])];
-        newOutput.push(output.data);
+        const currentOutput = state.activeMainRepoSession.output || [];
+        const newOutput = currentOutput.length >= MAX_OUTPUTS
+          ? [...currentOutput.slice(1), output.data]
+          : [...currentOutput, output.data];
         updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: newOutput };
       }
     }
@@ -317,23 +339,40 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   setSessionOutputs: (sessionId, outputs) => set((state) => {
     console.log(`[SessionStore] Setting ${outputs.length} outputs for session ${sessionId}`);
     
-    // Performance optimization: Use simple loops instead of array methods for large datasets
+    // PERFORMANCE: Process arrays in chunks to avoid V8 optimization bailouts
     const stdOutputs: string[] = [];
     const jsonMessages: any[] = [];
     
-    // Use a simple for loop to avoid iterator overhead
-    for (let i = 0; i < outputs.length; i++) {
-      const output = outputs[i];
-      if (output.type === 'json') {
-        jsonMessages.push({ ...output.data, timestamp: output.timestamp });
-      } else if (output.type === 'stdout' || output.type === 'stderr') {
-        stdOutputs.push(output.data);
+    // Process in smaller batches to avoid long-running loops that trigger V8 deoptimization
+    const BATCH_SIZE = 100;
+    for (let batch = 0; batch < outputs.length; batch += BATCH_SIZE) {
+      const batchEnd = Math.min(batch + BATCH_SIZE, outputs.length);
+      
+      for (let i = batch; i < batchEnd; i++) {
+        const output = outputs[i];
+        if (output.type === 'json') {
+          jsonMessages.push({ ...output.data, timestamp: output.timestamp });
+        } else if (output.type === 'stdout' || output.type === 'stderr') {
+          stdOutputs.push(output.data);
+        }
+      }
+      
+      // Allow event loop to breathe between batches for very large arrays
+      if (batchEnd < outputs.length && outputs.length > 500) {
+        // This is a synchronous operation, so we can't truly yield,
+        // but we can at least break up the work
+        if (stdOutputs.length > 300 || jsonMessages.length > 100) {
+          // Stop early if we already have enough data
+          console.warn(`[SessionStore] Stopping early at ${batchEnd} of ${outputs.length} outputs due to limits`);
+          break;
+        }
       }
     }
     
-    // Memory optimization: Limit stored outputs to prevent unbounded growth
-    const MAX_STORED_OUTPUTS = 10000;
-    const MAX_STORED_MESSAGES = 5000;
+    // CRITICAL PERFORMANCE FIX: Even more aggressive limits to prevent V8 optimization failures
+    // V8 was getting stuck in recursive array iterations with large arrays
+    const MAX_STORED_OUTPUTS = 300; // Further reduced to prevent CPU spikes
+    const MAX_STORED_MESSAGES = 100; // Further reduced to prevent memory pressure
     
     const trimmedOutputs = stdOutputs.length > MAX_STORED_OUTPUTS 
       ? stdOutputs.slice(-MAX_STORED_OUTPUTS) 
@@ -419,20 +458,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
   
   addTerminalOutput: (output) => set((state) => {
-    // Performance optimization: Use direct array mutation for terminal output
-    const existingOutput = state.terminalOutput[output.sessionId] || [];
-    const newOutput = [...existingOutput, output.data];
+    // Performance optimization: Much stricter limit to prevent memory issues
+    const MAX_TERMINAL_LINES = 1000; // Drastically reduced from 5000
     
-    // Limit terminal output to prevent memory issues
-    const MAX_TERMINAL_LINES = 10000;
-    const trimmedOutput = newOutput.length > MAX_TERMINAL_LINES
-      ? newOutput.slice(-MAX_TERMINAL_LINES)
-      : newOutput;
+    const existingOutput = state.terminalOutput[output.sessionId] || [];
+    
+    // If already at max, remove oldest before adding new
+    let updatedOutput: string[];
+    if (existingOutput.length >= MAX_TERMINAL_LINES) {
+      // Shift array instead of creating new one for better performance
+      updatedOutput = existingOutput.slice(-(MAX_TERMINAL_LINES - 1));
+      updatedOutput.push(output.data);
+    } else {
+      updatedOutput = [...existingOutput, output.data];
+    }
     
     return {
       terminalOutput: {
         ...state.terminalOutput,
-        [output.sessionId]: trimmedOutput
+        [output.sessionId]: updatedOutput
       }
     };
   }),
@@ -619,5 +663,51 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       get().updateSessionGitStatusBatch(statusUpdates);
       state.pendingGitStatusUpdates.clear();
     }
-  }
+  },
+  
+  cleanupInactiveSessions: () => set((state) => {
+    // Performance: Clear output data for inactive sessions to free memory
+    const activeId = state.activeSessionId;
+    const MAX_INACTIVE_OUTPUTS = 50; // Even less for inactive sessions
+    
+    // Create new sessions array with trimmed outputs for inactive sessions
+    const cleanedSessions = state.sessions.map(session => {
+      if (session.id === activeId) {
+        // Don't touch active session
+        return session;
+      }
+      
+      // For inactive sessions, aggressively trim outputs
+      if (session.output && session.output.length > MAX_INACTIVE_OUTPUTS) {
+        return {
+          ...session,
+          output: session.output.slice(-MAX_INACTIVE_OUTPUTS),
+          jsonMessages: session.jsonMessages ? session.jsonMessages.slice(-25) : []
+        };
+      }
+      
+      return session;
+    });
+    
+    // Also cleanup terminal outputs for inactive sessions
+    const cleanedTerminalOutput: Record<string, string[]> = {};
+    Object.keys(state.terminalOutput).forEach(sessionId => {
+      if (sessionId === activeId) {
+        // Keep active session's terminal output
+        cleanedTerminalOutput[sessionId] = state.terminalOutput[sessionId];
+      } else if (state.terminalOutput[sessionId].length > 50) {
+        // Trim inactive session's terminal output more aggressively
+        cleanedTerminalOutput[sessionId] = state.terminalOutput[sessionId].slice(-50);
+      } else {
+        cleanedTerminalOutput[sessionId] = state.terminalOutput[sessionId];
+      }
+    });
+    
+    console.log('[SessionStore] Cleaned up inactive session data');
+    
+    return {
+      sessions: cleanedSessions,
+      terminalOutput: cleanedTerminalOutput
+    };
+  })
 }));

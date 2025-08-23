@@ -5,7 +5,6 @@ import { isDocumentVisible } from '../utils/performanceUtils';
 import { Badge } from './ui/Badge';
 import { StatusDot } from './ui/StatusDot';
 import { cn } from '../utils/cn';
-import { useSessionStore } from '../stores/sessionStore';
 
 interface StatusIndicatorProps {
   session: Session;
@@ -22,14 +21,8 @@ export const StatusIndicator = React.memo(({
 }: StatusIndicatorProps) => {
   const [animationsEnabled, setAnimationsEnabled] = useState(isDocumentVisible());
   
-  // Get the current session status from the store - this is the source of truth
-  const storeSession = useSessionStore((state) => 
-    state.sessions.find(s => s.id === session.id) || 
-    (state.activeMainRepoSession?.id === session.id ? state.activeMainRepoSession : null)
-  );
-  
-  // Use store session status if available, otherwise fall back to prop
-  const currentStatus = storeSession?.status || session.status;
+  // Use the session status from the prop - parent component manages the session state
+  const currentStatus = session.status;
 
   useEffect(() => {
     const handleVisibilityChange = () => {

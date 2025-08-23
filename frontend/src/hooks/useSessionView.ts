@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { useErrorStore } from '../stores/errorStore';
@@ -411,6 +411,40 @@ export const useSessionView = (
   const messageCount = activeSession?.jsonMessages?.length || 0;
   const outputCount = activeSession?.output?.length || 0;
 
+  // Performance optimization: Use useMemo to cache the expensive join operation
+  const formattedOutputMemo = useMemo(() => {
+    if (!activeSession || currentSessionIdForOutput !== activeSession.id) {
+      return '';
+    }
+    
+    const outputArray = activeSession.output || [];
+    if (outputArray.length === 0) {
+      return '';
+    }
+    
+    // CRITICAL PERFORMANCE FIX: Much more aggressive limiting
+    // Process only recent output to avoid massive array operations that lock up V8
+    const MAX_OUTPUT_TO_PROCESS = 500; // Drastically reduced from 2000
+    const outputToProcess = outputArray.length > MAX_OUTPUT_TO_PROCESS 
+      ? outputArray.slice(-MAX_OUTPUT_TO_PROCESS)
+      : outputArray;
+    
+    // PERFORMANCE: Build string in chunks to avoid V8 string concatenation issues
+    if (outputToProcess.length > 100) {
+      // For large arrays, build in chunks to avoid V8 optimization bailouts
+      const chunks: string[] = [];
+      const chunkSize = 50;
+      for (let i = 0; i < outputToProcess.length; i += chunkSize) {
+        const chunk = outputToProcess.slice(i, Math.min(i + chunkSize, outputToProcess.length));
+        chunks.push(chunk.join(''));
+      }
+      return chunks.join('');
+    } else {
+      // For small arrays, direct join is fine
+      return outputToProcess.join('');
+    }
+  }, [activeSession?.id, currentSessionIdForOutput, outputCount]);
+  
   useEffect(() => {
     if (!activeSession) return;
     
@@ -432,38 +466,14 @@ export const useSessionView = (
       setIsWaitingForFirstOutput(false);
     }
 
-    const formatOutput = () => {
-      const currentActiveSession = useSessionStore.getState().getActiveSession();
-      if (!currentActiveSession || currentActiveSession.id !== activeSession.id) {
-        console.log(`[formatOutput] Session changed during formatting, aborting`);
-        return;
-      }
-      
-      // The output array should already contain formatted strings from the IPC handler
-      const outputArray = currentActiveSession.output || [];
-      console.log(`[formatOutput] Session ${activeSession.id} has ${outputArray.length} output items`);
-      
-      if (outputArray.length > 0) {
-        console.log(`[formatOutput] First output item preview: ${outputArray[0].substring(0, 200)}`);
-      }
-      
-      const formatted = outputArray.join('');
-      
-      // Double-check we're still on the same session before updating
-      const finalActiveSession = useSessionStore.getState().getActiveSession();
-      if (finalActiveSession && finalActiveSession.id === activeSession.id && currentSessionIdForOutput === activeSession.id) {
-        console.log(`[formatOutput] Setting formatted output for session ${activeSession.id}, length: ${formatted.length}, first 100 chars: ${formatted.substring(0, 100)}`);
-        setFormattedOutput(formatted);
-      } else {
-        console.log(`[formatOutput] Session mismatch during final check - finalActiveSession.id: ${finalActiveSession?.id}, activeSession.id: ${activeSession.id}, currentSessionIdForOutput: ${currentSessionIdForOutput}`);
-      }
-    };
+    // PERFORMANCE FIX: More aggressive debouncing for large outputs
+    const delay = outputCount > 100 ? 200 : 50; // Longer delay for large outputs
+    const timeoutId = setTimeout(() => {
+      setFormattedOutput(formattedOutputMemo);
+    }, delay);
     
-    // Use requestAnimationFrame to ensure state is settled
-    requestAnimationFrame(() => {
-      formatOutput();
-    });
-  }, [activeSession?.id, messageCount, outputCount, currentSessionIdForOutput, isWaitingForFirstOutput]);
+    return () => clearTimeout(timeoutId);
+  }, [activeSession?.id, messageCount, outputCount, currentSessionIdForOutput, isWaitingForFirstOutput, formattedOutputMemo]);
   
   // Consolidated effect for loading output
   useEffect(() => {
@@ -534,9 +544,11 @@ export const useSessionView = (
     forceResetLoadingState
   ]);
   
-  // Listen for output available events with debouncing for performance
+  // Listen for output available events with aggressive throttling for performance
   useEffect(() => {
     let reloadDebounceTimer: NodeJS.Timeout | null = null;
+    let lastReloadTime = 0;
+    const MIN_RELOAD_INTERVAL = 1000; // Increased to 1 second to prevent rapid reloads
     
     const handleOutputAvailable = (event: CustomEvent) => {
       const { sessionId } = event.detail;
@@ -545,16 +557,26 @@ export const useSessionView = (
       if (activeSession?.id === sessionId) {
         // Trigger reload if we're loaded or if we're continuing a conversation
         if (outputLoadState === 'loaded' || isContinuingConversationRef.current) {
-          console.log(`[Output Available] New output for active session ${sessionId}, requesting reload (state: ${outputLoadState}, continuing: ${isContinuingConversationRef.current})`);
+          const now = Date.now();
+          const timeSinceLastReload = now - lastReloadTime;
           
-          // Debounce rapid output updates to avoid excessive re-renders
-          if (reloadDebounceTimer) {
-            clearTimeout(reloadDebounceTimer);
-          }
-          reloadDebounceTimer = setTimeout(() => {
+          // PERFORMANCE FIX: Throttle reloads to prevent CPU overload
+          if (timeSinceLastReload < MIN_RELOAD_INTERVAL) {
+            // Schedule for later if too soon
+            if (reloadDebounceTimer) {
+              clearTimeout(reloadDebounceTimer);
+            }
+            reloadDebounceTimer = setTimeout(() => {
+              setShouldReloadOutput(true);
+              lastReloadTime = Date.now();
+              reloadDebounceTimer = null;
+            }, MIN_RELOAD_INTERVAL - timeSinceLastReload);
+          } else {
+            // Can reload immediately
+            console.log(`[Output Available] Reloading output for session ${sessionId}`);
             setShouldReloadOutput(true);
-            reloadDebounceTimer = null;
-          }, 100);
+            lastReloadTime = now;
+          }
         }
       }
     };
@@ -586,7 +608,7 @@ export const useSessionView = (
         convertEol: true,
         rows: 30,
         cols: 80,
-        scrollback: 50000, // Reduced from 100000 for better performance
+        scrollback: 10000, // Further reduced to prevent memory issues
         fastScrollModifier: 'ctrl',
         fastScrollSensitivity: 5,
         scrollSensitivity: 1,
@@ -706,14 +728,38 @@ export const useSessionView = (
     lastProcessedScriptOutputLength.current = 0;
   }, [activeSessionId]);
 
+  // Performance: Memoize terminal output join operation
+  const fullScriptOutputMemo = useMemo(() => {
+    if (!scriptOutput || scriptOutput.length === 0) return '';
+    
+    // CRITICAL PERFORMANCE FIX: Much more aggressive limit
+    const MAX_TERMINAL_OUTPUT = 300; // Drastically reduced from 1000
+    const outputToProcess = scriptOutput.length > MAX_TERMINAL_OUTPUT
+      ? scriptOutput.slice(-MAX_TERMINAL_OUTPUT)
+      : scriptOutput;
+    
+    // Build in chunks for better performance
+    if (outputToProcess.length > 50) {
+      const chunks: string[] = [];
+      const chunkSize = 25;
+      for (let i = 0; i < outputToProcess.length; i += chunkSize) {
+        const chunk = outputToProcess.slice(i, Math.min(i + chunkSize, outputToProcess.length));
+        chunks.push(chunk.join(''));
+      }
+      return chunks.join('');
+    } else {
+      return outputToProcess.join('');
+    }
+  }, [scriptOutput]);
+  
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
-    const existingOutput = scriptOutput.join('');
+    const existingOutput = fullScriptOutputMemo;
     if (existingOutput && lastProcessedScriptOutputLength.current === 0) {
       scriptTerminalInstance.current.write(existingOutput);
       lastProcessedScriptOutputLength.current = existingOutput.length;
     }
-  }, [activeSessionId, scriptOutput]);
+  }, [activeSessionId, fullScriptOutputMemo, activeSession]);
   
   useEffect(() => {
     if (!scriptTerminalInstance.current || viewMode !== 'terminal' || !activeSession) return;
@@ -802,7 +848,7 @@ export const useSessionView = (
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
-    const fullScriptOutput = scriptOutput.join('');
+    const fullScriptOutput = fullScriptOutputMemo;
     
     // Handle case where output was cleared (e.g., user clicked clear button)
     if (fullScriptOutput.length === 0 && lastProcessedScriptOutputLength.current > 0) {
@@ -826,7 +872,7 @@ export const useSessionView = (
         scriptTerminalInstance.current.scrollToBottom();
       }
     }
-  }, [scriptOutput, activeSessionId]);
+  }, [fullScriptOutputMemo, activeSessionId, activeSession]);
 
   useEffect(() => {
     // Listen for session deletion events

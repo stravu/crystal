@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from '../utils/formatters';
 import { formatDuration, getTimeDifference, isValidTimestamp, parseTimestamp } from '../utils/timestampUtils';
 import { API } from '../utils/api';
-import { useSessionStore } from '../stores/sessionStore';
 import { PromptDetailModal } from './PromptDetailModal';
+import type { Session } from '../types/session';
 
 interface PromptMarker {
   id: number;
@@ -25,7 +25,36 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
   const [modalPrompt, setModalPrompt] = useState<{ prompt: PromptMarker; index: number } | null>(null);
-  const activeSession = useSessionStore((state) => state.sessions.find(s => s.id === sessionId));
+  const [activeSession, setActiveSession] = useState<Session | undefined>(undefined);
+
+  // Fetch session data when sessionId changes
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    const fetchSession = async () => {
+      try {
+        const response = await window.electronAPI.invoke('sessions:get', sessionId);
+        if (response.success && response.session) {
+          setActiveSession(response.session);
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error);
+      }
+    };
+    
+    fetchSession();
+    
+    // Listen for session updates
+    const unsubscribe = window.electronAPI?.events?.onSessionUpdated?.((updatedSession: Session) => {
+      if (updatedSession.id === sessionId) {
+        setActiveSession(updatedSession);
+      }
+    });
+    
+    return () => {
+      unsubscribe?.();
+    };
+  }, [sessionId]);
 
   const calculateDuration = (currentPrompt: PromptMarker, currentIndex: number): string => {
     try {

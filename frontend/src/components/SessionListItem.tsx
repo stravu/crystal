@@ -30,9 +30,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
   const { menuState, openMenu, closeMenu, isMenuOpen } = useContextMenu();
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
-  
-  // Selective subscription for git status loading state
-  const gitStatusLoading = useSessionStore((state) => state.gitStatusLoading.has(session.id));
+  const [gitStatusLoading, setGitStatusLoading] = useState(false);
   
   
   // Performance optimization: Remove unnecessary subscription
@@ -107,13 +105,15 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     // Fetch Git status for this session
     const fetchGitStatus = async () => {
       try {
-        // Don't set loading state here anymore - it's handled by backend events
+        setGitStatusLoading(true);
         const response = await window.electronAPI.invoke('sessions:get-git-status', session.id);
         if (response.success && response.gitStatus) {
           setGitStatus(response.gitStatus);
         }
       } catch (error) {
         console.error('Error fetching git status:', error);
+      } finally {
+        setGitStatusLoading(false);
       }
     };
 
@@ -129,6 +129,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       unsubscribeGitStatus = window.electronAPI.events.onGitStatusUpdated((data) => {
         if (data.sessionId === session.id) {
           setGitStatus(data.gitStatus);
+          setGitStatusLoading(false);
         }
       });
     }

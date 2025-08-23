@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ProjectDashboard } from './ProjectDashboard';
 import { FileEditor } from './FileEditor';
 import { SessionInputWithImages } from './session/SessionInputWithImages';
@@ -338,11 +338,29 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
 
   // Session output updates are now handled by useSessionView hook
 
+  // Performance: Memoize terminal output join
+  const fullScriptOutputMemo = useMemo(() => {
+    if (!scriptOutput || scriptOutput.length === 0) return '';
+    
+    // For very large arrays, join in chunks
+    const CHUNK_SIZE = 500;
+    if (scriptOutput.length > CHUNK_SIZE) {
+      let result = '';
+      for (let i = 0; i < scriptOutput.length; i += CHUNK_SIZE) {
+        const chunk = scriptOutput.slice(i, Math.min(i + CHUNK_SIZE, scriptOutput.length));
+        result += chunk.join('');
+      }
+      return result;
+    }
+    
+    return scriptOutput.join('');
+  }, [scriptOutput]);
+  
   // Write script output to terminal
   useEffect(() => {
     if (!terminalInstance.current || !mainRepoSessionId) return;
     
-    const fullScriptOutput = scriptOutput.join('');
+    const fullScriptOutput = fullScriptOutputMemo;
     
     // Handle case where output was cleared
     if (fullScriptOutput.length === 0 && lastProcessedOutputLength.current > 0) {
@@ -357,7 +375,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       terminalInstance.current.write(newOutput);
       lastProcessedOutputLength.current = fullScriptOutput.length;
     }
-  }, [scriptOutput, mainRepoSessionId]);
+  }, [fullScriptOutputMemo, mainRepoSessionId]);
 
   // Output terminal updates are now handled by useSessionView hook
   

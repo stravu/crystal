@@ -22,23 +22,18 @@ import { MessagesView } from './session/MessagesView';
 
 export const SessionView = memo(() => {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
-  const sessions = useSessionStore((state) => state.sessions);
-  const activeMainRepoSession = useSessionStore((state) => state.activeMainRepoSession);
+  const getActiveSession = useSessionStore((state) => state.getActiveSession);
   const { activeView, activeProjectId } = useNavigationStore();
   const [projectData, setProjectData] = useState<any>(null);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [isMergingProject, setIsMergingProject] = useState(false);
   const [sessionProject, setSessionProject] = useState<any>(null);
 
-  // Define activeSession early so it can be used in effects
-  // Memoize to avoid recomputing on every render
+  // Get active session using the store's method - avoids subscribing to entire sessions array
   const activeSession = useMemo(() => {
     if (!activeSessionId) return undefined;
-    if (activeMainRepoSession && activeMainRepoSession.id === activeSessionId) {
-      return activeMainRepoSession;
-    }
-    return sessions.find(s => s.id === activeSessionId);
-  }, [activeSessionId, activeMainRepoSession, sessions]);
+    return getActiveSession();
+  }, [activeSessionId, getActiveSession]);
 
 
   // Load project data for active session
