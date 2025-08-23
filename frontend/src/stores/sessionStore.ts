@@ -106,19 +106,22 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
     
     // Otherwise update in regular sessions
-    const newSessions = state.sessions.map(session => {
-      if (session.id === updatedSession.id) {
+    // Performance: Only clone array if session exists
+    let newSessions = state.sessions;
+    for (let i = 0; i < state.sessions.length; i++) {
+      if (state.sessions[i].id === updatedSession.id) {
+        newSessions = state.sessions.slice();
         const updatedSessionWithOutput = {
-          ...session,
+          ...state.sessions[i],
           ...updatedSession,
-          output: session.output,
-          jsonMessages: session.jsonMessages
+          output: state.sessions[i].output,
+          jsonMessages: state.sessions[i].jsonMessages
         };
-        console.log(`[SessionStore] Updated session ${updatedSession.id} model: ${session.model} -> ${updatedSessionWithOutput.model}`);
-        return updatedSessionWithOutput;
+        console.log(`[SessionStore] Updated session ${updatedSession.id} model: ${state.sessions[i].model} -> ${updatedSessionWithOutput.model}`);
+        newSessions[i] = updatedSessionWithOutput;
+        break;
       }
-      return session;
-    });
+    }
     
     return {
       ...state,
@@ -250,8 +253,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return state;
     }
     
-    // Update sessions array
-    const sessions = [...state.sessions];
+    // Performance: Only clone sessions array once
+    const sessions = state.sessions.slice();
     const session = sessions[sessionIndex];
     
     if (output.type === 'json') {
@@ -288,12 +291,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   }),
   
   setSessionOutput: (sessionId, output) => set((state) => {
-    // Update sessions array
-    const updatedSessions = state.sessions.map(session => 
-      session.id === sessionId
-        ? { ...session, output: [output] }
-        : session
-    );
+    // Performance: Only clone array if session exists
+    let updatedSessions = state.sessions;
+    for (let i = 0; i < state.sessions.length; i++) {
+      if (state.sessions[i].id === sessionId) {
+        updatedSessions = state.sessions.slice();
+        updatedSessions[i] = { ...state.sessions[i], output: [output] };
+        break;
+      }
+    }
     
     // Update activeMainRepoSession if it matches
     let updatedActiveMainRepoSession = state.activeMainRepoSession;
@@ -341,14 +347,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       console.warn(`[SessionStore] Trimmed outputs from ${stdOutputs.length} to ${MAX_STORED_OUTPUTS} for performance`);
     }
     
-    // Performance optimization: Only update the specific session instead of mapping all sessions
+    // Performance optimization: Only create new array if session is found
     let updatedSessions = state.sessions;
+    let sessionFound = false;
     
     // Use a for loop for better performance with large arrays
     for (let i = 0; i < state.sessions.length; i++) {
       if (state.sessions[i].id === sessionId) {
         const newSession = { ...state.sessions[i], output: trimmedOutputs, jsonMessages: trimmedMessages };
-        updatedSessions = [...state.sessions];
+        // Only create new array when we actually find the session to update
+        if (!sessionFound) {
+          updatedSessions = state.sessions.slice(); // Shallow copy is more efficient than spread
+          sessionFound = true;
+        }
         updatedSessions[i] = newSession;
         break;
       }
@@ -369,12 +380,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   }),
   
   clearSessionOutput: (sessionId) => set((state) => {
-    // Update sessions array
-    const updatedSessions = state.sessions.map(session => 
-      session.id === sessionId
-        ? { ...session, output: [], jsonMessages: [] }
-        : session
-    );
+    // Performance: Only clone array if session exists
+    let updatedSessions = state.sessions;
+    for (let i = 0; i < state.sessions.length; i++) {
+      if (state.sessions[i].id === sessionId) {
+        updatedSessions = state.sessions.slice();
+        updatedSessions[i] = { ...state.sessions[i], output: [], jsonMessages: [] };
+        break;
+      }
+    }
     
     // Update activeMainRepoSession if it matches
     let updatedActiveMainRepoSession = state.activeMainRepoSession;
@@ -551,11 +565,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         newLoadingSet.delete(sessionId);
       });
       
-      // Update sessions in one pass
-      const sessions = state.sessions.map(session => {
-        const newStatus = statusUpdates.get(session.id);
-        return newStatus ? { ...session, gitStatus: newStatus } : session;
-      });
+      // Performance: Only clone sessions array if updates affect sessions
+      let sessions = state.sessions;
+      let sessionsModified = false;
+      
+      for (let i = 0; i < state.sessions.length; i++) {
+        const newStatus = statusUpdates.get(state.sessions[i].id);
+        if (newStatus) {
+          if (!sessionsModified) {
+            sessions = state.sessions.slice();
+            sessionsModified = true;
+          }
+          sessions[i] = { ...state.sessions[i], gitStatus: newStatus };
+        }
+      }
       
       // Update main repo session if needed
       let activeMainRepoSession = state.activeMainRepoSession;

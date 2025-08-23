@@ -3,6 +3,9 @@ All notable changes to Crystal will be documented in this file.
 
 ## [0.2.2] - 2025-08-22
 
+### Added
+- **Homebrew install** - Crystal can now be installed with `brew install --cask stravu-crystal` on OSX
+
 ### Changed
 - **Performance improvements** - Optimized application performance for faster response times and smoother operation
 
