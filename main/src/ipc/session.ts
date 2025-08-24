@@ -198,47 +198,10 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       // Add a message to session output about archiving
       const timestamp = new Date().toLocaleTimeString();
       let archiveMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[44m\x1b[37m 📦 ARCHIVING SESSION \x1b[0m\r\n`;
+      archiveMessage += `\x1b[90mSession will be archived and removed from the active sessions list.\x1b[0m\r\n`;
 
-      // Clean up the worktree if session has one (but not for main repo sessions)
-      if (dbSession.worktree_name && dbSession.project_id && !dbSession.is_main_repo) {
-        const project = databaseService.getProject(dbSession.project_id);
-        if (project) {
-          try {
-            console.log(`[Main] Removing worktree ${dbSession.worktree_name} for session ${sessionId}`);
-            archiveMessage += `\x1b[90mRemoving git worktree: ${dbSession.worktree_name}\x1b[0m\r\n`;
-
-            await worktreeManager.removeWorktree(project.path, dbSession.worktree_name, project.worktree_folder);
-
-            console.log(`[Main] Successfully removed worktree ${dbSession.worktree_name}`);
-            archiveMessage += `\x1b[32m✓ Worktree removed successfully\x1b[0m\r\n`;
-          } catch (worktreeError) {
-            // Log the error but don't fail the session deletion
-            console.error(`[Main] Failed to remove worktree ${dbSession.worktree_name}:`, worktreeError);
-            archiveMessage += `\x1b[33m⚠ Failed to remove worktree (manual cleanup may be needed)\x1b[0m\r\n`;
-            // Continue with session deletion even if worktree removal fails
-          }
-        }
-      }
-
-      // Clean up session artifacts (images)
-      const artifactsDir = getCrystalSubdirectory('artifacts', sessionId);
-      if (existsSync(artifactsDir)) {
-        try {
-          console.log(`[Main] Removing artifacts directory for session ${sessionId}`);
-          archiveMessage += `\x1b[90mRemoving session artifacts...\x1b[0m\r\n`;
-          
-          await fs.rm(artifactsDir, { recursive: true, force: true });
-          
-          console.log(`[Main] Successfully removed artifacts for session ${sessionId}`);
-          archiveMessage += `\x1b[32m✓ Artifacts removed successfully\x1b[0m\r\n`;
-        } catch (artifactsError) {
-          console.error(`[Main] Failed to remove artifacts for session ${sessionId}:`, artifactsError);
-          archiveMessage += `\x1b[33m⚠ Failed to remove artifacts (manual cleanup may be needed)\x1b[0m\r\n`;
-          // Continue with session deletion even if artifacts removal fails
-        }
-      }
-
-      archiveMessage += `\x1b[90mSession archived. It will no longer appear in the active sessions list.\x1b[0m\r\n\r\n`;
+      // Archive the session immediately to provide fast feedback to the user
+      await sessionManager.archiveSession(sessionId);
 
       // Add the archive message to session output
       sessionManager.addSessionOutput(sessionId, {
@@ -247,8 +210,54 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         timestamp: new Date()
       });
 
-      // Archive the session
-      await sessionManager.archiveSession(sessionId);
+      // Clean up resources in the background after archiving
+      setImmediate(async () => {
+        let cleanupMessage = '';
+        
+        // Clean up the worktree if session has one (but not for main repo sessions)
+        if (dbSession.worktree_name && dbSession.project_id && !dbSession.is_main_repo) {
+          const project = databaseService.getProject(dbSession.project_id);
+          if (project) {
+            try {
+              console.log(`[Main] Removing worktree ${dbSession.worktree_name} for session ${sessionId} (background)`);
+              
+              await worktreeManager.removeWorktree(project.path, dbSession.worktree_name, project.worktree_folder);
+              
+              console.log(`[Main] Successfully removed worktree ${dbSession.worktree_name}`);
+              cleanupMessage += `\x1b[32m✓ Worktree removed successfully\x1b[0m\r\n`;
+            } catch (worktreeError) {
+              // Log the error but don't fail
+              console.error(`[Main] Failed to remove worktree ${dbSession.worktree_name}:`, worktreeError);
+              cleanupMessage += `\x1b[33m⚠ Failed to remove worktree (manual cleanup may be needed)\x1b[0m\r\n`;
+            }
+          }
+        }
+
+        // Clean up session artifacts (images)
+        const artifactsDir = getCrystalSubdirectory('artifacts', sessionId);
+        if (existsSync(artifactsDir)) {
+          try {
+            console.log(`[Main] Removing artifacts directory for session ${sessionId} (background)`);
+            
+            await fs.rm(artifactsDir, { recursive: true, force: true });
+            
+            console.log(`[Main] Successfully removed artifacts for session ${sessionId}`);
+            cleanupMessage += `\x1b[32m✓ Artifacts removed successfully\x1b[0m\r\n`;
+          } catch (artifactsError) {
+            console.error(`[Main] Failed to remove artifacts for session ${sessionId}:`, artifactsError);
+            cleanupMessage += `\x1b[33m⚠ Failed to remove artifacts (manual cleanup may be needed)\x1b[0m\r\n`;
+          }
+        }
+
+        // If there were any cleanup messages, add them to the session output
+        if (cleanupMessage) {
+          sessionManager.addSessionOutput(sessionId, {
+            type: 'stdout',
+            data: cleanupMessage,
+            timestamp: new Date()
+          });
+        }
+      });
 
       return { success: true };
     } catch (error) {
