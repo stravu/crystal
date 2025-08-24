@@ -283,25 +283,35 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       // Use gitStatusManager from services
       const { gitStatusManager } = services;
       
-      // Refresh git status for each session (parallel for better performance)
-      const refreshPromises = projectSessions
-        .filter(session => session.worktreePath)
-        .map(session => 
-          gitStatusManager.refreshSessionGitStatus(session.id, true) // true = user initiated
-            .catch(error => {
-              console.error(`[Main] Failed to refresh git status for session ${session.id}:`, error);
-              return null;
-            })
-        );
+      // Count the sessions that will be refreshed
+      const sessionsToRefresh = projectSessions.filter(session => session.worktreePath);
+      const sessionCount = sessionsToRefresh.length;
       
-      const results = await Promise.allSettled(refreshPromises);
-      const refreshedCount = results.filter(result => result.status === 'fulfilled').length;
+      // Start the refresh in background (non-blocking)
+      // Don't await this - let it run asynchronously
+      setImmediate(() => {
+        const refreshPromises = sessionsToRefresh
+          .map(session => 
+            gitStatusManager.refreshSessionGitStatus(session.id, true) // true = user initiated
+              .catch(error => {
+                console.error(`[Main] Failed to refresh git status for session ${session.id}:`, error);
+                return null;
+              })
+          );
+        
+        // Log when all refreshes complete (in background)
+        Promise.allSettled(refreshPromises).then(results => {
+          const refreshedCount = results.filter(result => result.status === 'fulfilled').length;
+          console.log(`[Main] Background refresh completed: ${refreshedCount}/${sessionCount} sessions`);
+        });
+      });
       
-      console.log(`[Main] Refreshed git status for ${refreshedCount} sessions`);
+      // Return immediately with the count of sessions that will be refreshed
+      console.log(`[Main] Starting background refresh for ${sessionCount} sessions`);
       
-      return { success: true, data: { count: refreshedCount } };
+      return { success: true, data: { count: sessionCount, backgroundRefresh: true } };
     } catch (error) {
-      console.error('[Main] Failed to refresh project git status:', error);
+      console.error('[Main] Failed to start project git status refresh:', error);
       return { success: false, error: 'Failed to refresh git status' };
     }
   });

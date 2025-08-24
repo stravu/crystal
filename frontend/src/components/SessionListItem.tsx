@@ -102,17 +102,27 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   }, [session.id]);
 
   useEffect(() => {
-    // Fetch Git status for this session
+    // Fetch Git status for this session (non-blocking)
     const fetchGitStatus = async () => {
       try {
         setGitStatusLoading(true);
-        const response = await window.electronAPI.invoke('sessions:get-git-status', session.id);
-        if (response.success && response.gitStatus) {
-          setGitStatus(response.gitStatus);
+        // Use non-blocking fetch (true as second parameter)
+        const response = await window.electronAPI.invoke('sessions:get-git-status', session.id, true);
+        if (response.success) {
+          // If we got cached status, use it immediately
+          if (response.gitStatus) {
+            setGitStatus(response.gitStatus);
+          }
+          // Loading indicator will be cleared when the background refresh completes
+          // via the git-status-updated event
+          if (!response.backgroundRefresh) {
+            setGitStatusLoading(false);
+          }
+        } else {
+          setGitStatusLoading(false);
         }
       } catch (error) {
         console.error('Error fetching git status:', error);
-      } finally {
         setGitStatusLoading(false);
       }
     };

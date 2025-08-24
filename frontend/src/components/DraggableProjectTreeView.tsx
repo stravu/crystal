@@ -765,7 +765,7 @@ export function DraggableProjectTreeView() {
     setRefreshingProjects(prev => new Set([...prev, project.id]));
     
     try {
-      // Refresh git status for all sessions in this project
+      // Start git status refresh for all sessions in this project (non-blocking)
       const response = await window.electronAPI.invoke('projects:refresh-git-status', project.id);
       
       if (!response.success) {
@@ -774,7 +774,30 @@ export function DraggableProjectTreeView() {
       
       // Log summary only if there were sessions to refresh
       if (response.data.count > 0) {
-        console.log(`[GitStatus] Refreshed ${response.data.count} sessions in ${project.name}`);
+        if (response.data.backgroundRefresh) {
+          console.log(`[GitStatus] Started background refresh for ${response.data.count} sessions in ${project.name}`);
+        } else {
+          console.log(`[GitStatus] Refreshed ${response.data.count} sessions in ${project.name}`);
+        }
+      }
+      
+      // For background refresh, keep the spinner for a bit to show something is happening
+      if (response.data.backgroundRefresh) {
+        // Remove spinner after a short delay to indicate background process started
+        setTimeout(() => {
+          setRefreshingProjects(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(project.id);
+            return newSet;
+          });
+        }, 1500); // Show spinner for 1.5 seconds
+      } else {
+        // Remove immediately if not background
+        setRefreshingProjects(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(project.id);
+          return newSet;
+        });
       }
     } catch (error: any) {
       console.error('Failed to refresh git status:', error);
@@ -782,8 +805,7 @@ export function DraggableProjectTreeView() {
         title: 'Failed to refresh git status',
         error: error.message || 'Unknown error occurred'
       });
-    } finally {
-      // Remove from refreshing set
+      // Remove from refreshing set on error
       setRefreshingProjects(prev => {
         const newSet = new Set(prev);
         newSet.delete(project.id);

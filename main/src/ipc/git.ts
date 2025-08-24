@@ -1068,7 +1068,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
     }
   });
 
-  ipcMain.handle('sessions:get-git-status', async (_event, sessionId: string) => {
+  ipcMain.handle('sessions:get-git-status', async (_event, sessionId: string, nonBlocking?: boolean) => {
     try {
       const session = await sessionManager.getSession(sessionId);
       if (!session || !session.worktreePath) {
@@ -1079,11 +1079,28 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: false, error: 'Cannot get git status for archived session' };
       }
 
-      // Use refreshSessionGitStatus with user-initiated flag
-      // This is called when user clicks on a session, so show loading state
-      const gitStatus = await gitStatusManager.refreshSessionGitStatus(sessionId, true);
-
-      return { success: true, gitStatus };
+      // If nonBlocking is true, start refresh in background and return immediately
+      if (nonBlocking) {
+        // Start the refresh in background
+        setImmediate(() => {
+          gitStatusManager.refreshSessionGitStatus(sessionId, true).catch(error => {
+            console.error(`[Git] Background git status refresh failed for session ${sessionId}:`, error);
+          });
+        });
+        
+        // Return the cached status if available, or indicate background refresh started
+        const cachedStatus = await gitStatusManager.getGitStatus(sessionId);
+        return { 
+          success: true, 
+          gitStatus: cachedStatus,
+          backgroundRefresh: true 
+        };
+      } else {
+        // Use refreshSessionGitStatus with user-initiated flag
+        // This is called when user clicks on a session, so show loading state
+        const gitStatus = await gitStatusManager.refreshSessionGitStatus(sessionId, true);
+        return { success: true, gitStatus };
+      }
     } catch (error) {
       console.error('Error getting git status:', error);
       return { success: false, error: (error as Error).message };

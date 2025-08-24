@@ -124,7 +124,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Git pull/push operations
     gitPull: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:git-pull', sessionId),
     gitPush: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:git-push', sessionId),
-    getGitStatus: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-git-status', sessionId),
+    getGitStatus: (sessionId: string, nonBlocking?: boolean): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-git-status', sessionId, nonBlocking),
     getLastCommits: (sessionId: string, count: number): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-last-commits', sessionId, count),
     
     // Git operation helpers
