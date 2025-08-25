@@ -21,19 +21,23 @@ import { LogView } from './session/LogView';
 import { MessagesView } from './session/MessagesView';
 
 export const SessionView = memo(() => {
-  const activeSessionId = useSessionStore((state) => state.activeSessionId);
-  const getActiveSession = useSessionStore((state) => state.getActiveSession);
   const { activeView, activeProjectId } = useNavigationStore();
   const [projectData, setProjectData] = useState<any>(null);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [isMergingProject, setIsMergingProject] = useState(false);
   const [sessionProject, setSessionProject] = useState<any>(null);
 
-  // Get active session using the store's method - avoids subscribing to entire sessions array
-  const activeSession = useMemo(() => {
-    if (!activeSessionId) return undefined;
-    return getActiveSession();
-  }, [activeSessionId, getActiveSession]);
+  // Get active session by subscribing directly to store state
+  // This ensures the component re-renders when git status or other session properties update
+  const activeSession = useSessionStore((state) => {
+    if (!state.activeSessionId) return undefined;
+    // Check main repo session first
+    if (state.activeMainRepoSession && state.activeMainRepoSession.id === state.activeSessionId) {
+      return state.activeMainRepoSession;
+    }
+    // Otherwise look in regular sessions
+    return state.sessions.find(session => session.id === state.activeSessionId);
+  });
 
 
   // Load project data for active session
