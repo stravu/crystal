@@ -1,6 +1,6 @@
 {
   "name": "shared",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "main": "index.js",
   "types": "index.d.ts",

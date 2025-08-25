@@ -1,6 +1,12 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.2.3] - 2025-08-25
+
+### Fixed
+- **Session completion status updates** - Fixed "Rebase to main" button not updating when a session completed
+- **Session archiving performance** - Made session archiving operation much quicker
+
 ## [0.2.2] - 2025-08-23
 
 ### Added
