@@ -15,7 +15,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     worktreeManager,
     claudeCodeManager,
     worktreeNameGenerator,
-    gitStatusManager
+    gitStatusManager,
+    archiveProgressManager
   } = services;
 
   // Session management handlers
@@ -210,8 +211,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         timestamp: new Date()
       });
 
-      // Clean up resources in the background after archiving
-      setImmediate(async () => {
+      // Create cleanup callback for background operations
+      const cleanupCallback = async () => {
         let cleanupMessage = '';
         
         // Clean up the worktree if session has one (but not for main repo sessions)
@@ -219,7 +220,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           const project = databaseService.getProject(dbSession.project_id);
           if (project) {
             try {
-              console.log(`[Main] Removing worktree ${dbSession.worktree_name} for session ${sessionId} (background)`);
+              console.log(`[Main] Removing worktree ${dbSession.worktree_name} for session ${sessionId} (queued)`);
+              
+              // Update progress: removing worktree
+              if (archiveProgressManager) {
+                archiveProgressManager.updateTaskStatus(sessionId, 'removing-worktree');
+              }
               
               await worktreeManager.removeWorktree(project.path, dbSession.worktree_name, project.worktree_folder);
               
@@ -229,6 +235,11 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               // Log the error but don't fail
               console.error(`[Main] Failed to remove worktree ${dbSession.worktree_name}:`, worktreeError);
               cleanupMessage += `\x1b[33m⚠ Failed to remove worktree (manual cleanup may be needed)\x1b[0m\r\n`;
+              
+              // Update progress: failed
+              if (archiveProgressManager) {
+                archiveProgressManager.updateTaskStatus(sessionId, 'failed', 'Failed to remove worktree');
+              }
             }
           }
         }
@@ -237,7 +248,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         const artifactsDir = getCrystalSubdirectory('artifacts', sessionId);
         if (existsSync(artifactsDir)) {
           try {
-            console.log(`[Main] Removing artifacts directory for session ${sessionId} (background)`);
+            console.log(`[Main] Removing artifacts directory for session ${sessionId} (queued)`);
+            
+            // Update progress: cleaning artifacts
+            if (archiveProgressManager) {
+              archiveProgressManager.updateTaskStatus(sessionId, 'cleaning-artifacts');
+            }
             
             await fs.rm(artifactsDir, { recursive: true, force: true });
             
@@ -257,7 +273,32 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
             timestamp: new Date()
           });
         }
-      });
+      };
+
+      // Queue the cleanup task if we have worktree cleanup to do
+      if (dbSession.worktree_name && dbSession.project_id && !dbSession.is_main_repo) {
+        const project = databaseService.getProject(dbSession.project_id);
+        console.log('[Main] Archive progress tracking:', {
+          hasWorktree: !!dbSession.worktree_name,
+          projectId: dbSession.project_id,
+          isMainRepo: dbSession.is_main_repo,
+          project: !!project,
+          archiveProgressManager: !!archiveProgressManager
+        });
+        if (project && archiveProgressManager) {
+          console.log('[Main] Adding archive task to queue for session:', sessionId);
+          archiveProgressManager.addTask(
+            sessionId,
+            dbSession.name,
+            dbSession.worktree_name,
+            project.name,
+            cleanupCallback
+          );
+        }
+      } else {
+        // No worktree cleanup needed, just run artifact cleanup immediately
+        setImmediate(() => cleanupCallback());
+      }
 
       return { success: true };
     } catch (error) {
@@ -880,6 +921,32 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     } catch (error) {
       console.error('Failed to get table structure:', error);
       return { success: false, error: 'Failed to get table structure' };
+    }
+  });
+
+  // Archive progress handler
+  ipcMain.handle('archive:get-progress', async () => {
+    try {
+      if (!archiveProgressManager) {
+        return { success: true, data: { tasks: [], activeCount: 0, totalCount: 0 } };
+      }
+      
+      const tasks = archiveProgressManager.getActiveTasks();
+      const activeCount = tasks.filter((t: any) => 
+        t.status !== 'completed' && t.status !== 'failed'
+      ).length;
+      
+      return { 
+        success: true, 
+        data: { 
+          tasks, 
+          activeCount, 
+          totalCount: tasks.length 
+        } 
+      };
+    } catch (error) {
+      console.error('Failed to get archive progress:', error);
+      return { success: false, error: 'Failed to get archive progress' };
     }
   });
 

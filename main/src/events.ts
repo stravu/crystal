@@ -12,7 +12,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     runCommandManager,
     gitDiffManager,
     gitStatusManager,
-    worktreeManager
+    worktreeManager,
+    archiveProgressManager
   } = services;
 
   // Listen to sessionManager events and broadcast to renderer
@@ -490,4 +491,18 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       }
     }
   });
+
+  // Listen for archive progress events
+  if (archiveProgressManager) {
+    archiveProgressManager.on('archive-progress', (progress) => {
+      const mw = getMainWindow();
+      if (mw && !mw.isDestroyed()) {
+        try {
+          mw.webContents.send('archive:progress', progress);
+        } catch (error) {
+          console.error('[Main] Failed to send archive:progress event:', error);
+        }
+      }
+    });
+  }
 } 

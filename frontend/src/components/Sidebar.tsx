@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings } from './Settings';
 import { DraggableProjectTreeView } from './DraggableProjectTreeView';
+import { ArchiveProgress } from './ArchiveProgress';
 import { Info, Clock, Check, Edit, CircleArrowDown, AlertTriangle, GitMerge } from 'lucide-react';
 import crystalLogo from '../assets/crystal-logo.svg';
 import { IconButton } from './ui/Button';
@@ -131,18 +132,24 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
           <DraggableProjectTreeView />
         </div>
         
-        {/* Version display at bottom */}
-        {version && (
-          <div className="px-4 py-2 border-t border-border-primary">
-            <div 
-              className="text-xs text-text-tertiary text-center cursor-pointer hover:text-text-secondary transition-colors truncate"
-              onClick={onAboutClick}
-              title="Click to view version details"
-            >
-              v{version}{worktreeName && ` • ${worktreeName}`}{gitCommit && ` • ${gitCommit}`}
+        {/* Bottom section - always visible */}
+        <div className="flex-shrink-0">
+          {/* Archive progress indicator above version */}
+          <ArchiveProgress />
+          
+          {/* Version display at bottom */}
+          {version && (
+            <div className="px-4 py-2 border-t border-border-primary">
+              <div 
+                className="text-xs text-text-tertiary text-center cursor-pointer hover:text-text-secondary transition-colors truncate"
+                onClick={onAboutClick}
+                title="Click to view version details"
+              >
+                v{version}{worktreeName && ` • ${worktreeName}`}{gitCommit && ` • ${gitCommit}`}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
     </div>
 
       <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

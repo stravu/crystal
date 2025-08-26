@@ -9,7 +9,7 @@ if (process.platform === 'linux') {
 }
 
 // Now import the rest of electron
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as path from 'path';
 import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
@@ -26,6 +26,7 @@ import { VersionChecker } from './services/versionChecker';
 import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
+import { ArchiveProgressManager } from './services/archiveProgressManager';
 import { setCrystalDirectory } from './utils/crystalDirectory';
 import { getCurrentWorktreeName } from './utils/worktreeUtils';
 import { registerIpcHandlers } from './ipc';
@@ -79,6 +80,7 @@ let permissionIpcServer: PermissionIpcServer | null;
 let versionChecker: VersionChecker;
 let stravuAuthManager: StravuAuthManager;
 let stravuNotebookService: StravuNotebookService;
+let archiveProgressManager: ArchiveProgressManager;
 
 // Store original console methods before overriding
 // These must be captured immediately when the module loads
@@ -407,6 +409,8 @@ async function initializeServices() {
 
   sessionManager = new SessionManager(databaseService);
   sessionManager.initializeFromDatabase();
+  
+  archiveProgressManager = new ArchiveProgressManager();
 
   // Start permission IPC server
   console.log('[Main] Initializing Permission IPC server...');
@@ -474,6 +478,7 @@ async function initializeServices() {
     taskQueue,
     getMainWindow: () => mainWindow,
     logger,
+    archiveProgressManager,
   };
 
   // Set up IPC event listeners for real-time updates
@@ -537,7 +542,42 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', async () => {
+app.on('before-quit', async (event) => {
+  // Check if there are active archive tasks
+  if (archiveProgressManager && archiveProgressManager.hasActiveTasks()) {
+    event.preventDefault();
+    
+    console.log('[Main] Archive tasks in progress, showing warning dialog...');
+    const activeCount = archiveProgressManager.getActiveTaskCount();
+    const choice = mainWindow 
+      ? dialog.showMessageBoxSync(mainWindow, {
+          type: 'warning',
+          title: 'Archive Tasks In Progress',
+          message: `Crystal is removing ${activeCount} worktree${activeCount > 1 ? 's' : ''} in the background.`,
+          detail: 'Git worktree removal can take time, especially for large repositories with many files. If you quit now, the worktree directories may not be fully cleaned up and you may need to remove them manually.\n\nDo you want to quit anyway?',
+          buttons: ['Wait', 'Quit Anyway'],
+          defaultId: 0,
+          cancelId: 0
+        })
+      : dialog.showMessageBoxSync({
+          type: 'warning',
+          title: 'Archive Tasks In Progress',
+          message: `Crystal is removing ${activeCount} worktree${activeCount > 1 ? 's' : ''} in the background.`,
+          detail: 'Git worktree removal can take time, especially for large repositories with many files. If you quit now, the worktree directories may not be fully cleaned up and you may need to remove them manually.\n\nDo you want to quit anyway?',
+          buttons: ['Wait', 'Quit Anyway'],
+          defaultId: 0,
+          cancelId: 0
+        });
+    
+    if (choice === 1) {
+      // User chose to quit anyway
+      archiveProgressManager.clearAll();
+      app.exit(0);
+    }
+    // Otherwise, the quit is cancelled and app continues
+    return;
+  }
+  
   // Cleanup all sessions and terminate child processes
   if (sessionManager) {
     console.log('[Main] Cleaning up sessions and terminating child processes...');

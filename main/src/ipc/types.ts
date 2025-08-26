@@ -14,6 +14,7 @@ import type { StravuAuthManager } from '../services/stravuAuthManager';
 import type { StravuNotebookService } from '../services/stravuNotebookService';
 import type { ClaudeCodeManager } from '../services/claudeCodeManager';
 import type { Logger } from '../utils/logger';
+import type { ArchiveProgressManager } from '../services/archiveProgressManager';
 
 export interface AppServices {
   app: App;
@@ -33,4 +34,5 @@ export interface AppServices {
   taskQueue: TaskQueue | null;
   getMainWindow: () => BrowserWindow | null;
   logger?: Logger;
+  archiveProgressManager?: ArchiveProgressManager;
 } 
