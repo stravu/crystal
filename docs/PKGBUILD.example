@@ -1,5 +1,5 @@
 # Maintainer: Your Name <your.email@example.com>
-pkgname=crystal-bin
+pkgname=stravu-crystal-bin
 pkgver=0.2.0
 pkgrel=1
 pkgdesc="Claude Code Commander for managing multiple Claude Code instances"
@@ -7,38 +7,38 @@ arch=('x86_64')
 url="https://github.com/stravu/crystal"
 license=('MIT')
 depends=('gtk3' 'libnotify' 'nss' 'libxss' 'libxtst' 'xdg-utils' 'at-spi2-core' 'util-linux-libs')
-provides=('crystal')
-conflicts=('crystal')
-source=("https://github.com/stravu/crystal/releases/download/v${pkgver}/Crystal-${pkgver}-linux-x64.pkg.tar.xz")
+provides=('stravu-crystal')
+conflicts=('stravu-crystal')
+source=("https://github.com/stravu/crystal/releases/download/v${pkgver}/stravu-crystal-${pkgver}-linux-x64.pkg.tar.xz")
 sha256sums=('SKIP')  # Update with actual checksum
 
 package() {
     # Extract the pre-built electron-builder pacman package
-    bsdtar -xf "${srcdir}/Crystal-${pkgver}-linux-x64.pkg.tar.xz" -C "${pkgdir}/"
+    bsdtar -xf "${srcdir}/stravu-crystal-${pkgver}-linux-x64.pkg.tar.xz" -C "${pkgdir}/"
 }
 
 # Alternative implementation using AppImage (if pacman target fails):
-# source=("https://github.com/stravu/crystal/releases/download/v${pkgver}/Crystal-${pkgver}-linux-x64.AppImage")
+# source=("https://github.com/stravu/crystal/releases/download/v${pkgver}/stravu-crystal-${pkgver}-linux-x64.AppImage")
 # 
 # package() {
 #     # Install AppImage
-#     install -Dm755 "${srcdir}/Crystal-${pkgver}-linux-x64.AppImage" "${pkgdir}/opt/crystal/crystal.AppImage"
+#     install -Dm755 "${srcdir}/stravu-crystal-${pkgver}-linux-x64.AppImage" "${pkgdir}/opt/stravu-crystal/stravu-crystal.AppImage"
 #     
 #     # Create launcher script
-#     install -Dm755 /dev/stdin "${pkgdir}/usr/bin/crystal" <<EOF
+#     install -Dm755 /dev/stdin "${pkgdir}/usr/bin/stravu-crystal" <<EOF
 # #!/bin/sh
-# exec /opt/crystal/crystal.AppImage "\$@"
+# exec /opt/stravu-crystal/stravu-crystal.AppImage "\$@"
 # EOF
 #     
 #     # Install desktop file
-#     install -Dm644 /dev/stdin "${pkgdir}/usr/share/applications/crystal.desktop" <<EOF
+#     install -Dm644 /dev/stdin "${pkgdir}/usr/share/applications/stravu-crystal.desktop" <<EOF
 # [Desktop Entry]
-# Name=Crystal
+# Name=stravu-crystal
 # Comment=Claude Code Commander for managing multiple Claude Code instances
-# Exec=crystal
-# Icon=crystal
+# Exec=stravu-crystal
+# Icon=stravu-crystal
 # Type=Application
 # Categories=Development;IDE;
-# StartupWMClass=crystal
+# StartupWMClass=stravu-crystal
 # EOF
 # }

@@ -104,7 +104,7 @@ brew install --cask stravu-crystal
 ```
 - **Linux**: Download from the [latest release](https://github.com/stravu/crystal/releases/latest)
   - **Debian/Ubuntu**: `Crystal-{version}-linux-x64.deb` - Install with `sudo dpkg -i Crystal-{version}-linux-x64.deb`
-  - **Arch Linux**: `Crystal-{version}-linux-x64.pkg.tar.xz` - Install with `sudo pacman -U Crystal-{version}-linux-x64.pkg.tar.xz`
+  - **Arch Linux**: `stravu-crystal-{version}-linux-x64.pkg.tar.xz` - Install with `sudo pacman -U stravu-crystal-{version}-linux-x64.pkg.tar.xz`
   - **Universal**: `Crystal-{version}-linux-x64.AppImage` (works on any Linux distribution) - Make executable and run directly
 
 ### Arch Linux Installation
@@ -113,8 +113,8 @@ For Arch Linux users, you can install Crystal using the pre-built pacman package
 
 ```bash
 # Download and install the package
-wget https://github.com/stravu/crystal/releases/latest/download/Crystal-{version}-linux-x64.pkg.tar.xz
-sudo pacman -U Crystal-{version}-linux-x64.pkg.tar.xz
+wget https://github.com/stravu/crystal/releases/latest/download/stravu-crystal-{version}-linux-x64.pkg.tar.xz
+sudo pacman -U stravu-crystal-{version}-linux-x64.pkg.tar.xz
 ```
 
 Alternatively, for AUR maintainers, see `docs/PKGBUILD.example` for a template PKGBUILD.
