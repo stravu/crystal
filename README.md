@@ -153,11 +153,8 @@ pnpm build:arch
   ```bash
   # On Arch Linux
   sudo pacman -S bsdtar
-<<<<<<< HEAD
 
-=======
   
->>>>>>> 1fc06b5 (merge fix)
   # On Ubuntu/Debian (for cross-platform builds)
   sudo apt-get install bsdtar
   ```
