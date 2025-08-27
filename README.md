@@ -98,6 +98,10 @@ sudo pacman -U Crystal-{version}-linux-x64.pkg.tar.xz
 
 Alternatively, for AUR maintainers, see `docs/PKGBUILD.example` for a template PKGBUILD.
 
+### Homebrew
+```bash
+brew install --cask stravu-crystal
+```
 
 ## Building from Source
 
@@ -132,7 +136,7 @@ pnpm build:arch
   ```bash
   # On Arch Linux
   sudo pacman -S bsdtar
-  
+
   # On Ubuntu/Debian (for cross-platform builds)
   sudo apt-get install bsdtar
   ```
@@ -154,7 +158,7 @@ pnpm run setup && pnpm run build:main && CRYSTAL_DIR=~/.crystal_test pnpm electr
 
 This ensures:
 - Your development Crystal instance uses `~/.crystal_test` for its data
-- Your main Crystal instance continues using `~/.crystal` 
+- Your main Crystal instance continues using `~/.crystal`
 - Worktrees won't conflict between the two instances
 - You can safely test changes without affecting your primary Crystal setup
 
