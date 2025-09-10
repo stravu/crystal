@@ -2,9 +2,14 @@
 
 ## Overview
 
-This document outlines the implementation of a flexible, multi-instance tool panel system for Crystal. The new panel system will be displayed as a **second tab bar underneath the existing ViewTabs bar**, and initially we will **only migrate the Terminal view** to the new system.
+This document outlines the implementation of a flexible, multi-instance tool panel system for Crystal. The tool panel bar is **always visible** as a second tab bar underneath the existing ViewTabs bar. Terminal has been **removed from the main tabs** and is now exclusively available through the tool panel system.
 
-Eventually, all tool types will be migrated and the top tool bar will be removed. This implementation plan only covers the migration of the terminal tool.
+The tool panel bar features:
+- Always visible below the main tab bar (Output | Diff | Logs | Editor)
+- Multiple terminal instances per session
+- Dropdown "Add Tool" button for creating panels (currently only Terminal, expandable for future panel types)
+- When a panel is active, it replaces the main view content
+- When no panel is active, the main view content (Output, Diff, etc.) is shown
 
 ## Design Goals
 
@@ -55,14 +60,18 @@ The tool panel system must achieve these core objectives:
 ┌─────────────────────────────────────────────────────────────┐
 │                     Session Header                           │
 ├─────────────────────────────────────────────────────────────┤
-│   Existing Tab Bar (Output | Diff | Terminal* | Logs | Editor)│
+│   Existing Tab Bar (Output | Diff | Logs | Editor)           │
 ├─────────────────────────────────────────────────────────────┤
-│   NEW Panel Tab Bar (Terminal 1 | Terminal 2 | + Add Panel)  │
+│   Tool Panel Bar (Terminal 1 | Terminal 2 | [+] Add Tool)    │
 ├─────────────────────────────────────────────────────────────┤
-│                   Active Panel Content                       │
+│        Active Panel Content (or Main View Content)           │
 └─────────────────────────────────────────────────────────────┘
 
-* Terminal in the existing bar will show/hide the panel tab bar
+Notes:
+- Terminal has been REMOVED from the existing tab bar
+- Tool Panel Bar is ALWAYS visible below the main tabs
+- When no panel is active, the main view content is shown
+- [+] Add Tool button shows a dropdown menu of available panel types
 ```
 
 ## Phase 1: Core Infrastructure
@@ -487,69 +496,110 @@ Create `frontend/src/stores/panelStore.ts` for implementation:
 
 ```typescript
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 import { PanelStore } from '../types/panelStore';
+import { ToolPanel } from '../../shared/types/panels';
 
-export const usePanelStore = create<PanelStore>((set, get) => ({
-  panels: {},
-  activePanels: {},
-  panelEvents: [],
-  eventSubscriptions: {},
+// FIX: Use immer for safe immutable updates
+export const usePanelStore = create<PanelStore>()(
+  immer((set, get) => ({
+    panels: {},
+    activePanels: {},
+    panelEvents: [],
+    eventSubscriptions: {},
 
-  // Synchronous state updates
-  setPanels: (sessionId, panels) => {
-    set((state) => ({
-      panels: { ...state.panels, [sessionId]: panels }
-    }));
-  },
+    // Pure synchronous state updates
+    setPanels: (sessionId, panels) => {
+      set((state) => {
+        state.panels[sessionId] = panels;
+      });
+    },
 
-  setActivePanel: (sessionId, panelId) => {
-    set((state) => ({
-      activePanels: { ...state.activePanels, [sessionId]: panelId }
-    }));
-  },
+    setActivePanel: (sessionId, panelId) => {
+      set((state) => {
+        state.activePanels[sessionId] = panelId;
+      });
+    },
 
-  addPanel: (panel) => {
-    // Add panel and make it active
-    set((state) => ({
-      panels: { 
-        ...state.panels, 
-        [panel.sessionId]: [...(state.panels[panel.sessionId] || []), panel] 
-      },
-      activePanels: { ...state.activePanels, [panel.sessionId]: panel.id }
-    }));
-  },
+    addPanel: (panel) => {
+      set((state) => {
+        if (!state.panels[panel.sessionId]) {
+          state.panels[panel.sessionId] = [];
+        }
+        state.panels[panel.sessionId].push(panel);
+        state.activePanels[panel.sessionId] = panel.id;
+      });
+    },
 
-  removePanel: (sessionId, panelId) => {
-    // Remove panel from list
-    set((state) => ({
-      panels: {
-        ...state.panels,
-        [sessionId]: state.panels[sessionId]?.filter(p => p.id !== panelId) || []
-      }
-    }));
-  },
+    removePanel: (sessionId, panelId) => {
+      set((state) => {
+        if (state.panels[sessionId]) {
+          state.panels[sessionId] = state.panels[sessionId].filter(p => p.id !== panelId);
+        }
+        // Clear active panel if it was the removed one
+        if (state.activePanels[sessionId] === panelId) {
+          delete state.activePanels[sessionId];
+        }
+      });
+    },
 
-  updatePanelState: (panel) => {
-    // Update specific panel in the list
-    // Implementation details...
-  },
+    updatePanelState: (panel) => {
+      set((state) => {
+        const sessionPanels = state.panels[panel.sessionId];
+        if (sessionPanels) {
+          const index = sessionPanels.findIndex(p => p.id === panel.id);
+          if (index !== -1) {
+            sessionPanels[index] = panel;
+          }
+        }
+      });
+    },
 
-  // Getters
-  getSessionPanels: (sessionId) => get().panels[sessionId] || [],
-  getActivePanel: (sessionId) => {
-    const panels = get().panels[sessionId] || [];
-    return panels.find(p => p.id === get().activePanels[sessionId]);
-  },
+    // Getters remain the same
+    getSessionPanels: (sessionId) => get().panels[sessionId] || [],
+    getActivePanel: (sessionId) => {
+      const panels = get().panels[sessionId] || [];
+      return panels.find(p => p.id === get().activePanels[sessionId]);
+    },
 
-  // Event subscription management
-  subscribeToPanelEvents: (panelId, eventTypes) => { /* Implementation */ },
-  unsubscribeFromPanelEvents: (panelId, eventTypes) => { /* Implementation */ },
-  getPanelEvents: (panelId, eventTypes) => { /* Implementation */ },
-  addPanelEvent: (event) => { 
-    // Add event to history and notify subscribers
-    // Implementation details...
-  }
-}));
+    // Event management
+    subscribeToPanelEvents: (panelId, eventTypes) => {
+      set((state) => {
+        if (!state.eventSubscriptions[panelId]) {
+          state.eventSubscriptions[panelId] = new Set();
+        }
+        eventTypes.forEach(type => state.eventSubscriptions[panelId].add(type));
+      });
+    },
+
+    unsubscribeFromPanelEvents: (panelId, eventTypes) => {
+      set((state) => {
+        if (state.eventSubscriptions[panelId]) {
+          eventTypes.forEach(type => state.eventSubscriptions[panelId].delete(type));
+        }
+      });
+    },
+
+    addPanelEvent: (event) => {
+      set((state) => {
+        state.panelEvents.push(event);
+        // Keep only last 100 events
+        if (state.panelEvents.length > 100) {
+          state.panelEvents = state.panelEvents.slice(-100);
+        }
+      });
+    },
+
+    getPanelEvents: (panelId, eventTypes) => {
+      const events = get().panelEvents;
+      return events.filter(e => {
+        const matchesPanel = !panelId || e.source.panelId === panelId;
+        const matchesType = !eventTypes || eventTypes.includes(e.type);
+        return matchesPanel && matchesType;
+      });
+    }
+  }))
+);
 ```
 
 ### 2.2 Panel Tab Bar Component
@@ -564,7 +614,7 @@ export interface PanelTabBarProps {
   activePanel?: ToolPanel;
   onPanelSelect: (panel: ToolPanel) => void;
   onPanelClose: (panel: ToolPanel) => void;
-  onPanelCreate: () => void;
+  onPanelCreate: (type: ToolPanelType) => void;
 }
 
 export interface PanelContainerProps {
@@ -581,11 +631,12 @@ export interface TerminalPanelProps {
 Create `frontend/src/components/panels/PanelTabBar.tsx`:
 
 ```typescript
-import React, { useCallback, memo } from 'react';
-import { Plus, X, Terminal } from 'lucide-react';
+import React, { useCallback, memo, useState, useRef } from 'react';
+import { Plus, X, Terminal, ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { usePanelStore } from '../../stores/panelStore';
 import { PanelTabBarProps } from '../../types/panelComponents';
+import { ToolPanelType, PANEL_CAPABILITIES } from '../../../shared/types/panels';
 
 export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   panels,
@@ -594,6 +645,9 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   onPanelClose,
   onPanelCreate
 }) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
   // Memoize event handlers to prevent unnecessary re-renders
   const handlePanelClick = useCallback((panel: ToolPanel) => {
     onPanelSelect(panel);
@@ -603,16 +657,88 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     e.stopPropagation();
     onPanelClose(panel);
   }, [onPanelClose]);
+  
+  const handleAddPanel = useCallback((type: ToolPanelType) => {
+    onPanelCreate(type);
+    setShowDropdown(false);
+  }, [onPanelCreate]);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showDropdown]);
+  
+  // Get available panel types
+  const availablePanelTypes = Object.keys(PANEL_CAPABILITIES) as ToolPanelType[];
+  
+  const getPanelIcon = (type: ToolPanelType) => {
+    switch (type) {
+      case 'terminal':
+        return <Terminal className="w-4 h-4" />;
+      // Add more icons as panel types are added
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="panel-tab-bar">
-      {/* Render panel tabs with click handlers */}
+    <div className="panel-tab-bar flex items-center bg-gray-800 border-b border-gray-700 h-8">
+      {/* Render panel tabs */}
       {panels.map((panel) => (
-        <div key={panel.id} onClick={() => handlePanelClick(panel)}>
-          {/* Tab UI with title, icon, close button */}
+        <div
+          key={panel.id}
+          className={cn(
+            "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700",
+            activePanel?.id === panel.id && "bg-gray-700"
+          )}
+          onClick={() => handlePanelClick(panel)}
+        >
+          {getPanelIcon(panel.type)}
+          <span className="ml-2 text-sm">{panel.title}</span>
+          <button
+            className="ml-2 p-0.5 hover:bg-gray-600 rounded"
+            onClick={(e) => handlePanelClose(e, panel)}
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       ))}
-      <button onClick={onPanelCreate}>New Terminal</button>
+      
+      {/* Add Panel dropdown button */}
+      <div className="relative" ref={dropdownRef}>
+        <button
+          className="flex items-center px-3 py-1 hover:bg-gray-700 text-sm"
+          onClick={() => setShowDropdown(!showDropdown)}
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Add Tool
+          <ChevronDown className="w-3 h-3 ml-1" />
+        </button>
+        
+        {showDropdown && (
+          <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+            {availablePanelTypes.map((type) => (
+              <button
+                key={type}
+                className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-700 text-left"
+                onClick={() => handleAddPanel(type)}
+              >
+                {getPanelIcon(type)}
+                <span className="ml-2 capitalize">{type}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 });
@@ -627,36 +753,157 @@ The Terminal Panel manages individual terminal instances within the panel system
 **Critical XTerm.js Integration Requirements:**
 
 ```typescript
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { useSession } from '../../contexts/SessionContext';
+import { useRequiredSession } from '../../contexts/SessionContext';
+import { TerminalPanelProps } from '../../types/panelComponents';
 
 export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive }) => {
-  // Get session data from context instead of props
-  const { sessionId, workingDirectory } = useSession();
+  // FIX: Get session data only from context, not props
+  const { sessionId, workingDirectory } = useRequiredSession();
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
-  
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isActive || !terminalRef.current) return;
-    
-    // Initialize XTerm with proper ref isolation
-    const terminal = new Terminal(/* config */);
-    terminal.open(terminalRef.current);
-    xtermRef.current = terminal;
-    
-    // Connect to backend using sessionId and workingDirectory from context
-    // Handle I/O, resize events, etc.
-    
-    // Cleanup on unmount
-    return () => {
-      terminal.dispose();
-      xtermRef.current = null;
+
+    let terminal: Terminal | null = null;
+    let fitAddon: FitAddon | null = null;
+    let disposed = false;
+
+    const initializeTerminal = async () => {
+      try {
+        // Check if already initialized on backend
+        const initialized = await window.electron.invoke('panels:checkInitialized', panel.id);
+        
+        if (!initialized) {
+          // Initialize backend PTY process
+          await window.electron.invoke('panels:initialize', panel.id, {
+            cwd: workingDirectory,
+            sessionId
+          });
+        }
+
+        // FIX: Check if component was unmounted during async operation
+        if (disposed) return;
+
+        // Create XTerm instance
+        terminal = new Terminal({
+          fontSize: 14,
+          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+          theme: {
+            background: '#1e1e1e',
+            foreground: '#d4d4d4'
+          },
+          scrollback: 50000
+        });
+
+        fitAddon = new FitAddon();
+        terminal.loadAddon(fitAddon);
+        
+        // FIX: Additional check before DOM manipulation
+        if (terminalRef.current && !disposed) {
+          terminal.open(terminalRef.current);
+          fitAddon.fit();
+          
+          xtermRef.current = terminal;
+          fitAddonRef.current = fitAddon;
+          setIsInitialized(true);
+
+          // Set up IPC communication for terminal I/O
+          const outputHandler = (_: any, data: { panelId: string; output: string }) => {
+            if (data.panelId === panel.id && terminal && !disposed) {
+              terminal.write(data.output);
+            }
+          };
+
+          window.electron.on('terminal:output', outputHandler);
+
+          // Handle terminal input
+          const inputDisposable = terminal.onData((data) => {
+            window.electron.invoke('terminal:input', panel.id, data);
+          });
+
+          // Handle resize
+          const resizeObserver = new ResizeObserver(() => {
+            if (fitAddon && !disposed) {
+              fitAddon.fit();
+              const dimensions = fitAddon.proposeDimensions();
+              if (dimensions) {
+                window.electron.invoke('terminal:resize', panel.id, dimensions.cols, dimensions.rows);
+              }
+            }
+          });
+          
+          resizeObserver.observe(terminalRef.current);
+
+          // FIX: Return comprehensive cleanup function
+          return () => {
+            disposed = true;
+            resizeObserver.disconnect();
+            window.electron.off('terminal:output', outputHandler);
+            inputDisposable.dispose();
+          };
+        }
+      } catch (error) {
+        console.error('Failed to initialize terminal:', error);
+        setInitError(error instanceof Error ? error.message : 'Unknown error');
+      }
     };
-  }, [isActive, panel.id, sessionId, workingDirectory]);
-  
-  return <div ref={terminalRef} />;
+
+    const cleanup = initializeTerminal();
+
+    // FIX: Proper cleanup that checks initialization state
+    return () => {
+      disposed = true;
+      
+      // Clean up async initialization
+      cleanup.then(cleanupFn => cleanupFn?.());
+      
+      // FIX: Safe disposal with null checks
+      if (xtermRef.current) {
+        try {
+          xtermRef.current.dispose();
+        } catch (e) {
+          console.warn('Error disposing terminal:', e);
+        }
+        xtermRef.current = null;
+      }
+      
+      if (fitAddonRef.current) {
+        try {
+          fitAddonRef.current.dispose();
+        } catch (e) {
+          console.warn('Error disposing fit addon:', e);
+        }
+        fitAddonRef.current = null;
+      }
+      
+      setIsInitialized(false);
+    };
+  }, [isActive, panel.id]); // FIX: Removed sessionId and workingDirectory from deps
+
+  if (initError) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500">
+        Terminal initialization failed: {initError}
+      </div>
+    );
+  }
+
+  if (!isInitialized && isActive) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        Initializing terminal...
+      </div>
+    );
+  }
+
+  return <div ref={terminalRef} className="h-full w-full" />;
 };
 ```
 
@@ -693,9 +940,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
    ```typescript
    interface TerminalPanelProps {
      panel: ToolPanel;           // Panel configuration
-     sessionId: string;          // Current session ID
-     workingDirectory: string;   // Initial working directory
      isActive: boolean;          // Controls mounting/unmounting
+     // REMOVED: sessionId and workingDirectory (get from context instead)
    }
    ```
 
@@ -718,20 +964,38 @@ Create `frontend/src/components/panels/PanelContainer.tsx`:
 **Important**: Wrap PanelContainer with an Error Boundary to prevent panel failures from crashing the entire application. Each panel type should gracefully handle errors and display fallback UI.
 
 ```typescript
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useMemo } from 'react';
 import { PanelContainerProps } from '../../types/panelComponents';
+import { ErrorBoundary } from 'react-error-boundary';
 
 // Lazy load panel components for better performance
-const TerminalPanel = lazy(() => import('./types/TerminalPanel'));
+const TerminalPanel = lazy(() => import('./TerminalPanel'));
+
+const PanelErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => void }> = ({ 
+  error, 
+  resetErrorBoundary 
+}) => (
+  <div className="flex flex-col items-center justify-center h-full text-red-500 p-4">
+    <p className="text-lg font-semibold mb-2">Panel Error</p>
+    <p className="text-sm text-gray-400 mb-4">{error.message}</p>
+    <button 
+      onClick={resetErrorBoundary}
+      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+    >
+      Retry
+    </button>
+  </div>
+);
 
 export const PanelContainer: React.FC<PanelContainerProps> = ({
   panel,
   isActive
 }) => {
-  // Only render active panel to save memory
-  // Use lazy loading with Suspense for better performance
+  // FIX: Use stable panel rendering without forcing remounts
+  // Each panel type maintains its own state internally
+  // The isActive prop controls whether it should render its content
   
-  const renderPanel = () => {
+  const panelComponent = useMemo(() => {
     switch (panel.type) {
       case 'terminal':
         return <TerminalPanel panel={panel} isActive={isActive} />;
@@ -739,12 +1003,21 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
       default:
         return <div>Unknown panel type: {panel.type}</div>;
     }
-  };
+  }, [panel.type, panel.id, isActive]); // Include stable deps only
 
   return (
-    <Suspense fallback={<div>Loading panel...</div>}>
-      {renderPanel()}
-    </Suspense>
+    <ErrorBoundary
+      FallbackComponent={PanelErrorFallback}
+      resetKeys={[panel.id]} // Only reset when panel changes
+    >
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-full text-gray-500">
+          Loading panel...
+        </div>
+      }>
+        {panelComponent}
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 ```
@@ -761,7 +1034,7 @@ interface SessionContextValue {
   sessionId: string;
   workingDirectory: string;
   projectId: string;
-  session: Session | null;
+  session: Session;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -770,8 +1043,14 @@ export const SessionProvider: React.FC<{
   children: ReactNode;
   session: Session | null;
 }> = ({ children, session }) => {
+  // FIX: Don't render children without a valid session
+  // This prevents components that require session from rendering
   if (!session) {
-    return <>{children}</>;
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        No session selected
+      </div>
+    );
   }
 
   const value: SessionContextValue = {
@@ -788,17 +1067,18 @@ export const SessionProvider: React.FC<{
   );
 };
 
-export const useSession = (): SessionContextValue => {
-  const context = useContext(SessionContext);
-  if (!context) {
-    throw new Error('useSession must be used within a SessionProvider');
-  }
-  return context;
+// Safe hook that doesn't throw
+export const useSession = (): SessionContextValue | null => {
+  return useContext(SessionContext) || null;
 };
 
-// Optional: hook that doesn't throw if no session
-export const useSessionOptional = (): SessionContextValue | undefined => {
-  return useContext(SessionContext);
+// Hook for components that absolutely require a session
+export const useRequiredSession = (): SessionContextValue => {
+  const context = useContext(SessionContext);
+  if (!context) {
+    throw new Error('useRequiredSession must be used within a SessionProvider with a valid session');
+  }
+  return context;
 };
 ```
 
@@ -808,7 +1088,9 @@ Modify `frontend/src/components/SessionView.tsx`:
 
 ```typescript
 // Add to imports
+import { useMemo, useCallback } from 'react';
 import { usePanelStore } from '../stores/panelStore';
+import { panelApi } from '../services/panelApi';
 import { PanelTabBar } from './panels/PanelTabBar';
 import { PanelContainer } from './panels/PanelContainer';
 import { SessionProvider } from '../contexts/SessionContext';
@@ -816,48 +1098,145 @@ import { SessionProvider } from '../contexts/SessionContext';
 // Inside SessionView component
 const {
   panels,
-  activePanel,
-  createPanel,
-  deletePanel,
-  setActivePanel,
-  loadPanelsForSession
+  activePanels,
+  setPanels,
+  setActivePanel: setActivePanelInStore,
+  addPanel,
+  removePanel,
 } = usePanelStore();
 
 // Load panels when session changes
 useEffect(() => {
   if (activeSession?.id) {
-    loadPanelsForSession(activeSession.id);
-  }
-}, [activeSession?.id]);
-
-// Get panels for current session
-const sessionPanels = panels[activeSession?.id || ''] || [];
-const currentActivePanel = activePanels[activeSession?.id || ''];
-
-// In the render, wrap terminal view section with SessionProvider:
-{hook.viewMode === 'terminal' && (
-  <SessionProvider session={activeSession}>
-    <PanelTabBar
-      panels={sessionPanels}
-      activePanel={currentActivePanel}
-      onPanelSelect={(panel) => setActivePanel(activeSession.id, panel.id)}
-      onPanelClose={(panel) => deletePanel(panel.id)}
-      onPanelCreate={() => createPanel({ sessionId: activeSession.id, type: 'terminal' })}
-    />
+    panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
+      setPanels(activeSession.id, loadedPanels);
+    });
     
-    <div className="panel-content">
-      {currentActivePanel ? (
-        <PanelContainer
-          key={currentActivePanel.id}
-          panel={currentActivePanel}
-          isActive={true}
-        />
+    panelApi.getActivePanel(activeSession.id).then(activePanel => {
+      if (activePanel) {
+        setActivePanelInStore(activeSession.id, activePanel.id);
+      }
+    });
+  }
+}, [activeSession?.id, setPanels, setActivePanelInStore]);
+
+// Get panels for current session with memoization
+const sessionPanels = useMemo(
+  () => panels[activeSession?.id || ''] || [],
+  [panels, activeSession?.id]
+);
+
+const currentActivePanel = useMemo(
+  () => sessionPanels.find(p => p.id === activePanels[activeSession?.id || '']),
+  [sessionPanels, activePanels, activeSession?.id]
+);
+
+// FIX: Memoize all callbacks to prevent re-renders
+const handlePanelSelect = useCallback(
+  async (panel: ToolPanel) => {
+    if (!activeSession) return;
+    setActivePanelInStore(activeSession.id, panel.id);
+    await panelApi.setActivePanel(activeSession.id, panel.id);
+  },
+  [activeSession, setActivePanelInStore]
+);
+
+const handlePanelClose = useCallback(
+  async (panel: ToolPanel) => {
+    if (!activeSession) return;
+    
+    // Find next panel to activate
+    const panelIndex = sessionPanels.findIndex(p => p.id === panel.id);
+    const nextPanel = sessionPanels[panelIndex + 1] || sessionPanels[panelIndex - 1];
+    
+    // Remove from store first for immediate UI update
+    removePanel(activeSession.id, panel.id);
+    
+    // Set next active panel if available
+    if (nextPanel) {
+      setActivePanelInStore(activeSession.id, nextPanel.id);
+      await panelApi.setActivePanel(activeSession.id, nextPanel.id);
+    }
+    
+    // Delete on backend
+    await panelApi.deletePanel(panel.id);
+  },
+  [activeSession, sessionPanels, removePanel, setActivePanelInStore]
+);
+
+const handlePanelCreate = useCallback(
+  async (type: ToolPanelType) => {
+    if (!activeSession) return;
+    
+    const newPanel = await panelApi.createPanel({
+      sessionId: activeSession.id,
+      type
+    });
+    
+    // Add to store and make active
+    addPanel(newPanel);
+  },
+  [activeSession, addPanel]
+);
+
+// FIX: Memoize the panel content to prevent unnecessary re-renders
+const panelContent = useMemo(() => {
+  if (!currentActivePanel) {
+    // When no panel is active, show the main view content based on viewMode
+    return null; // Main content will be rendered based on viewMode
+  }
+
+  // FIX: Don't use key prop - let React handle reconciliation
+  // The PanelContainer will handle mounting/unmounting internally based on isActive
+  return (
+    <PanelContainer
+      panel={currentActivePanel}
+      isActive={true}
+    />
+  );
+}, [currentActivePanel]);
+
+// In the render method:
+return (
+  <div className="session-view flex flex-col h-full">
+    {/* Existing tab bar (without Terminal) */}
+    <div className="tab-bar">
+      <button className={cn(viewMode === 'output' && 'active')}>Output</button>
+      <button className={cn(viewMode === 'diff' && 'active')}>Diff</button>
+      <button className={cn(viewMode === 'logs' && 'active')}>Logs</button>
+      <button className={cn(viewMode === 'editor' && 'active')}>Editor</button>
+    </div>
+    
+    {/* Tool Panel Bar - ALWAYS VISIBLE */}
+    <SessionProvider session={activeSession}>
+      <PanelTabBar
+        panels={sessionPanels}
+        activePanel={currentActivePanel}
+        onPanelSelect={handlePanelSelect}
+        onPanelClose={handlePanelClose}
+        onPanelCreate={handlePanelCreate}
+      />
+    </SessionProvider>
+    
+    {/* Main content area */}
+    <div className="content-area flex-1 overflow-hidden">
+      {panelContent ? (
+        // Show active panel content
+        <SessionProvider session={activeSession}>
+          {panelContent}
+        </SessionProvider>
       ) : (
-        <div>No active panel or create first panel prompt</div>
+        // Show main view content based on viewMode
+        <>
+          {viewMode === 'output' && <OutputView />}
+          {viewMode === 'diff' && <DiffView />}
+          {viewMode === 'logs' && <LogsView />}
+          {viewMode === 'editor' && <EditorView />}
+        </>
       )}
     </div>
-  </SessionProvider>
-)}
+  </div>
+);
 ```
 
 ## Migration Strategy
