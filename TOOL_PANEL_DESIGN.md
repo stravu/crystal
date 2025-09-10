@@ -1,5 +1,11 @@
 # Tool Panel System Design - Phases 1 & 2
 
+## Overview
+
+This document outlines the implementation of a flexible, multi-instance tool panel system for Crystal. The new panel system will be displayed as a **second tab bar underneath the existing ViewTabs bar**, and initially we will **only migrate the Terminal view** to the new system.
+
+Eventually, all tool types will be migrated and the top tool bar will be removed. This implementation plan only covers the migration of the terminal tool.
+
 ## Design Goals
 
 The tool panel system must achieve these core objectives:
@@ -24,10 +30,6 @@ The tool panel system must achieve these core objectives:
    - Panels as self-contained modules
    - Clear separation of concerns
    - Consistent lifecycle management
-
-## Overview
-
-This document outlines the implementation of a flexible, multi-instance tool panel system for Crystal. The new panel system will be displayed as a **second tab bar underneath the existing ViewTabs bar**, and initially we will **only migrate the Terminal view** to the new system.
 
 ### What's Actually Being Built in Phase 1-2
 
@@ -889,34 +891,6 @@ User clicks "New Terminal" →
     Frontend updates state → 
   New tab appears in UI
 ```
-
-## Testing Checklist
-
-### Phase 1 Testing
-- [ ] Database migration runs successfully
-- [ ] Panel CRUD operations work via IPC
-- [ ] Panel state persists across app restarts
-- [ ] Events propagate correctly
-- [ ] Terminal working directory persists
-- [ ] Terminal panel recreates on app restart
-
-### Phase 2 Testing
-- [ ] Panel tab bar renders below main tabs
-- [ ] Can create multiple terminal panels
-- [ ] Can switch between panels
-- [ ] Can close panels (with confirmation if running)
-- [ ] Terminal input/output works correctly
-- [ ] Panels maintain independent state
-- [ ] Panel titles are editable
-- [ ] Overflow handling works (scrollable tabs)
-
-### Terminal Persistence Testing
-- [ ] Basic state (cwd, title) persists on close/reopen
-- [ ] Scrollback buffer saves and restores (if implemented)
-- [ ] Command history persists (if implemented)
-- [ ] "Session restored" indicator appears
-- [ ] Terminal dimensions maintained
-- [ ] Large scrollback buffers handle gracefully (>10K lines)
 
 ## Panel Event System Overview
 
