@@ -445,7 +445,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       sessionManager.updateSession(sessionId, updateData);
 
       if (isMainRepoFirstStart && continuePrompt) {
-        // First message in main repo session - start Claude Code without --continue
+        // First message in main repo session - start Claude Code without --resume
         console.log(`[IPC] Starting Claude Code for main repo session ${sessionId} with first prompt`);
 
         // Add initial prompt marker
@@ -616,7 +616,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         sessionOutputs: sessionOutputs as any // Type conversion needed
       });
       
-      // Set flag to skip --continue on the next execution
+      // Set flag to skip --resume on the next execution
       console.log('[IPC] Setting skip_continue_next flag to true for session:', sessionId);
       await sessionManager.updateSession(sessionId, { skip_continue_next: true });
       

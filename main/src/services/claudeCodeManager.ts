@@ -404,20 +404,15 @@ export class ClaudeCodeManager extends EventEmitter {
         // Get Claude's session ID if available
         const claudeSessionId = this.sessionManager.getClaudeSessionId(sessionId);
         
-        // Use --continue flag (automatically continues from latest session in folder)
-        args.push('--continue');
-        console.log(`[ClaudeCodeManager] Continuing latest Claude session in ${worktreePath} for Crystal session ${sessionId}`);
-        
-        // Commented out --resume logic for future reference
-        // if (claudeSessionId) {
-        //   // Use --resume flag with Claude's actual session ID
-        //   args.push('--resume', claudeSessionId);
-        //   console.log(`[ClaudeCodeManager] Resuming Claude session ${claudeSessionId} for Crystal session ${sessionId}`);
-        // } else {
-        //   // Fall back to --resume without ID (will resume most recent)
-        //   args.push('--resume');
-        //   console.log(`[ClaudeCodeManager] No Claude session ID found for Crystal session ${sessionId}, resuming most recent session`);
-        // }
+        if (claudeSessionId) {
+          // Use --resume flag with Claude's actual session ID
+          args.push('--resume', claudeSessionId);
+          console.log(`[ClaudeCodeManager] Resuming Claude session ${claudeSessionId} for Crystal session ${sessionId}`);
+        } else {
+          // Fall back to --resume without ID (will resume most recent)
+          args.push('--resume');
+          console.log(`[ClaudeCodeManager] No Claude session ID found for Crystal session ${sessionId}, resuming most recent session`);
+        }
         
         // If a new prompt is provided, add it
         if (prompt && prompt.trim()) {
@@ -1120,7 +1115,7 @@ export class ClaudeCodeManager extends EventEmitter {
     const dbSession = this.sessionManager.getDbSession(sessionId);
     const permissionMode = dbSession?.permission_mode;
     
-    // Check if we should skip --continue flag this time (after prompt compaction)
+    // Check if we should skip --resume flag this time (after prompt compaction)
     // SQLite returns 0/1 for booleans, so we need to check explicitly
     const skipContinueRaw = dbSession?.skip_continue_next;
     const shouldSkipContinue = skipContinueRaw === 1 || skipContinueRaw === true;
@@ -1136,19 +1131,19 @@ export class ClaudeCodeManager extends EventEmitter {
     });
     
     if (shouldSkipContinue) {
-      // Clear the flag and start a fresh session without --continue
+      // Clear the flag and start a fresh session without --resume
       console.log(`[ClaudeCodeManager] Clearing skip_continue_next flag for session ${sessionId}`);
       this.sessionManager.updateSession(sessionId, { skip_continue_next: false });
       
       // Verify the flag was cleared
       const updatedDbSession = this.sessionManager.getDbSession(sessionId);
       console.log(`[ClaudeCodeManager] Verified skip_continue_next flag is now:`, updatedDbSession?.skip_continue_next);
-      console.log(`[ClaudeCodeManager] Skipping --continue flag for session ${sessionId} due to prompt compaction`);
+      console.log(`[ClaudeCodeManager] Skipping --resume flag for session ${sessionId} due to prompt compaction`);
       return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], false, permissionMode, model);
     } else {
-      // For continuing a session, we use the --continue flag
-      // The conversationHistory parameter is kept for compatibility but not used with --continue
-      console.log(`[ClaudeCodeManager] Using --continue flag for session ${sessionId}`);
+      // For continuing a session, we use the --resume flag
+      // The conversationHistory parameter is kept for compatibility but not used with --resume
+      console.log(`[ClaudeCodeManager] Using --resume flag for session ${sessionId}`);
       return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true, permissionMode, model);
     }
   }
