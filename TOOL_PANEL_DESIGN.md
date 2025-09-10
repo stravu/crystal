@@ -256,18 +256,18 @@ export class PanelEventBus {
   private subscriptions = new Map<string, PanelEventSubscription[]>();
   private eventHistory: PanelEvent[] = [];
   
-  subscribe(subscription: PanelEventSubscription): () => void
-  emit(event: PanelEvent): void
-  getRecentEvents(eventTypes?: PanelEventType[], limit = 10): PanelEvent[]
-  unsubscribePanel(panelId: string): void
-  
-  // Key behaviors:
-  // - Routes events to subscribed panels (excluding source panel)
-  // - Maintains event history for debugging (last 100 events)
-  // - Prevents circular events (panels don't receive their own events)
-  // - Emits events to frontend via IPC for UI updates
+  subscribe(subscription: PanelEventSubscription): () => void;
+  emit(event: PanelEvent): void;
+  getRecentEvents(eventTypes?: PanelEventType[], limit = 10): PanelEvent[];
+  unsubscribePanel(panelId: string): void;
 }
 ```
+
+**Key behaviors:**
+- Routes events to subscribed panels (excluding source panel)
+- Maintains event history for debugging (last 100 events)
+- Prevents circular events (panels don't receive their own events)
+- Emits events to frontend via IPC for UI updates
 
 ### 1.5 Panel Manager Service
 
@@ -275,102 +275,52 @@ Create `main/src/services/panelManager.ts`:
 
 ```typescript
 export class PanelManager {
-  async createPanel(request: CreatePanelRequest): Promise<ToolPanel>
-  async deletePanel(panelId: string): Promise<void>
-  async updatePanel(panelId: string, updates: Partial<ToolPanel>): Promise<void>
-  async setActivePanel(sessionId: string, panelId: string): Promise<void>
-  getPanel(panelId: string): ToolPanel | undefined
-  getPanelsForSession(sessionId: string): ToolPanel[]
-  async emitPanelEvent(panelId: string, eventType: PanelEventType, data: any): Promise<void>
-  
-  // Key behaviors:
-  // - Auto-generates panel titles (Terminal 1, Terminal 2, etc.)
-  // - Manages panel lifecycle and database persistence
-  // - Tracks initialization state for lazy loading
-  // - Cleans up event subscriptions on panel deletion
-  // - Automatically activates another panel when active panel is deleted
-  // - Emits IPC events for frontend synchronization
+  async createPanel(request: CreatePanelRequest): Promise<ToolPanel>;
+  async deletePanel(panelId: string): Promise<void>;
+  async updatePanel(panelId: string, updates: Partial<ToolPanel>): Promise<void>;
+  async setActivePanel(sessionId: string, panelId: string): Promise<void>;
+  getPanel(panelId: string): ToolPanel | undefined;
+  getPanelsForSession(sessionId: string): ToolPanel[];
+  async emitPanelEvent(panelId: string, eventType: PanelEventType, data: any): Promise<void>;
 }
 ```
+
+**Key behaviors:**
+- Auto-generates panel titles (Terminal 1, Terminal 2, etc.)
+- Manages panel lifecycle and database persistence
+- Tracks initialization state for lazy loading
+- Cleans up event subscriptions on panel deletion
+- Automatically activates another panel when active panel is deleted
+- Emits IPC events for frontend synchronization
 
 ### 1.6 IPC Handlers
 
 Add to `main/src/ipc/panels.ts`:
 
 ```typescript
-import { ipcMain } from 'electron';
-import { panelManager } from '../services/panelManager';
-import { terminalPanelManager } from '../services/terminalPanelManager';
-
 export function registerPanelHandlers() {
-  ipcMain.handle('panels:create', async (_, request) => {
-    return panelManager.createPanel(request);
-  });
-
-  ipcMain.handle('panels:delete', async (_, panelId) => {
-    return panelManager.deletePanel(panelId);
-  });
-
-  ipcMain.handle('panels:update', async (_, panelId, updates) => {
-    return panelManager.updatePanel(panelId, updates);
-  });
-
-  ipcMain.handle('panels:list', async (_, sessionId) => {
-    return panelManager.getPanelsForSession(sessionId);
-  });
-
-  ipcMain.handle('panels:setActive', async (_, sessionId, panelId) => {
-    return panelManager.setActivePanel(sessionId, panelId);
-  });
-
-  ipcMain.handle('panels:getActive', async (_, sessionId) => {
-    const db = getDatabase();
-    return db.getActivePanel(sessionId);
-  });
-
-  // Panel initialization tracking (for lazy loading)
+  // Panel CRUD operations
+  ipcMain.handle('panels:create', async (_, request) => panelManager.createPanel(request));
+  ipcMain.handle('panels:delete', async (_, panelId) => panelManager.deletePanel(panelId));
+  ipcMain.handle('panels:update', async (_, panelId, updates) => panelManager.updatePanel(panelId, updates));
+  ipcMain.handle('panels:list', async (_, sessionId) => panelManager.getPanelsForSession(sessionId));
+  ipcMain.handle('panels:setActive', async (_, sessionId, panelId) => panelManager.setActivePanel(sessionId, panelId));
+  ipcMain.handle('panels:getActive', async (_, sessionId) => db.getActivePanel(sessionId));
+  
+  // Panel initialization (lazy loading)
   ipcMain.handle('panels:initialize', async (_, panelId) => {
-    const panel = panelManager.getPanel(panelId);
-    if (!panel) throw new Error('Panel not found');
-    
-    // Mark panel as viewed if not already
-    if (!panel.state.hasBeenViewed) {
-      await panelManager.updatePanel(panelId, {
-        state: { ...panel.state, hasBeenViewed: true }
-      });
-    }
-    
-    // Initialize terminal if not already initialized
-    if (panel.type === 'terminal' && !panel.state.customState?.isInitialized) {
-      const cwd = panel.state.customState?.cwd || process.cwd();
-      terminalPanelManager.initializeTerminal(panel, cwd);
-      
-      await panelManager.updatePanel(panelId, {
-        state: {
-          ...panel.state,
-          customState: { 
-            ...panel.state.customState, 
-            isInitialized: true 
-          }
-        }
-      });
-    }
-    
-    return panel;
+    // Mark panel as viewed and initialize terminal if needed
+    // Implementation details...
   });
-
+  
   ipcMain.handle('panels:checkInitialized', async (_, panelId) => {
     const panel = panelManager.getPanel(panelId);
     return panel?.state.customState?.isInitialized || false;
   });
-
-  // Event-related handlers
+  
+  // Event handlers
   ipcMain.handle('panels:emitEvent', async (_, panelId, eventType, data) => {
     return panelManager.emitPanelEvent(panelId, eventType, data);
-  });
-
-  ipcMain.handle('panels:getRecentEvents', async (_, eventTypes, limit) => {
-    return panelEventBus.getRecentEvents(eventTypes, limit);
   });
 }
 ```
@@ -414,7 +364,7 @@ The Terminal Panel Manager handles PTY process lifecycle and state management.
    - State persists across app restarts
    - Graceful cleanup on panel deletion
 
-## Terminal State Persistence (Using Option 1: Simple State Restoration)
+## Terminal State Persistence (Simple State Restoration)
 
 ### What Gets Persisted
 
@@ -461,227 +411,153 @@ When reopening Crystal with persisted terminals:
 
 ## Phase 2: UI Components
 
-### 2.1 Panel Store
+### 2.1 Panel Store Types and Implementation
 
-Create `frontend/src/stores/panelStore.ts`:
+Create `frontend/src/types/panelStore.ts` for interfaces:
 
 ```typescript
-import { create } from 'zustand';
 import { ToolPanel, CreatePanelRequest, PanelEvent, PanelEventType } from '../../shared/types/panels';
 
-interface PanelStore {
-  // State
-  panels: Map<string, ToolPanel[]>;        // sessionId -> panels
-  activePanels: Map<string, string>;       // sessionId -> active panelId
-  panelEvents: PanelEvent[];               // Recent events
-  eventSubscriptions: Map<string, Set<PanelEventType>>; // panelId -> subscribed events
+export interface PanelStore {
+  // State (using plain objects instead of Maps for React reactivity)
+  panels: Record<string, ToolPanel[]>;        // sessionId -> panels
+  activePanels: Record<string, string>;       // sessionId -> active panelId
+  panelEvents: PanelEvent[];                  // Recent events
+  eventSubscriptions: Record<string, Set<PanelEventType>>; // panelId -> subscribed events
   
-  // Actions
-  createPanel: (request: CreatePanelRequest) => Promise<ToolPanel>;
-  deletePanel: (panelId: string) => Promise<void>;
-  updatePanel: (panelId: string, updates: Partial<ToolPanel>) => Promise<void>;
-  setActivePanel: (sessionId: string, panelId: string) => Promise<void>;
-  loadPanelsForSession: (sessionId: string) => Promise<void>;
+  // Synchronous state update actions
+  setPanels: (sessionId: string, panels: ToolPanel[]) => void;
+  setActivePanel: (sessionId: string, panelId: string) => void;
+  addPanel: (panel: ToolPanel) => void;
+  removePanel: (sessionId: string, panelId: string) => void;
+  updatePanelState: (panel: ToolPanel) => void;
   
-  // Event actions
-  emitPanelEvent: (panelId: string, eventType: PanelEventType, data: any) => Promise<void>;
+  // Event actions  
   subscribeToPanelEvents: (panelId: string, eventTypes: PanelEventType[]) => void;
   unsubscribeFromPanelEvents: (panelId: string, eventTypes: PanelEventType[]) => void;
+  addPanelEvent: (event: PanelEvent) => void;
   
   // Getters
   getSessionPanels: (sessionId: string) => ToolPanel[];
   getActivePanel: (sessionId: string) => ToolPanel | undefined;
   getPanelEvents: (panelId?: string, eventTypes?: PanelEventType[]) => PanelEvent[];
   
-  // Event handlers
-  handlePanelCreated: (panel: ToolPanel) => void;
-  handlePanelDeleted: (data: { panelId: string; sessionId: string }) => void;
-  handlePanelUpdated: (panel: ToolPanel) => void;
-  handlePanelActivated: (data: { sessionId: string; panelId: string }) => void;
-  handlePanelEvent: (event: PanelEvent) => void;
 }
+```
+
+Create `frontend/src/services/panelApi.ts` for async operations:
+
+```typescript
+import { CreatePanelRequest, ToolPanel } from '../../shared/types/panels';
+
+export const panelApi = {
+  async createPanel(request: CreatePanelRequest): Promise<ToolPanel> {
+    return window.electron.invoke('panels:create', request);
+  },
+  
+  async deletePanel(panelId: string): Promise<void> {
+    return window.electron.invoke('panels:delete', panelId);
+  },
+  
+  async updatePanel(panelId: string, updates: Partial<ToolPanel>): Promise<void> {
+    return window.electron.invoke('panels:update', panelId, updates);
+  },
+  
+  async loadPanelsForSession(sessionId: string): Promise<ToolPanel[]> {
+    return window.electron.invoke('panels:list', sessionId);
+  },
+  
+  async getActivePanel(sessionId: string): Promise<ToolPanel | null> {
+    return window.electron.invoke('panels:getActive', sessionId);
+  },
+  
+  async setActivePanel(sessionId: string, panelId: string): Promise<void> {
+    return window.electron.invoke('panels:setActive', sessionId, panelId);
+  },
+  
+  async emitPanelEvent(panelId: string, eventType: string, data: any): Promise<void> {
+    return window.electron.invoke('panels:emitEvent', panelId, eventType, data);
+  }
+};
+```
+
+Create `frontend/src/stores/panelStore.ts` for implementation:
+
+```typescript
+import { create } from 'zustand';
+import { PanelStore } from '../types/panelStore';
 
 export const usePanelStore = create<PanelStore>((set, get) => ({
-  panels: new Map(),
-  activePanels: new Map(),
+  panels: {},
+  activePanels: {},
   panelEvents: [],
-  eventSubscriptions: new Map(),
+  eventSubscriptions: {},
 
-  createPanel: async (request) => {
-    const panel = await window.electron.invoke('panels:create', request);
-    get().handlePanelCreated(panel);
-    return panel;
+  // Synchronous state updates
+  setPanels: (sessionId, panels) => {
+    set((state) => ({
+      panels: { ...state.panels, [sessionId]: panels }
+    }));
   },
 
-  deletePanel: async (panelId) => {
-    await window.electron.invoke('panels:delete', panelId);
+  setActivePanel: (sessionId, panelId) => {
+    set((state) => ({
+      activePanels: { ...state.activePanels, [sessionId]: panelId }
+    }));
   },
 
-  updatePanel: async (panelId, updates) => {
-    await window.electron.invoke('panels:update', panelId, updates);
+  addPanel: (panel) => {
+    // Add panel and make it active
+    set((state) => ({
+      panels: { 
+        ...state.panels, 
+        [panel.sessionId]: [...(state.panels[panel.sessionId] || []), panel] 
+      },
+      activePanels: { ...state.activePanels, [panel.sessionId]: panel.id }
+    }));
   },
 
-  setActivePanel: async (sessionId, panelId) => {
-    await window.electron.invoke('panels:setActive', sessionId, panelId);
-    set((state) => {
-      const newActivePanels = new Map(state.activePanels);
-      newActivePanels.set(sessionId, panelId);
-      return { activePanels: newActivePanels };
-    });
-  },
-
-  loadPanelsForSession: async (sessionId) => {
-    const panels = await window.electron.invoke('panels:list', sessionId);
-    const activePanel = await window.electron.invoke('panels:getActive', sessionId);
-    
-    set((state) => {
-      const newPanels = new Map(state.panels);
-      newPanels.set(sessionId, panels);
-      
-      const newActivePanels = new Map(state.activePanels);
-      if (activePanel) {
-        newActivePanels.set(sessionId, activePanel.id);
+  removePanel: (sessionId, panelId) => {
+    // Remove panel from list
+    set((state) => ({
+      panels: {
+        ...state.panels,
+        [sessionId]: state.panels[sessionId]?.filter(p => p.id !== panelId) || []
       }
-      
-      return { panels: newPanels, activePanels: newActivePanels };
-    });
+    }));
   },
 
-  getSessionPanels: (sessionId) => {
-    return get().panels.get(sessionId) || [];
+  updatePanelState: (panel) => {
+    // Update specific panel in the list
+    // Implementation details...
   },
 
+  // Getters
+  getSessionPanels: (sessionId) => get().panels[sessionId] || [],
   getActivePanel: (sessionId) => {
-    const panels = get().panels.get(sessionId) || [];
-    const activePanelId = get().activePanels.get(sessionId);
-    return panels.find(p => p.id === activePanelId);
+    const panels = get().panels[sessionId] || [];
+    return panels.find(p => p.id === get().activePanels[sessionId]);
   },
 
-  handlePanelCreated: (panel) => {
-    set((state) => {
-      const newPanels = new Map(state.panels);
-      const sessionPanels = newPanels.get(panel.sessionId) || [];
-      newPanels.set(panel.sessionId, [...sessionPanels, panel]);
-      
-      const newActivePanels = new Map(state.activePanels);
-      newActivePanels.set(panel.sessionId, panel.id);
-      
-      return { panels: newPanels, activePanels: newActivePanels };
-    });
-  },
-
-  handlePanelDeleted: (data) => {
-    set((state) => {
-      const newPanels = new Map(state.panels);
-      const sessionPanels = newPanels.get(data.sessionId) || [];
-      newPanels.set(data.sessionId, sessionPanels.filter(p => p.id !== data.panelId));
-      return { panels: newPanels };
-    });
-  },
-
-  handlePanelUpdated: (panel) => {
-    set((state) => {
-      const newPanels = new Map(state.panels);
-      const sessionPanels = newPanels.get(panel.sessionId) || [];
-      const index = sessionPanels.findIndex(p => p.id === panel.id);
-      if (index !== -1) {
-        sessionPanels[index] = panel;
-        newPanels.set(panel.sessionId, [...sessionPanels]);
-      }
-      return { panels: newPanels };
-    });
-  },
-
-  handlePanelActivated: (data) => {
-    set((state) => {
-      const newActivePanels = new Map(state.activePanels);
-      newActivePanels.set(data.sessionId, data.panelId);
-      return { activePanels: newActivePanels };
-    });
-  },
-
-  // Event methods
-  emitPanelEvent: async (panelId, eventType, data) => {
-    await window.electron.invoke('panels:emitEvent', panelId, eventType, data);
-  },
-
-  subscribeToPanelEvents: (panelId, eventTypes) => {
-    set((state) => {
-      const newSubscriptions = new Map(state.eventSubscriptions);
-      const existing = newSubscriptions.get(panelId) || new Set();
-      eventTypes.forEach(type => existing.add(type));
-      newSubscriptions.set(panelId, existing);
-      return { eventSubscriptions: newSubscriptions };
-    });
-  },
-
-  unsubscribeFromPanelEvents: (panelId, eventTypes) => {
-    set((state) => {
-      const newSubscriptions = new Map(state.eventSubscriptions);
-      const existing = newSubscriptions.get(panelId);
-      if (existing) {
-        eventTypes.forEach(type => existing.delete(type));
-        if (existing.size === 0) {
-          newSubscriptions.delete(panelId);
-        } else {
-          newSubscriptions.set(panelId, existing);
-        }
-      }
-      return { eventSubscriptions: newSubscriptions };
-    });
-  },
-
-  getPanelEvents: (panelId, eventTypes) => {
-    const events = get().panelEvents;
-    let filtered = events;
-    
-    if (panelId) {
-      filtered = filtered.filter(e => e.source.panelId === panelId);
-    }
-    
-    if (eventTypes && eventTypes.length > 0) {
-      filtered = filtered.filter(e => eventTypes.includes(e.type));
-    }
-    
-    return filtered;
-  },
-
-  handlePanelEvent: (event) => {
-    set((state) => {
-      const newEvents = [...state.panelEvents, event];
-      // Keep only last 100 events
-      if (newEvents.length > 100) {
-        newEvents.shift();
-      }
-      return { panelEvents: newEvents };
-    });
-    
-    // Check if any panels are subscribed to this event type
-    const subscriptions = get().eventSubscriptions;
-    subscriptions.forEach((eventTypes, panelId) => {
-      if (eventTypes.has(event.type) && panelId !== event.source.panelId) {
-        // Panel is subscribed to this event type
-        // Trigger re-render or specific action based on panel type
-        console.log(`Panel ${panelId} received event ${event.type}`, event);
-      }
-    });
+  // Event subscription management
+  subscribeToPanelEvents: (panelId, eventTypes) => { /* Implementation */ },
+  unsubscribeFromPanelEvents: (panelId, eventTypes) => { /* Implementation */ },
+  getPanelEvents: (panelId, eventTypes) => { /* Implementation */ },
+  addPanelEvent: (event) => { 
+    // Add event to history and notify subscribers
+    // Implementation details...
   }
 }));
 ```
 
 ### 2.2 Panel Tab Bar Component
 
-Create `frontend/src/components/panels/PanelTabBar.tsx`:
+Create `frontend/src/types/panelComponents.ts`:
 
 ```typescript
-import React from 'react';
-import { Plus, X, Terminal } from 'lucide-react';
-import { ToolPanel } from '../../../shared/types/panels';
-import { cn } from '../../utils/cn';
-import { usePanelStore } from '../../stores/panelStore';
+import { ToolPanel } from '../../shared/types/panels';
 
-interface PanelTabBarProps {
-  sessionId: string;
+export interface PanelTabBarProps {
   panels: ToolPanel[];
   activePanel?: ToolPanel;
   onPanelSelect: (panel: ToolPanel) => void;
@@ -689,76 +565,106 @@ interface PanelTabBarProps {
   onPanelCreate: () => void;
 }
 
-export const PanelTabBar: React.FC<PanelTabBarProps> = ({
-  sessionId,
+export interface PanelContainerProps {
+  panel: ToolPanel;
+  isActive: boolean;
+}
+
+export interface TerminalPanelProps {
+  panel: ToolPanel;
+  isActive: boolean;
+}
+```
+
+Create `frontend/src/components/panels/PanelTabBar.tsx`:
+
+```typescript
+import React, { useCallback, memo } from 'react';
+import { Plus, X, Terminal } from 'lucide-react';
+import { cn } from '../../utils/cn';
+import { usePanelStore } from '../../stores/panelStore';
+import { PanelTabBarProps } from '../../types/panelComponents';
+
+export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   panels,
   activePanel,
   onPanelSelect,
   onPanelClose,
   onPanelCreate
 }) => {
-  const getPanelIcon = (type: string) => {
-    switch (type) {
-      case 'terminal':
-        return <Terminal className="w-3 h-3" />;
-      default:
-        return null;
-    }
-  };
+  // Memoize event handlers to prevent unnecessary re-renders
+  const handlePanelClick = useCallback((panel: ToolPanel) => {
+    onPanelSelect(panel);
+  }, [onPanelSelect]);
+
+  const handlePanelClose = useCallback((e: React.MouseEvent, panel: ToolPanel) => {
+    e.stopPropagation();
+    onPanelClose(panel);
+  }, [onPanelClose]);
 
   return (
-    <div className="flex items-center bg-surface-tertiary border-t border-border-primary px-2 h-9">
-      {/* Panel tabs */}
-      <div className="flex items-center flex-1 overflow-x-auto scrollbar-thin">
-        {panels.map((panel) => (
-          <div
-            key={panel.id}
-            className={cn(
-              "group flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer transition-all",
-              "border-r border-border-secondary hover:bg-surface-hover",
-              activePanel?.id === panel.id
-                ? "bg-surface-secondary text-text-primary font-medium"
-                : "text-text-secondary"
-            )}
-            onClick={() => onPanelSelect(panel)}
-          >
-            {getPanelIcon(panel.type)}
-            <span className="max-w-[120px] truncate">{panel.title}</span>
-            
-            {/* Close button */}
-            <button
-              className={cn(
-                "ml-1 p-0.5 rounded hover:bg-surface-hover",
-                "opacity-0 group-hover:opacity-100 transition-opacity"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                onPanelClose(panel);
-              }}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Add panel button */}
-      <button
-        className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all"
-        onClick={onPanelCreate}
-        title="Add new terminal"
-      >
-        <Plus className="w-3 h-3" />
-        <span>New Terminal</span>
-      </button>
+    <div className="panel-tab-bar">
+      {/* Render panel tabs with click handlers */}
+      {panels.map((panel) => (
+        <div key={panel.id} onClick={() => handlePanelClick(panel)}>
+          {/* Tab UI with title, icon, close button */}
+        </div>
+      ))}
+      <button onClick={onPanelCreate}>New Terminal</button>
     </div>
   );
-};
+});
+
+PanelTabBar.displayName = 'PanelTabBar';
 ```
 
 ### 2.3 Terminal Panel Component
 
 The Terminal Panel manages individual terminal instances within the panel system.
+
+**Critical XTerm.js Integration Requirements:**
+
+```typescript
+import { useRef, useEffect } from 'react';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { useSession } from '../../contexts/SessionContext';
+
+export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive }) => {
+  // Get session data from context instead of props
+  const { sessionId, workingDirectory } = useSession();
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  
+  useEffect(() => {
+    if (!isActive || !terminalRef.current) return;
+    
+    // Initialize XTerm with proper ref isolation
+    const terminal = new Terminal(/* config */);
+    terminal.open(terminalRef.current);
+    xtermRef.current = terminal;
+    
+    // Connect to backend using sessionId and workingDirectory from context
+    // Handle I/O, resize events, etc.
+    
+    // Cleanup on unmount
+    return () => {
+      terminal.dispose();
+      xtermRef.current = null;
+    };
+  }, [isActive, panel.id, sessionId, workingDirectory]);
+  
+  return <div ref={terminalRef} />;
+};
+```
+
+**Benefits of Using Context:**
+
+1. **Clean Component Interfaces**: Components only receive the props they directly use (panel, isActive)
+2. **No Prop Drilling**: Session data is available to any component that needs it without passing through intermediate components
+3. **Easy to Extend**: Adding new session-related data (like userId, permissions) only requires updating the context
+4. **Better Testability**: Can easily provide mock session data in tests
+5. **Consistent Access Pattern**: All components access session data the same way via `useSession()`
 
 **Component Requirements:**
 
@@ -807,59 +713,94 @@ The Terminal Panel manages individual terminal instances within the panel system
 
 Create `frontend/src/components/panels/PanelContainer.tsx`:
 
-```typescript
-import React from 'react';
-import { ToolPanel } from '../../../shared/types/panels';
-import { TerminalPanel } from './types/TerminalPanel';
+**Important**: Wrap PanelContainer with an Error Boundary to prevent panel failures from crashing the entire application. Each panel type should gracefully handle errors and display fallback UI.
 
-interface PanelContainerProps {
-  panel: ToolPanel;
-  sessionId: string;
-  workingDirectory: string;
-  isActive: boolean;  // Critical: Only render when active
-}
+```typescript
+import React, { Suspense, lazy } from 'react';
+import { PanelContainerProps } from '../../types/panelComponents';
+
+// Lazy load panel components for better performance
+const TerminalPanel = lazy(() => import('./types/TerminalPanel'));
 
 export const PanelContainer: React.FC<PanelContainerProps> = ({
   panel,
-  sessionId,
-  workingDirectory,
   isActive
 }) => {
-  // Suspend rendering for inactive panels (terminal keeps running)
-  if (!isActive) {
-    return (
-      <div className="h-full flex items-center justify-center text-text-secondary">
-        <div className="text-center">
-          <Terminal className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <div>Terminal Running in Background</div>
-          <div className="text-xs mt-1">Click tab to view</div>
-        </div>
-      </div>
-    );
-  }
+  // Only render active panel to save memory
+  // Use lazy loading with Suspense for better performance
   
-  // Render appropriate panel based on type
-  switch (panel.type) {
-    case 'terminal':
-      return (
-        <TerminalPanel
-          panel={panel}
-          sessionId={sessionId}
-          workingDirectory={workingDirectory}
-          isActive={isActive}  // Pass isActive to enable mounting/unmounting
-        />
-      );
-    default:
-      return (
-        <div className="h-full flex items-center justify-center text-text-secondary">
-          Unknown panel type: {panel.type}
-        </div>
-      );
-  }
+  const renderPanel = () => {
+    switch (panel.type) {
+      case 'terminal':
+        return <TerminalPanel panel={panel} isActive={isActive} />;
+      // Future panel types...
+      default:
+        return <div>Unknown panel type: {panel.type}</div>;
+    }
+  };
+
+  return (
+    <Suspense fallback={<div>Loading panel...</div>}>
+      {renderPanel()}
+    </Suspense>
+  );
 };
 ```
 
-### 2.5 Integration with SessionView
+### 2.5 Session Context Provider
+
+Create `frontend/src/contexts/SessionContext.tsx`:
+
+```typescript
+import React, { createContext, useContext, ReactNode } from 'react';
+import { Session } from '../../shared/types';
+
+interface SessionContextValue {
+  sessionId: string;
+  workingDirectory: string;
+  projectId: string;
+  session: Session | null;
+}
+
+const SessionContext = createContext<SessionContextValue | undefined>(undefined);
+
+export const SessionProvider: React.FC<{
+  children: ReactNode;
+  session: Session | null;
+}> = ({ children, session }) => {
+  if (!session) {
+    return <>{children}</>;
+  }
+
+  const value: SessionContextValue = {
+    sessionId: session.id,
+    workingDirectory: session.worktreePath,
+    projectId: session.projectId,
+    session
+  };
+
+  return (
+    <SessionContext.Provider value={value}>
+      {children}
+    </SessionContext.Provider>
+  );
+};
+
+export const useSession = (): SessionContextValue => {
+  const context = useContext(SessionContext);
+  if (!context) {
+    throw new Error('useSession must be used within a SessionProvider');
+  }
+  return context;
+};
+
+// Optional: hook that doesn't throw if no session
+export const useSessionOptional = (): SessionContextValue | undefined => {
+  return useContext(SessionContext);
+};
+```
+
+### 2.6 Integration with SessionView
 
 Modify `frontend/src/components/SessionView.tsx`:
 
@@ -868,6 +809,7 @@ Modify `frontend/src/components/SessionView.tsx`:
 import { usePanelStore } from '../stores/panelStore';
 import { PanelTabBar } from './panels/PanelTabBar';
 import { PanelContainer } from './panels/PanelContainer';
+import { SessionProvider } from '../contexts/SessionContext';
 
 // Inside SessionView component
 const {
@@ -887,58 +829,32 @@ useEffect(() => {
 }, [activeSession?.id]);
 
 // Get panels for current session
-const sessionPanels = panels.get(activeSession?.id || '') || [];
-const currentActivePanel = activePanel.get(activeSession?.id || '');
+const sessionPanels = panels[activeSession?.id || ''] || [];
+const currentActivePanel = activePanels[activeSession?.id || ''];
 
-// In the render, modify the terminal view section:
+// In the render, wrap terminal view section with SessionProvider:
 {hook.viewMode === 'terminal' && (
-  <>
-    {/* Panel tab bar - shown below the main tab bar */}
+  <SessionProvider session={activeSession}>
     <PanelTabBar
-      sessionId={activeSession.id}
       panels={sessionPanels}
       activePanel={currentActivePanel}
       onPanelSelect={(panel) => setActivePanel(activeSession.id, panel.id)}
       onPanelClose={(panel) => deletePanel(panel.id)}
-      onPanelCreate={() => createPanel({
-        sessionId: activeSession.id,
-        type: 'terminal'
-      })}
+      onPanelCreate={() => createPanel({ sessionId: activeSession.id, type: 'terminal' })}
     />
     
-    {/* Panel content - Keep all panels in DOM but only render active one */}
-    <div className="flex-1 min-h-0">
-      {sessionPanels.length > 0 ? (
-        <>
-          {sessionPanels.map(panel => (
-            <div
-              key={panel.id}
-              className={panel.id === currentActivePanel?.id ? 'h-full' : 'hidden'}
-            >
-              <PanelContainer
-                panel={panel}
-                sessionId={activeSession.id}
-                workingDirectory={activeSession.worktreePath}
-                isActive={panel.id === currentActivePanel?.id}  // Only active panel renders XTerm
-              />
-            </div>
-          ))}
-        </>
+    <div className="panel-content">
+      {currentActivePanel ? (
+        <PanelContainer
+          key={currentActivePanel.id}
+          panel={currentActivePanel}
+          isActive={true}
+        />
       ) : (
-        <div className="h-full flex items-center justify-center text-text-secondary">
-          <button
-            onClick={() => createPanel({
-              sessionId: activeSession.id,
-              type: 'terminal'
-            })}
-            className="px-4 py-2 bg-surface-secondary hover:bg-surface-hover rounded-lg transition-colors"
-          >
-            Create Terminal
-          </button>
-        </div>
+        <div>No active panel or create first panel prompt</div>
       )}
     </div>
-  </>
+  </SessionProvider>
 )}
 ```
 
