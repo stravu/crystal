@@ -4,15 +4,16 @@
 
 This document outlines the migration strategy for transitioning Claude Code from the existing tab-based system to the new Tool Panel infrastructure. The migration prioritizes code reuse, maintains backward compatibility during transition, and includes a comprehensive database migration strategy for existing sessions.
 
-**Key User Experience Preservation**: The existing session creation flow where users specify a Claude Code prompt remains unchanged. Each new session automatically creates a default Claude panel, maintaining the current user workflow while gaining the benefits of the panel system.
+**Key User Experience Change**: The prompt input bar will move from the session level (always visible) to be integrated within each Claude panel. Each Claude panel will have its own independent prompt bar, conversation history, and Claude process. Multiple Claude panels can run simultaneously within a single session, each with completely independent state.
 
 ## Migration Goals
 
 1. **Maximum Code Reuse**: Move existing Claude Code components with minimal rewriting
 2. **Zero Data Loss**: Preserve all existing session data, outputs, and conversation history
-3. **Seamless User Experience**: Existing sessions continue to work during and after migration
-4. **Clean Architecture**: Organize Claude Code as a self-contained panel module
-5. **Incremental Migration**: Allow gradual transition without breaking existing functionality
+3. **Multiple Independent Claude Instances**: Enable multiple Claude panels per session with independent state
+4. **Panel-Integrated Prompt Input**: Move prompt bar from session level into each Claude panel
+5. **Clean Architecture**: Organize Claude Code as a self-contained panel module
+6. **Incremental Migration**: Allow gradual transition without breaking existing functionality
 
 ## Current State Analysis
 
@@ -78,7 +79,7 @@ claude: {
   ],
   canConsume: ['files:changed'], // React to external file changes
   requiresProcess: true,
-  singleton: true  // Only one Claude panel per session
+  singleton: false  // Multiple independent Claude panels allowed per session
 }
 ```
 
@@ -132,9 +133,9 @@ WHERE active_panel_id IS NULL;
 
 ### Phase 2: Session Creation Flow (Week 1)
 
-#### 2.1 Preserve Session Creation with Claude Prompt
+#### 2.1 Update Session Creation Flow
 
-The existing session creation flow where users specify a Claude Code prompt must be preserved:
+The session creation flow changes to support multiple independent Claude panels:
 
 ```typescript
 // main/src/ipc/session.ts - Update session creation handler
@@ -143,39 +144,48 @@ ipcMain.handle('sessions:create', async (_, sessionData) => {
   // 1. Create session as before with worktree setup
   const session = await sessionManager.createSession({
     name: sessionData.name,
-    initial_prompt: sessionData.prompt,  // Claude prompt preserved
+    initial_prompt: sessionData.prompt,  // Initial prompt (optional)
     worktree_name: sessionData.worktreeName,
     // ... other fields
   });
 
-  // 2. Automatically create a Claude panel for the session
-  const claudePanel = await panelManager.createPanel({
-    sessionId: session.id,
-    type: 'claude',
-    title: 'Claude',
-    state: {
-      isActive: true,
-      hasBeenViewed: false,
-      customState: {
-        isInitialized: false,
-        lastPrompt: sessionData.prompt,
-        outputMode: 'rich',
-        status: 'idle'
+  // 2. Optionally create first Claude panel if prompt provided
+  if (sessionData.prompt) {
+    const claudePanel = await panelManager.createPanel({
+      sessionId: session.id,
+      type: 'claude',
+      title: 'Claude 1',  // Numbered for multiple panels
+      state: {
+        isActive: true,
+        hasBeenViewed: false,
+        customState: {
+          isInitialized: false,
+          lastPrompt: sessionData.prompt,
+          outputMode: 'rich',
+          status: 'idle',
+          conversationHistory: [],  // Independent conversation per panel
+          claudeProcessId: null     // Will spawn unique process
+        }
       }
-    }
-  });
+    });
 
-  // 3. Set as active panel (default behavior)
-  await sessionManager.setActivePanel(session.id, claudePanel.id);
+    // 3. Set as active panel (default behavior)
+    await sessionManager.setActivePanel(session.id, claudePanel.id);
 
-  // 4. Start Claude process with initial prompt (existing behavior)
-  await claudeCodeManager.spawnClaudeCode(
-    session.id,
-    session.worktree_path,
-    sessionData.prompt,
-    sessionData.conversationHistory,
-    sessionData.isResume
-  );
+    // 4. Start Claude process for THIS panel specifically
+    const processId = await claudeCodeManager.spawnClaudeCodeForPanel(
+      claudePanel.id,  // Use panel ID, not session ID
+      session.worktree_path,
+      sessionData.prompt,
+      [],  // Empty conversation history for new panel
+      false
+    );
+    
+    // 5. Update panel with process ID
+    await panelManager.updatePanelState(claudePanel.id, {
+      claudeProcessId: processId
+    });
+  }
 
   return session;
 });
@@ -185,15 +195,15 @@ ipcMain.handle('sessions:create', async (_, sessionData) => {
 
 ```typescript
 // frontend/src/components/CreateSessionDialog.tsx
-// No changes needed - dialog continues to collect:
+// Minor changes - dialog now:
 // - Session name/template
-// - Claude prompt (required)
+// - Claude prompt (now OPTIONAL - can create session without Claude)
 // - Worktree configuration
-// - Model selection
+// - Model selection (if Claude prompt provided)
 
-// The only difference is behind the scenes:
-// - Old: Creates session → Opens richOutput tab
-// - New: Creates session → Creates Claude panel → Opens Claude panel
+// Behind the scenes:
+// - Old: Creates session → Opens richOutput tab with prompt bar at bottom
+// - New: Creates session → Creates Claude panel (if prompt) → Opens Claude panel with integrated prompt bar
 ```
 
 #### 2.3 Default Panel Behavior
@@ -202,8 +212,8 @@ ipcMain.handle('sessions:create', async (_, sessionData) => {
 // shared/types/panels.ts
 export const DEFAULT_PANELS_PER_SESSION = {
   claude: {
-    autoCreate: true,      // Always create Claude panel with new session
-    singleton: true,       // Only one Claude panel per session
+    autoCreate: false,     // Create on demand (when user provides prompt)
+    singleton: false,      // Multiple Claude panels allowed per session
     defaultActive: true    // Set as active panel on creation
   },
   terminal: {
@@ -227,6 +237,7 @@ import { PanelEventBus } from './panelEventBus';
 import { ToolPanel, ClaudePanelState } from '../../shared/types/panels';
 
 export class ClaudePanelManager {
+  // Map panel IDs to their independent Claude processes
   private claudeProcesses = new Map<string, any>();
   
   constructor(
@@ -235,15 +246,15 @@ export class ClaudePanelManager {
     private db: Database,
     private eventBus: PanelEventBus
   ) {
-    // Reuse existing ClaudeCodeManager for process management
     this.setupEventListeners();
   }
 
   async initializePanel(panel: ToolPanel): Promise<void> {
     const state = panel.state.customState as ClaudePanelState;
     
-    if (state?.isInitialized) {
-      // Panel already initialized, just reconnect to existing process
+    // Each panel gets its own Claude process
+    if (state?.claudeProcessId && this.claudeProcesses.has(panel.id)) {
+      // Reconnect to existing panel process
       return this.reconnectToProcess(panel);
     }
 
@@ -251,23 +262,52 @@ export class ClaudePanelManager {
     const session = this.sessionManager.getDbSession(panel.sessionId);
     if (!session) throw new Error('Session not found');
 
-    // Check if there's an existing Claude process for this session
-    const existingProcess = this.claudeCodeManager.getProcess(session.id);
-    if (existingProcess) {
-      // Link existing process to panel
-      await this.linkProcessToPanel(panel, existingProcess);
-    } else {
-      // Panel needs new Claude process (rare case)
-      await this.createNewClaudeProcess(panel, session);
-    }
+    // Always create a new, independent Claude process for this panel
+    await this.createNewClaudeProcessForPanel(panel, session);
+  }
+
+  private async createNewClaudeProcessForPanel(panel: ToolPanel, session: any): Promise<void> {
+    // Spawn a completely independent Claude process for this panel
+    const processId = `claude_${panel.id}_${Date.now()}`;
+    
+    // Each panel has its own conversation history
+    const panelConversationHistory = panel.state.customState?.conversationHistory || [];
+    
+    // Create new Claude instance with panel-specific ID
+    const process = await this.claudeCodeManager.spawnClaudeCodeWithId(
+      processId,
+      session.worktree_path,
+      panel.state.customState?.lastPrompt || '',
+      panelConversationHistory,
+      false
+    );
+
+    // Store process mapped to panel ID
+    this.claudeProcesses.set(panel.id, process);
+    
+    // Update panel state with process ID
+    await this.db.updatePanelState(panel.id, {
+      claudeProcessId: processId,
+      isInitialized: true
+    });
   }
 
   async sendInput(panelId: string, input: string): Promise<void> {
     const panel = this.db.getPanel(panelId);
     if (!panel) throw new Error('Panel not found');
 
-    // Delegate to existing ClaudeCodeManager
-    await this.claudeCodeManager.sendInput(panel.sessionId, input);
+    // Get the specific Claude process for this panel
+    const process = this.claudeProcesses.get(panelId);
+    if (!process) throw new Error('Claude process not found for panel');
+
+    // Send input to this panel's specific Claude instance
+    await this.claudeCodeManager.sendInputToProcess(process, input);
+    
+    // Update panel's conversation history
+    await this.db.updatePanelState(panelId, {
+      conversationHistory: [...(panel.state.customState?.conversationHistory || []), 
+        { role: 'user', content: input }]
+    });
     
     // Emit panel event
     this.eventBus.emit({
@@ -278,27 +318,32 @@ export class ClaudePanelManager {
     });
   }
 
-  // Migration helper: Convert existing Claude session to panel
-  async migrateSessionToPanel(sessionId: string): Promise<ToolPanel> {
+  // Create additional Claude panel for session
+  async createAdditionalClaudePanel(sessionId: string): Promise<ToolPanel> {
     const session = this.sessionManager.getDbSession(sessionId);
     if (!session) throw new Error('Session not found');
 
-    // Check if panel already exists
+    // Count existing Claude panels to generate unique title
     const existingPanels = this.db.getPanelsForSession(sessionId);
-    const claudePanel = existingPanels.find(p => p.type === 'claude');
+    const claudePanelCount = existingPanels.filter(p => p.type === 'claude').length;
     
-    if (claudePanel) {
-      return claudePanel; // Already migrated
-    }
-
-    // Create new Claude panel for session
-    const panel = await this.createPanelForSession(session);
-    
-    // Link existing Claude process if running
-    const process = this.claudeCodeManager.getProcess(sessionId);
-    if (process) {
-      await this.linkProcessToPanel(panel, process);
-    }
+    // Create new independent Claude panel
+    const panel = await this.db.createPanel({
+      sessionId,
+      type: 'claude',
+      title: `Claude ${claudePanelCount + 1}`,
+      state: {
+        isActive: true,
+        hasBeenViewed: false,
+        customState: {
+          isInitialized: false,
+          outputMode: 'rich',
+          status: 'idle',
+          conversationHistory: [],  // Fresh conversation
+          claudeProcessId: null     // Will get new process
+        }
+      }
+    });
 
     return panel;
   }
@@ -361,12 +406,12 @@ frontend/src/components/panels/claude/
 └── index.ts                     # Export aggregation
 ```
 
-#### 3.2 ClaudePanel Component
+#### 3.2 ClaudePanel Component (With Integrated Prompt Bar)
 ```typescript
 // frontend/src/components/panels/claude/ClaudePanel.tsx
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { SessionInputWithImages } from '../../session/SessionInputWithImages'; // Reuse existing input
+import { SessionInputWithImages } from '../../session/SessionInputWithImages'; // Migrate to panel
 import { RichOutputWithSidebar } from './RichOutputWithSidebar'; // Reuse existing output
 import { ClaudePanelToolbar } from './ClaudePanelToolbar';
 import { useRequiredSession } from '../../../contexts/SessionContext';
@@ -380,47 +425,81 @@ export const ClaudePanel: React.FC<{ panel: ToolPanel; isActive: boolean }> = ({
   const [outputMode, setOutputMode] = useState<'rich' | 'messages'>('rich');
   const [outputs, setOutputs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [input, setInput] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  // Load existing outputs when panel becomes active
+  // Panel-specific state for this Claude instance
+  const [panelStatus, setPanelStatus] = useState(panel.state.customState?.status || 'idle');
+  const [conversationHistory, setConversationHistory] = useState(
+    panel.state.customState?.conversationHistory || []
+  );
+  
+  // Load panel-specific outputs when panel becomes active
   useEffect(() => {
     if (!isActive) return;
     
     const loadOutputs = async () => {
       setIsLoading(true);
       try {
-        // Reuse existing IPC handler
-        const sessionOutputs = await window.electron.invoke(
-          'sessions:get-output', 
-          sessionId
+        // Load outputs for THIS specific panel
+        const panelOutputs = await window.electron.invoke(
+          'panels:claude:get-output', 
+          panel.id  // Panel ID, not session ID
         );
-        setOutputs(sessionOutputs);
+        setOutputs(panelOutputs);
       } finally {
         setIsLoading(false);
       }
     };
     
     loadOutputs();
-  }, [isActive, sessionId]);
+  }, [isActive, panel.id]);
 
-  // Listen for real-time outputs
+  // Listen for real-time outputs for THIS panel
   useEffect(() => {
     if (!isActive) return;
     
     const handleOutput = (event: any, data: any) => {
-      if (data.sessionId === sessionId) {
+      if (data.panelId === panel.id) {  // Panel-specific output
         setOutputs(prev => [...prev, data.output]);
+        
+        // Update conversation history for this panel
+        if (data.output.type === 'assistant') {
+          setConversationHistory(prev => [...prev, 
+            { role: 'assistant', content: data.output.content }
+          ]);
+        }
       }
     };
     
-    window.electron.on('session:output', handleOutput);
-    return () => {
-      window.electron.off('session:output', handleOutput);
+    const handleStatusChange = (event: any, data: any) => {
+      if (data.panelId === panel.id) {
+        setPanelStatus(data.status);
+      }
     };
-  }, [isActive, sessionId]);
+    
+    window.electron.on('panel:claude:output', handleOutput);
+    window.electron.on('panel:claude:status', handleStatusChange);
+    
+    return () => {
+      window.electron.off('panel:claude:output', handleOutput);
+      window.electron.off('panel:claude:status', handleStatusChange);
+    };
+  }, [isActive, panel.id]);
 
-  const handleSendInput = useCallback(async (input: string) => {
-    await window.electron.invoke('panels:claude:input', panel.id, input);
+  const handleSendInput = useCallback(async (inputText: string) => {
+    // Send to this panel's specific Claude instance
+    await window.electron.invoke('panels:claude:input', panel.id, inputText);
+    
+    // Update local conversation history
+    setConversationHistory(prev => [...prev, { role: 'user', content: inputText }]);
+    setInput(''); // Clear input after sending
   }, [panel.id]);
+
+  const handleContinueConversation = useCallback(async () => {
+    // Continue with this panel's specific conversation history
+    await window.electron.invoke('panels:claude:continue', panel.id, conversationHistory);
+  }, [panel.id, conversationHistory]);
 
   if (!isActive) {
     return null; // Don't render when not active (saves memory)
@@ -428,26 +507,41 @@ export const ClaudePanel: React.FC<{ panel: ToolPanel; isActive: boolean }> = ({
 
   return (
     <div className="claude-panel flex flex-col h-full">
+      {/* Toolbar for output mode toggle */}
+      <ClaudePanelToolbar 
+        outputMode={outputMode}
+        setOutputMode={setOutputMode}
+        panelStatus={panelStatus}
+      />
+      
+      {/* Main output area */}
       <div className="flex-1 overflow-hidden">
         <RichOutputWithSidebar 
+          panelId={panel.id}  // Panel-specific outputs
           sessionId={sessionId}
-          sessionStatus={panel.state.customState?.status}
+          sessionStatus={panelStatus}
           model={panel.state.customState?.modelVersion}
-          settings={/* load from panel state */}
+          outputs={outputs}
+          outputMode={outputMode}
         />
       </div>
       
-      <SessionInputWithImages 
-        activeSession={/* get session object */}
-        viewMode="richOutput"
-        input={input}
-        setInput={setInput}
-        textareaRef={textareaRef}
-        handleTerminalCommand={() => {}}
-        handleSendInput={handleSendInput}
-        handleContinueConversation={handleContinue}
-        // ... other required props
-      />
+      {/* INTEGRATED PROMPT BAR - Only visible when this panel is active */}
+      <div className="border-t border-gray-700">
+        <SessionInputWithImages 
+          panelId={panel.id}  // Panel-specific input
+          activeSession={/* get session object */}
+          viewMode="richOutput"
+          input={input}
+          setInput={setInput}
+          textareaRef={textareaRef}
+          handleSendInput={handleSendInput}
+          handleContinueConversation={handleContinueConversation}
+          isWaiting={panelStatus === 'waiting'}
+          conversationHistory={conversationHistory}  // Panel-specific history
+          // ... other required props adapted for panel use
+        />
+      </div>
     </div>
   );
 };
@@ -524,44 +618,79 @@ export class ClaudeCompatibilityLayer {
 
 ### Phase 5: UI Migration (Week 3)
 
-#### 5.1 Update SessionView
+#### 5.1 Update SessionView (Remove Session-Level Prompt Bar)
 ```typescript
 // frontend/src/components/SessionView.tsx
 
-// Modify ViewTabs to remove 'richOutput' and 'messages' tabs
-// These are now accessed through the Claude panel
+// MAJOR CHANGE: Remove SessionInputWithImages from SessionView
+// The prompt bar is no longer at the session level
+// It now lives inside each Claude panel
 
-const handleViewModeChange = (mode: ViewMode) => {
-  if (mode === 'richOutput' || mode === 'messages') {
-    // Redirect to Claude panel
-    openOrFocusClaudePanel();
-  } else {
-    setViewMode(mode);
-  }
-};
-
-const openOrFocusClaudePanel = async () => {
-  const claudePanel = sessionPanels.find(p => p.type === 'claude');
+const SessionView: React.FC = () => {
+  // ... existing state ...
   
-  if (claudePanel) {
-    // Focus existing panel
-    await handlePanelSelect(claudePanel);
-  } else {
-    // Create new Claude panel
-    await handlePanelCreate('claude');
-  }
+  // Remove input-related state (moved to Claude panels)
+  // const [input, setInput] = useState('');
+  // const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  return (
+    <div className="flex flex-col h-full">
+      {/* Main content area with tabs */}
+      <div className="flex-1 overflow-hidden">
+        {/* View tabs for non-Claude content */}
+        <ViewTabs 
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          tabs={['changes', 'terminal', 'logs', 'editor']}  // No richOutput/messages
+        />
+        
+        {/* View content */}
+        {renderViewContent()}
+      </div>
+      
+      {/* Tool Panel Bar - Always visible */}
+      <ToolPanelBar 
+        panels={sessionPanels}
+        activePanel={activePanel}
+        onPanelSelect={handlePanelSelect}
+        onPanelCreate={handlePanelCreate}
+      />
+      
+      {/* Tool Panel Content */}
+      {activePanel && (
+        <div className="flex-1">
+          {renderActivePanel()}
+        </div>
+      )}
+      
+      {/* NO MORE PROMPT BAR HERE - Moved to Claude panels */}
+    </div>
+  );
 };
 
-// Add migration prompt for existing users
-useEffect(() => {
-  if (activeSession && !hasShownMigrationPrompt) {
-    const claudePanel = sessionPanels.find(p => p.type === 'claude');
-    if (!claudePanel && activeSession.status !== 'stopped') {
-      // Show non-intrusive migration hint
-      showMigrationHint();
-    }
-  }
-}, [activeSession, sessionPanels]);
+// Handle creating Claude panels with "Add Claude" button
+const handleCreateClaudePanel = async () => {
+  const newPanel = await window.electron.invoke(
+    'panels:claude:create',
+    sessionId
+  );
+  
+  // Set as active to show the prompt bar
+  setActivePanel(newPanel);
+};
+
+// Add helpful message when no Claude panels exist
+const renderNoClaudeMessage = () => (
+  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+    <p>No Claude panels active</p>
+    <button 
+      onClick={handleCreateClaudePanel}
+      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+    >
+      Add Claude Panel
+    </button>
+  </div>
+);
 ```
 
 #### 5.2 Migration UI Flow
@@ -767,12 +896,41 @@ frontend/src/components/panels/
 ### Risk 5: Breaking Existing Workflows
 **Mitigation**: Comprehensive backward compatibility layer
 
+## Key Architectural Changes Summary
+
+### Before Migration (Current State)
+- **Single Claude instance per session**: One Claude process shared across the entire session
+- **Session-level prompt bar**: Always visible at bottom of SessionView, regardless of active tab
+- **Shared conversation history**: All prompts/responses in single conversation thread
+- **Tab-based Claude views**: richOutput and messages tabs in main view area
+
+### After Migration (New Panel System)
+- **Multiple Claude instances per session**: Each panel spawns its own independent Claude process
+- **Panel-integrated prompt bars**: Each Claude panel has its own prompt input, only visible when that panel is active
+- **Independent conversation histories**: Each panel maintains its own separate conversation thread
+- **Panel-based Claude views**: Multiple Claude panels can run simultaneously with different contexts
+
+### User Experience Impact
+1. **Creating Claude panels**: Users explicitly create Claude panels when needed (no longer automatic with session)
+2. **Multiple contexts**: Users can run multiple Claude instances with different prompts/approaches simultaneously
+3. **Prompt visibility**: Prompt bar only visible when a Claude panel is active (not always present)
+4. **Panel switching**: Switching between Claude panels switches between independent conversations
+5. **Resource usage**: Each Claude panel consumes its own resources (memory/CPU)
+
+### Technical Benefits
+- **True isolation**: Each Claude panel is completely independent with its own process and state
+- **Parallel workflows**: Multiple Claude instances can work on different tasks simultaneously
+- **Better organization**: Each panel can focus on a specific aspect of the problem
+- **Cleaner architecture**: Prompt input logically grouped with its output display
+- **Scalability**: System can handle N Claude instances limited only by system resources
+
 ## Conclusion
 
 This migration plan provides a structured approach to transitioning Claude Code to the new panel system while:
 - Maximizing code reuse (90% of existing code preserved)
 - Ensuring zero data loss through non-destructive migrations
-- Maintaining backward compatibility via dual-mode operation
+- Enabling multiple independent Claude instances per session
+- Moving prompt input to be panel-specific rather than session-global
 - Providing a smooth, reversible migration path
 - Setting foundation for future extensibility
 
