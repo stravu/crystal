@@ -49,12 +49,15 @@ All core features have been successfully implemented with significant enhancemen
 - **Active project**: Persistent active project selection
 
 ### User Interface
-- **Professional terminal**: XTerm.js with 50,000 line scrollback buffer
+- **Dual tab system**: Main view tabs (Output | Diff | Logs | Editor) with tool panel bar underneath
+- **Tool Panel System**: Flexible panel framework supporting multiple terminal instances per session
 - **Multiple view modes**:
   - Output View: Formatted terminal output with syntax highlighting
   - Messages View: Raw JSON message inspection for debugging
   - View Diff View: Git diff viewer with file statistics
-  - Terminal View: Dedicated terminal for running project scripts
+  - Editor View: File editor with syntax highlighting
+- **Multi-instance terminals**: Multiple XTerm.js terminals per session with 50,000 line scrollback
+- **Panel management**: Create, switch, rename, and close tool panels dynamically
 - **Sidebar navigation**: Session list, project selector, prompt history
 - **Real-time updates**: IPC-based live output streaming
 - **Status indicators**: Color-coded badges with animations
@@ -68,11 +71,27 @@ All core features have been successfully implemented with significant enhancemen
 - **Clipboard support**: Copy prompts to clipboard
 
 ### Advanced Terminal Features
+- **Panel-based terminals**: Each terminal runs in its own panel with independent state
+- **Multi-instance support**: Multiple terminal panels per session for parallel workflows
 - **Multi-line input**: Auto-resizing textarea with keyboard shortcuts
 - **Smart formatting**: Automatic formatting of JSON messages
 - **Tool call display**: Clear visual structure for Claude's tool usage
 - **Script execution**: Run project scripts with real-time output
 - **Process management**: Start/stop script processes
+- **State persistence**: Terminal scrollback, working directory, and history persist across app restarts
+- **Lazy initialization**: Terminal processes only start when panels are first viewed
+
+### Tool Panel System ✨ NEW
+- **Flexible architecture**: Extensible panel framework supporting multiple panel types
+- **Multi-instance terminals**: Run multiple terminal instances per session in separate panels
+- **Lazy initialization**: Panels only start processes when first viewed for memory efficiency
+- **State persistence**: Terminal scrollback, working directories, and panel configurations persist across restarts
+- **Panel lifecycle management**: Create, switch, rename, and delete panels dynamically
+- **Event-driven communication**: Panel event bus enabling future inter-panel communication
+- **Always-visible panel bar**: Tool panel tabs always visible below main view tabs
+- **Seamless integration**: Panels integrate with existing session and view management
+- **Memory efficient**: Inactive panels suspend rendering while maintaining background processes
+- **Future extensibility**: Architecture designed to support Claude, Diff, and Editor panels in future releases
 
 ### Settings & Configuration
 - **Global settings**:
@@ -92,11 +111,12 @@ All core features have been successfully implemented with significant enhancemen
 ### Data Persistence
 - **SQLite Database**:
   - `projects`: Project configurations and paths
-  - `sessions`: Core session metadata
+  - `sessions`: Core session metadata with active panel tracking
   - `session_outputs`: Terminal output history
   - `conversation_messages`: Conversation history for continuations
   - `execution_diffs`: Git diff tracking per execution
   - `prompt_markers`: Navigation markers for prompts
+  - `tool_panels`: Panel configurations, state, and metadata
 - **Automatic initialization**: `~/.crystal` directory created on first run
 - **Migration system**: SQL migrations for schema evolution
 - **Electron Store**: Application configuration persistence
@@ -197,6 +217,64 @@ The frontend has also been modularized:
 - **`useSessionView.ts`** (941 lines): Extracted session view logic from the previous monolithic SessionView component
 
 This modular structure improves maintainability and makes it easier to locate and modify specific functionality.
+
+### Tool Panel System Implementation Guidelines ✨ NEW
+
+⚠️ **IMPORTANT**: The tool panel system implements a flexible, extensible architecture for managing multiple tool instances per session.
+
+#### Architecture Overview
+
+The tool panel system consists of several key components:
+
+1. **Panel Manager** (`main/src/services/panelManager.ts`): Central coordinator for panel lifecycle management
+2. **Terminal Panel Manager** (`main/src/services/terminalPanelManager.ts`): Specialized handler for terminal panel processes
+3. **Panel Event Bus** (`main/src/services/panelEventBus.ts`): Event communication system between panels
+4. **Panel Store** (`frontend/src/stores/panelStore.ts`): Frontend state management with Zustand
+5. **Panel Components**: React components for rendering different panel types
+
+#### Key Implementation Principles
+
+1. **Lazy Initialization**: Panels are created in the database immediately but background processes (like terminal PTY) only start when the panel is first viewed
+2. **State Persistence**: All panel state including terminal scrollback, working directories, and configurations persist across application restarts
+3. **Memory Efficiency**: Inactive panels suspend rendering but maintain background processes
+4. **Event-Driven Updates**: Uses IPC events to synchronize state between main and renderer processes
+5. **Extensible Design**: Architecture supports future panel types beyond terminals
+
+#### Panel Lifecycle
+
+1. **Creation**: User clicks "Add Tool" → Panel entry created in database → Added to UI
+2. **First View**: User clicks panel tab → Background process initializes → XTerm.js mounts
+3. **Switching**: User switches panels → Previous panel unmounts XTerm → New panel mounts
+4. **Background Operation**: Processes continue running even when panel is not visible
+5. **Deletion**: Panel closed → Process terminated → Database entry removed → UI updated
+
+#### Terminal Panel Specifics
+
+- Each terminal panel spawns an independent PTY process using node-pty
+- Terminal state (scrollback, history, dimensions) persists in `tool_panels.state` as JSON
+- XTerm.js instances mount/unmount based on panel visibility to save memory
+- Working directories are maintained independently per panel
+- Command history and environment variables can be preserved across restarts
+
+#### Database Schema
+
+- `tool_panels` table stores panel configuration and state
+- `sessions.active_panel_id` tracks the currently active panel per session  
+- Foreign key constraints ensure panels are cleaned up when sessions are deleted
+
+#### Event System
+
+- Terminal panels emit `terminal:command_executed`, `terminal:exit`, and `files:changed` events
+- Event bus routes events to subscribed panels (planned for future panel types)
+- Events support future inter-panel communication (e.g., diff panels reacting to file changes)
+
+#### Future Extensibility
+
+The system is designed to support additional panel types:
+- Claude panels (for multiple Claude instances)
+- Diff panels (for comparing different versions)
+- Editor panels (for in-app file editing)
+- Log panels (for application logs)
 
 ### Session Output Handling (DO NOT MODIFY WITHOUT EXPLICIT PERMISSION)
 
