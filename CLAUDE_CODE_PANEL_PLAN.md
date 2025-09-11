@@ -25,10 +25,13 @@ This document outlines the migration strategy for transitioning Claude Code from
 - `main/src/events.ts` - Event handling for Claude outputs
 
 #### Frontend Components
-- `frontend/src/components/session/RichOutputView.tsx` - Formatted Claude output display
-- `frontend/src/components/session/MessagesView.tsx` - Raw JSON message viewer
+- `frontend/src/components/session/RichOutputWithSidebar.tsx` - Main Claude output display with prompt/commit sidebar
+- `frontend/src/components/session/RichOutputView.tsx` - Rich formatted Claude output renderer
+- `frontend/src/components/session/MessagesView.tsx` - Raw JSON message viewer for debugging
+- `frontend/src/components/session/SessionInputWithImages.tsx` - Modern prompt input with image support
 - `frontend/src/hooks/useSessionView.ts` - Session view logic (includes claude handling)
-- Input handling integrated into SessionView component
+- `frontend/src/components/PromptNavigation.tsx` - Prompt history navigation sidebar
+- `frontend/src/components/CommitsPanel.tsx` - Git commits sidebar panel
 
 #### Data Structure
 - Sessions table includes Claude-specific fields
@@ -349,11 +352,11 @@ export class ClaudePanelManager {
 ```
 frontend/src/components/panels/claude/
 ├── ClaudePanel.tsx              # Main panel component
-├── ClaudePanelInput.tsx         # Input area (reuse existing)
+├── ClaudePanelInput.tsx         # Adapt from SessionInputWithImages
 ├── ClaudePanelOutput.tsx        # Output display wrapper
+├── RichOutputWithSidebar.tsx    # Move existing component here
 ├── RichOutputDisplay.tsx        # Move from session/RichOutputView
 ├── MessagesDisplay.tsx          # Move from session/MessagesView
-├── PromptNavigation.tsx         # Prompt history sidebar
 ├── ClaudePanelToolbar.tsx       # Toggle output modes, settings
 └── index.ts                     # Export aggregation
 ```
@@ -363,8 +366,8 @@ frontend/src/components/panels/claude/
 // frontend/src/components/panels/claude/ClaudePanel.tsx
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ClaudePanelInput } from './ClaudePanelInput';
-import { ClaudePanelOutput } from './ClaudePanelOutput';
+import { SessionInputWithImages } from '../../session/SessionInputWithImages'; // Reuse existing input
+import { RichOutputWithSidebar } from './RichOutputWithSidebar'; // Reuse existing output
 import { ClaudePanelToolbar } from './ClaudePanelToolbar';
 import { useRequiredSession } from '../../../contexts/SessionContext';
 import { ClaudePanelState } from '../../../../shared/types/panels';
@@ -425,22 +428,25 @@ export const ClaudePanel: React.FC<{ panel: ToolPanel; isActive: boolean }> = ({
 
   return (
     <div className="claude-panel flex flex-col h-full">
-      <ClaudePanelToolbar 
-        outputMode={outputMode}
-        onOutputModeChange={setOutputMode}
-      />
-      
       <div className="flex-1 overflow-hidden">
-        <ClaudePanelOutput 
-          outputs={outputs}
-          mode={outputMode}
-          isLoading={isLoading}
+        <RichOutputWithSidebar 
+          sessionId={sessionId}
+          sessionStatus={panel.state.customState?.status}
+          model={panel.state.customState?.modelVersion}
+          settings={/* load from panel state */}
         />
       </div>
       
-      <ClaudePanelInput 
-        onSendInput={handleSendInput}
-        sessionId={sessionId}
+      <SessionInputWithImages 
+        activeSession={/* get session object */}
+        viewMode="richOutput"
+        input={input}
+        setInput={setInput}
+        textareaRef={textareaRef}
+        handleTerminalCommand={() => {}}
+        handleSendInput={handleSendInput}
+        handleContinueConversation={handleContinue}
+        // ... other required props
       />
     </div>
   );
