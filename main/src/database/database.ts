@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
+import type { ToolPanel } from '../../../shared/types/panels';
 
 export class DatabaseService {
   private db: Database.Database;
@@ -770,6 +771,36 @@ export class DatabaseService {
       // Mark migration as complete
       this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('auto_commit_migrated', 'true')").run();
       console.log('[Database] Completed auto_commit migration');
+    }
+
+    // Add tool panels table if it doesn't exist
+    const toolPanelsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tool_panels'").all();
+    if (toolPanelsTable.length === 0) {
+      this.db.prepare(`
+        CREATE TABLE tool_panels (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          state TEXT,
+          metadata TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        )
+      `).run();
+      this.db.prepare("CREATE INDEX idx_tool_panels_session_id ON tool_panels(session_id)").run();
+      this.db.prepare("CREATE INDEX idx_tool_panels_type ON tool_panels(type)").run();
+      console.log('[Database] Created tool_panels table');
+    }
+
+    // Add active_panel_id column to sessions table if it doesn't exist
+    const sessionsTableInfoPanel = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasActivePanelIdColumn = sessionsTableInfoPanel.some((col: any) => col.name === 'active_panel_id');
+    
+    if (!hasActivePanelIdColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN active_panel_id TEXT").run();
+      console.log('[Database] Added active_panel_id column to sessions table');
     }
   }
 
@@ -1754,6 +1785,118 @@ export class DatabaseService {
       preferences[row.key] = row.value;
     }
     return preferences;
+  }
+
+  // Panel operations
+  createPanel(data: {
+    id: string;
+    sessionId: string;
+    type: string;
+    title: string;
+    state?: any;
+    metadata?: any;
+  }): void {
+    const stateJson = data.state ? JSON.stringify(data.state) : null;
+    const metadataJson = data.metadata ? JSON.stringify(data.metadata) : null;
+    
+    this.db.prepare(`
+      INSERT INTO tool_panels (id, session_id, type, title, state, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(data.id, data.sessionId, data.type, data.title, stateJson, metadataJson);
+  }
+
+  updatePanel(panelId: string, updates: {
+    title?: string;
+    state?: any;
+    metadata?: any;
+  }): void {
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    
+    if (updates.title !== undefined) {
+      setClauses.push('title = ?');
+      values.push(updates.title);
+    }
+    
+    if (updates.state !== undefined) {
+      setClauses.push('state = ?');
+      values.push(JSON.stringify(updates.state));
+    }
+    
+    if (updates.metadata !== undefined) {
+      setClauses.push('metadata = ?');
+      values.push(JSON.stringify(updates.metadata));
+    }
+    
+    if (setClauses.length > 0) {
+      setClauses.push('updated_at = CURRENT_TIMESTAMP');
+      values.push(panelId);
+      
+      this.db.prepare(`
+        UPDATE tool_panels
+        SET ${setClauses.join(', ')}
+        WHERE id = ?
+      `).run(...values);
+    }
+  }
+
+  deletePanel(panelId: string): void {
+    this.db.prepare('DELETE FROM tool_panels WHERE id = ?').run(panelId);
+  }
+
+  getPanel(panelId: string): ToolPanel | null {
+    const row = this.db.prepare('SELECT * FROM tool_panels WHERE id = ?').get(panelId) as any;
+    
+    if (!row) return null;
+    
+    return {
+      id: row.id,
+      sessionId: row.session_id,
+      type: row.type,
+      title: row.title,
+      state: row.state ? JSON.parse(row.state) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+    };
+  }
+
+  getPanelsForSession(sessionId: string): ToolPanel[] {
+    const rows = this.db.prepare('SELECT * FROM tool_panels WHERE session_id = ? ORDER BY created_at').all(sessionId) as any[];
+    
+    return rows.map(row => ({
+      id: row.id,
+      sessionId: row.session_id,
+      type: row.type,
+      title: row.title,
+      state: row.state ? JSON.parse(row.state) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+    }));
+  }
+
+  setActivePanel(sessionId: string, panelId: string | null): void {
+    this.db.prepare('UPDATE sessions SET active_panel_id = ? WHERE id = ?').run(panelId, sessionId);
+  }
+
+  getActivePanel(sessionId: string): ToolPanel | null {
+    const row = this.db.prepare(`
+      SELECT tp.* FROM tool_panels tp
+      JOIN sessions s ON s.active_panel_id = tp.id
+      WHERE s.id = ?
+    `).get(sessionId) as any;
+    
+    if (!row) return null;
+    
+    return {
+      id: row.id,
+      sessionId: row.session_id,
+      type: row.type,
+      title: row.title,
+      state: row.state ? JSON.parse(row.state) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+    };
+  }
+
+  deletePanelsForSession(sessionId: string): void {
+    this.db.prepare('DELETE FROM tool_panels WHERE session_id = ?').run(sessionId);
   }
 
   close(): void {

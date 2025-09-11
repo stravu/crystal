@@ -1,0 +1,365 @@
+import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import { ToolPanel, TerminalPanelState, PanelEventType } from '../../../shared/types/panels';
+import { panelManager } from './panelManager';
+import { mainWindow } from '../index';
+import * as os from 'os';
+import * as path from 'path';
+
+interface TerminalProcess {
+  pty: pty.IPty;
+  panelId: string;
+  sessionId: string;
+  scrollbackBuffer: string[];
+  commandHistory: string[];
+  currentCommand: string;
+  lastActivity: Date;
+}
+
+export class TerminalPanelManager {
+  private terminals = new Map<string, TerminalProcess>();
+  private readonly MAX_SCROLLBACK_LINES = 10000;
+  
+  async initializeTerminal(panel: ToolPanel, cwd: string): Promise<void> {
+    if (this.terminals.has(panel.id)) {
+      console.log(`[TerminalPanelManager] Terminal ${panel.id} already initialized`);
+      return;
+    }
+    
+    console.log(`[TerminalPanelManager] Initializing terminal ${panel.id} in ${cwd}`);
+    
+    // Determine shell based on platform
+    const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
+    
+    // Create PTY process
+    const ptyProcess = pty.spawn(shell, [], {
+      name: 'xterm-color',
+      cols: 80,
+      rows: 30,
+      cwd: cwd,
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        CRYSTAL_SESSION_ID: panel.sessionId,
+        CRYSTAL_PANEL_ID: panel.id
+      }
+    });
+    
+    // Create terminal process object
+    const terminalProcess: TerminalProcess = {
+      pty: ptyProcess,
+      panelId: panel.id,
+      sessionId: panel.sessionId,
+      scrollbackBuffer: [],
+      commandHistory: [],
+      currentCommand: '',
+      lastActivity: new Date()
+    };
+    
+    // Store in map
+    this.terminals.set(panel.id, terminalProcess);
+    
+    // Set up event handlers
+    this.setupTerminalHandlers(terminalProcess);
+    
+    // Update panel state
+    const state = panel.state;
+    state.customState = {
+      ...state.customState,
+      isInitialized: true,
+      cwd: cwd,
+      shellType: path.basename(shell),
+      dimensions: { cols: 80, rows: 30 }
+    } as TerminalPanelState;
+    
+    await panelManager.updatePanel(panel.id, { state });
+    
+    console.log(`[TerminalPanelManager] Terminal ${panel.id} initialized successfully`);
+  }
+  
+  private setupTerminalHandlers(terminal: TerminalProcess): void {
+    // Handle terminal output
+    terminal.pty.onData((data: string) => {
+      // Update last activity
+      terminal.lastActivity = new Date();
+      
+      // Add to scrollback buffer
+      this.addToScrollback(terminal, data);
+      
+      // Detect commands (simple heuristic - look for carriage returns)
+      if (data.includes('\r') || data.includes('\n')) {
+        if (terminal.currentCommand.trim()) {
+          terminal.commandHistory.push(terminal.currentCommand);
+          
+          // Emit command executed event
+          panelManager.emitPanelEvent(
+            terminal.panelId,
+            'terminal:command_executed',
+            {
+              command: terminal.currentCommand,
+              timestamp: new Date().toISOString()
+            }
+          );
+          
+          // Check for file operation commands
+          if (this.isFileOperationCommand(terminal.currentCommand)) {
+            panelManager.emitPanelEvent(
+              terminal.panelId,
+              'files:changed',
+              {
+                command: terminal.currentCommand,
+                timestamp: new Date().toISOString()
+              }
+            );
+          }
+          
+          terminal.currentCommand = '';
+        }
+      } else {
+        // Accumulate command input
+        terminal.currentCommand += data;
+      }
+      
+      // Send output to frontend
+      if (mainWindow) {
+        mainWindow.webContents.send('terminal:output', {
+          panelId: terminal.panelId,
+          output: data
+        });
+      }
+    });
+    
+    // Handle terminal exit
+    terminal.pty.onExit((exitCode: { exitCode: number; signal?: number }) => {
+      console.log(`[TerminalPanelManager] Terminal ${terminal.panelId} exited with code ${exitCode.exitCode}`);
+      
+      // Emit exit event
+      panelManager.emitPanelEvent(
+        terminal.panelId,
+        'terminal:exit',
+        {
+          exitCode: exitCode.exitCode,
+          signal: exitCode.signal,
+          timestamp: new Date().toISOString()
+        }
+      );
+      
+      // Clean up
+      this.terminals.delete(terminal.panelId);
+      
+      // Notify frontend
+      if (mainWindow) {
+        mainWindow.webContents.send('terminal:exited', {
+          panelId: terminal.panelId,
+          exitCode: exitCode.exitCode
+        });
+      }
+    });
+  }
+  
+  private addToScrollback(terminal: TerminalProcess, data: string): void {
+    // Split data into lines and add to buffer
+    const lines = data.split(/\r?\n/);
+    terminal.scrollbackBuffer.push(...lines);
+    
+    // Trim buffer if it exceeds max size
+    if (terminal.scrollbackBuffer.length > this.MAX_SCROLLBACK_LINES) {
+      terminal.scrollbackBuffer = terminal.scrollbackBuffer.slice(-this.MAX_SCROLLBACK_LINES);
+    }
+  }
+  
+  private isFileOperationCommand(command: string): boolean {
+    const fileOperations = [
+      'touch', 'rm', 'mv', 'cp', 'mkdir', 'rmdir',
+      'cat >', 'echo >', 'echo >>', 'vim', 'vi', 'nano', 'emacs',
+      'git add', 'git rm', 'git mv'
+    ];
+    
+    const trimmedCommand = command.trim().toLowerCase();
+    return fileOperations.some(op => trimmedCommand.startsWith(op));
+  }
+  
+  isTerminalInitialized(panelId: string): boolean {
+    return this.terminals.has(panelId);
+  }
+  
+  writeToTerminal(panelId: string, data: string): void {
+    const terminal = this.terminals.get(panelId);
+    if (!terminal) {
+      console.warn(`[TerminalPanelManager] Terminal ${panelId} not found`);
+      return;
+    }
+    
+    terminal.pty.write(data);
+    terminal.lastActivity = new Date();
+  }
+  
+  resizeTerminal(panelId: string, cols: number, rows: number): void {
+    const terminal = this.terminals.get(panelId);
+    if (!terminal) {
+      console.warn(`[TerminalPanelManager] Terminal ${panelId} not found for resize`);
+      return;
+    }
+    
+    terminal.pty.resize(cols, rows);
+    
+    // Update panel state with new dimensions
+    const panel = panelManager.getPanel(panelId);
+    if (panel) {
+      const state = panel.state;
+      state.customState = {
+        ...state.customState,
+        dimensions: { cols, rows }
+      } as TerminalPanelState;
+      panelManager.updatePanel(panelId, { state });
+    }
+  }
+  
+  async saveTerminalState(panelId: string): Promise<void> {
+    const terminal = this.terminals.get(panelId);
+    if (!terminal) {
+      console.warn(`[TerminalPanelManager] Terminal ${panelId} not found for state save`);
+      return;
+    }
+    
+    const panel = panelManager.getPanel(panelId);
+    if (!panel) return;
+    
+    // Get current working directory (if possible)
+    let cwd = panel.state.customState?.cwd || process.cwd();
+    try {
+      // Try to get CWD from process (platform-specific)
+      if (process.platform !== 'win32') {
+        const pid = terminal.pty.pid;
+        if (pid) {
+          // This is a simplified approach - in production you might use platform-specific methods
+          cwd = await this.getProcessCwd(pid);
+        }
+      }
+    } catch (error) {
+      console.warn(`[TerminalPanelManager] Could not get CWD for terminal ${panelId}:`, error);
+    }
+    
+    // Save state to panel
+    const state = panel.state;
+    state.customState = {
+      ...state.customState,
+      isInitialized: true,
+      cwd: cwd,
+      scrollbackBuffer: terminal.scrollbackBuffer.slice(-this.MAX_SCROLLBACK_LINES),
+      commandHistory: terminal.commandHistory.slice(-100), // Keep last 100 commands
+      lastActivityTime: terminal.lastActivity.toISOString(),
+      lastActiveCommand: terminal.currentCommand
+    } as TerminalPanelState;
+    
+    await panelManager.updatePanel(panelId, { state });
+    
+    console.log(`[TerminalPanelManager] Saved state for terminal ${panelId}`);
+  }
+  
+  private async getProcessCwd(pid: number): Promise<string> {
+    // This is platform-specific and simplified
+    // In production, you'd use more robust methods
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      try {
+        const fs = require('fs').promises;
+        const cwdLink = `/proc/${pid}/cwd`;
+        return await fs.readlink(cwdLink);
+      } catch {
+        return process.cwd();
+      }
+    }
+    return process.cwd();
+  }
+  
+  async restoreTerminalState(panel: ToolPanel, state: TerminalPanelState): Promise<void> {
+    if (!state.scrollbackBuffer || state.scrollbackBuffer.length === 0) {
+      console.log(`[TerminalPanelManager] No state to restore for terminal ${panel.id}`);
+      return;
+    }
+    
+    // Initialize terminal first
+    await this.initializeTerminal(panel, state.cwd || process.cwd());
+    
+    const terminal = this.terminals.get(panel.id);
+    if (!terminal) return;
+    
+    // Restore scrollback buffer
+    terminal.scrollbackBuffer = state.scrollbackBuffer || [];
+    terminal.commandHistory = state.commandHistory || [];
+    
+    // Send restoration indicator to terminal
+    const restorationMsg = `\r\n[Session Restored from ${state.lastActivityTime || 'previous session'}]\r\n`;
+    terminal.pty.write(restorationMsg);
+    
+    // Send scrollback to frontend
+    if (mainWindow && state.scrollbackBuffer) {
+      const restoredOutput = state.scrollbackBuffer.join('\n');
+      mainWindow.webContents.send('terminal:output', {
+        panelId: panel.id,
+        output: restoredOutput + restorationMsg
+      });
+    }
+    
+    console.log(`[TerminalPanelManager] Restored state for terminal ${panel.id}`);
+  }
+  
+  getTerminalState(panelId: string): TerminalPanelState | null {
+    const terminal = this.terminals.get(panelId);
+    if (!terminal) return null;
+    
+    return {
+      isInitialized: true,
+      cwd: process.cwd(), // Simplified - would need platform-specific implementation
+      shellType: process.env.SHELL || 'bash',
+      scrollbackBuffer: terminal.scrollbackBuffer,
+      commandHistory: terminal.commandHistory,
+      lastActivityTime: terminal.lastActivity.toISOString(),
+      lastActiveCommand: terminal.currentCommand
+    };
+  }
+  
+  destroyTerminal(panelId: string): void {
+    const terminal = this.terminals.get(panelId);
+    if (!terminal) {
+      console.log(`[TerminalPanelManager] Terminal ${panelId} not found for destruction`);
+      return;
+    }
+    
+    // Save state before destroying
+    this.saveTerminalState(panelId);
+    
+    // Kill the PTY process
+    try {
+      terminal.pty.kill();
+    } catch (error) {
+      console.error(`[TerminalPanelManager] Error killing terminal ${panelId}:`, error);
+    }
+    
+    // Remove from map
+    this.terminals.delete(panelId);
+    
+    console.log(`[TerminalPanelManager] Destroyed terminal ${panelId}`);
+  }
+  
+  destroyAllTerminals(): void {
+    console.log(`[TerminalPanelManager] Destroying all ${this.terminals.size} terminals...`);
+    
+    for (const [panelId, terminal] of this.terminals) {
+      try {
+        terminal.pty.kill();
+      } catch (error) {
+        console.error(`[TerminalPanelManager] Error killing terminal ${panelId}:`, error);
+      }
+    }
+    
+    this.terminals.clear();
+  }
+  
+  getActiveTerminals(): string[] {
+    return Array.from(this.terminals.keys());
+  }
+}
+
+// Export singleton instance
+export const terminalPanelManager = new TerminalPanelManager();

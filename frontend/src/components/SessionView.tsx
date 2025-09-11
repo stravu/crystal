@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, memo, useMemo } from 'react';
+import { useRef, useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { EmptyState } from './EmptyState';
@@ -19,6 +19,12 @@ import { RichOutputSettings } from './session/RichOutputView';
 import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
 import { LogView } from './session/LogView';
 import { MessagesView } from './session/MessagesView';
+import { usePanelStore } from '../stores/panelStore';
+import { panelApi } from '../services/panelApi';
+import { PanelTabBar } from './panels/PanelTabBar';
+import { PanelContainer } from './panels/PanelContainer';
+import { SessionProvider } from '../contexts/SessionContext';
+import { ToolPanel, ToolPanelType } from '../../../shared/types/panels';
 
 export const SessionView = memo(() => {
   const { activeView, activeProjectId } = useNavigationStore();
@@ -39,6 +45,97 @@ export const SessionView = memo(() => {
     return state.sessions.find(session => session.id === state.activeSessionId);
   });
 
+  // Panel store state and actions
+  const {
+    panels,
+    activePanels,
+    setPanels,
+    setActivePanel: setActivePanelInStore,
+    addPanel,
+    removePanel,
+  } = usePanelStore();
+
+  // Load panels when session changes
+  useEffect(() => {
+    if (activeSession?.id) {
+      console.log('[SessionView] Loading panels for session:', activeSession.id);
+      panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
+        console.log('[SessionView] Loaded panels:', loadedPanels);
+        setPanels(activeSession.id, loadedPanels);
+      });
+      
+      panelApi.getActivePanel(activeSession.id).then(activePanel => {
+        console.log('[SessionView] Active panel from backend:', activePanel);
+        if (activePanel) {
+          setActivePanelInStore(activeSession.id, activePanel.id);
+        }
+      });
+    }
+  }, [activeSession?.id, setPanels, setActivePanelInStore]);
+
+  // Get panels for current session with memoization
+  const sessionPanels = useMemo(
+    () => panels[activeSession?.id || ''] || [],
+    [panels, activeSession?.id]
+  );
+
+  const currentActivePanel = useMemo(
+    () => sessionPanels.find(p => p.id === activePanels[activeSession?.id || '']),
+    [sessionPanels, activePanels, activeSession?.id]
+  );
+  
+  // Debug logging
+  console.log('[SessionView] Session panels:', sessionPanels);
+  console.log('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
+  console.log('[SessionView] Current active panel:', currentActivePanel);
+
+  // FIX: Memoize all callbacks to prevent re-renders
+  const handlePanelSelect = useCallback(
+    async (panel: ToolPanel) => {
+      if (!activeSession) return;
+      setActivePanelInStore(activeSession.id, panel.id);
+      await panelApi.setActivePanel(activeSession.id, panel.id);
+    },
+    [activeSession, setActivePanelInStore]
+  );
+
+  const handlePanelClose = useCallback(
+    async (panel: ToolPanel) => {
+      if (!activeSession) return;
+      
+      // Find next panel to activate
+      const panelIndex = sessionPanels.findIndex(p => p.id === panel.id);
+      const nextPanel = sessionPanels[panelIndex + 1] || sessionPanels[panelIndex - 1];
+      
+      // Remove from store first for immediate UI update
+      removePanel(activeSession.id, panel.id);
+      
+      // Set next active panel if available
+      if (nextPanel) {
+        setActivePanelInStore(activeSession.id, nextPanel.id);
+        await panelApi.setActivePanel(activeSession.id, nextPanel.id);
+      }
+      
+      // Delete on backend
+      await panelApi.deletePanel(panel.id);
+    },
+    [activeSession, sessionPanels, removePanel, setActivePanelInStore]
+  );
+
+  const handlePanelCreate = useCallback(
+    async (type: ToolPanelType) => {
+      if (!activeSession) return;
+      
+      const newPanel = await panelApi.createPanel({
+        sessionId: activeSession.id,
+        type
+      });
+      
+      // Add to store and make active
+      addPanel(newPanel);
+    },
+    [activeSession, addPanel]
+  );
 
   // Load project data for active session
   useEffect(() => {
@@ -222,12 +319,41 @@ export const SessionView = memo(() => {
         showSettings={showRichOutputSettings}
       />
       
+      {/* Tool Panel Bar - ALWAYS VISIBLE */}
+      <SessionProvider session={activeSession}>
+        <PanelTabBar
+          panels={sessionPanels}
+          activePanel={currentActivePanel}
+          onPanelSelect={handlePanelSelect}
+          onPanelClose={handlePanelClose}
+          onPanelCreate={handlePanelCreate}
+        />
+      </SessionProvider>
+      
       <div className="flex-1 flex relative min-h-0">
         <div className="flex-1 relative">
-          {hook.isLoadingOutput && hook.viewMode !== 'richOutput' && (
-            <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
-          )}
-          {hook.viewMode === 'richOutput' && (
+          {/* Render all panels but only show the active one - keeps terminals alive */}
+          {sessionPanels.length > 0 && currentActivePanel ? (
+            <SessionProvider session={activeSession}>
+              {sessionPanels.map(panel => (
+                <div 
+                  key={panel.id} 
+                  className="absolute inset-0"
+                  style={{ display: panel.id === currentActivePanel.id ? 'block' : 'none' }}
+                >
+                  <PanelContainer
+                    panel={panel}
+                    isActive={panel.id === currentActivePanel.id}
+                  />
+                </div>
+              ))}
+            </SessionProvider>
+          ) : (
+            <>
+              {hook.isLoadingOutput && hook.viewMode !== 'richOutput' && (
+                <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
+              )}
+              {hook.viewMode === 'richOutput' && (
             <div className="h-full block">
               <RichOutputWithSidebar 
                 sessionId={activeSession.id}
@@ -315,10 +441,12 @@ export const SessionView = memo(() => {
               <MessagesView sessionId={activeSession.id} />
             </div>
           )}
+            </>
+          )}
         </div>
       </div>
       
-      {hook.viewMode !== 'terminal' && (
+      {hook.viewMode !== 'terminal' && !currentActivePanel && (
         <SessionInputWithImages
           activeSession={activeSession}
           viewMode={hook.viewMode}
