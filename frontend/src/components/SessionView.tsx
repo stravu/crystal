@@ -16,7 +16,6 @@ import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
 import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
 import { RichOutputSettings } from './panels/claude/RichOutputView';
-import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
 import { LogView } from './session/LogView';
 import { MessagesView } from './panels/claude/MessagesView';
 import { usePanelStore } from '../stores/panelStore';
@@ -236,7 +235,6 @@ export const SessionView = memo(() => {
   const hook = useSessionView(activeSession, terminalRef, scriptTerminalRef);
   
   // Settings state for Rich Output view
-  const [showRichOutputSettings, setShowRichOutputSettings] = useState(false);
   const [richOutputSettings, setRichOutputSettings] = useState<RichOutputSettings>(() => {
     const saved = localStorage.getItem('richOutputSettings');
     return saved ? JSON.parse(saved) : {
@@ -322,8 +320,6 @@ export const SessionView = memo(() => {
         setViewMode={hook.setViewMode}
         unreadActivity={hook.unreadActivity}
         setUnreadActivity={hook.setUnreadActivity}
-        onSettingsClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
-        showSettings={showRichOutputSettings}
       />
       
       {/* Tool Panel Bar - ALWAYS VISIBLE */}
@@ -526,15 +522,6 @@ export const SessionView = memo(() => {
         onClose={() => hook.setShowStravuSearch(false)}
         onFileSelect={hook.handleStravuFileSelect}
       />
-      
-      {/* Rich Output Settings Panel */}
-      {hook.viewMode === 'richOutput' && showRichOutputSettings && (
-        <RichOutputSettingsPanel
-          settings={richOutputSettings}
-          onSettingsChange={handleRichOutputSettingsChange}
-          onClose={() => setShowRichOutputSettings(false)}
-        />
-      )}
 
     </div>
   );
