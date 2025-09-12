@@ -5,13 +5,15 @@ interface UseResizablePanelOptions {
   minWidth: number;
   maxWidth: number;
   storageKey?: string;
+  onResize?: (width: number) => void;
 }
 
 export function useResizablePanel({
   defaultWidth,
   minWidth,
   maxWidth,
-  storageKey
+  storageKey,
+  onResize
 }: UseResizablePanelOptions) {
   // Get initial width from localStorage or use default
   const getInitialWidth = () => {
@@ -32,12 +34,15 @@ export function useResizablePanel({
   const startX = useRef(0);
   const startWidth = useRef(0);
 
-  // Save width to localStorage
+  // Save width to localStorage and call onResize
   useEffect(() => {
     if (storageKey) {
       localStorage.setItem(storageKey, width.toString());
     }
-  }, [width, storageKey]);
+    if (onResize) {
+      onResize(width);
+    }
+  }, [width, storageKey, onResize]);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

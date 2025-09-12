@@ -11,7 +11,7 @@ import { SessionHeader } from './session/SessionHeader';
 import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages';
 import { GitErrorDialog } from './session/GitErrorDialog';
 import { CommitMessageDialog } from './session/CommitMessageDialog';
-import { FileEditor } from './FileEditor';
+import { FileEditor } from './panels/editor/FileEditor';
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
 import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';

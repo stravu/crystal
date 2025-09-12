@@ -18,6 +18,7 @@ import { registerCommitModeHandlers } from './commitMode';
 import { setupLogHandlers } from './logs';
 import { registerPanelHandlers } from './panels';
 import { registerClaudePanelHandlers } from './claudePanel';
+import { registerEditorPanelHandlers } from './editorPanel';
 
 
 export function registerIpcHandlers(services: AppServices): void {
@@ -39,4 +40,5 @@ export function registerIpcHandlers(services: AppServices): void {
   setupLogHandlers(services.sessionManager);
   registerPanelHandlers(ipcMain, services);
   registerClaudePanelHandlers(ipcMain, services);
+  registerEditorPanelHandlers(ipcMain, services);
 } 

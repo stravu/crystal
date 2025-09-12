@@ -112,8 +112,17 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
       return true;
     }
     
-    // For claude and other panels that have isInitialized
-    return (panel.state.customState as any)?.isInitialized || false;
+    if (panel.type === 'claude') {
+      const customState = panel.state.customState as any;
+      return customState?.isInitialized || false;
+    }
+    
+    // Editor panels don't need initialization
+    if (panel.type === 'editor') {
+      return true;
+    }
+    
+    return false;
   });
   
   // Event handlers

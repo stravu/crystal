@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal' | 'claude' | 'diff'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude' | 'diff' | 'editor'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState;
+  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState | EditorPanelState;
 }
 
 export interface TerminalPanelState {
@@ -60,6 +60,27 @@ export interface ClaudePanelState {
   model?: string;                // Model being used (sonnet, opus, haiku)
   permissionMode?: 'approve' | 'ignore'; // Permission mode
   lastActivityTime?: string;     // For "idle since" indicators
+}
+
+export interface EditorPanelState {
+  filePath?: string;              // Currently open file
+  content?: string;               // File content (for unsaved changes)
+  isDirty?: boolean;              // Has unsaved changes
+  cursorPosition?: {              // Cursor location
+    line: number;
+    column: number;
+  };
+  scrollPosition?: number;        // Scroll position
+  language?: string;              // File language for syntax highlighting
+  readOnly?: boolean;             // Read-only mode
+  fontSize?: number;              // Editor font size preference
+  theme?: string;                 // Editor theme preference
+  
+  // File tree state
+  expandedDirs?: string[];        // List of expanded directory paths
+  fileTreeWidth?: number;         // Width of the file tree panel
+  searchQuery?: string;           // Current search query in file tree
+  showSearch?: boolean;           // Whether search is visible
 }
 
 export interface ToolPanelMetadata {
@@ -116,6 +137,9 @@ export type PanelEventType =
   | 'terminal:exit'              // When terminal process exits
   | 'files:changed'              // When terminal detects file system changes
   | 'diff:refreshed'             // When diff panel refreshes its content
+  // Editor panel events
+  | 'editor:file_saved'          // When a file is saved in editor
+  | 'editor:file_changed'        // When file content changes in editor
 
 export interface PanelEventSubscription {
   panelId: string;
@@ -151,6 +175,12 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     requiresProcess: false,           // No background process
     singleton: true,                  // Only one diff panel
     permanent: true                   // Cannot be closed
-  }
+  },
+  editor: {
+    canEmit: ['editor:file_saved', 'editor:file_changed'],
+    canConsume: ['files:changed'],  // React to file system changes
+    requiresProcess: false,          // No background process needed
+    singleton: false                 // Multiple editors allowed
+  },
   // Future panel types will be added here when migrated
 };

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ProjectDashboard } from './ProjectDashboard';
-import { FileEditor } from './FileEditor';
+import { FileEditor } from './panels/editor/FileEditor';
 import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages';
 import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
 import { RichOutputSettings } from './panels/claude/RichOutputView';

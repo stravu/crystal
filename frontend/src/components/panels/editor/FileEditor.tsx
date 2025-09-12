@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { flushSync } from 'react-dom';
 import Editor from '@monaco-editor/react';
 import { ChevronRight, ChevronDown, File, Folder, RefreshCw, Plus, Trash2, FolderPlus, Search, X, Eye, Code } from 'lucide-react';
-import { MonacoErrorBoundary } from './MonacoErrorBoundary';
-import { useTheme } from '../contexts/ThemeContext';
-import { debounce } from '../utils/debounce';
-import { MarkdownPreview } from './MarkdownPreview';
-import { useResizablePanel } from '../hooks/useResizablePanel';
+import { MonacoErrorBoundary } from '../../MonacoErrorBoundary';
+import { useTheme } from '../../../contexts/ThemeContext';
+import { debounce } from '../../../utils/debounce';
+import { MarkdownPreview } from '../../MarkdownPreview';
+import { useResizablePanel } from '../../../hooks/useResizablePanel';
+import { EditorPanelState } from '../../../../../shared/types/panels';
 
 interface FileItem {
   name: string;
@@ -125,15 +126,29 @@ interface FileTreeProps {
   sessionId: string;
   onFileSelect: (file: FileItem) => void;
   selectedPath: string | null;
+  initialExpandedDirs?: string[];
+  initialSearchQuery?: string;
+  initialShowSearch?: boolean;
+  onTreeStateChange?: (state: { expandedDirs: string[]; searchQuery: string; showSearch: boolean }) => void;
 }
 
-function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
+function FileTree({ 
+  sessionId, 
+  onFileSelect, 
+  selectedPath,
+  initialExpandedDirs,
+  initialSearchQuery,
+  initialShowSearch,
+  onTreeStateChange 
+}: FileTreeProps) {
   const [files, setFiles] = useState<Map<string, FileItem[]>>(new Map());
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(['']));
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(
+    new Set(initialExpandedDirs || [''])
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
+  const [showSearch, setShowSearch] = useState(initialShowSearch || false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showNewItemDialog, setShowNewItemDialog] = useState<'file' | 'folder' | null>(null);
   const [newItemName, setNewItemName] = useState('');
@@ -369,6 +384,25 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
     }
   }, [showSearch]);
 
+  // Notify parent about tree state changes
+  // Use a ref to track if this is the initial mount to avoid calling on first render
+  const isInitialMount = useRef(true);
+  
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return; // Skip the first render
+    }
+    
+    if (onTreeStateChange) {
+      onTreeStateChange({
+        expandedDirs: Array.from(expandedDirs),
+        searchQuery,
+        showSearch
+      });
+    }
+  }, [expandedDirs, searchQuery, showSearch]); // Remove onTreeStateChange from deps to avoid loops
+  
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -514,9 +548,19 @@ function FileTree({ sessionId, onFileSelect, selectedPath }: FileTreeProps) {
 
 interface FileEditorProps {
   sessionId: string;
+  initialFilePath?: string;
+  initialState?: EditorPanelState;
+  onFileChange?: (filePath: string | undefined, isDirty: boolean) => void;
+  onStateChange?: (state: Partial<EditorPanelState>) => void;
 }
 
-export function FileEditor({ sessionId }: FileEditorProps) {
+export function FileEditor({ 
+  sessionId, 
+  initialFilePath,
+  initialState,
+  onFileChange,
+  onStateChange 
+}: FileEditorProps) {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [originalContent, setOriginalContent] = useState<string>('');
@@ -529,12 +573,20 @@ export function FileEditor({ sessionId }: FileEditorProps) {
   const isDarkMode = theme === 'dark';
   const hasUnsavedChanges = fileContent !== originalContent;
   
+  // Wrap onResize callback to avoid recreating
+  const handleTreeResize = useCallback((width: number) => {
+    if (onStateChange) {
+      onStateChange({ fileTreeWidth: width });
+    }
+  }, [onStateChange]);
+  
   // Add resizable hook for file tree column
   const { width: fileTreeWidth, startResize } = useResizablePanel({
-    defaultWidth: 256,  // Same as w-64
+    defaultWidth: initialState?.fileTreeWidth || 256,  // Use saved width or default
     minWidth: 200,
     maxWidth: 400,
-    storageKey: 'crystal-file-tree-width'
+    storageKey: 'crystal-file-tree-width',
+    onResize: handleTreeResize
   });
   
   // Check if this is a markdown file
@@ -560,6 +612,11 @@ export function FileEditor({ sessionId }: FileEditorProps) {
         setOriginalContent(result.content);
         setSelectedFile(file);
         setViewMode('edit'); // Reset to edit mode when opening a new file
+        
+        // Notify parent about file change
+        if (onFileChange) {
+          onFileChange(file.path, false);
+        }
       } else {
         setError(result.error);
       }
@@ -568,7 +625,7 @@ export function FileEditor({ sessionId }: FileEditorProps) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, onFileChange]);
 
 
   const handleEditorMount = (editor: unknown) => {
@@ -577,6 +634,12 @@ export function FileEditor({ sessionId }: FileEditorProps) {
 
   const handleEditorChange = (value: string | undefined) => {
     setFileContent(value || '');
+    
+    // Notify parent about dirty state
+    if (onFileChange && selectedFile) {
+      const isDirty = (value || '') !== originalContent;
+      onFileChange(selectedFile.path, isDirty);
+    }
   };
 
   // Auto-save functionality
@@ -593,6 +656,19 @@ export function FileEditor({ sessionId }: FileEditorProps) {
         
         if (result.success) {
           setOriginalContent(fileContent);
+          
+          // Notify parent that file is saved
+          if (onFileChange && selectedFile) {
+            onFileChange(selectedFile.path, false);
+          }
+          
+          // Emit file saved event
+          if (onStateChange) {
+            onStateChange({ 
+              filePath: selectedFile.path, 
+              isDirty: false 
+            });
+          }
         } else {
           setError(result.error);
         }
@@ -600,7 +676,7 @@ export function FileEditor({ sessionId }: FileEditorProps) {
         setError(err instanceof Error ? err.message : 'Failed to auto-save file');
       }
     }, 1000), // Auto-save after 1 second of inactivity
-    [sessionId, selectedFile, fileContent, originalContent]
+    [sessionId, selectedFile, fileContent, originalContent, onFileChange, onStateChange]
   );
 
   // Trigger auto-save when content changes
@@ -609,7 +685,29 @@ export function FileEditor({ sessionId }: FileEditorProps) {
       autoSave();
     }
   }, [fileContent, originalContent, selectedFile, autoSave]);
+  
+  // Load initial file if provided
+  useEffect(() => {
+    if (initialFilePath && !selectedFile) {
+      const file: FileItem = {
+        name: initialFilePath.split('/').pop() || '',
+        path: initialFilePath,
+        isDirectory: false
+      };
+      loadFile(file);
+    }
+  }, [initialFilePath, selectedFile, loadFile]);
 
+  // Memoize the tree state change handler to prevent infinite loops
+  const handleTreeStateChange = useCallback((treeState: { expandedDirs: string[]; searchQuery: string; showSearch: boolean }) => {
+    if (onStateChange) {
+      onStateChange({
+        expandedDirs: treeState.expandedDirs,
+        searchQuery: treeState.searchQuery,
+        showSearch: treeState.showSearch
+      });
+    }
+  }, [onStateChange]);
 
   return (
     <div className="h-full flex">
@@ -621,6 +719,10 @@ export function FileEditor({ sessionId }: FileEditorProps) {
           sessionId={sessionId}
           onFileSelect={loadFile}
           selectedPath={selectedFile?.path || null}
+          initialExpandedDirs={initialState?.expandedDirs}
+          initialSearchQuery={initialState?.searchQuery}
+          initialShowSearch={initialState?.showSearch}
+          onTreeStateChange={handleTreeStateChange}
         />
         
         {/* Resize handle */}
