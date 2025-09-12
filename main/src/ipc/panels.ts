@@ -9,7 +9,23 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   // Panel CRUD operations
   ipcMain.handle('panels:create', async (_, request: CreatePanelRequest) => {
     console.log('[IPC] Creating panel:', request);
-    return panelManager.createPanel(request);
+    const panel = await panelManager.createPanel(request);
+
+    // Auto-register Claude panels so they’re hooked to the Claude runtime
+    if (panel.type === 'claude') {
+      try {
+        const { claudePanelManager } = require('./claudePanel');
+        if (claudePanelManager) {
+          claudePanelManager.registerPanel(panel.id, panel.sessionId, panel.state.customState);
+        } else {
+          console.warn('[Panels IPC] ClaudePanelManager not initialized yet; will register later');
+        }
+      } catch (err) {
+        console.error('[Panels IPC] Failed to register Claude panel with ClaudePanelManager:', err);
+      }
+    }
+
+    return panel;
   });
   
   ipcMain.handle('panels:delete', async (_, panelId: string) => {
@@ -17,6 +33,21 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
     
     // Clean up terminal process if it's a terminal panel
     const panel = panelManager.getPanel(panelId);
+    // Unregister Claude panels from ClaudePanelManager
+    if (panel?.type === 'claude') {
+      try {
+        const { claudePanelManager } = require('./claudePanel');
+        if (claudePanelManager) {
+          // Stop if running, then unregister
+          if (claudePanelManager.isPanelRunning(panelId)) {
+            await claudePanelManager.stopPanel(panelId);
+          }
+          claudePanelManager.unregisterPanel(panelId);
+        }
+      } catch (err) {
+        console.warn('[Panels IPC] Failed to unregister Claude panel during delete:', err);
+      }
+    }
     if (panel?.type === 'terminal') {
       terminalPanelManager.destroyTerminal(panelId);
     }

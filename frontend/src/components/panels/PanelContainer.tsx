@@ -4,6 +4,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 // Lazy load panel components for better performance
 const TerminalPanel = lazy(() => import('./TerminalPanel'));
+const ClaudePanel = lazy(() => import('./claude/ClaudePanel'));
 
 const PanelErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => void }> = ({ 
   error, 
@@ -36,6 +37,8 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
     switch (panel.type) {
       case 'terminal':
         return <TerminalPanel panel={panel} isActive={isActive} />;
+      case 'claude':
+        return <ClaudePanel panel={panel} isActive={isActive} />;
       // Future panel types...
       default:
         return <div>Unknown panel type: {panel.type}</div>;

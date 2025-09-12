@@ -33,7 +33,7 @@ import { registerIpcHandlers } from './ipc';
 import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
-import { ClaudeCodeManager } from './services/claudeCodeManager';
+import { ClaudeCodeManager } from './services/panels/claude/claudeCodeManager';
 import { setupConsoleWrapper } from './utils/consoleWrapper';
 import * as fs from 'fs';
 
@@ -481,9 +481,10 @@ async function initializeServices() {
     archiveProgressManager,
   };
 
-  // Set up IPC event listeners for real-time updates
-  setupEventListeners(services, () => mainWindow);
+  // Initialize IPC handlers first so managers (like ClaudePanelManager) are ready
   registerIpcHandlers(services);
+  // Then set up event listeners that may rely on initialized managers
+  setupEventListeners(services, () => mainWindow);
   
   // Register console logging IPC handler for development
   if (isDevelopment) {

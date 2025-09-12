@@ -1,0 +1,444 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSessionStore } from '../stores/sessionStore';
+import { useTheme } from '../contexts/ThemeContext';
+import { API } from '../utils/api';
+import { GitCommands } from '../types/session';
+import { createVisibilityAwareInterval } from '../utils/performanceUtils';
+
+export const useClaudePanel = (
+  panelId: string,
+  isActive: boolean
+) => {
+  const { theme } = useTheme();
+  
+  // Get the session associated with this panel
+  // For now, we'll get the active session since panels are session-scoped
+  // In the future, this could be refactored to store session association in panel metadata
+  const activeSession = useSessionStore((state) => {
+    if (!state.activeSessionId) return undefined;
+    if (state.activeMainRepoSession && state.activeMainRepoSession.id === state.activeSessionId) {
+      return state.activeMainRepoSession;
+    }
+    return state.sessions.find(session => session.id === state.activeSessionId);
+  });
+
+  const activeSessionId = activeSession?.id;
+
+  // States specific to Claude functionality
+  const [input, setInput] = useState('');
+  const [ultrathink, setUltrathink] = useState(false);
+  const [isLoadingOutput, setIsLoadingOutput] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [outputLoadState, setOutputLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [gitCommands, setGitCommands] = useState<GitCommands | null>(null);
+  const [showStravuSearch, setShowStravuSearch] = useState(false);
+  const [isStravuConnected, setIsStravuConnected] = useState(false);
+  const [contextCompacted, setContextCompacted] = useState(false);
+  const [compactedContext, setCompactedContext] = useState<string | null>(null);
+  const [hasConversationHistory, setHasConversationHistory] = useState(false);
+
+  // Refs
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const loadingRef = useRef(false);
+  const loadingPanelIdRef = useRef<string | null>(null);
+  const isContinuingConversationRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const outputLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Force reset stuck state
+  const forceResetLoadingState = useCallback(() => {
+    console.log('[forceResetLoadingState] Forcing reset of all loading states for panel:', panelId);
+    loadingRef.current = false;
+    loadingPanelIdRef.current = null;
+    setIsLoadingOutput(false);
+    setOutputLoadState('idle');
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (outputLoadTimeoutRef.current) {
+      clearTimeout(outputLoadTimeoutRef.current);
+      outputLoadTimeoutRef.current = null;
+    }
+  }, [panelId]);
+
+  // Load output content for the panel's associated session
+  const loadOutputContent = useCallback(async (sessionId: string, retryCount = 0) => {
+    console.log(`[loadOutputContent] Called for panel ${panelId}, session ${sessionId}, retry: ${retryCount}`);
+    
+    // Cancel any existing load request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Clear any pending timeout
+    if (outputLoadTimeoutRef.current) {
+      clearTimeout(outputLoadTimeoutRef.current);
+      outputLoadTimeoutRef.current = null;
+    }
+    
+    // Check if already loading this session for this panel
+    if (loadingRef.current && loadingPanelIdRef.current === panelId) {
+      console.log(`[loadOutputContent] Already loading for panel ${panelId}, skipping`);
+      return;
+    }
+    
+    // Check if session is still active
+    const currentActiveSession = useSessionStore.getState().getActiveSession();
+    if (!currentActiveSession || currentActiveSession.id !== sessionId) {
+      console.log(`[loadOutputContent] Session ${sessionId} not active, skipping`);
+      return;
+    }
+
+    // Set loading state
+    loadingRef.current = true;
+    loadingPanelIdRef.current = panelId;
+    setIsLoadingOutput(true);
+    setOutputLoadState('loading');
+    setLoadError(null);
+    
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
+
+    try {
+      // Use panel-based API for Claude data
+      const response = await API.panels.getOutput(panelId);
+      if (!response.success) {
+        if (response.error && response.error.includes('not found')) {
+          console.log(`[loadOutputContent] Session ${sessionId} not found (possibly archived), aborting`);
+          loadingRef.current = false;
+          loadingPanelIdRef.current = null;
+          setIsLoadingOutput(false);
+          setOutputLoadState('idle');
+          return;
+        }
+        throw new Error(response.error || 'Failed to load output');
+      }
+      
+      const outputs = response.data || [];
+      console.log(`[loadOutputContent] Received ${outputs.length} outputs for session ${sessionId} (panel ${panelId})`);
+      
+      // Check if still the active session after async operation
+      const stillActiveSession = useSessionStore.getState().getActiveSession();
+      if (!stillActiveSession || stillActiveSession.id !== sessionId) {
+        console.log(`[loadOutputContent] Session ${sessionId} no longer active, aborting`);
+        loadingRef.current = false;
+        loadingPanelIdRef.current = null;
+        setIsLoadingOutput(false);
+        setOutputLoadState('idle');
+        return;
+      }
+      
+      // Set outputs in the session store
+      console.log(`[loadOutputContent] Setting outputs in store for session ${sessionId} (panel ${panelId})`);
+      useSessionStore.getState().setSessionOutputs(sessionId, outputs);
+      
+      setOutputLoadState('loaded');
+      
+      // Reset continuing conversation flag after successfully loading output
+      if (isContinuingConversationRef.current) {
+        console.log(`[loadOutputContent] Resetting continuing conversation flag after output load`);
+        isContinuingConversationRef.current = false;
+      }
+      
+      setLoadError(null);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log(`[loadOutputContent] Request aborted for session ${sessionId} (panel ${panelId})`);
+        loadingRef.current = false;
+        loadingPanelIdRef.current = null;
+        setIsLoadingOutput(false);
+        setOutputLoadState('idle');
+        return;
+      }
+      
+      console.error(`[loadOutputContent] Error loading output for session ${sessionId} (panel ${panelId}):`, error);
+      setOutputLoadState('error');
+      
+      // Retry logic for new sessions only
+      const isNewSession = activeSession?.status === 'initializing';
+      const maxRetries = isNewSession ? 3 : 0;
+      
+      if (retryCount < maxRetries) {
+        const delay = 1000 * (retryCount + 1);
+        console.log(`[loadOutputContent] Retrying in ${delay}ms for session ${sessionId} (panel ${panelId})`);
+        loadingRef.current = false;
+        loadingPanelIdRef.current = null;
+        setIsLoadingOutput(false);
+        outputLoadTimeoutRef.current = setTimeout(() => {
+          const currentActiveSession = useSessionStore.getState().getActiveSession();
+          if (currentActiveSession && currentActiveSession.id === sessionId) {
+            loadOutputContent(sessionId, retryCount + 1);
+          }
+        }, delay);
+      } else {
+        setLoadError(error instanceof Error ? error.message : 'Failed to load output content');
+      }
+    } finally {
+      // Always reset loading state
+      loadingRef.current = false;
+      loadingPanelIdRef.current = null;
+      setIsLoadingOutput(false);
+    }
+  }, [panelId, activeSession?.status]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const { scrollHeight } = textareaRef.current;
+      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, 42), 200)}px`;
+    }
+  }, [input]);
+
+  // Check Stravu connection status
+  useEffect(() => {
+    const checkStravuConnection = async () => {
+      try {
+        const response = await API.stravu.getConnectionStatus();
+        setIsStravuConnected(response.success && response.data.status === 'connected');
+      } catch (err) {
+        setIsStravuConnected(false);
+      }
+    };
+    checkStravuConnection();
+    // Use visibility-aware interval for Stravu connection checking
+    const cleanup = createVisibilityAwareInterval(
+      checkStravuConnection,
+      30000, // 30 seconds when visible
+      120000 // 2 minutes when not visible
+    );
+    return cleanup;
+  }, [activeSessionId]);
+
+  // Load git commands when session changes
+  useEffect(() => {
+    if (!activeSession) {
+      setGitCommands(null);
+      return;
+    }
+    const loadGitData = async () => {
+      try {
+        const commandsResponse = await API.sessions.getGitCommands(activeSession.id);
+        if (commandsResponse.success) setGitCommands(commandsResponse.data);
+      } catch (error) { 
+        console.error('Error loading git data:', error); 
+      }
+    };
+    loadGitData();
+  }, [activeSessionId]);
+
+  // Check if session has conversation history
+  useEffect(() => {
+    if (!activeSession) {
+      setHasConversationHistory(false);
+      return;
+    }
+    
+    const checkConversationHistory = async () => {
+      try {
+        // Use panel-based API for Claude conversation data
+        const response = await API.panels.getConversationMessages(panelId);
+        if (response.success && response.data) {
+          setHasConversationHistory(response.data.length > 0);
+        }
+      } catch (error) {
+        console.error('Failed to check conversation history:', error);
+        setHasConversationHistory(false);
+      }
+    };
+    checkConversationHistory();
+  }, [activeSession?.id]);
+
+  // Load output when panel becomes active and has an associated session
+  useEffect(() => {
+    if (isActive && activeSession && outputLoadState === 'idle') {
+      console.log(`[useClaudePanel] Panel ${panelId} became active, loading output for session ${activeSession.id}`);
+      loadOutputContent(activeSession.id);
+    }
+  }, [isActive, activeSession?.id, outputLoadState, loadOutputContent, panelId]);
+
+  const handleSendInput = async (attachedImages?: any[]) => {
+    console.log('[useClaudePanel] handleSendInput called', { input, activeSession: activeSession?.id, hasActiveSession: !!activeSession, panelId });
+    if (!input.trim() || !activeSession) {
+      console.log('[useClaudePanel] handleSendInput early return', { inputTrimmed: !input.trim(), noActiveSession: !activeSession });
+      return;
+    }
+    
+    let finalInput = ultrathink ? `${input}\nultrathink` : input;
+    
+    // Check if we have compacted context to inject
+    if (contextCompacted && compactedContext) {
+      console.log('[Context Compaction] Injecting compacted context into prompt');
+      finalInput = `<session_context>\n${compactedContext}\n</session_context>\n\n${finalInput}`;
+      
+      // Clear the compacted context after using it
+      setContextCompacted(false);
+      setCompactedContext(null);
+    }
+    
+    // If there are attached images, save them and append paths to input
+    if (attachedImages && attachedImages.length > 0) {
+      try {
+        // Save images via IPC
+        const imagePaths = await window.electronAPI.sessions.saveImages(
+          activeSession.id,
+          attachedImages.map(img => ({
+            name: img.name,
+            dataUrl: img.dataUrl,
+            type: img.type,
+          }))
+        );
+        
+        // Append image paths to the prompt
+        const imagePathsText = imagePaths.map(path => `Image: ${path}`).join('\n');
+        finalInput = `${finalInput}\n\n${imagePathsText}`;
+      } catch (error) {
+        console.error('Failed to save images:', error);
+        // Continue without images on error
+      }
+    }
+    
+    const response = await API.panels.sendInput(panelId, `${finalInput}\n`);
+    if (response.success) {
+      setInput('');
+      setUltrathink(false);
+    }
+  };
+
+  const handleContinueConversation = async (attachedImages?: any[], model?: string) => {
+    if (!input.trim() || !activeSession) return;
+    
+    // Mark that we're continuing a conversation to prevent output reload
+    isContinuingConversationRef.current = true;
+    
+    let finalInput = ultrathink ? `${input}\nultrathink` : input;
+    
+    // Check if we have compacted context to inject
+    if (contextCompacted && compactedContext) {
+      console.log('[Context Compaction] Injecting compacted context into continuation prompt');
+      finalInput = `<session_context>\n${compactedContext}\n</session_context>\n\n${finalInput}`;
+      
+      // Clear the compacted context after using it
+      setContextCompacted(false);
+      setCompactedContext(null);
+    }
+    
+    // If there are attached images, save them and append paths to input
+    if (attachedImages && attachedImages.length > 0) {
+      try {
+        // Save images via IPC
+        const imagePaths = await window.electronAPI.sessions.saveImages(
+          activeSession.id,
+          attachedImages.map(img => ({
+            name: img.name,
+            dataUrl: img.dataUrl,
+            type: img.type,
+          }))
+        );
+        
+        // Append image paths to the prompt
+        const imagePathsText = imagePaths.map(path => `Image: ${path}`).join('\n');
+        finalInput = `${finalInput}\n\n${imagePathsText}`;
+      } catch (error) {
+        console.error('Failed to save images:', error);
+        // Continue without images on error
+      }
+    }
+    
+    const response = await API.panels.continue(panelId, finalInput, model);
+    if (response.success) {
+      setInput('');
+      setUltrathink(false);
+      // Output will be loaded automatically when session status changes
+    }
+  };
+
+  const handleTerminalCommand = async () => {
+    if (!input.trim() || !activeSession) return;
+    const response = await API.sessions.runTerminalCommand(activeSession.id, input);
+    if (response.success) setInput('');
+  };
+
+  const handleStopSession = async () => {
+    if (activeSession) await API.sessions.stop(activeSession.id);
+  };
+
+  const handleStravuFileSelect = (file: any, content: string) => {
+    const formattedContent = `\n\n## File: ${file.name}\n\`\`\`${file.type}\n${content}\n\`\`\`\n\n`;
+    setInput(prev => prev + formattedContent);
+  };
+
+  const handleCompactContext = async () => {
+    if (!activeSession) return;
+    
+    try {
+      console.log('[Context Compaction] Starting compaction for session:', activeSession.id);
+      
+      // Generate the compacted context
+      const response = await API.sessions.generateCompactedContext(activeSession.id);
+      
+      if (response.success && response.data) {
+        const summary = response.data.summary;
+        setCompactedContext(summary);
+        setContextCompacted(true);
+        console.log('[Context Compaction] Context successfully compacted');
+      } else {
+        console.error('[Context Compaction] Failed to compact context:', response.error);
+      }
+    } catch (error) {
+      console.error('[Context Compaction] Error during compaction:', error);
+    }
+  };
+
+  // Cleanup on unmount or panel change
+  useEffect(() => {
+    return () => {
+      // Cancel any pending operations
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (outputLoadTimeoutRef.current) {
+        clearTimeout(outputLoadTimeoutRef.current);
+      }
+    };
+  }, [panelId]);
+  
+  return {
+    // Session and panel info
+    activeSession,
+    panelId,
+    isActive,
+    
+    // UI state
+    theme,
+    input,
+    setInput,
+    ultrathink,
+    setUltrathink,
+    isLoadingOutput,
+    outputLoadState,
+    loadError,
+    showStravuSearch,
+    setShowStravuSearch,
+    isStravuConnected,
+    textareaRef,
+    contextCompacted,
+    compactedContext,
+    hasConversationHistory,
+    gitCommands,
+    
+    // Actions
+    handleSendInput,
+    handleContinueConversation,
+    handleTerminalCommand,
+    handleStopSession,
+    handleStravuFileSelect,
+    handleCompactContext,
+    
+    // Utilities
+    loadOutputContent,
+    forceResetLoadingState,
+  };
+};

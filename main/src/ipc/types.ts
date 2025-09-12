@@ -12,7 +12,7 @@ import type { RunCommandManager } from '../services/runCommandManager';
 import type { VersionChecker } from '../services/versionChecker';
 import type { StravuAuthManager } from '../services/stravuAuthManager';
 import type { StravuNotebookService } from '../services/stravuNotebookService';
-import type { ClaudeCodeManager } from '../services/claudeCodeManager';
+import type { ClaudeCodeManager } from '../services/panels/claude/claudeCodeManager';
 import type { Logger } from '../utils/logger';
 import type { ArchiveProgressManager } from '../services/archiveProgressManager';
 

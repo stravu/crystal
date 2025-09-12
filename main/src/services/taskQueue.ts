@@ -3,7 +3,7 @@ import { SimpleQueue } from './simpleTaskQueue';
 import type { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import { WorktreeNameGenerator } from './worktreeNameGenerator';
-import type { ClaudeCodeManager } from './claudeCodeManager';
+import type { ClaudeCodeManager } from './panels/claude/claudeCodeManager';
 import type { GitDiffManager } from './gitDiffManager';
 import type { ExecutionTracker } from './executionTracker';
 import { formatForDisplay } from '../utils/timestampUtils';
@@ -241,8 +241,52 @@ export class TaskQueue {
         }
 
         console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
-        await claudeCodeManager.startSession(session.id, session.worktreePath, prompt, permissionMode, model);
-        console.log(`[TaskQueue] Claude Code started successfully for session ${session.id}`);
+        
+        // Wait for the Claude panel to be created by the session-created event handler in events.ts
+        // This ensures Claude starts for the panel, not the session directly
+        let claudePanel = null;
+        let attempts = 0;
+        const maxAttempts = 15; // Increased attempts for better reliability
+        
+        while (!claudePanel && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
+          const { panelManager } = require('./panelManager');
+          const existingPanels = panelManager.getPanelsForSession(session.id);
+          claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+          attempts++;
+        }
+        
+        if (claudePanel) {
+          console.log(`[TaskQueue] Found Claude panel ${claudePanel.id} for session ${session.id}, starting Claude via panel`);
+          
+          // Import the claude panel manager to start Claude properly
+          const { claudePanelManager } = require('../ipc/claudePanel');
+          
+          if (claudePanelManager) {
+            try {
+              // Record the initial prompt in panel conversation history
+              try {
+                sessionManager.addPanelConversationMessage(claudePanel.id, 'user', prompt);
+              } catch (e) {
+                console.warn('[TaskQueue] Failed to add initial panel conversation message:', e);
+              }
+
+              // Use the claude panel manager directly instead of calling IPC handlers
+              await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, model);
+              console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);
+            } catch (error) {
+              console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
+              throw new Error(`Failed to start Claude panel: ${error}`);
+            }
+          } else {
+            console.error(`[TaskQueue] ClaudePanelManager not available, cannot start with real panel ID`);
+            throw new Error('Claude panel manager not available');
+          }
+        } else {
+          console.error(`[TaskQueue] No Claude panel found for session ${session.id} after ${maxAttempts} attempts`);
+          console.error(`[TaskQueue] This indicates the panel creation failed in events.ts. Cannot proceed without a real panel.`);
+          throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
+        }
 
         return { sessionId: session.id };
       } catch (error) {
@@ -253,22 +297,57 @@ export class TaskQueue {
 
     this.inputQueue.process(10, async (job) => {
       const { sessionId, input } = job.data;
-      const { claudeCodeManager } = this.options;
       
-      await claudeCodeManager.sendInput(sessionId, input);
+      // Find the Claude panel for this session
+      const { panelManager } = require('./panelManager');
+      const existingPanels = panelManager.getPanelsForSession(sessionId);
+      const claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+      
+      if (!claudePanel) {
+        throw new Error(`No Claude panel found for session ${sessionId}`);
+      }
+
+      // Use the claude panel manager instead of the legacy session-based approach
+      const { claudePanelManager } = require('../ipc/claudePanel');
+      
+      if (!claudePanelManager) {
+        throw new Error('Claude panel manager not available');
+      }
+
+      claudePanelManager.sendInputToPanel(claudePanel.id, input);
     });
 
     this.continueQueue.process(10, async (job) => {
       const { sessionId, prompt } = job.data;
-      const { sessionManager, claudeCodeManager } = this.options;
+      const { sessionManager } = this.options;
       
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
         throw new Error(`Session ${sessionId} not found`);
       }
 
-      const messages = await sessionManager.getConversationMessages(sessionId);
-      await claudeCodeManager.continueSession(sessionId, session.worktreePath, prompt, messages);
+      // Find the Claude panel for this session
+      const { panelManager } = require('./panelManager');
+      const existingPanels = panelManager.getPanelsForSession(sessionId);
+      const claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+      
+      if (!claudePanel) {
+        throw new Error(`No Claude panel found for session ${sessionId}`);
+      }
+
+      // Use the claude panel manager instead of the legacy session-based approach
+      const { claudePanelManager } = require('../ipc/claudePanel');
+      
+      if (!claudePanelManager) {
+        throw new Error('Claude panel manager not available');
+      }
+
+      // Get conversation history using panel-based method for Claude data
+      const conversationHistory = sessionManager.getPanelConversationMessages ? 
+        await sessionManager.getPanelConversationMessages(claudePanel.id) :
+        await sessionManager.getConversationMessages(sessionId);
+
+      await claudePanelManager.continuePanel(claudePanel.id, session.worktreePath, prompt, conversationHistory);
     });
   }
 

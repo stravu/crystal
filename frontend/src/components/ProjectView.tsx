@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ProjectDashboard } from './ProjectDashboard';
 import { FileEditor } from './FileEditor';
-import { SessionInputWithImages } from './session/SessionInputWithImages';
-import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
-import { RichOutputSettings } from './session/RichOutputView';
+import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages';
+import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
+import { RichOutputSettings } from './panels/claude/RichOutputView';
 import { API } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';

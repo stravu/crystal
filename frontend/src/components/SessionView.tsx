@@ -8,17 +8,17 @@ import { Inbox } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSessionView } from '../hooks/useSessionView';
 import { SessionHeader } from './session/SessionHeader';
-import { SessionInputWithImages } from './session/SessionInputWithImages';
+import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages';
 import { GitErrorDialog } from './session/GitErrorDialog';
 import { CommitMessageDialog } from './session/CommitMessageDialog';
 import { FileEditor } from './FileEditor';
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
-import { RichOutputWithSidebar } from './session/RichOutputWithSidebar';
-import { RichOutputSettings } from './session/RichOutputView';
+import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
+import { RichOutputSettings } from './panels/claude/RichOutputView';
 import { RichOutputSettingsPanel } from './session/RichOutputSettingsPanel';
 import { LogView } from './session/LogView';
-import { MessagesView } from './session/MessagesView';
+import { MessagesView } from './panels/claude/MessagesView';
 import { usePanelStore } from '../stores/panelStore';
 import { panelApi } from '../services/panelApi';
 import { PanelTabBar } from './panels/PanelTabBar';
@@ -84,10 +84,17 @@ export const SessionView = memo(() => {
     [sessionPanels, activePanels, activeSession?.id]
   );
   
+  // Check if session has Claude panels
+  const hasClaudePanels = useMemo(
+    () => sessionPanels.some(panel => panel.type === 'claude'),
+    [sessionPanels]
+  );
+  
   // Debug logging
   console.log('[SessionView] Session panels:', sessionPanels);
   console.log('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
   console.log('[SessionView] Current active panel:', currentActivePanel);
+  console.log('[SessionView] Has Claude panels:', hasClaudePanels);
 
   // FIX: Memoize all callbacks to prevent re-renders
   const handlePanelSelect = useCallback(
@@ -353,7 +360,7 @@ export const SessionView = memo(() => {
               {hook.isLoadingOutput && hook.viewMode !== 'richOutput' && (
                 <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
               )}
-              {hook.viewMode === 'richOutput' && (
+              {hook.viewMode === 'richOutput' && !hasClaudePanels && (
             <div className="h-full block">
               <RichOutputWithSidebar 
                 sessionId={activeSession.id}
@@ -436,7 +443,7 @@ export const SessionView = memo(() => {
               <FileEditor sessionId={activeSession.id} />
             </div>
           )}
-          {hook.viewMode === 'messages' && (
+          {hook.viewMode === 'messages' && !hasClaudePanels && (
             <div className="h-full flex flex-col overflow-hidden">
               <MessagesView sessionId={activeSession.id} />
             </div>
@@ -446,6 +453,30 @@ export const SessionView = memo(() => {
         </div>
       </div>
       
+      {/* Session-level prompt bar - Comment out when Claude panels exist */}
+      {hook.viewMode !== 'terminal' && !currentActivePanel && !hasClaudePanels && (
+        <SessionInputWithImages
+          activeSession={activeSession}
+          viewMode={hook.viewMode}
+          input={hook.input}
+          setInput={hook.setInput}
+          textareaRef={hook.textareaRef}
+          handleTerminalCommand={hook.handleTerminalCommand}
+          handleSendInput={hook.handleSendInput}
+          handleContinueConversation={hook.handleContinueConversation}
+          isStravuConnected={hook.isStravuConnected}
+          setShowStravuSearch={hook.setShowStravuSearch}
+          ultrathink={hook.ultrathink}
+          setUltrathink={hook.setUltrathink}
+          gitCommands={hook.gitCommands}
+          handleCompactContext={hook.handleCompactContext}
+          hasConversationHistory={hook.hasConversationHistory}
+          contextCompacted={hook.contextCompacted}
+          handleCancelRequest={hook.handleStopSession}
+        />
+      )}
+      
+      {/* Legacy session-level prompt bar - COMMENTED OUT for Claude panel integration
       {hook.viewMode !== 'terminal' && !currentActivePanel && (
         <SessionInputWithImages
           activeSession={activeSession}
@@ -467,6 +498,7 @@ export const SessionView = memo(() => {
           handleCancelRequest={hook.handleStopSession}
         />
       )}
+      */}
 
       <CommitMessageDialog
         isOpen={hook.showCommitMessageDialog}

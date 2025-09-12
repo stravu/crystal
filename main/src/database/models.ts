@@ -159,3 +159,17 @@ export interface CreateExecutionDiffData {
   after_commit_hash?: string;
   commit_message?: string;
 }
+
+export interface CreatePanelExecutionDiffData {
+  panel_id: string;
+  prompt_marker_id?: number;
+  execution_sequence: number;
+  git_diff?: string;
+  files_changed?: string[];
+  stats_additions?: number;
+  stats_deletions?: number;
+  stats_files_changed?: number;
+  before_commit_hash?: string;
+  after_commit_hash?: string;
+  commit_message?: string;
+}

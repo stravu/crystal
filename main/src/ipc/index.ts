@@ -17,6 +17,7 @@ import { registerDashboardHandlers } from './dashboard';
 import { registerCommitModeHandlers } from './commitMode';
 import { setupLogHandlers } from './logs';
 import { registerPanelHandlers } from './panels';
+import { registerClaudePanelHandlers } from './claudePanel';
 
 
 export function registerIpcHandlers(services: AppServices): void {
@@ -37,4 +38,5 @@ export function registerIpcHandlers(services: AppServices): void {
   registerCommitModeHandlers(services.databaseService, services.logger, services.sessionManager);
   setupLogHandlers(services.sessionManager);
   registerPanelHandlers(ipcMain, services);
+  registerClaudePanelHandlers(ipcMain, services);
 } 

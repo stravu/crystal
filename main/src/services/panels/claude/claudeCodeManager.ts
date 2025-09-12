@@ -4,17 +4,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { app } from 'electron';
-import type { Logger } from '../utils/logger';
-import { testClaudeCodeAvailability, testClaudeCodeInDirectory, getAugmentedPath } from '../utils/claudeCodeTest';
-import type { ConfigManager } from './configManager';
-import { getShellPath, findExecutableInPath } from '../utils/shellPath';
-import { PermissionManager } from './permissionManager';
+import type { Logger } from '../../../utils/logger';
+import { testClaudeCodeAvailability, testClaudeCodeInDirectory, getAugmentedPath } from '../../../utils/claudeCodeTest';
+import type { ConfigManager } from '../../configManager';
+import { getShellPath, findExecutableInPath } from '../../../utils/shellPath';
+import { PermissionManager } from '../../permissionManager';
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
-import { findNodeExecutable, testNodeExecutable, findClaudeCodeScript } from '../utils/nodeFinder';
+import { findNodeExecutable, testNodeExecutable, findClaudeCodeScript } from '../../../utils/nodeFinder';
 
 interface ClaudeCodeProcess {
   process: pty.IPty;
+  panelId: string;
   sessionId: string;
   worktreePath: string;
 }
@@ -25,7 +26,7 @@ interface ClaudeAvailabilityCache {
 }
 
 export class ClaudeCodeManager extends EventEmitter {
-  private processes: Map<string, ClaudeCodeProcess> = new Map();
+  private processes: Map<string, ClaudeCodeProcess> = new Map(); // Now keyed by panelId instead of sessionId
   private availabilityCache: ClaudeAvailabilityCache | null = null;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
@@ -40,9 +41,9 @@ export class ClaudeCodeManager extends EventEmitter {
     this.setMaxListeners(50);
   }
 
-  async spawnClaudeCode(sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
+  async spawnClaudeCode(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory?: string[], isResume: boolean = false, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
     try {
-      this.logger?.verbose(`Spawning Claude for session ${sessionId} in ${worktreePath}`);
+      this.logger?.verbose(`Spawning Claude for panel ${panelId} (session ${sessionId}) in ${worktreePath}`);
       this.logger?.verbose(`Command: claude -p "${prompt}"`);
       this.logger?.verbose(`Working directory: ${worktreePath}`);
       
@@ -124,6 +125,7 @@ export class ClaudeCodeManager extends EventEmitter {
         
         // Emit both the styled error message and add to session manager
         this.emit('output', {
+          panelId,
           sessionId,
           type: 'json',
           data: errorMessage,
@@ -401,17 +403,32 @@ export class ClaudeCodeManager extends EventEmitter {
       }
       
       if (isResume) {
-        // Get Claude's session ID if available
-        const claudeSessionId = this.sessionManager.getClaudeSessionId(sessionId);
+        // Get Claude's session ID for this panel if available
+        const claudeSessionId = this.sessionManager.getPanelClaudeSessionId(panelId);
         
         if (claudeSessionId) {
           // Use --resume flag with Claude's actual session ID
           args.push('--resume', claudeSessionId);
           console.log(`[ClaudeCodeManager] Resuming Claude session ${claudeSessionId} for Crystal session ${sessionId}`);
         } else {
-          // Fall back to --resume without ID (will resume most recent)
-          args.push('--resume');
-          console.log(`[ClaudeCodeManager] No Claude session ID found for Crystal session ${sessionId}, resuming most recent session`);
+          // Do not resume without explicit ID; log error and emit system message
+          const errMsg = `Cannot resume: no Claude session_id stored for Crystal session ${sessionId}`;
+          this.logger?.error(`[ClaudeCodeManager] ${errMsg}`);
+          const errorMessage = {
+            type: 'system',
+            subtype: 'error',
+            timestamp: new Date().toISOString(),
+            message: 'Unable to resume Claude conversation',
+            details: 'Missing Claude session_id. Please start a new message to begin a fresh conversation.'
+          };
+          this.emit('output', {
+            panelId,
+            sessionId,
+            type: 'json',
+            data: errorMessage,
+            timestamp: new Date()
+          });
+          throw new Error(errMsg);
         }
         
         // If a new prompt is provided, add it
@@ -568,6 +585,7 @@ export class ClaudeCodeManager extends EventEmitter {
           };
           
           this.emit('output', {
+            panelId,
             sessionId,
             type: 'json',
             data: errorMessage,
@@ -594,7 +612,7 @@ export class ClaudeCodeManager extends EventEmitter {
       // Try normal spawn first, then fallback to Node.js invocation if it fails
       while (spawnAttempt < 2) {
         try {
-          console.log(`[ClaudeManager] Spawning Claude process (attempt ${spawnAttempt + 1})...`);
+          console.log(`[ClaudeManager] Spawning Claude process (attempt ${spawnAttempt + 1}) with: ${fullCommand}`);
           console.log(`[ClaudeManager] Command: ${claudeCommand}`);
           console.log(`[ClaudeManager] Working directory: ${worktreePath}`);
           console.log(`[ClaudeManager] PATH entries: ${pathWithNode.split(pathSeparator).length}`);
@@ -704,6 +722,7 @@ export class ClaudeCodeManager extends EventEmitter {
         };
         
         this.emit('output', {
+          panelId,
           sessionId,
           type: 'json',
           data: errorMessage,
@@ -722,15 +741,16 @@ export class ClaudeCodeManager extends EventEmitter {
 
       const claudeProcess: ClaudeCodeProcess = {
         process: ptyProcess,
+        panelId,
         sessionId,
         worktreePath
       };
 
-      this.processes.set(sessionId, claudeProcess);
-      this.logger?.verbose(`Claude Code process created for session ${sessionId}`);
+      this.processes.set(panelId, claudeProcess);
+      this.logger?.verbose(`Claude Code process created for panel ${panelId} (session ${sessionId})`);
       
-      // Emit spawned event to update session status
-      this.emit('spawned', { sessionId });
+      // Emit spawned event to update panel status
+      this.emit('spawned', { panelId, sessionId });
 
       // Emit initial session info message with prompt and command
       const sessionInfoMessage = {
@@ -744,6 +764,7 @@ export class ClaudeCodeManager extends EventEmitter {
       };
       
       this.emit('output', {
+        panelId,
         sessionId,
         type: 'json',
         data: sessionInfoMessage,
@@ -767,10 +788,11 @@ export class ClaudeCodeManager extends EventEmitter {
           if (line.trim()) {
             try {
               const jsonMessage = JSON.parse(line.trim());
-              this.logger?.verbose(`JSON message from session ${sessionId}: ${JSON.stringify(jsonMessage)}`);
+              this.logger?.verbose(`JSON message from panel ${panelId} (session ${sessionId}): ${JSON.stringify(jsonMessage)}`);
               
               // Emit JSON message only - terminal formatting will be done on the fly
               this.emit('output', {
+                panelId,
                 sessionId,
                 type: 'json',
                 data: jsonMessage,
@@ -778,7 +800,7 @@ export class ClaudeCodeManager extends EventEmitter {
               });
             } catch (error) {
               // If not valid JSON, treat as regular output
-              this.logger?.verbose(`Raw output from session ${sessionId}: ${line.substring(0, 200)}`);
+              this.logger?.verbose(`Raw output from panel ${panelId} (session ${sessionId}): ${line.substring(0, 200)}`);
               
               // Check if this looks like an error message
               const isError = line.includes('ERROR') || 
@@ -789,6 +811,7 @@ export class ClaudeCodeManager extends EventEmitter {
                             line.includes('fatal:');
               
               this.emit('output', {
+                panelId,
                 sessionId,
                 type: isError ? 'stderr' : 'stdout',
                 data: line + '\n',
@@ -810,12 +833,13 @@ export class ClaudeCodeManager extends EventEmitter {
             this.logger?.info(`[Claude] Found ${descendantPids.length} orphaned child processes after Claude exit for session ${sessionId}`);
             
             // Kill all child processes
-            await this.killProcessTree(pid, sessionId);
+            await this.killProcessTree(pid, panelId, sessionId);
             
             // Report what processes were killed
             const processReport = killedProcesses.map(p => `${p.name || 'unknown'}(${p.pid})`).join(', ');
             const message = `\n[Process Cleanup] Terminated ${killedProcesses.length} orphaned child process${killedProcesses.length > 1 ? 'es' : ''} after Claude exit: ${processReport}\n`;
             this.emit('output', {
+              panelId,
               sessionId,
               type: 'stdout',
               data: message,
@@ -829,6 +853,7 @@ export class ClaudeCodeManager extends EventEmitter {
           try {
             const jsonMessage = JSON.parse(buffer.trim());
             this.emit('output', {
+              panelId,
               sessionId,
               type: 'json',
               data: jsonMessage,
@@ -844,6 +869,7 @@ export class ClaudeCodeManager extends EventEmitter {
                           buffer.includes('fatal:');
             
             this.emit('output', {
+              panelId,
               sessionId,
               type: isError ? 'stderr' : 'stdout',
               data: buffer,
@@ -894,6 +920,7 @@ export class ClaudeCodeManager extends EventEmitter {
             };
             
             this.emit('output', {
+              panelId,
               sessionId,
               type: 'json',
               data: errorMessage,
@@ -913,6 +940,7 @@ export class ClaudeCodeManager extends EventEmitter {
             };
             
             this.emit('output', {
+              panelId,
               sessionId,
               type: 'json',
               data: errorMessage,
@@ -920,7 +948,7 @@ export class ClaudeCodeManager extends EventEmitter {
             });
           }
         } else {
-          this.logger?.info(`Claude process exited normally for session ${sessionId}`);
+          this.logger?.info(`Claude process exited normally for panel ${panelId} (session ${sessionId})`);
         }
         
         // Clear any pending permission requests
@@ -960,20 +988,22 @@ export class ClaudeCodeManager extends EventEmitter {
         }
         
         this.emit('exit', {
+          panelId,
           sessionId,
           exitCode,
           signal
         });
-        this.processes.delete(sessionId);
+        this.processes.delete(panelId);
       });
 
       // Note: 'spawned' event is already emitted earlier in the function
-      this.logger?.info(`Claude spawned successfully for session ${sessionId}`);
+      this.logger?.info(`Claude spawned successfully for panel ${panelId} (session ${sessionId})`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger?.error(`Failed to spawn Claude for session ${sessionId}`, error instanceof Error ? error : undefined);
+      this.logger?.error(`Failed to spawn Claude for panel ${panelId} (session ${sessionId})`, error instanceof Error ? error : undefined);
       
       this.emit('error', {
+        panelId,
         sessionId,
         error: errorMessage
       });
@@ -981,21 +1011,22 @@ export class ClaudeCodeManager extends EventEmitter {
     }
   }
 
-  sendInput(sessionId: string, input: string): void {
-    const claudeProcess = this.processes.get(sessionId);
+  sendInput(panelId: string, input: string): void {
+    const claudeProcess = this.processes.get(panelId);
     if (!claudeProcess) {
-      throw new Error(`No Claude Code process found for session ${sessionId}`);
+      throw new Error(`No Claude Code process found for panel ${panelId}`);
     }
 
     claudeProcess.process.write(input);
   }
 
-  async killProcess(sessionId: string): Promise<void> {
-    const claudeProcess = this.processes.get(sessionId);
+  async killProcess(panelId: string): Promise<void> {
+    const claudeProcess = this.processes.get(panelId);
     if (!claudeProcess) {
       return;
     }
 
+    const { sessionId } = claudeProcess;
     const pid = claudeProcess.process.pid;
     
     // Get all child processes before killing
@@ -1047,13 +1078,14 @@ export class ClaudeCodeManager extends EventEmitter {
 
     // Kill the process and all its children
     if (pid) {
-      const success = await this.killProcessTree(pid, sessionId);
+      const success = await this.killProcessTree(pid, panelId, sessionId);
       
       // Report what processes were killed
       if (killedProcesses.length > 0) {
         const processReport = killedProcesses.map(p => `${p.name || 'unknown'}(${p.pid})`).join(', ');
         const message = `\n[Process Cleanup] Terminated ${killedProcesses.length} child process${killedProcesses.length > 1 ? 'es' : ''} started by Claude: ${processReport}\n`;
         this.emit('output', {
+          panelId,
           sessionId,
           type: 'stdout',
           data: message,
@@ -1062,53 +1094,53 @@ export class ClaudeCodeManager extends EventEmitter {
       }
       
       if (!success) {
-        this.logger?.error(`Failed to cleanly terminate all child processes for Claude session ${sessionId}`);
+        this.logger?.error(`Failed to cleanly terminate all child processes for Claude panel ${panelId} (session ${sessionId})`);
       }
     } else {
       // Fallback to simple kill if no PID
       claudeProcess.process.kill();
     }
     
-    this.processes.delete(sessionId);
+    this.processes.delete(panelId);
   }
 
-  getProcess(sessionId: string): ClaudeCodeProcess | undefined {
-    return this.processes.get(sessionId);
+  getProcess(panelId: string): ClaudeCodeProcess | undefined {
+    return this.processes.get(panelId);
   }
 
   getAllProcesses(): string[] {
     return Array.from(this.processes.keys());
   }
 
-  async restartSessionWithHistory(sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: string[]): Promise<void> {
+  async restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: string[]): Promise<void> {
     // Kill existing process if it exists
-    await this.killProcess(sessionId);
+    await this.killProcess(panelId);
     
     // Restart with conversation history
-    await this.spawnClaudeCode(sessionId, worktreePath, initialPrompt, conversationHistory);
+    await this.spawnClaudeCode(panelId, sessionId, worktreePath, initialPrompt, conversationHistory);
   }
 
-  isSessionRunning(sessionId: string): boolean {
-    return this.processes.has(sessionId);
+  isPanelRunning(panelId: string): boolean {
+    return this.processes.has(panelId);
   }
 
-  async startSession(sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
-    return this.spawnClaudeCode(sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
+  async startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
+    return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
   }
 
-  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
-    // Kill any existing process for this session first
-    if (this.processes.has(sessionId)) {
-      console.log(`[ClaudeCodeManager] Killing existing process for session ${sessionId} before continuing`);
-      await this.killProcess(sessionId);
+  async continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
+    // Kill any existing process for this panel first
+    if (this.processes.has(panelId)) {
+      console.log(`[ClaudeCodeManager] Killing existing process for panel ${panelId} before continuing`);
+      await this.killProcess(panelId);
       // Add a small delay to ensure the process is fully cleaned up
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     // Double-check that the process was actually killed
-    if (this.processes.has(sessionId)) {
-      console.error(`[ClaudeCodeManager] Process ${sessionId} still exists after kill attempt, aborting continue`);
-      throw new Error('Failed to stop previous session instance');
+    if (this.processes.has(panelId)) {
+      console.error(`[ClaudeCodeManager] Process ${panelId} still exists after kill attempt, aborting continue`);
+      throw new Error('Failed to stop previous panel instance');
     }
     
     // Get the session's permission mode from database
@@ -1120,7 +1152,7 @@ export class ClaudeCodeManager extends EventEmitter {
     const skipContinueRaw = dbSession?.skip_continue_next;
     const shouldSkipContinue = skipContinueRaw === 1 || skipContinueRaw === true;
     
-    console.log(`[ClaudeCodeManager] continueSession called for ${sessionId}:`, {
+    console.log(`[ClaudeCodeManager] continuePanel called for ${panelId} (session ${sessionId}):`, {
       skip_continue_next_raw: skipContinueRaw,
       skip_continue_next_type: typeof skipContinueRaw,
       skip_continue_next_value: skipContinueRaw,
@@ -1138,28 +1170,58 @@ export class ClaudeCodeManager extends EventEmitter {
       // Verify the flag was cleared
       const updatedDbSession = this.sessionManager.getDbSession(sessionId);
       console.log(`[ClaudeCodeManager] Verified skip_continue_next flag is now:`, updatedDbSession?.skip_continue_next);
-      console.log(`[ClaudeCodeManager] Skipping --resume flag for session ${sessionId} due to prompt compaction`);
-      return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], false, permissionMode, model);
+      console.log(`[ClaudeCodeManager] Skipping --resume flag for panel ${panelId} due to prompt compaction`);
+      return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, [], false, permissionMode, model);
     } else {
       // For continuing a session, we use the --resume flag
       // The conversationHistory parameter is kept for compatibility but not used with --resume
-      console.log(`[ClaudeCodeManager] Using --resume flag for session ${sessionId}`);
-      return this.spawnClaudeCode(sessionId, worktreePath, prompt, [], true, permissionMode, model);
+      console.log(`[ClaudeCodeManager] Using --resume flag for panel ${panelId}`);
+      return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, [], true, permissionMode, model);
     }
   }
 
+  async stopPanel(panelId: string): Promise<void> {
+    await this.killProcess(panelId);
+  }
+
+  // Legacy methods for backward compatibility with session management
+  // DEPRECATED: These methods create virtual panel IDs which can cause database issues
+  async startSession(sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
+    console.warn(`[ClaudeCodeManager] DEPRECATED: startSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
+    // For legacy session calls, create a virtual panel ID
+    const virtualPanelId = `session-${sessionId}`;
+    return this.startPanel(virtualPanelId, sessionId, worktreePath, prompt, permissionMode, model);
+  }
+
+  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
+    console.warn(`[ClaudeCodeManager] DEPRECATED: continueSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
+    // For legacy session calls, create a virtual panel ID
+    const virtualPanelId = `session-${sessionId}`;
+    return this.continuePanel(virtualPanelId, sessionId, worktreePath, prompt, conversationHistory, model);
+  }
+
   async stopSession(sessionId: string): Promise<void> {
-    await this.killProcess(sessionId);
+    console.warn(`[ClaudeCodeManager] DEPRECATED: stopSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
+    // For legacy session calls, use virtual panel ID
+    const virtualPanelId = `session-${sessionId}`;
+    await this.stopPanel(virtualPanelId);
+  }
+
+  isSessionRunning(sessionId: string): boolean {
+    console.warn(`[ClaudeCodeManager] DEPRECATED: isSessionRunning called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
+    // For legacy session calls, check virtual panel ID
+    const virtualPanelId = `session-${sessionId}`;
+    return this.isPanelRunning(virtualPanelId);
   }
 
   /**
    * Kill all Claude processes on shutdown
    */
   async killAllProcesses(): Promise<void> {
-    const sessionIds = Array.from(this.processes.keys());
-    this.logger?.info(`[Claude] Killing ${sessionIds.length} Claude processes on shutdown`);
+    const panelIds = Array.from(this.processes.keys());
+    this.logger?.info(`[Claude] Killing ${panelIds.length} Claude panel processes on shutdown`);
     
-    const killPromises = sessionIds.map(sessionId => this.killProcess(sessionId));
+    const killPromises = panelIds.map(panelId => this.killProcess(panelId));
     await Promise.all(killPromises);
   }
 
@@ -1266,7 +1328,7 @@ export class ClaudeCodeManager extends EventEmitter {
    * Kill a process and all its descendants
    * Returns true if successful, false if zombie processes remain
    */
-  private async killProcessTree(pid: number, sessionId: string): Promise<boolean> {
+  private async killProcessTree(pid: number, panelId: string, sessionId: string): Promise<boolean> {
     const platform = os.platform();
     const execAsync = promisify(exec);
     
@@ -1358,6 +1420,7 @@ export class ClaudeCodeManager extends EventEmitter {
         
         // Emit error event so UI can show warning
         this.emit('output', {
+          panelId,
           sessionId,
           type: 'stderr',
           data: `\n[WARNING] Failed to terminate ${remainingPids.length} child process${remainingPids.length > 1 ? 'es' : ''}: ${processReport}\nPlease manually kill these processes.\n`,

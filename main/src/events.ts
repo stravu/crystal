@@ -3,6 +3,7 @@ import { execSync } from './utils/commandExecutor';
 import type { AppServices } from './ipc/types';
 import type { VersionInfo } from './services/versionChecker';
 import { addSessionLog } from './ipc/logs';
+import { panelManager } from './services/panelManager';
 
 export function setupEventListeners(services: AppServices, getMainWindow: () => BrowserWindow | null): void {
   const {
@@ -24,6 +25,35 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         mw.webContents.send('session:created', session);
       } catch (error) {
         console.error('[Main] Failed to send session:created event:', error);
+      }
+    }
+    
+    // Claude Panel Integration: Auto-create Claude panel for sessions with prompts
+    if (session.prompt && session.prompt.trim()) {
+      console.log(`[Events] Session ${session.id} created with prompt, auto-creating Claude panel`);
+      try {
+        const panel = await panelManager.createPanel({
+          sessionId: session.id,
+          type: 'claude',
+          title: 'Claude'
+        });
+        console.log(`[Events] Auto-created Claude panel for session ${session.id}`);
+
+        // Ensure the newly created Claude panel is registered with ClaudePanelManager
+        try {
+          const { claudePanelManager } = require('./ipc/claudePanel');
+          if (claudePanelManager) {
+            claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
+            console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
+          } else {
+            console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
+          }
+        } catch (err) {
+          console.error('[Events] Failed to register Claude panel with ClaudePanelManager:', err);
+        }
+      } catch (error) {
+        console.error(`[Events] Failed to auto-create Claude panel for session ${session.id}:`, error);
+        // Don't fail session creation if panel creation fails
       }
     }
     
@@ -113,12 +143,15 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   // Listen to claudeCodeManager events
   claudeCodeManager.on('output', async (output: any) => {
-    // Save raw output to database (including JSON)
-    sessionManager.addSessionOutput(output.sessionId, {
-      type: output.type,
-      data: output.data,
-      timestamp: output.timestamp
-    });
+    // Persist output: let ClaudePanelManager handle panel-based storage to avoid duplicates
+    if (!output.panelId) {
+      console.log(`[Events] Saving Claude output for session ${output.sessionId} (legacy mode)`);
+      sessionManager.addSessionOutput(output.sessionId, {
+        type: output.type,
+        data: output.data,
+        timestamp: output.timestamp
+      });
+    }
 
     // Check if Claude is waiting for user input
     if (output.type === 'json' && output.data.type === 'prompt') {
@@ -142,8 +175,12 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
   });
 
-  claudeCodeManager.on('spawned', async ({ sessionId }: { sessionId: string }) => {
-    console.log(`[Main] Claude Code spawned for session ${sessionId}, updating status to 'running'`);
+  claudeCodeManager.on('spawned', async ({ panelId, sessionId }: { panelId?: string; sessionId: string }) => {
+    if (panelId) {
+      console.log(`[Main] Claude Code spawned for panel ${panelId} (session ${sessionId}), updating status to 'running'`);
+    } else {
+      console.log(`[Main] Claude Code spawned for session ${sessionId}, updating status to 'running'`);
+    }
 
     // Add a small delay to ensure the session is fully initialized
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -177,8 +214,12 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
   });
 
-  claudeCodeManager.on('exit', async ({ sessionId, exitCode, signal }: { sessionId: string; exitCode: number; signal: string }) => {
-    console.log(`[Main] Claude Code exited for session ${sessionId} with code ${exitCode}, signal ${signal}`);
+  claudeCodeManager.on('exit', async ({ panelId, sessionId, exitCode, signal }: { panelId?: string; sessionId: string; exitCode: number; signal: string }) => {
+    if (panelId) {
+      console.log(`[Main] Claude Code exited for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signal}`);
+    } else {
+      console.log(`[Main] Claude Code exited for session ${sessionId} with code ${exitCode}, signal ${signal}`);
+    }
     await sessionManager.setSessionExitCode(sessionId, exitCode);
     
     // Get the current session to check its current status
@@ -308,8 +349,12 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
   });
 
-  claudeCodeManager.on('error', async ({ sessionId, error }: { sessionId: string; error: string }) => {
-    console.log(`Session ${sessionId} encountered an error: ${error}`);
+  claudeCodeManager.on('error', async ({ panelId, sessionId, error }: { panelId?: string; sessionId: string; error: string }) => {
+    if (panelId) {
+      console.log(`Panel ${panelId} (session ${sessionId}) encountered an error: ${error}`);
+    } else {
+      console.log(`Session ${sessionId} encountered an error: ${error}`);
+    }
     await sessionManager.updateSession(sessionId, { status: 'error', error });
 
     // Stop run commands on error

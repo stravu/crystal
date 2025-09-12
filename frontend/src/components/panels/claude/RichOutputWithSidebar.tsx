@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, History, GitCommit } from 'lucide-react';
 import { RichOutputView } from './RichOutputView';
-import { PromptNavigation } from '../PromptNavigation';
-import { CommitsPanel } from '../CommitsPanel';
-import { cn } from '../../utils/cn';
+import { PromptNavigation } from './PromptNavigation';
+// import { CommitsPanel } from './CommitsPanel';
+import { cn } from '../../../utils/cn';
 import { RichOutputSettings } from './RichOutputView';
 
 interface RichOutputWithSidebarProps {
-  sessionId: string;
+  panelId?: string;
+  sessionId?: string; // Support both for backward compatibility
   sessionStatus?: string;
   model?: string;
   settings?: RichOutputSettings;
@@ -22,10 +23,16 @@ const SIDEBAR_TAB_KEY = 'crystal-rich-output-sidebar-tab';
 type SidebarTab = 'prompts' | 'commits';
 
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
+  panelId,
   sessionId,
   sessionStatus,
   settings,
 }) => {
+  // Use panelId if available, otherwise fall back to sessionId for backward compatibility
+  const id = panelId || sessionId;
+  if (!id) {
+    throw new Error('RichOutputWithSidebar requires either panelId or sessionId');
+  }
   // Load collapsed state from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
@@ -65,7 +72,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
       <div className="flex-1 overflow-hidden">
         <RichOutputView
           ref={richOutputRef}
-          sessionId={sessionId}
+          panelId={id}
           sessionStatus={sessionStatus}
           settings={settings}
         />
@@ -138,11 +145,15 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
             <div className="flex-1 overflow-hidden">
               {activeTab === 'prompts' ? (
                 <PromptNavigation
-                  sessionId={sessionId}
+                  panelId={id}
                   onNavigateToPrompt={handleNavigateToPrompt}
                 />
               ) : (
-                <CommitsPanel sessionId={sessionId} />
+                // TODO: CommitsPanel needs session context, not panel context
+                // <CommitsPanel panelId={id} />
+                <div className="p-4 text-text-secondary">
+                  Commits view coming soon...
+                </div>
               )}
             </div>
           </div>

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData } from './models';
+import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, CreatePanelExecutionDiffData } from './models';
 import type { ToolPanel } from '../../../shared/types/panels';
 
 export class DatabaseService {
@@ -802,6 +802,146 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN active_panel_id TEXT").run();
       console.log('[Database] Added active_panel_id column to sessions table');
     }
+
+    // Migration 004: Claude panels migration
+    const claudePanelsMigrated = this.db.prepare("SELECT value FROM user_preferences WHERE key = 'claude_panels_migrated'").get();
+    if (!claudePanelsMigrated) {
+      console.log('[Database] Running Claude panels migration 004...');
+      
+      try {
+        // Step 1: Add panel_id columns to Claude tables if they don't exist
+        const sessionOutputsInfo = this.db.prepare("PRAGMA table_info(session_outputs)").all();
+        const conversationMessagesInfo = this.db.prepare("PRAGMA table_info(conversation_messages)").all();
+        const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
+        const executionDiffsInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all();
+
+        const hasSessionOutputsPanelId = sessionOutputsInfo.some((col: any) => col.name === 'panel_id');
+        const hasConversationMessagesPanelId = conversationMessagesInfo.some((col: any) => col.name === 'panel_id');
+        const hasPromptMarkersPanelId = promptMarkersInfo.some((col: any) => col.name === 'panel_id');
+        const hasExecutionDiffsPanelId = executionDiffsInfo.some((col: any) => col.name === 'panel_id');
+
+        if (!hasSessionOutputsPanelId) {
+          this.db.prepare("ALTER TABLE session_outputs ADD COLUMN panel_id TEXT").run();
+          console.log('[Database] Added panel_id column to session_outputs');
+        }
+
+        if (!hasConversationMessagesPanelId) {
+          this.db.prepare("ALTER TABLE conversation_messages ADD COLUMN panel_id TEXT").run();
+          console.log('[Database] Added panel_id column to conversation_messages');
+        }
+
+        if (!hasPromptMarkersPanelId) {
+          this.db.prepare("ALTER TABLE prompt_markers ADD COLUMN panel_id TEXT").run();
+          console.log('[Database] Added panel_id column to prompt_markers');
+        }
+
+        if (!hasExecutionDiffsPanelId) {
+          this.db.prepare("ALTER TABLE execution_diffs ADD COLUMN panel_id TEXT").run();
+          console.log('[Database] Added panel_id column to execution_diffs');
+        }
+
+        // Step 2: Create claude_panel_settings table if it doesn't exist
+        const claudePanelSettingsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='claude_panel_settings'").all();
+        if (claudePanelSettingsTable.length === 0) {
+          this.db.prepare(`
+            CREATE TABLE claude_panel_settings (
+              panel_id TEXT PRIMARY KEY,
+              model TEXT DEFAULT 'claude-3-opus-20240229',
+              commit_mode BOOLEAN DEFAULT 0,
+              system_prompt TEXT,
+              max_tokens INTEGER DEFAULT 4096,
+              temperature REAL DEFAULT 0.7,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (panel_id) REFERENCES tool_panels(id) ON DELETE CASCADE
+            )
+          `).run();
+          console.log('[Database] Created claude_panel_settings table');
+        }
+
+        // Step 3: Create indexes for efficient queries
+        this.db.prepare("CREATE INDEX IF NOT EXISTS idx_session_outputs_panel_id ON session_outputs(panel_id)").run();
+        this.db.prepare("CREATE INDEX IF NOT EXISTS idx_conversation_messages_panel_id ON conversation_messages(panel_id)").run();
+        this.db.prepare("CREATE INDEX IF NOT EXISTS idx_prompt_markers_panel_id ON prompt_markers(panel_id)").run();
+        this.db.prepare("CREATE INDEX IF NOT EXISTS idx_execution_diffs_panel_id ON execution_diffs(panel_id)").run();
+
+        // Step 4: Data migration - Create Claude panels for existing sessions and migrate data
+        const sessionsWithClaude = this.db.prepare(`
+          SELECT id, claude_session_id, model FROM sessions 
+          WHERE claude_session_id IS NOT NULL 
+          AND NOT EXISTS (
+            SELECT 1 FROM tool_panels 
+            WHERE session_id = sessions.id 
+            AND type = 'claude'
+          )
+        `).all() as Array<{id: string, claude_session_id: string, model?: string}>;
+
+        console.log(`[Database] Found ${sessionsWithClaude.length} sessions with Claude data to migrate`);
+
+        for (const session of sessionsWithClaude) {
+          // Generate a unique panel ID
+          const panelId = `claude-panel-${session.id}-${Date.now()}`;
+          
+          // Create Claude panel in tool_panels table
+          this.db.prepare(`
+            INSERT INTO tool_panels (id, session_id, type, title, metadata)
+            VALUES (?, ?, 'claude', 'Claude', ?)
+          `).run(
+            panelId, 
+            session.id, 
+            JSON.stringify({ claudeResumeId: session.claude_session_id })
+          );
+
+          // Create Claude panel settings
+          this.db.prepare(`
+            INSERT INTO claude_panel_settings (panel_id, model)
+            VALUES (?, ?)
+          `).run(panelId, session.model || 'claude-3-opus-20240229');
+
+          // Update all Claude data tables to link to the new panel
+          this.db.prepare(`
+            UPDATE session_outputs 
+            SET panel_id = ? 
+            WHERE session_id = ? AND panel_id IS NULL
+          `).run(panelId, session.id);
+
+          this.db.prepare(`
+            UPDATE conversation_messages 
+            SET panel_id = ? 
+            WHERE session_id = ? AND panel_id IS NULL
+          `).run(panelId, session.id);
+
+          this.db.prepare(`
+            UPDATE prompt_markers 
+            SET panel_id = ? 
+            WHERE session_id = ? AND panel_id IS NULL
+          `).run(panelId, session.id);
+
+          this.db.prepare(`
+            UPDATE execution_diffs 
+            SET panel_id = ? 
+            WHERE session_id = ? AND panel_id IS NULL
+          `).run(panelId, session.id);
+
+          // Set this as the active panel for the session
+          this.db.prepare(`
+            UPDATE sessions 
+            SET active_panel_id = ? 
+            WHERE id = ? AND active_panel_id IS NULL
+          `).run(panelId, session.id);
+
+          console.log(`[Database] Created Claude panel ${panelId} for session ${session.id}`);
+        }
+
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('claude_panels_migrated', 'true')").run();
+        console.log('[Database] Completed Claude panels migration 004');
+
+      } catch (error) {
+        console.error('[Database] Failed to run Claude panels migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
   }
 
   // Project operations
@@ -1399,6 +1539,46 @@ export class DatabaseService {
     this.db.prepare('DELETE FROM session_outputs WHERE session_id = ?').run(sessionId);
   }
 
+  // Claude panel output operations - use panel_id for Claude-specific data
+  addPanelOutput(panelId: string, type: 'stdout' | 'stderr' | 'system' | 'json' | 'error', data: string): void {
+    // Get the session_id from the panel
+    const panel = this.getPanel(panelId);
+    if (!panel) {
+      throw new Error(`Panel not found: ${panelId}`);
+    }
+    
+    this.db.prepare(`
+      INSERT INTO session_outputs (session_id, panel_id, type, data)
+      VALUES (?, ?, ?, ?)
+    `).run(panel.sessionId, panelId, type, data);
+  }
+
+  getPanelOutputs(panelId: string, limit?: number): SessionOutput[] {
+    const limitClause = limit ? `LIMIT ${limit}` : '';
+    return this.db.prepare(`
+      SELECT * FROM session_outputs 
+      WHERE panel_id = ? 
+      ORDER BY timestamp ASC 
+      ${limitClause}
+    `).all(panelId) as SessionOutput[];
+  }
+
+  getRecentPanelOutputs(panelId: string, since?: Date): SessionOutput[] {
+    if (since) {
+      return this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE panel_id = ? AND timestamp > ? 
+        ORDER BY timestamp ASC
+      `).all(panelId, since.toISOString()) as SessionOutput[];
+    } else {
+      return this.getPanelOutputs(panelId);
+    }
+  }
+
+  clearPanelOutputs(panelId: string): void {
+    this.db.prepare('DELETE FROM session_outputs WHERE panel_id = ?').run(panelId);
+  }
+
   // Conversation message operations
   addConversationMessage(sessionId: string, messageType: 'user' | 'assistant', content: string): void {
     this.db.prepare(`
@@ -1417,6 +1597,32 @@ export class DatabaseService {
 
   clearConversationMessages(sessionId: string): void {
     this.db.prepare('DELETE FROM conversation_messages WHERE session_id = ?').run(sessionId);
+  }
+
+  // Claude panel conversation message operations - use panel_id for Claude-specific data
+  addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string): void {
+    // Get the session_id from the panel
+    const panel = this.getPanel(panelId);
+    if (!panel) {
+      throw new Error(`Panel not found: ${panelId}`);
+    }
+    
+    this.db.prepare(`
+      INSERT INTO conversation_messages (session_id, panel_id, message_type, content)
+      VALUES (?, ?, ?, ?)
+    `).run(panel.sessionId, panelId, messageType, content);
+  }
+
+  getPanelConversationMessages(panelId: string): ConversationMessage[] {
+    return this.db.prepare(`
+      SELECT * FROM conversation_messages 
+      WHERE panel_id = ? 
+      ORDER BY timestamp ASC
+    `).all(panelId) as ConversationMessage[];
+  }
+
+  clearPanelConversationMessages(panelId: string): void {
+    this.db.prepare('DELETE FROM conversation_messages WHERE panel_id = ?').run(panelId);
   }
 
   // Cleanup operations
@@ -1476,6 +1682,29 @@ export class DatabaseService {
     return markers;
   }
 
+  getPanelPromptMarkers(panelId: string): PromptMarker[] {
+    const markers = this.db.prepare(`
+      SELECT 
+        id,
+        session_id,
+        panel_id,
+        prompt_text,
+        output_index,
+        output_line,
+        datetime(timestamp) || 'Z' as timestamp,
+        CASE 
+          WHEN completion_timestamp IS NOT NULL 
+          THEN datetime(completion_timestamp) || 'Z'
+          ELSE NULL
+        END as completion_timestamp
+      FROM prompt_markers 
+      WHERE panel_id = ? 
+      ORDER BY timestamp ASC
+    `).all(panelId) as PromptMarker[];
+    
+    return markers;
+  }
+
   updatePromptMarkerLine(id: number, outputLine: number): void {
     this.db.prepare(`
       UPDATE prompt_markers 
@@ -1513,6 +1742,64 @@ export class DatabaseService {
           LIMIT 1
         )
       `).run(sessionId, sessionId);
+    }
+  }
+
+  // Claude panel prompt marker operations - use panel_id for Claude-specific data
+  addPanelPromptMarker(panelId: string, promptText: string, outputIndex: number, outputLine?: number): number {
+    console.log('[Database] Adding panel prompt marker:', { panelId, promptText, outputIndex, outputLine });
+    
+    try {
+      // Get the session_id from the panel
+      const panel = this.getPanel(panelId);
+      if (!panel) {
+        throw new Error(`Panel not found: ${panelId}`);
+      }
+      
+      // Use datetime('now') to ensure UTC timestamp
+      const result = this.db.prepare(`
+        INSERT INTO prompt_markers (session_id, panel_id, prompt_text, output_index, output_line, timestamp)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+      `).run(panel.sessionId, panelId, promptText, outputIndex, outputLine);
+      
+      console.log('[Database] Panel prompt marker added successfully, ID:', result.lastInsertRowid);
+      return result.lastInsertRowid as number;
+    } catch (error) {
+      console.error('[Database] Failed to add panel prompt marker:', error);
+      throw error;
+    }
+  }
+
+
+  updatePanelPromptMarkerCompletion(panelId: string, timestamp?: string): void {
+    // Update the most recent prompt marker for this panel with completion timestamp
+    // Use datetime() to ensure proper UTC timestamp handling
+    if (timestamp) {
+      // If timestamp is provided, use datetime() to normalize it
+      this.db.prepare(`
+        UPDATE prompt_markers 
+        SET completion_timestamp = datetime(?) 
+        WHERE panel_id = ? 
+        AND id = (
+          SELECT id FROM prompt_markers 
+          WHERE panel_id = ? 
+          ORDER BY timestamp DESC 
+          LIMIT 1
+        )
+      `).run(timestamp, panelId, panelId);
+    } else {
+      // If no timestamp, use current UTC time
+      this.db.prepare(`
+        UPDATE prompt_markers 
+        SET completion_timestamp = datetime('now') 
+        WHERE panel_id = ? 
+        AND id = (
+          SELECT id FROM prompt_markers 
+          WHERE panel_id = ? 
+          ORDER BY timestamp DESC 
+          LIMIT 1
+        )
+      `).run(panelId, panelId);
     }
   }
 
@@ -1584,6 +1871,53 @@ export class DatabaseService {
       commit_message: row.commit_message,
       timestamp: row.timestamp
     };
+  }
+
+  // Claude panel execution diff operations - use panel_id for Claude-specific data
+  createPanelExecutionDiff(data: CreatePanelExecutionDiffData): ExecutionDiff {
+    const result = this.db.prepare(`
+      INSERT INTO execution_diffs (
+        panel_id, prompt_marker_id, execution_sequence, git_diff, 
+        files_changed, stats_additions, stats_deletions, stats_files_changed,
+        before_commit_hash, after_commit_hash, commit_message
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      data.panel_id,
+      data.prompt_marker_id || null,
+      data.execution_sequence,
+      data.git_diff || null,
+      data.files_changed ? JSON.stringify(data.files_changed) : null,
+      data.stats_additions || 0,
+      data.stats_deletions || 0,
+      data.stats_files_changed || 0,
+      data.before_commit_hash || null,
+      data.after_commit_hash || null,
+      data.commit_message || null
+    );
+
+    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
+    return this.convertDbExecutionDiff(diff);
+  }
+
+  getPanelExecutionDiffs(panelId: string): ExecutionDiff[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM execution_diffs 
+      WHERE panel_id = ? 
+      ORDER BY execution_sequence ASC
+    `).all(panelId);
+    
+    return rows.map(this.convertDbExecutionDiff);
+  }
+
+  getNextPanelExecutionSequence(panelId: string): number {
+    const result = this.db.prepare(`
+      SELECT MAX(execution_sequence) as max_seq 
+      FROM execution_diffs 
+      WHERE panel_id = ?
+    `).get(panelId) as any;
+    
+    return (result?.max_seq || 0) + 1;
   }
 
   // Display order operations
@@ -1897,6 +2231,106 @@ export class DatabaseService {
 
   deletePanelsForSession(sessionId: string): void {
     this.db.prepare('DELETE FROM tool_panels WHERE session_id = ?').run(sessionId);
+  }
+
+  // Claude panel settings operations
+  createClaudePanelSettings(panelId: string, settings: {
+    model?: string;
+    commit_mode?: boolean;
+    system_prompt?: string;
+    max_tokens?: number;
+    temperature?: number;
+  }): void {
+    this.db.prepare(`
+      INSERT INTO claude_panel_settings (panel_id, model, commit_mode, system_prompt, max_tokens, temperature)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      panelId,
+      settings.model || 'claude-3-opus-20240229',
+      settings.commit_mode ? 1 : 0,
+      settings.system_prompt || null,
+      settings.max_tokens || 4096,
+      settings.temperature || 0.7
+    );
+  }
+
+  getClaudePanelSettings(panelId: string): {
+    panel_id: string;
+    model: string;
+    commit_mode: boolean;
+    system_prompt: string | null;
+    max_tokens: number;
+    temperature: number;
+    created_at: string;
+    updated_at: string;
+  } | null {
+    const row = this.db.prepare(`
+      SELECT * FROM claude_panel_settings WHERE panel_id = ?
+    `).get(panelId) as any;
+
+    if (!row) return null;
+
+    return {
+      panel_id: row.panel_id,
+      model: row.model,
+      commit_mode: Boolean(row.commit_mode),
+      system_prompt: row.system_prompt,
+      max_tokens: row.max_tokens,
+      temperature: row.temperature,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    };
+  }
+
+  updateClaudePanelSettings(panelId: string, settings: {
+    model?: string;
+    commit_mode?: boolean;
+    system_prompt?: string;
+    max_tokens?: number;
+    temperature?: number;
+  }): void {
+    const setClauses: string[] = [];
+    const values: any[] = [];
+
+    if (settings.model !== undefined) {
+      setClauses.push('model = ?');
+      values.push(settings.model);
+    }
+
+    if (settings.commit_mode !== undefined) {
+      setClauses.push('commit_mode = ?');
+      values.push(settings.commit_mode ? 1 : 0);
+    }
+
+    if (settings.system_prompt !== undefined) {
+      setClauses.push('system_prompt = ?');
+      values.push(settings.system_prompt);
+    }
+
+    if (settings.max_tokens !== undefined) {
+      setClauses.push('max_tokens = ?');
+      values.push(settings.max_tokens);
+    }
+
+    if (settings.temperature !== undefined) {
+      setClauses.push('temperature = ?');
+      values.push(settings.temperature);
+    }
+
+    if (setClauses.length > 0) {
+      setClauses.push('updated_at = CURRENT_TIMESTAMP');
+      values.push(panelId);
+
+      this.db.prepare(`
+        UPDATE claude_panel_settings
+        SET ${setClauses.join(', ')}
+        WHERE panel_id = ?
+      `).run(...values);
+    }
+  }
+
+  deleteClaudePanelSettings(panelId: string): void {
+    this.db.prepare('DELETE FROM claude_panel_settings WHERE panel_id = ?').run(panelId);
   }
 
   close(): void {

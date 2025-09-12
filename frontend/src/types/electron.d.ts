@@ -237,6 +237,24 @@ interface ElectronAPI {
     removeAllListeners: (channel: string) => void;
   };
 
+  // Panel operations
+  panels: {
+    getSessionPanels: (sessionId: string) => Promise<IPCResponse>;
+    createPanel: (sessionId: string, type: string, name: string, config?: any) => Promise<IPCResponse>;
+    deletePanel: (panelId: string) => Promise<IPCResponse>;
+    renamePanel: (panelId: string, name: string) => Promise<IPCResponse>;
+    setActivePanel: (sessionId: string, panelId: string) => Promise<IPCResponse>;
+    sendInput: (panelId: string, input: string, images?: Array<{ name: string; dataUrl: string; type: string }>) => Promise<IPCResponse>;
+    getOutput: (panelId: string, limit?: number) => Promise<IPCResponse>;
+    getConversationMessages: (panelId: string) => Promise<IPCResponse>;
+    getJsonMessages: (panelId: string) => Promise<IPCResponse>;
+    getPrompts: (panelId: string) => Promise<IPCResponse>;
+    continue: (panelId: string, input: string, model?: string) => Promise<IPCResponse>;
+    stop: (panelId: string) => Promise<IPCResponse>;
+    resizeTerminal: (panelId: string, cols: number, rows: number) => Promise<IPCResponse>;
+    sendTerminalInput: (panelId: string, data: string) => Promise<IPCResponse>;
+  };
+
   // Debug utilities
   debug: {
     getTableStructure: (tableName: 'folders' | 'sessions') => Promise<IPCResponse<{

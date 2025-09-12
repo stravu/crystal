@@ -464,6 +464,39 @@ export class API {
       return window.electronAPI.dashboard.onSessionUpdate(callback);
     },
   };
+
+  // Panels - for Claude panels and other panel types
+  static panels = {
+    async getOutput(panelId: string, limit?: number) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.panels.getOutput(panelId, limit);
+    },
+
+    async getConversationMessages(panelId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.panels.getConversationMessages(panelId);
+    },
+
+    async getJsonMessages(panelId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.panels.getJsonMessages(panelId);
+    },
+
+    async getPrompts(panelId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.panels.getPrompts(panelId);
+    },
+
+    async sendInput(panelId: string, input: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.panels.sendInput(panelId, input);
+    },
+
+    async continue(panelId: string, input: string, model?: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.panels.continue(panelId, input, model);
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete

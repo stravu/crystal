@@ -68,6 +68,18 @@ export class SessionManager extends EventEmitter {
     return claudeSessionId;
   }
 
+  // Panel-scoped Claude session ID for correct per-panel resume behavior
+  getPanelClaudeSessionId(panelId: string): string | undefined {
+    try {
+      const panel = this.db.getPanel(panelId);
+      const claudeSessionId = (panel as any)?.state?.customState?.claudeSessionId;
+      console.log(`[SessionManager] Getting Claude session ID for panel ${panelId}: ${claudeSessionId || 'not found'}`);
+      return claudeSessionId;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   getProjectById(id: number): Project | undefined {
     return this.db.getProject(id);
   }
@@ -516,6 +528,147 @@ export class SessionManager extends EventEmitter {
 
   getConversationMessages(id: string): ConversationMessage[] {
     return this.db.getConversationMessages(id);
+  }
+
+  // Panel-based methods for Claude panels (use panel_id instead of session_id)
+  addPanelOutput(panelId: string, output: Omit<SessionOutput, 'sessionId'>): void {
+    // Check for JSON message type and store appropriately
+    const existingOutputs = this.db.getPanelOutputs(panelId, 1);
+    const isContinuing = existingOutputs.length > 0 && 
+                        existingOutputs[existingOutputs.length - 1]?.type === 'json';
+    
+    const dataToStore = (output.type === 'json' || output.type === 'error') 
+      ? JSON.stringify(output.data) 
+      : output.data as string;
+    
+    this.db.addPanelOutput(panelId, output.type, dataToStore);
+
+    // Capture Claude's session ID from init/system messages for proper --resume handling
+    try {
+      if (output.type === 'json' && output.data && typeof output.data === 'object') {
+        const data: any = output.data;
+        const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
+        if (sessionIdFromMsg) {
+          const panel = this.db.getPanel(panelId);
+          if (panel?.sessionId) {
+            this.db.updateSession(panel.sessionId, { claude_session_id: sessionIdFromMsg });
+            console.log(`[SessionManager] Captured Claude session ID from panel ${panelId}: ${sessionIdFromMsg} for Crystal session ${panel.sessionId}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SessionManager] Failed to capture Claude session_id from panel output:', e);
+    }
+
+    // Handle assistant conversation message extraction for Claude panels (same logic as sessions)
+    if (output.type === 'json' && output.data.type === 'assistant' && output.data.message?.content) {
+      // Extract text content from assistant messages
+      const content = output.data.message.content;
+      let assistantText = '';
+      
+      if (Array.isArray(content)) {
+        // Concatenate all text content from the array
+        assistantText = content
+          .filter((item: any) => item.type === 'text')
+          .map((item: any) => item.text)
+          .join('\n');
+      } else if (typeof content === 'string') {
+        assistantText = content;
+      }
+      
+      if (assistantText) {
+        // Add to panel conversation messages for continuation support
+        this.db.addPanelConversationMessage(panelId, 'assistant', assistantText);
+      }
+    }
+    
+    // Handle user conversation message extraction for Claude panels (same logic as sessions)
+    if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
+      // Extract text content from user messages
+      const content = output.data.message.content;
+      let promptText = '';
+      
+      if (Array.isArray(content)) {
+        // Look for text content in the array
+        const textContent = content.find((item: any) => item.type === 'text');
+        if (textContent?.text) {
+          promptText = textContent.text;
+        }
+      } else if (typeof content === 'string') {
+        promptText = content;
+      }
+      
+      if (promptText) {
+        // Get current output count to use as index for prompt markers
+        const outputs = this.db.getPanelOutputs(panelId);
+        // Note: Panel-based prompt markers would need addPanelPromptMarker method
+        // For now, we rely on the explicit addPanelConversationMessage calls in IPC handlers
+        // this.db.addPanelPromptMarker(panelId, promptText, outputs.length - 1);
+        
+        // Add to panel conversation messages for continuation support
+        this.db.addPanelConversationMessage(panelId, 'user', promptText);
+      }
+    }
+
+    // Capture Claude session ID per panel for proper --resume usage
+    try {
+      if (output.type === 'json' && output.data && typeof output.data === 'object') {
+        const data: any = output.data;
+        const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
+        if (sessionIdFromMsg) {
+          const panel = this.db.getPanel(panelId);
+          if (panel) {
+            const currentState = (panel as any).state || {};
+            const customState = currentState.customState || {};
+            const updatedState = {
+              ...currentState,
+              customState: { ...customState, claudeSessionId: sessionIdFromMsg }
+            };
+            this.db.updatePanel(panelId, { state: updatedState });
+            console.log(`[SessionManager] Stored Claude session_id for panel ${panelId}: ${sessionIdFromMsg}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SessionManager] Failed to persist panel-level Claude session_id:', e);
+    }
+  }
+
+  getPanelOutputs(panelId: string, limit?: number): SessionOutput[] {
+    const dbOutputs = this.db.getPanelOutputs(panelId, limit);
+    return dbOutputs.map(dbOutput => ({
+      sessionId: dbOutput.session_id || '', // For compatibility, though panels use panel_id
+      type: dbOutput.type as 'stdout' | 'stderr' | 'json' | 'error',
+      data: (dbOutput.type === 'json' || dbOutput.type === 'error') ? JSON.parse(dbOutput.data) : dbOutput.data,
+      timestamp: new Date(dbOutput.timestamp)
+    }));
+  }
+
+  addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string): void {
+    this.db.addPanelConversationMessage(panelId, messageType, content);
+  }
+
+  getPanelConversationMessages(panelId: string): ConversationMessage[] {
+    return this.db.getPanelConversationMessages(panelId);
+  }
+
+  // Panel-based prompt marker methods
+  getPanelPromptMarkers(panelId: string): PromptMarker[] {
+    return this.db.getPanelPromptMarkers(panelId);
+  }
+
+  addPanelInitialPromptMarker(panelId: string, prompt: string): void {
+    console.log('[SessionManager] Adding initial prompt marker for panel:', panelId);
+    console.log('[SessionManager] Prompt text:', prompt);
+    
+    try {
+      // Add the initial prompt as the first prompt marker (index 0)
+      this.db.addPanelPromptMarker(panelId, prompt, 0, 0);
+      console.log('[SessionManager] Panel initial prompt marker added successfully');
+    } catch (error) {
+      console.error('[SessionManager] Failed to add panel initial prompt marker:', error);
+      throw error;
+    }
   }
 
   continueConversation(id: string, userMessage: string): void {

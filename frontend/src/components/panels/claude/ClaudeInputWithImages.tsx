@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
-import { Session, GitCommands } from '../../types/session';
-import { ViewMode } from '../../hooks/useSessionView';
+import { Session, GitCommands } from '../../../types/session';
+import { ViewMode } from '../../../hooks/useSessionView';
 import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square } from 'lucide-react';
-import FilePathAutocomplete from '../FilePathAutocomplete';
-import { API } from '../../utils/api';
-import { CommitModePill, AutoCommitSwitch } from '../CommitModeToggle';
-import { Dropdown, type DropdownItem } from '../ui/Dropdown';
-import { Pill } from '../ui/Pill';
-import { SwitchSimple as Switch } from '../ui/SwitchSimple';
+import FilePathAutocomplete from '../../FilePathAutocomplete';
+import { API } from '../../../utils/api';
+import { CommitModePill, AutoCommitSwitch } from '../../CommitModeToggle';
+import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
+import { Pill } from '../../ui/Pill';
+import { SwitchSimple as Switch } from '../../ui/SwitchSimple';
 
 interface AttachedImage {
   id: string;
@@ -646,6 +646,9 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 });
 
 SessionInputWithImages.displayName = 'SessionInputWithImages';
+
+// Export with both names for compatibility
+export const ClaudeInputWithImages = SessionInputWithImages;
 
 // Model Selector Component
 interface ModelSelectorProps {

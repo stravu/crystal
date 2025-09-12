@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState;
+  customState?: TerminalPanelState | ClaudePanelState;
 }
 
 export interface TerminalPanelState {
@@ -35,6 +35,18 @@ export interface TerminalPanelState {
   // Advanced persistence options
   tmuxSessionId?: string;        // For true session persistence via tmux
   outputSizeLimit?: number;      // Max lines to persist (default: 10000)
+}
+
+export interface ClaudePanelState {
+  // Basic state
+  isInitialized?: boolean;       // Whether Claude process has been started
+  claudeResumeId?: string;       // Claude's internal resume ID for session continuation
+  
+  // Enhanced persistence (can be added incrementally)
+  lastPrompt?: string;           // Last user prompt
+  model?: string;                // Model being used (sonnet, opus, haiku)
+  permissionMode?: 'approve' | 'ignore'; // Permission mode
+  lastActivityTime?: string;     // For "idle since" indicators
 }
 
 export interface ToolPanelMetadata {
@@ -107,6 +119,12 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
   terminal: {
     canEmit: ['terminal:command_executed', 'terminal:exit', 'files:changed'],
     canConsume: [], // Terminal doesn't consume events in Phase 1-2
+    requiresProcess: true,
+    singleton: false
+  },
+  claude: {
+    canEmit: ['files:changed'], // Claude can change files through tool calls
+    canConsume: [], // Claude doesn't consume events in initial implementation
     requiresProcess: true,
     singleton: false
   },

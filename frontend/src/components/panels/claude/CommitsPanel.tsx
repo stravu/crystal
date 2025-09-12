@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { GitCommit, ChevronDown, ChevronRight, FileText, Plus, Minus } from 'lucide-react';
-import { API } from '../utils/api';
-import { parseTimestamp, formatDistanceToNow } from '../utils/timestampUtils';
-import { cn } from '../utils/cn';
+// import { API } from '../../../utils/api';
+import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
+import { cn } from '../../../utils/cn';
 
 interface ExecutionDiff {
   id: number;
@@ -17,32 +17,38 @@ interface ExecutionDiff {
 }
 
 interface CommitsPanelProps {
-  sessionId: string;
+  panelId: string;
 }
 
-export function CommitsPanel({ sessionId }: CommitsPanelProps) {
-  const [commits, setCommits] = useState<ExecutionDiff[]>([]);
+export function CommitsPanel({ panelId }: CommitsPanelProps) {
+  const [commits] = useState<ExecutionDiff[]>([]);
   const [expandedCommits, setExpandedCommits] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
 
+  // TODO: CommitsPanel needs session context. For now, disable functionality.
+  // Commits are session-level, not panel-level, so this component needs refactoring.
+  
   useEffect(() => {
-    loadCommits();
-  }, [sessionId]);
+    // loadCommits();
+    setLoading(false);
+  }, [panelId]);
 
+  /*
   const loadCommits = async () => {
     try {
       setLoading(true);
-      const response = await API.sessions.getExecutions(sessionId);
-      if (response.success && response.data) {
-        // Show all execution diffs, including failed commits
-        setCommits(response.data);
-      }
+      // const response = await API.sessions.getExecutions(sessionId);
+      // if (response.success && response.data) {
+      //   // Show all execution diffs, including failed commits
+      //   setCommits(response.data);
+      // }
     } catch (error) {
       console.error('Failed to load commits:', error);
     } finally {
       setLoading(false);
     }
   };
+  */
 
   const toggleCommit = (commitId: number) => {
     setExpandedCommits(prev => {

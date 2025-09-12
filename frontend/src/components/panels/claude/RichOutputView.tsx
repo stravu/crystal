@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { API } from '../../utils/api';
-import { MarkdownPreview } from '../MarkdownPreview';
+import { API } from '../../../utils/api';
+import { MarkdownPreview } from '../../MarkdownPreview';
 import { User, Bot, ChevronDown, ChevronRight, Eye, EyeOff, Settings2, Wrench, CheckCircle, XCircle, Clock, ArrowDown } from 'lucide-react';
-import { parseTimestamp, formatDistanceToNow } from '../../utils/timestampUtils';
-import { ThinkingPlaceholder, InlineWorkingIndicator } from './ThinkingPlaceholder';
+import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
+import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 
 // Agent-agnostic message types for flexibility
 interface RawMessage {
@@ -64,7 +64,7 @@ interface ToolResult {
 }
 
 interface RichOutputViewProps {
-  sessionId: string;
+  panelId: string;
   sessionStatus?: string;
   settings?: RichOutputSettings;
 }
@@ -87,7 +87,7 @@ const defaultSettings: RichOutputSettings = {
 };
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
-  ({ sessionId, sessionStatus, settings: propsSettings }, ref) => {
+  ({ panelId, sessionStatus, settings: propsSettings }, ref) => {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -490,10 +490,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     try {
       setError(null);
       
-      // Load conversation messages and JSON messages
+      // Load conversation messages and JSON messages using panel-based APIs
       const [conversationResponse, outputResponse] = await Promise.all([
-        API.sessions.getConversation(sessionId),
-        API.sessions.getJsonMessages(sessionId)
+        API.panels.getConversationMessages(panelId),
+        API.panels.getJsonMessages(panelId)
       ]);
       
       // Combine both sources - conversation messages have the actual user prompts
@@ -537,7 +537,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       setLoading(false);
       isLoadingRef.current = false;
     }
-  }, [sessionId]);
+  }, [panelId]);
 
   // Store loadMessages in ref to avoid dependency cycles
   useEffect(() => {
@@ -548,8 +548,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
     
-    const handleOutputAvailable = (event: CustomEvent<{ sessionId: string }>) => {
-      if (event.detail.sessionId === sessionId) {
+    const handleOutputAvailable = (event: CustomEvent<{ sessionId: string; panelId?: string }>) => {
+      if (event.detail.sessionId === panelId || event.detail.panelId === panelId) {
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -564,16 +564,16 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       clearTimeout(debounceTimer);
       window.removeEventListener('session-output-available', handleOutputAvailable as any);
     };
-  }, [sessionId]); // Only depend on sessionId, not loadMessages
+  }, [panelId]); // Only depend on panelId, not loadMessages
 
   // Initial load
   useEffect(() => {
-    if (!sessionId) return;
+    if (!panelId) return;
     // Reset first load flag when session changes
     isFirstLoadRef.current = true;
     wasAtBottomRef.current = true; // Also reset to true for new sessions
     loadMessages();
-  }, [sessionId, loadMessages]);
+  }, [panelId, loadMessages]);
 
   // Track if user is at bottom - set up once when container is available
   useEffect(() => {

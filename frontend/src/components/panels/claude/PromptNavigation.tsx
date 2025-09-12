@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { formatDistanceToNow } from '../utils/formatters';
-import { formatDuration, getTimeDifference, isValidTimestamp, parseTimestamp } from '../utils/timestampUtils';
-import { API } from '../utils/api';
-import { PromptDetailModal } from './PromptDetailModal';
-import type { Session } from '../types/session';
+import { formatDistanceToNow } from '../../../utils/formatters';
+import { formatDuration, getTimeDifference, isValidTimestamp, parseTimestamp } from '../../../utils/timestampUtils';
+import { API } from '../../../utils/api';
+import { PromptDetailModal } from '../../PromptDetailModal';
+// import type { Session } from '../../../types/session';
 
 interface PromptMarker {
   id: number;
@@ -16,45 +16,16 @@ interface PromptMarker {
 }
 
 interface PromptNavigationProps {
-  sessionId: string;
+  panelId: string;
   onNavigateToPrompt: (marker: PromptMarker) => void;
 }
 
-export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNavigationProps) {
+export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigationProps) {
   const [prompts, setPrompts] = useState<PromptMarker[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
   const [modalPrompt, setModalPrompt] = useState<{ prompt: PromptMarker; index: number } | null>(null);
-  const [activeSession, setActiveSession] = useState<Session | undefined>(undefined);
-
-  // Fetch session data when sessionId changes
-  useEffect(() => {
-    if (!sessionId) return;
-    
-    const fetchSession = async () => {
-      try {
-        const response = await window.electronAPI.invoke('sessions:get', sessionId);
-        if (response.success && response.session) {
-          setActiveSession(response.session);
-        }
-      } catch (error) {
-        console.error('Error fetching session:', error);
-      }
-    };
-    
-    fetchSession();
-    
-    // Listen for session updates
-    const unsubscribe = window.electronAPI?.events?.onSessionUpdated?.((updatedSession: Session) => {
-      if (updatedSession.id === sessionId) {
-        setActiveSession(updatedSession);
-      }
-    });
-    
-    return () => {
-      unsubscribe?.();
-    };
-  }, [sessionId]);
+  // const [activeSession, setActiveSession] = useState<Session | undefined>(undefined);
 
   const calculateDuration = (currentPrompt: PromptMarker, currentIndex: number): string => {
     try {
@@ -66,7 +37,7 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
         prompt_id: currentPrompt.id,
         raw_timestamp: currentPrompt.timestamp,
         completion_timestamp: currentPrompt.completion_timestamp,
-        session_status: activeSession?.status,
+        // session_status: activeSession?.status,
         prompt_text_preview: currentPrompt.prompt_text.substring(0, 30) + '...'
       });
       
@@ -95,8 +66,8 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
         return formatDuration(durationMs);
       }
       
-      // If no completion timestamp, check if prompt is still running
-      if (isLast && activeSession && (activeSession.status === 'running' || activeSession.status === 'waiting')) {
+      // If no completion timestamp and it's the last prompt, assume it's still running
+      if (isLast) {
         // For ongoing prompts, calculate duration from the UTC timestamp to current UTC time
         const startTime = parseTimestamp(currentPrompt.timestamp);
         const now = new Date();
@@ -154,12 +125,12 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
   };
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!panelId) return;
 
     const fetchPrompts = async () => {
       setIsLoading(true);
       try {
-        const response = await API.sessions.getPrompts(sessionId);
+        const response = await API.panels.getPrompts(panelId);
         if (response.success) {
           // Log the timestamps to debug format issues
           console.log('Fetched prompts with timestamps:', response.data.map((p: PromptMarker) => ({
@@ -183,13 +154,12 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
     
     // Only refresh prompts when session status changes, not on a timer
     // This reduces unnecessary API calls from every 5 seconds to only when needed
-  }, [sessionId, activeSession?.status]);
+  }, [panelId]);
 
-  // Use requestAnimationFrame for smooth UI updates instead of setInterval
+  // Use requestAnimationFrame for smooth UI updates for ongoing durations
   useEffect(() => {
-    if (!activeSession || (activeSession.status !== 'running' && activeSession.status !== 'waiting')) {
-      return;
-    }
+    // Always update ongoing durations for the last prompt
+    // Since we don't have session status in panel context
 
     let animationId: number;
     let lastUpdate = 0;
@@ -205,7 +175,7 @@ export function PromptNavigation({ sessionId, onNavigateToPrompt }: PromptNaviga
 
     animationId = requestAnimationFrame(updateOngoingDuration);
     return () => cancelAnimationFrame(animationId);
-  }, [activeSession?.status]);
+  }, [prompts]);
 
   const handlePromptClick = (marker: PromptMarker) => {
     setSelectedPromptId(marker.id);

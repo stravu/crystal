@@ -226,7 +226,8 @@ export class TerminalPanelManager {
     if (!panel) return;
     
     // Get current working directory (if possible)
-    let cwd = panel.state.customState?.cwd || process.cwd();
+    let cwd = (panel.state.customState && 'cwd' in panel.state.customState) ? panel.state.customState.cwd : undefined;
+    cwd = cwd || process.cwd();
     try {
       // Try to get CWD from process (platform-specific)
       if (process.platform !== 'win32') {

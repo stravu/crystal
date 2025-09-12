@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API } from '../../utils/api';
-import { cn } from '../../utils/cn';
+import { API } from '../../../utils/api';
+import { cn } from '../../../utils/cn';
 import { ChevronRight, ChevronDown, Copy, Check, Terminal, FileText } from 'lucide-react';
 
 interface MessagesViewProps {
-  sessionId: string;
+  panelId?: string;
+  sessionId?: string; // Support both for backward compatibility
 }
 
 interface JSONMessage {
@@ -23,7 +24,12 @@ interface SessionInfo {
   timestamp: string;
 }
 
-export const MessagesView: React.FC<MessagesViewProps> = ({ sessionId }) => {
+export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }) => {
+  // Use panelId if available, otherwise fall back to sessionId for backward compatibility
+  const id = panelId || sessionId;
+  if (!id) {
+    throw new Error('MessagesView requires either panelId or sessionId');
+  }
   const [messages, setMessages] = useState<JSONMessage[]>([]);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
@@ -37,7 +43,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ sessionId }) => {
   useEffect(() => {
     const loadMessages = async () => {
       try {
-        const response = await API.sessions.getJsonMessages(sessionId);
+        const response = panelId 
+        ? await API.panels.getJsonMessages(panelId)
+        : await API.sessions.getJsonMessages(id);
         if (response.success && response.data) {
           // Filter out session_info messages and handle them separately
           const regularMessages: JSONMessage[] = [];
@@ -94,12 +102,14 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ sessionId }) => {
     };
 
     loadMessages();
-  }, [sessionId]);
+  }, [panelId, id]);
 
   // Subscribe to new messages
   useEffect(() => {
     const handleSessionOutput = (data: any) => {
-      if (data.sessionId === sessionId && data.type === 'json') {
+      // Match based on panelId when provided, otherwise fallback to sessionId for legacy mode
+      const matchesTarget = panelId ? (data.panelId === panelId) : (data.sessionId === sessionId);
+      if (matchesTarget && data.type === 'json') {
         try {
           // Check if this is a session_info message
           let parsedData: any;
@@ -151,7 +161,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ sessionId }) => {
     return () => {
       window.electron?.off('session:output', handleSessionOutput);
     };
-  }, [sessionId]);
+  }, [panelId, sessionId]);
 
   // Handle scroll to detect if user is at bottom
   useEffect(() => {

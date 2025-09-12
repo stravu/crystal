@@ -1,5 +1,5 @@
 import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
-import { Plus, X, Terminal, ChevronDown } from 'lucide-react';
+import { Plus, X, Terminal, ChevronDown, MessageSquare } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
 import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
@@ -50,6 +50,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     switch (type) {
       case 'terminal':
         return <Terminal className="w-4 h-4" />;
+      case 'claude':
+        return <MessageSquare className="w-4 h-4" />;
       // Add more icons as panel types are added
       default:
         return null;
