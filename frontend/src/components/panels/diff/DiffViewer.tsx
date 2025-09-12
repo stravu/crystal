@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, memo, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
 import { MonacoDiffViewer } from './MonacoDiffViewer';
 import { FileText, ChevronRight, ChevronDown } from 'lucide-react';
-import type { DiffViewerProps } from '../types/diff';
-import type { FileDiff } from '../types/diff';
-import { useTheme } from '../contexts/ThemeContext';
+import type { DiffViewerProps } from '../../../types/diff';
+import type { FileDiff } from '../../../types/diff';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 // Parse unified diff format to extract individual file diffs
 const parseUnifiedDiff = (diff: string): FileDiff[] => {

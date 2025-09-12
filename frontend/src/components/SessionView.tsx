@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { EmptyState } from './EmptyState';
-import CombinedDiffView from './CombinedDiffView';
+import CombinedDiffView from './panels/diff/CombinedDiffView';
 import { StravuFileSearch } from './StravuFileSearch';
 import { Inbox } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';

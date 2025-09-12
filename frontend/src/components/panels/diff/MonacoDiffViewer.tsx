@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DiffEditor, type DiffEditorProps, type MonacoDiffEditor } from '@monaco-editor/react';
 import { AlertCircle, FileText, Check, Loader2, Eye, Code } from 'lucide-react';
-import type { FileDiff } from '../types/diff';
-import { debounce } from '../utils/debounce';
-import { MonacoErrorBoundary } from './MonacoErrorBoundary';
-import { MarkdownPreview } from './MarkdownPreview';
+import type { FileDiff } from '../../../types/diff';
+import { debounce } from '../../../utils/debounce';
+import { MonacoErrorBoundary } from '../../MonacoErrorBoundary';
+import { MarkdownPreview } from '../../MarkdownPreview';
 
 interface MonacoDiffViewerProps {
   file: FileDiff;

@@ -942,6 +942,62 @@ export class DatabaseService {
         // Don't throw - allow app to continue
       }
     }
+    
+    // Migration 005: Ensure all sessions have diff panels
+    const diffPanelsMigrationComplete = this.db.prepare(
+      "SELECT value FROM user_preferences WHERE key = 'diff_panels_migrated'"
+    ).get() as { value: string } | undefined;
+    
+    if (!diffPanelsMigrationComplete) {
+      console.log('[Database] Running diff panels migration 005: Ensure all sessions have diff panels');
+      
+      try {
+        // Get all sessions
+        const sessions = this.db.prepare("SELECT id FROM sessions WHERE archived = 0").all() as { id: string }[];
+        
+        for (const session of sessions) {
+          // Check if session already has a diff panel
+          const hasDiffPanel = this.db.prepare(
+            "SELECT id FROM tool_panels WHERE session_id = ? AND type = 'diff'"
+          ).get(session.id);
+          
+          if (!hasDiffPanel) {
+            // Create diff panel for this session
+            const panelId = require('uuid').v4();
+            const now = new Date().toISOString();
+            
+            this.db.prepare(`
+              INSERT INTO tool_panels (id, session_id, type, title, state, metadata)
+              VALUES (?, ?, 'diff', 'Diff', ?, ?)
+            `).run(
+              panelId,
+              session.id,
+              JSON.stringify({
+                isActive: false,
+                hasBeenViewed: false,
+                customState: {}
+              }),
+              JSON.stringify({
+                createdAt: now,
+                lastActiveAt: now,
+                position: 0,
+                permanent: true
+              })
+            );
+            
+            console.log(`[Database] Created diff panel for session ${session.id}`);
+          }
+        }
+        
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('diff_panels_migrated', 'true')").run();
+        console.log('[Database] Completed diff panels migration 005');
+        
+      } catch (error) {
+        console.error('[Database] Failed to run diff panels migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
   }
 
   // Project operations

@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal' | 'claude'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude' | 'diff'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState;
+  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState;
 }
 
 export interface TerminalPanelState {
@@ -37,6 +37,19 @@ export interface TerminalPanelState {
   outputSizeLimit?: number;      // Max lines to persist (default: 10000)
 }
 
+export interface DiffPanelState {
+  lastRefresh?: string;            // Last time diff was refreshed
+  currentDiff?: string;             // Cached diff content
+  filesChanged?: number;            // Number of files changed
+  insertions?: number;              // Lines added
+  deletions?: number;               // Lines deleted
+  isDiffStale?: boolean;            // Needs refresh indicator
+  viewMode?: 'split' | 'unified';  // Diff view preference
+  showWhitespace?: boolean;         // Show whitespace changes
+  contextLines?: number;            // Lines of context
+  commitSha?: string;               // Specific commit being viewed
+}
+
 export interface ClaudePanelState {
   // Basic state
   isInitialized?: boolean;       // Whether Claude process has been started
@@ -53,6 +66,7 @@ export interface ToolPanelMetadata {
   createdAt: string;
   lastActiveAt: string;
   position: number;              // Tab order
+  permanent?: boolean;           // Cannot be closed (for diff panel)
 }
 
 export interface CreatePanelRequest {
@@ -60,6 +74,7 @@ export interface CreatePanelRequest {
   type: ToolPanelType;
   title?: string;                // Optional custom title
   initialState?: any;
+  metadata?: Partial<ToolPanelMetadata>; // Optional metadata overrides
 }
 
 export interface UpdatePanelRequest {
@@ -100,6 +115,7 @@ export type PanelEventType =
   | 'terminal:command_executed'  // When a command is run in terminal
   | 'terminal:exit'              // When terminal process exits
   | 'files:changed'              // When terminal detects file system changes
+  | 'diff:refreshed'             // When diff panel refreshes its content
 
 export interface PanelEventSubscription {
   panelId: string;
@@ -112,6 +128,7 @@ export interface PanelCapabilities {
   canConsume: PanelEventType[];   // Events this panel type listens to
   requiresProcess?: boolean;       // Whether panel needs a background process
   singleton?: boolean;             // Only one instance allowed per session
+  permanent?: boolean;             // Cannot be closed (for diff panel)
 }
 
 // Panel Registry - Currently only terminal is implemented
@@ -128,5 +145,12 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     requiresProcess: true,
     singleton: false
   },
+  diff: {
+    canEmit: ['diff:refreshed'],
+    canConsume: ['files:changed', 'terminal:command_executed'],
+    requiresProcess: false,           // No background process
+    singleton: true,                  // Only one diff panel
+    permanent: true                   // Cannot be closed
+  }
   // Future panel types will be added here when migrated
 };

@@ -8,6 +8,7 @@ import type { GitDiffManager } from './gitDiffManager';
 import type { ExecutionTracker } from './executionTracker';
 import { formatForDisplay } from '../utils/timestampUtils';
 import * as os from 'os';
+import { panelManager } from './panelManager';
 
 interface TaskQueueOptions {
   sessionManager: SessionManager;
@@ -218,6 +219,10 @@ export class TaskQueue {
           timestamp: new Date()
         });
         console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
+        
+        // Ensure diff panel exists for this session
+        await panelManager.ensureDiffPanel(session.id);
+        console.log(`[TaskQueue] Ensured diff panel exists for session ${session.id}`);
         
         // Emit the session-created event BEFORE running build script so UI shows immediately
         sessionManager.emitSessionCreated(session);

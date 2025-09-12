@@ -32,11 +32,12 @@ export class PanelManager {
       customState: request.initialState || {}
     };
     
-    // Create metadata
+    // Create metadata (merge with any provided overrides)
     const metadata: ToolPanelMetadata = {
       createdAt: new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
-      position: this.getNextPosition(request.sessionId)
+      position: this.getNextPosition(request.sessionId),
+      ...request.metadata // Apply any metadata overrides (like permanent flag)
     };
     
     // Create panel object
@@ -75,10 +76,31 @@ export class PanelManager {
     return panel;
   }
   
+  async ensureDiffPanel(sessionId: string): Promise<void> {
+    const panels = this.getPanelsForSession(sessionId);
+    const hasDiff = panels.some(p => p.type === 'diff');
+    
+    if (!hasDiff) {
+      console.log(`[PanelManager] Creating diff panel for session ${sessionId}`);
+      await this.createPanel({
+        sessionId,
+        type: 'diff',
+        title: 'Diff',
+        metadata: { permanent: true }
+      });
+    }
+  }
+  
   async deletePanel(panelId: string): Promise<void> {
     const panel = this.getPanel(panelId);
     if (!panel) {
       console.warn(`[PanelManager] Panel ${panelId} not found for deletion`);
+      return;
+    }
+    
+    // Check if panel is permanent
+    if (panel.metadata.permanent) {
+      console.warn(`[PanelManager] Cannot delete permanent panel ${panelId}`);
       return;
     }
     

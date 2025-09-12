@@ -1,5 +1,5 @@
 import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
-import { Plus, X, Terminal, ChevronDown, MessageSquare } from 'lucide-react';
+import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
 import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
@@ -43,8 +43,9 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     }
   }, [showDropdown]);
   
-  // Get available panel types
-  const availablePanelTypes = Object.keys(PANEL_CAPABILITIES) as ToolPanelType[];
+  // Get available panel types (excluding permanent panels)
+  const availablePanelTypes = (Object.keys(PANEL_CAPABILITIES) as ToolPanelType[])
+    .filter(type => !PANEL_CAPABILITIES[type].permanent);
   
   const getPanelIcon = (type: ToolPanelType) => {
     switch (type) {
@@ -52,6 +53,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         return <Terminal className="w-4 h-4" />;
       case 'claude':
         return <MessageSquare className="w-4 h-4" />;
+      case 'diff':
+        return <GitBranch className="w-4 h-4" />;
       // Add more icons as panel types are added
       default:
         return null;
@@ -61,25 +64,32 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   return (
     <div className="panel-tab-bar flex items-center bg-gray-800 border-b border-gray-700 h-8">
       {/* Render panel tabs */}
-      {panels.map((panel) => (
-        <div
-          key={panel.id}
-          className={cn(
-            "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700",
-            activePanel?.id === panel.id && "bg-gray-700"
-          )}
-          onClick={() => handlePanelClick(panel)}
-        >
-          {getPanelIcon(panel.type)}
-          <span className="ml-2 text-sm">{panel.title}</span>
-          <button
-            className="ml-2 p-0.5 hover:bg-gray-600 rounded"
-            onClick={(e) => handlePanelClose(e, panel)}
+      {panels.map((panel) => {
+        const isPermanent = panel.metadata?.permanent === true;
+        
+        return (
+          <div
+            key={panel.id}
+            className={cn(
+              "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700",
+              activePanel?.id === panel.id && "bg-gray-700"
+            )}
+            onClick={() => handlePanelClick(panel)}
+            title={isPermanent ? "This panel cannot be closed" : undefined}
           >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      ))}
+            {getPanelIcon(panel.type)}
+            <span className="ml-2 text-sm">{panel.title}</span>
+            {!isPermanent && (
+              <button
+                className="ml-2 p-0.5 hover:bg-gray-600 rounded"
+                onClick={(e) => handlePanelClose(e, panel)}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        );
+      })}
       
       {/* Add Panel dropdown button */}
       <div className="relative" ref={dropdownRef}>

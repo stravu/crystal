@@ -107,7 +107,13 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
       return terminalPanelManager.isTerminalInitialized(panelId);
     }
     
-    return panel.state.customState?.isInitialized || false;
+    if (panel.type === 'diff') {
+      // Diff panels don't have background processes, so they're always "initialized"
+      return true;
+    }
+    
+    // For claude and other panels that have isInitialized
+    return (panel.state.customState as any)?.isInitialized || false;
   });
   
   // Event handlers

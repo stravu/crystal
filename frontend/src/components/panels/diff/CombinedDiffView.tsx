@@ -1,11 +1,11 @@
 import React, { useState, useEffect, memo, useCallback, useRef, useMemo } from 'react';
 import DiffViewer, { DiffViewerHandle } from './DiffViewer';
-import ExecutionList from './ExecutionList';
-import { CommitDialog } from './CommitDialog';
-import { FileList } from './FileList';
-import { API } from '../utils/api';
-import type { CombinedDiffViewProps } from '../types/diff';
-import type { ExecutionDiff, GitDiffResult } from '../types/diff';
+import ExecutionList from '../../ExecutionList';
+import { CommitDialog } from '../../CommitDialog';
+import { FileList } from '../../FileList';
+import { API } from '../../../utils/api';
+import type { CombinedDiffViewProps } from '../../../types/diff';
+import type { ExecutionDiff, GitDiffResult } from '../../../types/diff';
 import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 
 const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({ 
