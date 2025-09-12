@@ -28,7 +28,13 @@ export function getCrystalDirectory(): string {
     return envDir;
   }
 
-  // 3. Default to ~/.crystal
+  // 3. If running inside Crystal (detected by bundle identifier), use development directory
+  if (process.env.__CFBundleIdentifier === 'com.stravu.crystal') {
+    console.log('[Crystal] Detected running inside Crystal, using ~/.crystal_dev for isolation');
+    return join(homedir(), '.crystal_dev');
+  }
+
+  // 4. Default to ~/.crystal
   return join(homedir(), '.crystal');
 }
 
