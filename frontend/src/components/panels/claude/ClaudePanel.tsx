@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
 import { MessagesView } from './MessagesView';
+import { SessionStats } from './SessionStats';
 import { ClaudeInputWithImages } from './ClaudeInputWithImages';
 import { useClaudePanel } from '../../../hooks/useClaudePanel';
 import { RichOutputSettings } from './RichOutputView';
 import { ClaudeSettingsPanel } from './ClaudeSettingsPanel';
 import { Settings } from 'lucide-react';
 
-export type ClaudeViewMode = 'richOutput' | 'messages';
+export type ClaudeViewMode = 'richOutput' | 'messages' | 'stats';
 
 interface ClaudePanelProps {
   panel: ToolPanel;
@@ -88,6 +89,16 @@ export const ClaudePanel: React.FC<ClaudePanelProps> = ({ panel, isActive }) => 
             >
               Messages
             </button>
+            <button
+              onClick={() => setViewMode('stats')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'stats'
+                  ? 'bg-bg-primary text-text-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Stats
+            </button>
           </div>
         </div>
 
@@ -124,6 +135,12 @@ export const ClaudePanel: React.FC<ClaudePanelProps> = ({ panel, isActive }) => 
         {viewMode === 'messages' && (
           <div className="h-full flex flex-col overflow-hidden w-full">
             <MessagesView panelId={panel.id} />
+          </div>
+        )}
+        
+        {viewMode === 'stats' && (
+          <div className="h-full flex flex-col overflow-hidden w-full">
+            <SessionStats sessionId={activeSession.id} />
           </div>
         )}
       </div>

@@ -1284,4 +1284,107 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  // Session statistics handler
+  ipcMain.handle('sessions:get-statistics', async (_event, sessionId: string) => {
+    try {
+      console.log('[IPC] sessions:get-statistics called for sessionId:', sessionId);
+      
+      // Get session details
+      const session = await sessionManager.getSession(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found' };
+      }
+
+      // Calculate session duration
+      const startTime = new Date(session.createdAt).getTime();
+      const endTime = session.status === 'stopped' || session.status === 'completed_unviewed'
+        ? (session.lastActivity ? new Date(session.lastActivity).getTime() : Date.now())
+        : Date.now();
+      const duration = endTime - startTime;
+
+      // Get token usage from session_outputs with type 'json'
+      const tokenUsageData = databaseService.getSessionTokenUsage(sessionId);
+      
+      // Get execution diffs for file changes
+      const executionDiffs = databaseService.getExecutionDiffs(sessionId);
+      
+      // Calculate file statistics
+      let totalFilesChanged = 0;
+      let totalLinesAdded = 0;
+      let totalLinesDeleted = 0;
+      const filesModified = new Set<string>();
+      
+      executionDiffs.forEach(diff => {
+        totalFilesChanged += diff.stats_files_changed || 0;
+        totalLinesAdded += diff.stats_additions || 0;
+        totalLinesDeleted += diff.stats_deletions || 0;
+        
+        // Track unique files
+        if (diff.files_changed) {
+          try {
+            const files = Array.isArray(diff.files_changed) 
+              ? diff.files_changed 
+              : JSON.parse(diff.files_changed);
+            files.forEach((file: string) => filesModified.add(file));
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      });
+
+      // Get prompt count and messages
+      const promptMarkers = databaseService.getPromptMarkers(sessionId);
+      const messageCount = databaseService.getConversationMessageCount(sessionId);
+      
+      // Get session outputs count by type
+      const outputCounts = databaseService.getSessionOutputCounts(sessionId);
+      
+      // Get tool usage statistics
+      const toolUsage = databaseService.getSessionToolUsage(sessionId);
+
+      const statistics = {
+        session: {
+          id: session.id,
+          name: session.name,
+          status: session.status,
+          model: session.model || 'claude-sonnet-4',
+          createdAt: session.createdAt,
+          updatedAt: session.lastActivity || session.createdAt,
+          duration: duration,
+          worktreePath: session.worktreePath,
+          branch: session.baseBranch || 'main'
+        },
+        tokens: {
+          totalInputTokens: tokenUsageData.totalInputTokens,
+          totalOutputTokens: tokenUsageData.totalOutputTokens,
+          totalCacheReadTokens: tokenUsageData.totalCacheReadTokens,
+          totalCacheCreationTokens: tokenUsageData.totalCacheCreationTokens,
+          messageCount: tokenUsageData.messageCount
+        },
+        files: {
+          totalFilesChanged: filesModified.size,
+          totalLinesAdded,
+          totalLinesDeleted,
+          filesModified: Array.from(filesModified),
+          executionCount: executionDiffs.length
+        },
+        activity: {
+          promptCount: promptMarkers.length,
+          messageCount: messageCount,
+          outputCounts: outputCounts,
+          lastActivity: session.lastActivity || session.createdAt
+        },
+        toolUsage: {
+          tools: toolUsage.tools,
+          totalToolCalls: toolUsage.totalToolCalls
+        }
+      };
+
+      return { success: true, data: statistics };
+    } catch (error) {
+      console.error('Failed to get session statistics:', error);
+      return { success: false, error: 'Failed to get session statistics' };
+    }
+  });
+
 } 

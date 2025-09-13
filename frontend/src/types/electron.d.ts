@@ -43,6 +43,7 @@ interface ElectronAPI {
     continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
     getOutput: (sessionId: string, limit?: number) => Promise<IPCResponse>;
     getJsonMessages: (sessionId: string) => Promise<IPCResponse>;
+    getStatistics: (sessionId: string) => Promise<IPCResponse>;
     getConversation: (sessionId: string) => Promise<IPCResponse>;
     getConversationMessages: (sessionId: string) => Promise<IPCResponse>;
     generateCompactedContext: (sessionId: string) => Promise<IPCResponse>;

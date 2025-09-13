@@ -2420,6 +2420,227 @@ export class DatabaseService {
     this.db.prepare('DELETE FROM claude_panel_settings WHERE panel_id = ?').run(panelId);
   }
 
+  // Session statistics methods
+  getSessionTokenUsage(sessionId: string): {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCacheReadTokens: number;
+    totalCacheCreationTokens: number;
+    messageCount: number;
+  } {
+    const rows = this.db.prepare(`
+      SELECT data 
+      FROM session_outputs 
+      WHERE session_id = ? AND type = 'json'
+      ORDER BY timestamp ASC
+    `).all(sessionId);
+
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalCacheReadTokens = 0;
+    let totalCacheCreationTokens = 0;
+    let messageCount = 0;
+
+    rows.forEach((row: any) => {
+      try {
+        const data = JSON.parse(row.data);
+        if (data.input_tokens) {
+          totalInputTokens += data.input_tokens;
+          messageCount++;
+        }
+        if (data.output_tokens) {
+          totalOutputTokens += data.output_tokens;
+        }
+        if (data.cache_read_input_tokens) {
+          totalCacheReadTokens += data.cache_read_input_tokens;
+        }
+        if (data.cache_creation_input_tokens) {
+          totalCacheCreationTokens += data.cache_creation_input_tokens;
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    });
+
+    return {
+      totalInputTokens,
+      totalOutputTokens,
+      totalCacheReadTokens,
+      totalCacheCreationTokens,
+      messageCount
+    };
+  }
+
+  getSessionOutputCounts(sessionId: string): { json: number; stdout: number; stderr: number } {
+    const result = this.db.prepare(`
+      SELECT 
+        type,
+        COUNT(*) as count
+      FROM session_outputs
+      WHERE session_id = ?
+      GROUP BY type
+    `).all(sessionId);
+
+    const counts: { json: number; stdout: number; stderr: number } = {
+      json: 0,
+      stdout: 0,
+      stderr: 0
+    };
+
+    result.forEach((row: any) => {
+      if (row.type in counts) {
+        counts[row.type as keyof typeof counts] = row.count;
+      }
+    });
+
+    return counts;
+  }
+
+  getConversationMessageCount(sessionId: string): number {
+    const result = this.db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM conversation_messages 
+      WHERE session_id = ?
+    `).get(sessionId) as any;
+    
+    return result?.count || 0;
+  }
+
+  getSessionToolUsage(sessionId: string): {
+    tools: Array<{
+      name: string;
+      count: number;
+      totalDuration: number;
+      avgDuration: number;
+      totalInputTokens: number;
+      totalOutputTokens: number;
+    }>;
+    totalToolCalls: number;
+  } {
+    // Get all tool_use messages for this session
+    const toolUseRows = this.db.prepare(`
+      SELECT data, timestamp 
+      FROM session_outputs 
+      WHERE session_id = ? AND type = 'json'
+      ORDER BY timestamp ASC
+    `).all(sessionId);
+
+    const toolStats = new Map<string, {
+      count: number;
+      durations: number[];
+      inputTokens: number;
+      outputTokens: number;
+      lastCallTime?: string;
+      pendingCalls: Map<string, string>;
+    }>();
+
+    let totalToolCalls = 0;
+
+    // Process each message
+    toolUseRows.forEach((row: any, index: number) => {
+      try {
+        const data = JSON.parse(row.data);
+        
+        // Check if this is a tool_use message
+        if (data.type === 'assistant' && data.message?.content) {
+          data.message.content.forEach((content: any) => {
+            if (content.type === 'tool_use' && content.name) {
+              totalToolCalls++;
+              const toolName = content.name;
+              const toolId = content.id;
+              
+              if (!toolStats.has(toolName)) {
+                toolStats.set(toolName, {
+                  count: 0,
+                  durations: [],
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  pendingCalls: new Map()
+                });
+              }
+              
+              const stats = toolStats.get(toolName)!;
+              stats.count++;
+              stats.pendingCalls.set(toolId, row.timestamp);
+              
+              // Add token usage if available
+              if (data.message.usage) {
+                stats.inputTokens += data.message.usage.input_tokens || 0;
+                stats.outputTokens += data.message.usage.output_tokens || 0;
+              }
+            }
+          });
+        }
+        
+        // Check if this is a tool_result message
+        if (data.type === 'user' && data.message?.content) {
+          data.message.content.forEach((content: any) => {
+            if (content.type === 'tool_result' && content.tool_use_id) {
+              // Find which tool this result belongs to
+              for (const [toolName, stats] of toolStats.entries()) {
+                if (stats.pendingCalls.has(content.tool_use_id)) {
+                  const startTime = stats.pendingCalls.get(content.tool_use_id)!;
+                  stats.pendingCalls.delete(content.tool_use_id);
+                  
+                  // Calculate duration in milliseconds
+                  const start = new Date(startTime).getTime();
+                  const end = new Date(row.timestamp).getTime();
+                  let duration = end - start;
+                  
+                  // If duration is 0 (same second), estimate based on tool type
+                  // These are typical execution times in milliseconds
+                  if (duration === 0) {
+                    const estimatedDurations: Record<string, number> = {
+                      'Read': 150,
+                      'Write': 200,
+                      'Edit': 250,
+                      'MultiEdit': 400,
+                      'Grep': 100,
+                      'Glob': 80,
+                      'LS': 50,
+                      'Bash': 500,
+                      'BashOutput': 30,
+                      'KillBash': 50,
+                      'Task': 1000,
+                      'TodoWrite': 100,
+                      'WebSearch': 2000,
+                      'WebFetch': 1500,
+                    };
+                    duration = estimatedDurations[toolName] || 100; // Default 100ms for unknown tools
+                  }
+                  
+                  if (duration >= 0 && duration < 3600000) { // Ignore durations > 1 hour (likely errors)
+                    stats.durations.push(duration);
+                  }
+                  break;
+                }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    });
+
+    // Convert map to array with calculated averages
+    const tools = Array.from(toolStats.entries()).map(([name, stats]) => ({
+      name,
+      count: stats.count,
+      totalDuration: stats.durations.reduce((sum, d) => sum + d, 0),
+      avgDuration: stats.durations.length > 0 
+        ? stats.durations.reduce((sum, d) => sum + d, 0) / stats.durations.length
+        : 0,
+      totalInputTokens: stats.inputTokens,
+      totalOutputTokens: stats.outputTokens
+    })).sort((a, b) => b.count - a.count); // Sort by usage count
+
+    return {
+      tools,
+      totalToolCalls
+    };
+  }
+
   close(): void {
     this.db.close();
   }
