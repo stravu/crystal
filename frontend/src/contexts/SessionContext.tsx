@@ -5,6 +5,7 @@ interface SessionContextValue {
   sessionId: string;
   workingDirectory: string;
   projectId: string;
+  projectName?: string;
   session: Session;
   gitBranchActions?: Array<{
     id: string;
@@ -23,6 +24,7 @@ export const SessionContext = createContext<SessionContextValue | undefined>(und
 export const SessionProvider: React.FC<{
   children: ReactNode;
   session: Session | null;
+  projectName?: string;
   gitBranchActions?: Array<{
     id: string;
     label: string;
@@ -33,7 +35,7 @@ export const SessionProvider: React.FC<{
     description: string;
   }>;
   isMerging?: boolean;
-}> = ({ children, session, gitBranchActions, isMerging }) => {
+}> = ({ children, session, projectName, gitBranchActions, isMerging }) => {
   // FIX: Don't render children without a valid session
   // This prevents components that require session from rendering
   if (!session) {
@@ -48,6 +50,7 @@ export const SessionProvider: React.FC<{
     sessionId: session.id,
     workingDirectory: session.worktreePath,
     projectId: session.projectId?.toString() || '',
+    projectName,
     session,
     gitBranchActions,
     isMerging

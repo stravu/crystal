@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal' | 'claude' | 'diff' | 'editor' | 'logs'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude' | 'diff' | 'editor' | 'logs' | 'dashboard'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState | EditorPanelState | LogsPanelState;
+  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState;
 }
 
 export interface TerminalPanelState {
@@ -94,6 +94,13 @@ export interface LogsPanelState {
   errorCount?: number;            // Number of errors detected
   warningCount?: number;          // Number of warnings detected
   lastActivityTime?: string;      // Last output received
+}
+
+export interface DashboardPanelState {
+  lastRefresh?: string;           // Last time dashboard was refreshed
+  filterType?: 'all' | 'stale' | 'changes' | 'pr'; // Current filter
+  isRefreshing?: boolean;          // Whether dashboard is currently refreshing
+  cachedData?: any;                // Cached dashboard data
 }
 
 export interface ToolPanelMetadata {
@@ -216,5 +223,14 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     singleton: true,                 // ONLY ONE logs panel per session
     canAppearInProjects: true,       // Logs can appear in projects
     canAppearInWorktrees: true       // Logs can appear in worktrees
+  },
+  dashboard: {
+    canEmit: [],                     // Dashboard doesn't emit events
+    canConsume: ['files:changed'],   // Refresh on file changes
+    requiresProcess: false,          // No background process
+    singleton: true,                 // Only one dashboard panel
+    permanent: true,                 // Cannot be closed (like diff panel)
+    canAppearInProjects: true,       // Dashboard ONLY in projects
+    canAppearInWorktrees: false      // Dashboard NOT in worktrees
   }
 };

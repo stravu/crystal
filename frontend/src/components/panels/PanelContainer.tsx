@@ -8,6 +8,7 @@ const ClaudePanel = lazy(() => import('./claude/ClaudePanel'));
 const DiffPanel = lazy(() => import('./diff/DiffPanel'));
 const EditorPanel = lazy(() => import('./editor/EditorPanel'));
 const LogsPanel = lazy(() => import('./logPanel/LogsPanel'));
+const DashboardPanel = lazy(() => import('./DashboardPanel'));
 
 const PanelErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => void }> = ({ 
   error, 
@@ -48,6 +49,8 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
         return <EditorPanel panel={panel} isActive={isActive} />;
       case 'logs':
         return <LogsPanel panel={panel} isActive={isActive} />;
+      case 'dashboard':
+        return <DashboardPanel panelId={panel.id} sessionId={panel.sessionId} isActive={isActive} />;
       // Future panel types...
       default:
         return <div>Unknown panel type: {panel.type}</div>;

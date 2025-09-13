@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ProjectDashboard } from './ProjectDashboard';
 import { API } from '../utils/api';
 import { useSessionStore } from '../stores/sessionStore';
 import { Session } from '../types/session';
-import { cn } from '../utils/cn';
-import { BarChart3 } from 'lucide-react';
 import { PanelTabBar } from './panels/PanelTabBar';
 import { PanelContainer } from './panels/PanelContainer';
 import { usePanelStore } from '../stores/panelStore';
 import { panelApi } from '../services/panelApi';
 import { ToolPanel, ToolPanelType } from '../../../shared/types/panels';
 import { SessionProvider } from '../contexts/SessionContext';
-
-export type ProjectViewMode = 'dashboard';
 
 interface ProjectViewProps {
   projectId: number;
@@ -22,41 +17,6 @@ interface ProjectViewProps {
   isMerging: boolean;
 }
 
-// Dashboard tab component
-const ProjectDashboardTab: React.FC<{ showDashboard: boolean; onToggleDashboard: () => void }> = ({
-  showDashboard,
-  onToggleDashboard
-}) => {
-  return (
-    <div className="flex items-center bg-surface-secondary" role="tablist">
-      <button
-        role="tab"
-        aria-selected={showDashboard}
-        onClick={onToggleDashboard}
-        className={cn(
-          "relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all",
-          "border-b-2 hover:text-text-primary",
-          showDashboard ? [
-            "text-text-primary border-interactive",
-            "bg-gradient-to-t from-interactive/5 to-transparent"
-          ] : [
-            "text-text-secondary border-transparent",
-            "hover:border-border-secondary hover:bg-surface-hover/50"
-          ]
-        )}
-      >
-        <span className={cn(
-          "transition-colors",
-          showDashboard ? "text-interactive" : "text-text-tertiary"
-        )}>
-          <BarChart3 className="w-4 h-4" />
-        </span>
-        <span>Dashboard</span>
-      </button>
-    </div>
-  );
-};
-
 export const ProjectView: React.FC<ProjectViewProps> = ({ 
   projectId, 
   projectName, 
@@ -64,7 +24,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   onGitPush, 
   isMerging
 }) => {
-    const [showDashboard, setShowDashboard] = useState(true);
   const [mainRepoSessionId, setMainRepoSessionId] = useState<string | null>(null);
   const [mainRepoSession, setMainRepoSession] = useState<Session | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -79,19 +38,44 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     removePanel
   } = usePanelStore();
   
-  // Load panels when main repo session changes
+  // Load panels when main repo session changes and ensure dashboard panel exists
   useEffect(() => {
     if (mainRepoSessionId) {
       console.log('[ProjectView] Loading panels for project session:', mainRepoSessionId);
-      panelApi.loadPanelsForSession(mainRepoSessionId).then(loadedPanels => {
+      panelApi.loadPanelsForSession(mainRepoSessionId).then(async (loadedPanels) => {
         console.log('[ProjectView] Loaded panels:', loadedPanels);
-        setPanels(mainRepoSessionId, loadedPanels);
-      });
-      
-      panelApi.getActivePanel(mainRepoSessionId).then(activePanel => {
-        console.log('[ProjectView] Active panel from backend:', activePanel);
-        if (activePanel) {
-          setActivePanelInStore(mainRepoSessionId, activePanel.id);
+        
+        // Check if dashboard panel exists, create if not
+        const dashboardPanel = loadedPanels.find(p => p.type === 'dashboard');
+        if (!dashboardPanel) {
+          console.log('[ProjectView] Creating dashboard panel for project');
+          await panelApi.createPanel({
+            sessionId: mainRepoSessionId,
+            type: 'dashboard',
+            title: 'Dashboard',
+            metadata: { permanent: true }
+          });
+          // Reload panels after creating dashboard
+          const updatedPanels = await panelApi.loadPanelsForSession(mainRepoSessionId);
+          setPanels(mainRepoSessionId, updatedPanels);
+          
+          // Set dashboard as active if it's the only panel
+          const newDashboard = updatedPanels.find(p => p.type === 'dashboard');
+          if (newDashboard && updatedPanels.length === 1) {
+            setActivePanelInStore(mainRepoSessionId, newDashboard.id);
+            await panelApi.setActivePanel(mainRepoSessionId, newDashboard.id);
+          }
+        } else {
+          setPanels(mainRepoSessionId, loadedPanels);
+          
+          // If no active panel but dashboard exists, activate it
+          const activePanel = await panelApi.getActivePanel(mainRepoSessionId);
+          if (!activePanel && dashboardPanel) {
+            setActivePanelInStore(mainRepoSessionId, dashboardPanel.id);
+            await panelApi.setActivePanel(mainRepoSessionId, dashboardPanel.id);
+          } else if (activePanel) {
+            setActivePanelInStore(mainRepoSessionId, activePanel.id);
+          }
         }
       });
     }
@@ -114,7 +98,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       if (!mainRepoSessionId) return;
       setActivePanelInStore(mainRepoSessionId, panel.id);
       await panelApi.setActivePanel(mainRepoSessionId, panel.id);
-      setShowDashboard(false);
     },
     [mainRepoSessionId, setActivePanelInStore]
   );
@@ -123,20 +106,28 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     async (panel: ToolPanel) => {
       if (!mainRepoSessionId) return;
       
+      // Don't allow closing dashboard panel
+      if (panel.type === 'dashboard') {
+        console.log('[ProjectView] Cannot close dashboard panel');
+        return;
+      }
+      
       // Find next panel to activate
       const panelIndex = sessionPanels.findIndex(p => p.id === panel.id);
-      const nextPanel = sessionPanels[panelIndex + 1] || sessionPanels[panelIndex - 1];
+      let nextPanel = sessionPanels[panelIndex + 1] || sessionPanels[panelIndex - 1];
+      
+      // If no other panel or the next panel is the same, fall back to dashboard
+      if (!nextPanel || nextPanel.id === panel.id) {
+        nextPanel = sessionPanels.find(p => p.type === 'dashboard') || sessionPanels[0];
+      }
       
       // Remove from store first for immediate UI update
       removePanel(mainRepoSessionId, panel.id);
       
-      // Set next active panel if available
+      // Set next active panel (should always have dashboard)
       if (nextPanel) {
         setActivePanelInStore(mainRepoSessionId, nextPanel.id);
         await panelApi.setActivePanel(mainRepoSessionId, nextPanel.id);
-      } else {
-        // If no panels left, show dashboard
-        setShowDashboard(true);
       }
       
       // Delete on backend
@@ -153,7 +144,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
         sessionId: mainRepoSessionId,
         type
       });
-      setShowDashboard(false);
     },
     [mainRepoSessionId]
   );
@@ -188,10 +178,10 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     console.log('[ProjectView] Session state:', { 
       mainRepoSessionId, 
       mainRepoSession: mainRepoSession?.id,
-      showDashboard,
+      activePanelType: currentActivePanel?.type,
       activeSessionInStore: useSessionStore.getState().activeSessionId
     });
-  }, [mainRepoSessionId, mainRepoSession, showDashboard]);
+  }, [mainRepoSessionId, mainRepoSession, currentActivePanel]);
 
   // Get or create main repo session when panels are needed
   useEffect(() => {
@@ -253,8 +243,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       if (panel.sessionId === mainRepoSessionId) {
         // The store's addPanel now checks for duplicates, so we can safely call it
         addPanel(panel);
-        // Hide dashboard when a panel is created
-        setShowDashboard(false);
       }
     };
     
@@ -265,18 +253,9 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     return () => {
       unsubscribeCreated?.();
     };
-  }, [mainRepoSessionId, addPanel, setShowDashboard]);
+  }, [mainRepoSessionId, addPanel]);
   
   // We don't need Stravu connection status here anymore as it's handled in panels
-  
-  // Toggle dashboard
-  const handleToggleDashboard = useCallback(() => {
-    setShowDashboard(!showDashboard);
-    if (!showDashboard && currentActivePanel) {
-      // If showing dashboard, deactivate current panel
-      setActivePanelInStore(mainRepoSessionId || '', '');
-    }
-  }, [showDashboard, currentActivePanel, setActivePanelInStore, mainRepoSessionId]);
 
 
   return (
@@ -330,15 +309,9 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
         </div>
       </div>
 
-      {/* Dashboard Tab */}
-      <ProjectDashboardTab 
-        showDashboard={showDashboard}
-        onToggleDashboard={handleToggleDashboard}
-      />
-      
-      {/* Tool Panel Bar */}
+      {/* Tool Panel Bar (Dashboard is now part of the panel system) */}
       {mainRepoSessionId && (
-        <SessionProvider session={mainRepoSession}>
+        <SessionProvider session={mainRepoSession} projectName={projectName}>
           <PanelTabBar
             panels={sessionPanels}
             activePanel={currentActivePanel}
@@ -353,48 +326,35 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       {/* Content Area */}
       <div className="flex-1 flex relative min-h-0">
         <div className="flex-1 relative">
-          {showDashboard ? (
-            /* Dashboard View */
-            <div className="h-full flex flex-col p-6">
-              <ProjectDashboard 
-                projectId={projectId} 
-                projectName={projectName} 
-              />
+          {isLoadingSession || !mainRepoSessionId ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-interactive mx-auto mb-4"></div>
+                <p className="text-text-secondary">Loading panels...</p>
+              </div>
             </div>
+          ) : sessionPanels.length > 0 && currentActivePanel ? (
+            <SessionProvider session={mainRepoSession} projectName={projectName}>
+              {sessionPanels.map(panel => (
+                <div 
+                  key={panel.id} 
+                  className="absolute inset-0"
+                  style={{ display: panel.id === currentActivePanel.id ? 'block' : 'none' }}
+                >
+                  <PanelContainer
+                    panel={panel}
+                    isActive={panel.id === currentActivePanel.id}
+                  />
+                </div>
+              ))}
+            </SessionProvider>
           ) : (
-            /* Panel Views */
-            <>
-              {isLoadingSession || !mainRepoSessionId ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-interactive mx-auto mb-4"></div>
-                    <p className="text-text-secondary">Loading panels...</p>
-                  </div>
-                </div>
-              ) : sessionPanels.length > 0 && currentActivePanel ? (
-                <SessionProvider session={mainRepoSession}>
-                  {sessionPanels.map(panel => (
-                    <div 
-                      key={panel.id} 
-                      className="absolute inset-0"
-                      style={{ display: panel.id === currentActivePanel.id ? 'block' : 'none' }}
-                    >
-                      <PanelContainer
-                        panel={panel}
-                        isActive={panel.id === currentActivePanel.id}
-                      />
-                    </div>
-                  ))}
-                </SessionProvider>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <p className="text-text-secondary mb-4">No panels open</p>
-                    <p className="text-text-tertiary text-sm">Click "Add Tool" above to create a panel</p>
-                  </div>
-                </div>
-              )}
-            </>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-text-secondary mb-4">Loading dashboard...</p>
+                <p className="text-text-tertiary text-sm">Setting up project panels</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
