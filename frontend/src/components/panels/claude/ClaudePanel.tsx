@@ -62,42 +62,48 @@ export const ClaudePanel: React.FC<ClaudePanelProps> = ({ panel, isActive }) => 
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-bg-primary">
-      {/* View Toggle Tabs */}
-      <div className="flex border-b border-border-primary bg-surface-secondary">
-        <button
-          onClick={() => setViewMode('richOutput')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            viewMode === 'richOutput'
-              ? 'text-interactive border-interactive bg-interactive/5'
-              : 'text-text-tertiary border-transparent hover:text-text-primary hover:bg-surface-hover'
-          }`}
-        >
-          Output
-        </button>
-        <button
-          onClick={() => setViewMode('messages')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            viewMode === 'messages'
-              ? 'text-interactive border-interactive bg-interactive/5'
-              : 'text-text-tertiary border-transparent hover:text-text-primary hover:bg-surface-hover'
-          }`}
-        >
-          Messages
-        </button>
+      {/* Panel Header with Segmented Control */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border-primary bg-surface-primary">
+        {/* Segmented Control for View Mode */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">View</span>
+          <div className="inline-flex rounded-lg bg-surface-secondary p-0.5">
+            <button
+              onClick={() => setViewMode('richOutput')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'richOutput'
+                  ? 'bg-bg-primary text-text-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Output
+            </button>
+            <button
+              onClick={() => setViewMode('messages')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'messages'
+                  ? 'bg-bg-primary text-text-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Messages
+            </button>
+          </div>
+        </div>
 
         {/* Settings button for Rich Output */}
         {viewMode === 'richOutput' && (
           <button
             onClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
-            className={`ml-auto mr-2 px-3 py-2 rounded-md text-sm transition-all flex items-center gap-2 ${
+            className={`px-2 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 ${
               showRichOutputSettings
-                ? 'bg-surface-hover text-text-primary ring-1 ring-border-secondary'
+                ? 'bg-surface-hover text-text-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
             }`}
-            title="Configure Rich Output display settings"
+            title="Configure display settings"
           >
-            <Settings className="w-4 h-4" />
-            <span>Display Settings</span>
+            <Settings className="w-3.5 h-3.5" />
+            <span>Settings</span>
           </button>
         )}
       </div>
