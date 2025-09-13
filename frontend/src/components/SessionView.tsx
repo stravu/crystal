@@ -16,7 +16,7 @@ import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
 import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
 import { RichOutputSettings } from './panels/claude/RichOutputView';
-import { LogView } from './session/LogView';
+import { LogsView } from './panels/logs/LogsView';
 import { MessagesView } from './panels/claude/MessagesView';
 import { usePanelStore } from '../stores/panelStore';
 import { panelApi } from '../services/panelApi';
@@ -78,26 +78,46 @@ export const SessionView = memo(() => {
   useEffect(() => {
     if (!activeSession?.id) return;
     
-    const handlePanelUpdated = (updatedPanel: ToolPanel) => {
-      console.log('[SessionView] Received panel:updated event:', updatedPanel);
+    // Handle panel creation events (for logs panel auto-creation)
+    const handlePanelCreated = (panel: ToolPanel) => {
+      console.log('[SessionView] Received panel:created event:', panel);
       
-      // Only update if it's for the current session
-      if (updatedPanel.sessionId === activeSession.id) {
-        console.log('[SessionView] Updating panel in store:', updatedPanel);
-        updatePanelState(updatedPanel);
+      // Only add if it's for the current session
+      if (panel.sessionId === activeSession.id) {
+        // Check if panel already exists to prevent duplicates
+        const existingPanels = panels[activeSession.id] || [];
+        const panelExists = existingPanels.some(p => p.id === panel.id);
+        
+        if (!panelExists) {
+          console.log('[SessionView] Adding new panel to store:', panel);
+          addPanel(panel);
+        } else {
+          console.log('[SessionView] Panel already exists, not adding duplicate:', panel.id);
+        }
       }
     };
     
-    // Listen for panel update events
-    const removeListener = window.electronAPI.events.onPanelUpdated(handlePanelUpdated);
+    // const handlePanelUpdated = (updatedPanel: ToolPanel) => {
+    //   console.log('[SessionView] Received panel:updated event:', updatedPanel);
+    //   
+    //   // Only update if it's for the current session
+    //   if (updatedPanel.sessionId === activeSession.id) {
+    //     console.log('[SessionView] Updating panel in store:', updatedPanel);
+    //     updatePanelState(updatedPanel);
+    //   }
+    // };
+    
+    // Listen for panel events
+    const unsubscribeCreated = window.electronAPI?.events?.onPanelCreated?.(handlePanelCreated);
+    // TODO: Implement onPanelUpdated event
+    // const unsubscribeUpdated = window.electronAPI.events.onPanelUpdated(handlePanelUpdated);
     
     // Cleanup
     return () => {
-      if (removeListener) {
-        removeListener();
-      }
+      unsubscribeCreated?.();
+      // unsubscribeUpdated?.();
     };
-  }, [activeSession?.id, updatePanelState]);
+  }, [activeSession?.id, addPanel, updatePanelState, panels]);
 
   // Get panels for current session with memoization
   const sessionPanels = useMemo(
@@ -159,15 +179,15 @@ export const SessionView = memo(() => {
     async (type: ToolPanelType) => {
       if (!activeSession) return;
       
-      const newPanel = await panelApi.createPanel({
+      await panelApi.createPanel({
         sessionId: activeSession.id,
         type
       });
       
-      // Add to store and make active
-      addPanel(newPanel);
+      // Don't add to store here - the panel:created event will handle it
+      // This prevents duplicate panels from appearing
     },
-    [activeSession, addPanel]
+    [activeSession]
   );
 
   // Load project data for active session
@@ -502,7 +522,7 @@ export const SessionView = memo(() => {
           </div>
           {hook.viewMode === 'logs' && (
             <div className="h-full block">
-              <LogView sessionId={activeSession.id} isVisible={true} />
+              <LogsView sessionId={activeSession.id} isVisible={true} />
             </div>
           )}
           {hook.viewMode === 'editor' && (

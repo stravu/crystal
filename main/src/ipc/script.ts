@@ -1,6 +1,8 @@
 import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 import { getShellPath, findExecutableInPath } from '../utils/shellPath';
+import { logsManager } from '../services/panels/logs/logsManager';
+import { panelManager } from '../services/panelManager';
 
 export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: AppServices): void {
   // Script execution handlers
@@ -36,7 +38,9 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
         return { success: false, error: 'No run script configured for this project' };
       }
 
-      await sessionManager.runScript(sessionId, commands, session.worktreePath);
+      // Use logs panel instead of old script running mechanism
+      const commandString = commands.join(' && ');
+      await logsManager.runScript(sessionId, commandString, session.worktreePath);
       return { success: true };
     } catch (error) {
       console.error('Failed to run script:', error);
@@ -44,9 +48,19 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
     }
   });
 
-  ipcMain.handle('sessions:stop-script', async () => {
+  ipcMain.handle('sessions:stop-script', async (_event, sessionId?: string) => {
     try {
-      await sessionManager.stopRunningScript();
+      // If sessionId provided, stop that session's logs panel
+      // Otherwise stop the old running script (for backward compatibility)
+      if (sessionId) {
+        const panels = await panelManager.getPanelsForSession(sessionId);
+        const logsPanel = panels?.find((p: any) => p.type === 'logs');
+        if (logsPanel) {
+          await logsManager.stopScript(logsPanel.id);
+        }
+      } else {
+        await sessionManager.stopRunningScript();
+      }
       return { success: true };
     } catch (error) {
       console.error('Failed to stop script:', error);
@@ -180,6 +194,37 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
     } catch (error) {
       console.error('Failed to open IDE:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Failed to open IDE' };
+    }
+  });
+
+  // Logs panel specific handlers
+  ipcMain.handle('logs:runScript', async (_event, sessionId: string, command: string, cwd: string) => {
+    try {
+      await logsManager.runScript(sessionId, command, cwd);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to run script in logs panel:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to run script' };
+    }
+  });
+
+  ipcMain.handle('logs:stopScript', async (_event, panelId: string) => {
+    try {
+      await logsManager.stopScript(panelId);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to stop script in logs panel:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to stop script' };
+    }
+  });
+
+  ipcMain.handle('logs:isRunning', async (_event, sessionId: string) => {
+    try {
+      const isRunning = await logsManager.isRunning(sessionId);
+      return { success: true, data: isRunning };
+    } catch (error) {
+      console.error('Failed to check if script is running:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to check script status' };
     }
   });
 } 

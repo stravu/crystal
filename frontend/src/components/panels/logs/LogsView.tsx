@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, X, Download, Trash2, ChevronUp, ChevronDown, Filter } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { cn } from '../../../utils/cn';
 import AnsiToHtml from 'ansi-to-html';
 
 interface LogEntry {
@@ -10,12 +10,12 @@ interface LogEntry {
   source?: string;
 }
 
-interface LogViewProps {
+interface LogsViewProps {
   sessionId: string;
   isVisible: boolean;
 }
 
-export const LogView: React.FC<LogViewProps> = ({ sessionId, isVisible }) => {
+export const LogsView: React.FC<LogsViewProps> = ({ sessionId, isVisible }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filterTerm, setFilterTerm] = useState('');
   const [searchTerm, setSearchTerm] = useState('');

@@ -1,5 +1,5 @@
 import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
-import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, MoreVertical } from 'lucide-react';
+import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
 import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
@@ -26,6 +26,16 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
 
   const handlePanelClose = useCallback((e: React.MouseEvent, panel: ToolPanel) => {
     e.stopPropagation();
+    
+    // Prevent closing logs panel while it's running
+    if (panel.type === 'logs') {
+      const logsState = panel.state?.customState as any;
+      if (logsState?.isRunning) {
+        alert('Cannot close logs panel while process is running. Please stop the process first.');
+        return;
+      }
+    }
+    
     onPanelClose(panel);
   }, [onPanelClose]);
   
@@ -48,9 +58,23 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     }
   }, [showDropdown]);
   
-  // Get available panel types (excluding permanent panels)
+  // Get available panel types (excluding permanent panels, logs, and enforcing singleton)
   const availablePanelTypes = (Object.keys(PANEL_CAPABILITIES) as ToolPanelType[])
-    .filter(type => !PANEL_CAPABILITIES[type].permanent);
+    .filter(type => {
+      // Exclude permanent panels
+      if (PANEL_CAPABILITIES[type].permanent) return false;
+      
+      // Exclude logs panel - it's only created automatically when running scripts
+      if (type === 'logs') return false;
+      
+      // Enforce singleton panels
+      if (PANEL_CAPABILITIES[type].singleton) {
+        // Check if a panel of this type already exists
+        return !panels.some(p => p.type === type);
+      }
+      
+      return true;
+    });
   
   const getPanelIcon = (type: ToolPanelType) => {
     switch (type) {
@@ -62,6 +86,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         return <GitBranch className="w-4 h-4" />;
       case 'editor':
         return <FileText className="w-4 h-4" />;
+      case 'logs':
+        return <FileCode className="w-4 h-4" />;
       // Add more icons as panel types are added
       default:
         return null;

@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal' | 'claude' | 'diff' | 'editor'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude' | 'diff' | 'editor' | 'logs'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState | EditorPanelState;
+  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState | EditorPanelState | LogsPanelState;
 }
 
 export interface TerminalPanelState {
@@ -83,6 +83,19 @@ export interface EditorPanelState {
   showSearch?: boolean;           // Whether search is visible
 }
 
+export interface LogsPanelState {
+  isRunning: boolean;             // Process currently running
+  processId?: number;             // Active process PID
+  command?: string;               // Command being executed
+  startTime?: string;             // When process started
+  endTime?: string;               // When process ended
+  exitCode?: number;              // Process exit code
+  outputBuffer?: string[];        // Recent output lines
+  errorCount?: number;            // Number of errors detected
+  warningCount?: number;          // Number of warnings detected
+  lastActivityTime?: string;      // Last output received
+}
+
 export interface ToolPanelMetadata {
   createdAt: string;
   lastActiveAt: string;
@@ -140,6 +153,10 @@ export type PanelEventType =
   // Editor panel events
   | 'editor:file_saved'          // When a file is saved in editor
   | 'editor:file_changed'        // When file content changes in editor
+  // Logs panel events
+  | 'process:started'            // When a script process starts
+  | 'process:output'             // When process produces output
+  | 'process:ended'              // When process exits
 
 export interface PanelEventSubscription {
   panelId: string;
@@ -182,5 +199,10 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     requiresProcess: false,          // No background process needed
     singleton: false                 // Multiple editors allowed
   },
-  // Future panel types will be added here when migrated
+  logs: {
+    canEmit: ['process:started', 'process:output', 'process:ended'],
+    canConsume: [],                  // Logs doesn't listen to other panels
+    requiresProcess: true,           // Manages script processes
+    singleton: true                  // ONLY ONE logs panel per session
+  }
 };

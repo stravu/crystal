@@ -308,6 +308,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     
     // Panel events
+    onPanelCreated: (callback: (panel: any) => void) => {
+      const wrappedCallback = (_event: any, panel: any) => callback(panel);
+      ipcRenderer.on('panel:created', wrappedCallback);
+      return () => ipcRenderer.removeListener('panel:created', wrappedCallback);
+    },
     onPanelUpdated: (callback: (panel: any) => void) => {
       const wrappedCallback = (_event: any, panel: any) => callback(panel);
       ipcRenderer.on('panel:updated', wrappedCallback);

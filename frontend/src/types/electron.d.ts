@@ -220,6 +220,7 @@ interface ElectronAPI {
     onFolderDeleted: (callback: (folderId: string) => void) => () => void;
     
     // Panel events
+    onPanelCreated: (callback: (panel: any) => void) => () => void;
     onPanelUpdated: (callback: (panel: any) => void) => () => void;
     onPanelPromptAdded: (callback: (data: { panelId: string; content: string }) => void) => () => void;
     onPanelResponseAdded: (callback: (data: { panelId: string; content: string }) => void) => () => void;
