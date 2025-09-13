@@ -104,83 +104,86 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   };
 
   return (
-    <div className="panel-tab-bar flex items-center bg-gray-800 border-b border-gray-700 h-8">
-      {/* Render panel tabs */}
-      {panels.map((panel) => {
-        const isPermanent = panel.metadata?.permanent === true;
+    <div className="panel-tab-bar bg-gray-800 border-b border-gray-700">
+      {/* Flex container that wraps when needed */}
+      <div className="flex flex-wrap items-center min-h-[2rem]">
+        {/* Render panel tabs */}
+        {panels.map((panel) => {
+          const isPermanent = panel.metadata?.permanent === true;
+          
+          return (
+            <div
+              key={panel.id}
+              className={cn(
+                "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700 h-8 whitespace-nowrap",
+                activePanel?.id === panel.id && "bg-gray-700"
+              )}
+              onClick={() => handlePanelClick(panel)}
+              title={isPermanent ? "This panel cannot be closed" : undefined}
+            >
+              {getPanelIcon(panel.type)}
+              <span className="ml-2 text-sm">{panel.title}</span>
+              {!isPermanent && (
+                <button
+                  className="ml-2 p-0.5 hover:bg-gray-600 rounded"
+                  onClick={(e) => handlePanelClose(e, panel)}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
         
-        return (
-          <div
-            key={panel.id}
-            className={cn(
-              "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700",
-              activePanel?.id === panel.id && "bg-gray-700"
-            )}
-            onClick={() => handlePanelClick(panel)}
-            title={isPermanent ? "This panel cannot be closed" : undefined}
+        {/* Add Panel dropdown button */}
+        <div className="relative h-8 flex items-center" ref={dropdownRef}>
+          <button
+            className="flex items-center px-3 py-1 hover:bg-gray-700 text-sm h-full"
+            onClick={() => setShowDropdown(!showDropdown)}
           >
-            {getPanelIcon(panel.type)}
-            <span className="ml-2 text-sm">{panel.title}</span>
-            {!isPermanent && (
-              <button
-                className="ml-2 p-0.5 hover:bg-gray-600 rounded"
-                onClick={(e) => handlePanelClose(e, panel)}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        );
-      })}
-      
-      {/* Add Panel dropdown button */}
-      <div className="relative" ref={dropdownRef}>
-        <button
-          className="flex items-center px-3 py-1 hover:bg-gray-700 text-sm"
-          onClick={() => setShowDropdown(!showDropdown)}
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add Tool
-          <ChevronDown className="w-3 h-3 ml-1" />
-        </button>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Tool
+            <ChevronDown className="w-3 h-3 ml-1" />
+          </button>
+          
+          {showDropdown && (
+            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+              {availablePanelTypes.map((type) => (
+                <button
+                  key={type}
+                  className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-700 text-left"
+                  onClick={() => handleAddPanel(type)}
+                >
+                  {getPanelIcon(type)}
+                  <span className="ml-2 capitalize">{type}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         
-        {showDropdown && (
-          <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
-            {availablePanelTypes.map((type) => (
-              <button
-                key={type}
-                className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-700 text-left"
-                onClick={() => handleAddPanel(type)}
-              >
-                {getPanelIcon(type)}
-                <span className="ml-2 capitalize">{type}</span>
-              </button>
-            ))}
+        {/* Branch Actions button - moved from ViewTabs - only in worktree context */}
+        {context === 'worktree' && gitBranchActions && gitBranchActions.length > 0 && (
+          <div className="ml-auto flex items-center gap-2 pr-2 h-8">
+            <Dropdown
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-2 px-3 py-1 h-7"
+                  disabled={isMerging}
+                >
+                  <GitBranch className="w-4 h-4" />
+                  <span className="text-sm">Git Branch Actions</span>
+                  <MoreVertical className="w-3 h-3" />
+                </Button>
+              }
+              items={gitBranchActions}
+              position="bottom-right"
+            />
           </div>
         )}
       </div>
-      
-      {/* Branch Actions button - moved from ViewTabs - only in worktree context */}
-      {context === 'worktree' && gitBranchActions && gitBranchActions.length > 0 && (
-        <div className="ml-auto flex items-center gap-2 pr-2">
-          <Dropdown
-            trigger={
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-2 px-3 py-1 h-7"
-                disabled={isMerging}
-              >
-                <GitBranch className="w-4 h-4" />
-                <span className="text-sm">Git Branch Actions</span>
-                <MoreVertical className="w-3 h-3" />
-              </Button>
-            }
-            items={gitBranchActions}
-            position="bottom-right"
-          />
-        </div>
-      )}
     </div>
   );
 });
