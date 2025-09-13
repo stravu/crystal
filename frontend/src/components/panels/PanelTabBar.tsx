@@ -1,8 +1,11 @@
 import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
-import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText } from 'lucide-react';
+import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, MoreVertical } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
 import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
+import { Button } from '../ui/Button';
+import { Dropdown } from '../ui/Dropdown';
+import { useSession } from '../../contexts/SessionContext';
 
 export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   panels,
@@ -11,6 +14,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   onPanelClose,
   onPanelCreate
 }) => {
+  const sessionContext = useSession();
+  const { gitBranchActions, isMerging } = sessionContext || {};
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
@@ -119,6 +124,28 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
           </div>
         )}
       </div>
+      
+      {/* Branch Actions button - moved from ViewTabs */}
+      {gitBranchActions && gitBranchActions.length > 0 && (
+        <div className="ml-auto flex items-center gap-2 pr-2">
+          <Dropdown
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2 px-3 py-1 h-7"
+                disabled={isMerging}
+              >
+                <GitBranch className="w-4 h-4" />
+                <span className="text-sm">Git Branch Actions</span>
+                <MoreVertical className="w-3 h-3" />
+              </Button>
+            }
+            items={gitBranchActions}
+            position="bottom-right"
+          />
+        </div>
+      )}
     </div>
   );
 });

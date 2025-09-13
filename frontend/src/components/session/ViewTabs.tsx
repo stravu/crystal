@@ -1,9 +1,7 @@
 import React, { useEffect } from 'react';
 import { ViewMode } from '../../hooks/useSessionView';
 import { cn } from '../../utils/cn';
-import { GitCompare, Terminal, FileEdit, Eye, GitBranch, MoreVertical, ScrollText, Code } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { Dropdown } from '../ui/Dropdown';
+import { GitCompare, Terminal, FileEdit, Eye, ScrollText, Code } from 'lucide-react';
 import { useConfigStore } from '../../stores/configStore';
 
 interface ViewTabsProps {
@@ -19,16 +17,6 @@ interface ViewTabsProps {
   };
   setUnreadActivity: (activity: any) => void;
   isTerminalRunning: boolean;
-  branchActions?: Array<{
-    id: string;
-    label: string;
-    icon: any;
-    onClick: () => void;
-    disabled: boolean;
-    variant: 'default' | 'success' | 'danger';
-    description: string;
-  }>;
-  isMerging?: boolean;
 }
 
 export const ViewTabs: React.FC<ViewTabsProps> = ({
@@ -37,8 +25,6 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
   unreadActivity,
   setUnreadActivity,
   isTerminalRunning,
-  branchActions,
-  isMerging,
 }) => {
   const { config, fetchConfig } = useConfigStore();
   
@@ -156,28 +142,6 @@ export const ViewTabs: React.FC<ViewTabsProps> = ({
           )}
         </button>
       ))}
-      
-      {/* Branch Actions button - positioned after tabs */}
-      {branchActions && branchActions.length > 0 && (
-        <div className="ml-auto flex items-center gap-2">
-          <Dropdown
-            trigger={
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-2 px-3 py-2"
-                disabled={isMerging}
-              >
-                <GitBranch className="w-4 h-4" />
-                <span>Git Branch Actions</span>
-                <MoreVertical className="w-3 h-3" />
-              </Button>
-            }
-            items={branchActions}
-            position="bottom-right"
-          />
-        </div>
-      )}
     </div>
   );
 };

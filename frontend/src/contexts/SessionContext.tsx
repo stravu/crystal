@@ -6,14 +6,34 @@ interface SessionContextValue {
   workingDirectory: string;
   projectId: string;
   session: Session;
+  gitBranchActions?: Array<{
+    id: string;
+    label: string;
+    icon: any;
+    onClick: () => void;
+    disabled: boolean;
+    variant: 'default' | 'success' | 'danger';
+    description: string;
+  }>;
+  isMerging?: boolean;
 }
 
-const SessionContext = createContext<SessionContextValue | undefined>(undefined);
+export const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
 export const SessionProvider: React.FC<{
   children: ReactNode;
   session: Session | null;
-}> = ({ children, session }) => {
+  gitBranchActions?: Array<{
+    id: string;
+    label: string;
+    icon: any;
+    onClick: () => void;
+    disabled: boolean;
+    variant: 'default' | 'success' | 'danger';
+    description: string;
+  }>;
+  isMerging?: boolean;
+}> = ({ children, session, gitBranchActions, isMerging }) => {
   // FIX: Don't render children without a valid session
   // This prevents components that require session from rendering
   if (!session) {
@@ -28,7 +48,9 @@ export const SessionProvider: React.FC<{
     sessionId: session.id,
     workingDirectory: session.worktreePath,
     projectId: session.projectId?.toString() || '',
-    session
+    session,
+    gitBranchActions,
+    isMerging
   };
 
   return (

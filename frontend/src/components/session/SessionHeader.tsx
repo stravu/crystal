@@ -1,10 +1,9 @@
 import React from 'react';
-import { Session, GitCommands } from '../../types/session';
+import { Session } from '../../types/session';
 import { StatusIndicator } from '../StatusIndicator';
 import { ViewTabs } from './ViewTabs';
 import { ViewMode } from '../../hooks/useSessionView';
 import { CommitModeIndicator } from '../CommitModeIndicator';
-import { Code2, Download, Upload, GitMerge } from 'lucide-react';
 
 interface SessionHeaderProps {
   activeSession: Session;
@@ -14,16 +13,6 @@ interface SessionHeaderProps {
   handleNameKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   handleSaveEditName: () => void;
   handleStartEditName: () => void;
-  isMerging: boolean;
-  handleGitPull: () => void;
-  handleGitPush: () => void;
-  handleRebaseMainIntoWorktree: () => void;
-  hasChangesToRebase: boolean;
-  gitCommands: GitCommands | null;
-  handleSquashAndRebaseToMain: () => void;
-  handleOpenIDE: () => void;
-  isOpeningIDE: boolean;
-  hasIdeCommand: boolean;
   mergeError: string | null;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -45,70 +34,12 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   handleNameKeyDown,
   handleSaveEditName,
   handleStartEditName,
-  isMerging,
-  handleGitPull,
-  handleGitPush,
-  handleRebaseMainIntoWorktree,
-  hasChangesToRebase,
-  gitCommands,
-  handleSquashAndRebaseToMain,
-  handleOpenIDE,
-  isOpeningIDE,
-  hasIdeCommand,
   mergeError,
   viewMode,
   setViewMode,
   unreadActivity,
   setUnreadActivity,
 }) => {
-  const branchActions = activeSession.isMainRepo ? [
-    {
-      id: 'pull',
-      label: 'Pull from Remote',
-      icon: Download,
-      onClick: handleGitPull,
-      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
-      variant: 'default' as const,
-      description: gitCommands?.getPullCommand ? `git ${gitCommands.getPullCommand()}` : 'git pull'
-    },
-    {
-      id: 'push',
-      label: 'Push to Remote', 
-      icon: Upload,
-      onClick: handleGitPush,
-      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
-      variant: 'success' as const,
-      description: gitCommands?.getPushCommand ? `git ${gitCommands.getPushCommand()}` : 'git push'
-    }
-  ] : [
-    {
-      id: 'rebase-from-main',
-      label: `Rebase from ${gitCommands?.mainBranch || 'main'}`,
-      icon: GitMerge,
-      onClick: handleRebaseMainIntoWorktree,
-      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || !hasChangesToRebase,
-      variant: 'default' as const,
-      description: gitCommands?.getRebaseFromMainCommand ? gitCommands.getRebaseFromMainCommand() : `Pulls latest changes from ${gitCommands?.mainBranch || 'main'}`
-    },
-    {
-      id: 'rebase-to-main',
-      label: `Rebase to ${gitCommands?.mainBranch || 'main'}`,
-      icon: GitMerge,
-      onClick: handleSquashAndRebaseToMain,
-      disabled: isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
-      variant: 'success' as const,
-      description: gitCommands?.getSquashAndRebaseToMainCommand ? gitCommands.getSquashAndRebaseToMainCommand() : `Squashes all commits and rebases onto ${gitCommands?.mainBranch || 'main'}`
-    },
-    {
-      id: 'open-ide',
-      label: isOpeningIDE ? 'Opening...' : 'Open in IDE',
-      icon: Code2,
-      onClick: handleOpenIDE,
-      disabled: activeSession.status === 'initializing' || isOpeningIDE || !hasIdeCommand,
-      variant: 'default' as const,
-      description: hasIdeCommand ? 'Open the worktree in your default IDE' : 'No IDE command configured'
-    }
-  ];
 
   return (
     <div className="bg-surface-primary border-b border-border-primary flex-shrink-0">
@@ -171,8 +102,6 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
           unreadActivity={unreadActivity}
           setUnreadActivity={setUnreadActivity}
           isTerminalRunning={activeSession.isRunning || false}
-          branchActions={branchActions}
-          isMerging={isMerging}
         />
       </div>
     </div>

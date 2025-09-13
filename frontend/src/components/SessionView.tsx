@@ -24,6 +24,7 @@ import { PanelTabBar } from './panels/PanelTabBar';
 import { PanelContainer } from './panels/PanelContainer';
 import { SessionProvider } from '../contexts/SessionContext';
 import { ToolPanel, ToolPanelType } from '../../../shared/types/panels';
+import { Download, Upload, GitMerge, Code2 } from 'lucide-react';
 
 export const SessionView = memo(() => {
   const { activeView, activeProjectId } = useNavigationStore();
@@ -260,6 +261,60 @@ export const SessionView = memo(() => {
 
   const hook = useSessionView(activeSession, terminalRef, scriptTerminalRef);
   
+  // Create branch actions for the panel bar
+  const branchActions = useMemo(() => {
+    if (!activeSession) return [];
+    
+    return activeSession.isMainRepo ? [
+      {
+        id: 'pull',
+        label: 'Pull from Remote',
+        icon: Download,
+        onClick: hook.handleGitPull,
+        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+        variant: 'default' as const,
+        description: hook.gitCommands?.getPullCommand ? `git ${hook.gitCommands.getPullCommand()}` : 'git pull'
+      },
+      {
+        id: 'push',
+        label: 'Push to Remote', 
+        icon: Upload,
+        onClick: hook.handleGitPush,
+        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+        variant: 'success' as const,
+        description: hook.gitCommands?.getPushCommand ? `git ${hook.gitCommands.getPushCommand()}` : 'git push'
+      }
+    ] : [
+      {
+        id: 'rebase-from-main',
+        label: `Rebase from ${hook.gitCommands?.mainBranch || 'main'}`,
+        icon: GitMerge,
+        onClick: hook.handleRebaseMainIntoWorktree,
+        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || !hook.hasChangesToRebase,
+        variant: 'default' as const,
+        description: hook.gitCommands?.getRebaseFromMainCommand ? hook.gitCommands.getRebaseFromMainCommand() : `Pulls latest changes from ${hook.gitCommands?.mainBranch || 'main'}`
+      },
+      {
+        id: 'rebase-to-main',
+        label: `Rebase to ${hook.gitCommands?.mainBranch || 'main'}`,
+        icon: GitMerge,
+        onClick: hook.handleSquashAndRebaseToMain,
+        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+        variant: 'success' as const,
+        description: hook.gitCommands?.getSquashAndRebaseToMainCommand ? hook.gitCommands.getSquashAndRebaseToMainCommand() : `Squashes all commits and rebases onto ${hook.gitCommands?.mainBranch || 'main'}`
+      },
+      {
+        id: 'open-ide',
+        label: hook.isOpeningIDE ? 'Opening...' : 'Open in IDE',
+        icon: Code2,
+        onClick: hook.handleOpenIDE,
+        disabled: activeSession.status === 'initializing' || hook.isOpeningIDE || !sessionProject?.open_ide_command,
+        variant: 'default' as const,
+        description: sessionProject?.open_ide_command ? 'Open the worktree in your default IDE' : 'No IDE command configured'
+      }
+    ];
+  }, [activeSession, hook.isMerging, hook.gitCommands, hook.hasChangesToRebase, hook.handleGitPull, hook.handleGitPush, hook.handleRebaseMainIntoWorktree, hook.handleSquashAndRebaseToMain, hook.handleOpenIDE, hook.isOpeningIDE, sessionProject?.open_ide_command]);
+  
   // Settings state for Rich Output view
   const [richOutputSettings, setRichOutputSettings] = useState<RichOutputSettings>(() => {
     const saved = localStorage.getItem('richOutputSettings');
@@ -331,16 +386,6 @@ export const SessionView = memo(() => {
         handleNameKeyDown={hook.handleNameKeyDown}
         handleSaveEditName={hook.handleSaveEditName}
         handleStartEditName={hook.handleStartEditName}
-        isMerging={hook.isMerging}
-        handleGitPull={hook.handleGitPull}
-        handleGitPush={hook.handleGitPush}
-        handleRebaseMainIntoWorktree={hook.handleRebaseMainIntoWorktree}
-        hasChangesToRebase={hook.hasChangesToRebase}
-        gitCommands={hook.gitCommands}
-        handleSquashAndRebaseToMain={hook.handleSquashAndRebaseToMain}
-        handleOpenIDE={hook.handleOpenIDE}
-        isOpeningIDE={hook.isOpeningIDE}
-        hasIdeCommand={!!sessionProject?.open_ide_command}
         mergeError={hook.mergeError}
         viewMode={hook.viewMode}
         setViewMode={hook.setViewMode}
@@ -349,7 +394,7 @@ export const SessionView = memo(() => {
       />
       
       {/* Tool Panel Bar - ALWAYS VISIBLE */}
-      <SessionProvider session={activeSession}>
+      <SessionProvider session={activeSession} gitBranchActions={branchActions} isMerging={hook.isMerging}>
         <PanelTabBar
           panels={sessionPanels}
           activePanel={currentActivePanel}
@@ -363,7 +408,7 @@ export const SessionView = memo(() => {
         <div className="flex-1 relative">
           {/* Render all panels but only show the active one - keeps terminals alive */}
           {sessionPanels.length > 0 && currentActivePanel ? (
-            <SessionProvider session={activeSession}>
+            <SessionProvider session={activeSession} gitBranchActions={branchActions} isMerging={hook.isMerging}>
               {sessionPanels.map(panel => (
                 <div 
                   key={panel.id} 
