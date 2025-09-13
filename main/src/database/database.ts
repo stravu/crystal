@@ -2275,6 +2275,24 @@ export class DatabaseService {
     }));
   }
 
+  getActivePanels(): ToolPanel[] {
+    const rows = this.db.prepare(`
+      SELECT tp.* FROM tool_panels tp
+      JOIN sessions s ON tp.session_id = s.id
+      WHERE s.archived = 0 OR s.archived IS NULL
+      ORDER BY tp.created_at
+    `).all() as any[];
+    
+    return rows.map(row => ({
+      id: row.id,
+      sessionId: row.session_id,
+      type: row.type,
+      title: row.title,
+      state: row.state ? JSON.parse(row.state) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+    }));
+  }
+
   setActivePanel(sessionId: string, panelId: string | null): void {
     this.db.prepare('UPDATE sessions SET active_panel_id = ? WHERE id = ?').run(panelId, sessionId);
   }
