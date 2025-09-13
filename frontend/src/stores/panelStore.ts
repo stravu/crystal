@@ -28,8 +28,12 @@ export const usePanelStore = create<PanelStore>()(
         if (!state.panels[panel.sessionId]) {
           state.panels[panel.sessionId] = [];
         }
-        state.panels[panel.sessionId].push(panel);
-        state.activePanels[panel.sessionId] = panel.id;
+        // Check if panel already exists to prevent duplicates
+        const existing = state.panels[panel.sessionId].find(p => p.id === panel.id);
+        if (!existing) {
+          state.panels[panel.sessionId].push(panel);
+          state.activePanels[panel.sessionId] = panel.id;
+        }
       });
     },
 

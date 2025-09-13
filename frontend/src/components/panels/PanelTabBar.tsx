@@ -12,7 +12,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   activePanel,
   onPanelSelect,
   onPanelClose,
-  onPanelCreate
+  onPanelCreate,
+  context = 'worktree'  // Default to worktree for backward compatibility
 }) => {
   const sessionContext = useSession();
   const { gitBranchActions, isMerging } = sessionContext || {};
@@ -61,14 +62,20 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   // Get available panel types (excluding permanent panels, logs, and enforcing singleton)
   const availablePanelTypes = (Object.keys(PANEL_CAPABILITIES) as ToolPanelType[])
     .filter(type => {
+      const capabilities = PANEL_CAPABILITIES[type];
+      
+      // Filter based on context
+      if (context === 'project' && !capabilities.canAppearInProjects) return false;
+      if (context === 'worktree' && !capabilities.canAppearInWorktrees) return false;
+      
       // Exclude permanent panels
-      if (PANEL_CAPABILITIES[type].permanent) return false;
+      if (capabilities.permanent) return false;
       
       // Exclude logs panel - it's only created automatically when running scripts
       if (type === 'logs') return false;
       
       // Enforce singleton panels
-      if (PANEL_CAPABILITIES[type].singleton) {
+      if (capabilities.singleton) {
         // Check if a panel of this type already exists
         return !panels.some(p => p.type === type);
       }
@@ -151,8 +158,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         )}
       </div>
       
-      {/* Branch Actions button - moved from ViewTabs */}
-      {gitBranchActions && gitBranchActions.length > 0 && (
+      {/* Branch Actions button - moved from ViewTabs - only in worktree context */}
+      {context === 'worktree' && gitBranchActions && gitBranchActions.length > 0 && (
         <div className="ml-auto flex items-center gap-2 pr-2">
           <Dropdown
             trigger={

@@ -170,6 +170,8 @@ export interface PanelCapabilities {
   requiresProcess?: boolean;       // Whether panel needs a background process
   singleton?: boolean;             // Only one instance allowed per session
   permanent?: boolean;             // Cannot be closed (for diff panel)
+  canAppearInProjects?: boolean;  // Whether panel can appear in project view
+  canAppearInWorktrees?: boolean; // Whether panel can appear in worktree sessions
 }
 
 // Panel Registry - Currently only terminal is implemented
@@ -178,31 +180,41 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     canEmit: ['terminal:command_executed', 'terminal:exit', 'files:changed'],
     canConsume: [], // Terminal doesn't consume events in Phase 1-2
     requiresProcess: true,
-    singleton: false
+    singleton: false,
+    canAppearInProjects: true,       // Terminal can appear in projects
+    canAppearInWorktrees: true       // Terminal can appear in worktrees
   },
   claude: {
     canEmit: ['files:changed'], // Claude can change files through tool calls
     canConsume: [], // Claude doesn't consume events in initial implementation
     requiresProcess: true,
-    singleton: false
+    singleton: false,
+    canAppearInProjects: true,       // Claude can appear in projects
+    canAppearInWorktrees: true       // Claude can appear in worktrees
   },
   diff: {
     canEmit: ['diff:refreshed'],
     canConsume: ['files:changed', 'terminal:command_executed'],
     requiresProcess: false,           // No background process
     singleton: true,                  // Only one diff panel
-    permanent: true                   // Cannot be closed
+    permanent: true,                  // Cannot be closed
+    canAppearInProjects: false,       // Diff not available in projects (no worktree)
+    canAppearInWorktrees: true        // Diff only in worktrees
   },
   editor: {
     canEmit: ['editor:file_saved', 'editor:file_changed'],
     canConsume: ['files:changed'],  // React to file system changes
     requiresProcess: false,          // No background process needed
-    singleton: false                 // Multiple editors allowed
+    singleton: false,                // Multiple editors allowed
+    canAppearInProjects: true,       // Editor can appear in projects
+    canAppearInWorktrees: true       // Editor can appear in worktrees
   },
   logs: {
     canEmit: ['process:started', 'process:output', 'process:ended'],
     canConsume: [],                  // Logs doesn't listen to other panels
     requiresProcess: true,           // Manages script processes
-    singleton: true                  // ONLY ONE logs panel per session
+    singleton: true,                 // ONLY ONE logs panel per session
+    canAppearInProjects: true,       // Logs can appear in projects
+    canAppearInWorktrees: true       // Logs can appear in worktrees
   }
 };
