@@ -7,7 +7,7 @@ const TerminalPanel = lazy(() => import('./TerminalPanel'));
 const ClaudePanel = lazy(() => import('./claude/ClaudePanel'));
 const DiffPanel = lazy(() => import('./diff/DiffPanel'));
 const EditorPanel = lazy(() => import('./editor/EditorPanel'));
-const LogsPanel = lazy(() => import('./logs/LogsPanel'));
+const LogsPanel = lazy(() => import('./logPanel/LogsPanel'));
 
 const PanelErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => void }> = ({ 
   error, 

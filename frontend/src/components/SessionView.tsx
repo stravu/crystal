@@ -16,7 +16,7 @@ import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
 import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
 import { RichOutputSettings } from './panels/claude/RichOutputView';
-import { LogsView } from './panels/logs/LogsView';
+import { LogsView } from './panels/logPanel/LogsView';
 import { MessagesView } from './panels/claude/MessagesView';
 import { usePanelStore } from '../stores/panelStore';
 import { panelApi } from '../services/panelApi';

@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 import { getShellPath, findExecutableInPath } from '../utils/shellPath';
-import { logsManager } from '../services/panels/logs/logsManager';
+import { logsManager } from '../services/panels/logPanel/logsManager';
 import { panelManager } from '../services/panelManager';
 
 export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: AppServices): void {
