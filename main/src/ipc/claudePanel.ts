@@ -17,6 +17,21 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
 
   // Initialize the Claude panel manager wrapper
   claudePanelManager = new ClaudePanelManager(claudeCodeManager, sessionManager, logger, configManager);
+  
+  // Register existing Claude panels from the database
+  console.log('[ClaudePanel] Registering existing Claude panels from database...');
+  const allPanels = databaseService.getAllPanels();
+  const claudePanels = allPanels.filter(panel => panel.type === 'claude');
+  
+  for (const panel of claudePanels) {
+    try {
+      claudePanelManager.registerPanel(panel.id, panel.sessionId, panel.state.customState as ClaudePanelState);
+      console.log(`[ClaudePanel] Registered existing Claude panel ${panel.id} for session ${panel.sessionId}`);
+    } catch (error) {
+      console.error(`[ClaudePanel] Failed to register existing panel ${panel.id}:`, error);
+    }
+  }
+  console.log(`[ClaudePanel] Registered ${claudePanels.length} existing Claude panels`);
 
   // Create a new Claude panel
   ipcMain.handle('claude-panels:create', async (_event, sessionId: string, title?: string) => {

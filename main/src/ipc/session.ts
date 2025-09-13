@@ -762,17 +762,38 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     try {
       console.log(`[IPC] panels:get-prompts called for panel: ${panelId}`);
       
-      if (!sessionManager.getPanelPromptMarkers) {
-        console.error('[IPC] Panel-based prompt methods not available on sessionManager');
-        return { success: false, error: 'Panel-based prompt methods not available' };
-      }
+      // Get all conversation messages to find assistant responses
+      const allMessages = databaseService.getPanelConversationMessages(panelId);
       
-      const prompts = await sessionManager.getPanelPromptMarkers(panelId);
-      console.log(`[IPC] Returning ${prompts.length} prompt markers for panel ${panelId}`);
+      // Build prompts with assistant response timestamps
+      const prompts = allMessages
+        .map((msg, index) => {
+          if (msg.message_type === 'user') {
+            // Find the next assistant message for completion timestamp
+            const nextAssistantMsg = allMessages
+              .slice(index + 1)
+              .find(m => m.message_type === 'assistant');
+            
+            return {
+              id: msg.id,
+              session_id: msg.session_id,
+              panel_id: panelId,
+              prompt_text: msg.content,
+              output_index: index,
+              timestamp: msg.timestamp,
+              // Use the assistant's response timestamp as completion
+              completion_timestamp: nextAssistantMsg?.timestamp
+            };
+          }
+          return null;
+        })
+        .filter(Boolean); // Remove nulls (assistant messages)
+      
+      console.log(`[IPC] Returning ${prompts.length} user prompts for panel ${panelId}`);
       return { success: true, data: prompts };
     } catch (error) {
-      console.error('Failed to get panel prompt markers:', error);
-      return { success: false, error: 'Failed to get panel prompt markers' };
+      console.error('Failed to get panel prompts:', error);
+      return { success: false, error: 'Failed to get panel prompts' };
     }
   });
 

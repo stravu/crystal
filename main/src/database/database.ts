@@ -2262,6 +2262,19 @@ export class DatabaseService {
     }));
   }
 
+  getAllPanels(): ToolPanel[] {
+    const rows = this.db.prepare('SELECT * FROM tool_panels ORDER BY created_at').all() as any[];
+    
+    return rows.map(row => ({
+      id: row.id,
+      sessionId: row.session_id,
+      type: row.type,
+      title: row.title,
+      state: row.state ? JSON.parse(row.state) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+    }));
+  }
+
   setActivePanel(sessionId: string, panelId: string | null): void {
     this.db.prepare('UPDATE sessions SET active_panel_id = ? WHERE id = ?').run(panelId, sessionId);
   }

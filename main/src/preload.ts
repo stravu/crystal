@@ -331,6 +331,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('folder:deleted', wrappedCallback);
     },
     
+    // Panel events
+    onPanelPromptAdded: (callback: (data: { panelId: string; content: string }) => void) => {
+      const wrappedCallback = (_event: any, data: { panelId: string; content: string }) => callback(data);
+      ipcRenderer.on('panel:prompt-added', wrappedCallback);
+      return () => ipcRenderer.removeListener('panel:prompt-added', wrappedCallback);
+    },
+    
+    onPanelResponseAdded: (callback: (data: { panelId: string; content: string }) => void) => {
+      const wrappedCallback = (_event: any, data: { panelId: string; content: string }) => callback(data);
+      ipcRenderer.on('panel:response-added', wrappedCallback);
+      return () => ipcRenderer.removeListener('panel:response-added', wrappedCallback);
+    },
+    
     onTerminalOutput: (callback: (output: any) => void) => {
       const wrappedCallback = (_event: any, output: any) => callback(output);
       ipcRenderer.on('terminal:output', wrappedCallback);

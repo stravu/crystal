@@ -132,6 +132,32 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
   });
 
+  // Listen for new prompts being added to panels
+  sessionManager.on('panel-prompt-added', (data) => {
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) {
+      try {
+        mw.webContents.send('panel:prompt-added', data);
+      } catch (error) {
+        console.error('[Main] Failed to send panel:prompt-added:', error);
+      }
+    }
+  });
+
+  // Listen for assistant responses being added to panels
+  sessionManager.on('panel-response-added', (data) => {
+    console.log('[Events] Received panel-response-added event for panel:', data.panelId);
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) {
+      try {
+        console.log('[Events] Sending panel:response-added to renderer for panel:', data.panelId);
+        mw.webContents.send('panel:response-added', data);
+      } catch (error) {
+        console.error('[Main] Failed to send panel:response-added:', error);
+      }
+    }
+  });
+
   // Listen for project update events from sessionManager (since it extends EventEmitter)
   sessionManager.on('project:updated', (project: any) => {
     console.log(`[Main] Project updated: ${project.id}`);

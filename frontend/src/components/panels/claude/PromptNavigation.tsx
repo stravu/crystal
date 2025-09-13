@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { formatDistanceToNow } from '../../../utils/formatters';
 import { formatDuration, getTimeDifference, isValidTimestamp, parseTimestamp } from '../../../utils/timestampUtils';
 import { API } from '../../../utils/api';
@@ -7,7 +7,8 @@ import { PromptDetailModal } from '../../PromptDetailModal';
 
 interface PromptMarker {
   id: number;
-  session_id: string;
+  session_id?: string;
+  panel_id?: string;
   prompt_text: string;
   output_index: number;
   output_line?: number;
@@ -31,135 +32,116 @@ export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigati
     try {
       const isLast = currentIndex === prompts.length - 1;
       
-      console.log('calculateDuration for prompt:', {
-        index: currentIndex,
-        isLast,
-        prompt_id: currentPrompt.id,
-        raw_timestamp: currentPrompt.timestamp,
-        completion_timestamp: currentPrompt.completion_timestamp,
-        // session_status: activeSession?.status,
-        prompt_text_preview: currentPrompt.prompt_text.substring(0, 30) + '...'
-      });
-      
       // Validate the current prompt's timestamp
       if (!isValidTimestamp(currentPrompt.timestamp)) {
         console.warn('Invalid timestamp for prompt:', currentPrompt.timestamp);
-        return 'Unknown duration';
+        return '';
       }
       
-      // If we have a completion_timestamp, use it to calculate the actual execution duration
+      // If we have a completion_timestamp (assistant response time), use it
       if (currentPrompt.completion_timestamp && isValidTimestamp(currentPrompt.completion_timestamp)) {
         const durationMs = getTimeDifference(currentPrompt.timestamp, currentPrompt.completion_timestamp);
         
-        console.log('Using completion timestamp:', {
-          start: currentPrompt.timestamp,
-          end: currentPrompt.completion_timestamp,
-          duration_ms: durationMs
-        });
-        
-        // Check for negative duration
-        if (durationMs < 0) {
-          console.warn('Negative duration detected with completion timestamp');
-          return 'Invalid duration';
+        if (durationMs >= 0) {
+          return formatDuration(durationMs);
         }
-        
-        return formatDuration(durationMs);
       }
       
-      // If no completion timestamp and it's the last prompt, assume it's still running
-      if (isLast) {
-        // For ongoing prompts, calculate duration from the UTC timestamp to current UTC time
+      // For the last prompt without completion, show elapsed time
+      if (isLast && !currentPrompt.completion_timestamp) {
         const startTime = parseTimestamp(currentPrompt.timestamp);
         const now = new Date();
         const durationMs = now.getTime() - startTime.getTime();
         
-        console.log('Calculating ongoing duration:', {
-          raw_timestamp: currentPrompt.timestamp,
-          parsed_start: startTime.toISOString(),
-          now_utc: now.toISOString(),
-          duration_ms: durationMs
-        });
-        
-        // Check for negative duration
-        if (durationMs < 0) {
-          console.error('NEGATIVE DURATION DETECTED:', {
-            raw_timestamp: currentPrompt.timestamp,
-            parsed_as_utc: startTime.toISOString(),
-            current_time_utc: now.toISOString(),
-            difference_ms: durationMs,
-            difference_hours: durationMs / (1000 * 60 * 60)
-          });
-          // Instead of showing negative, show the absolute value with a warning
-          return `${formatDuration(Math.abs(durationMs))} (!)`;
-        }
-        
-        return formatDuration(durationMs) + ' (ongoing)';
-      }
-      
-      // For prompts without completion_timestamp that are not actively running
-      // Try to estimate using the next prompt's timestamp
-      if (!isLast && currentIndex < prompts.length - 1) {
-        const nextPrompt = prompts[currentIndex + 1];
-        if (nextPrompt && isValidTimestamp(nextPrompt.timestamp)) {
-          const durationMs = getTimeDifference(currentPrompt.timestamp, nextPrompt.timestamp);
-          
-          console.log('Estimating duration from next prompt:', {
-            current_timestamp: currentPrompt.timestamp,
-            next_timestamp: nextPrompt.timestamp,
-            duration_ms: durationMs
-          });
-          
-          if (durationMs >= 0) {
-            return formatDuration(durationMs);
-          }
+        if (durationMs >= 0) {
+          // Show it's still waiting for response
+          return formatDuration(durationMs) + ' (waiting)';
         }
       }
       
-      // Fallback for completed prompts without any way to calculate duration
-      return 'Completed';
+      // If completed but no duration available
+      if (currentPrompt.completion_timestamp) {
+        return 'completed';
+      }
+      
+      return '';
       
     } catch (error) {
       console.error('Error calculating duration:', error);
-      return 'Unknown duration';
+      return '';
     }
   };
 
+  const fetchPrompts = useCallback(async () => {
+    if (!panelId) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await API.panels.getPrompts(panelId);
+      if (response.success) {
+        setPrompts(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching prompt markers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [panelId]);
+
   useEffect(() => {
     if (!panelId) return;
-
-    const fetchPrompts = async () => {
-      setIsLoading(true);
-      try {
-        const response = await API.panels.getPrompts(panelId);
-        if (response.success) {
-          // Log the timestamps to debug format issues
-          console.log('Fetched prompts with timestamps:', response.data.map((p: PromptMarker) => ({
-            id: p.id,
-            raw_timestamp: p.timestamp,
-            parsed_timestamp: parseTimestamp(p.timestamp).toISOString(),
-            completion_timestamp: p.completion_timestamp,
-            parsed_completion: p.completion_timestamp ? parseTimestamp(p.completion_timestamp).toISOString() : null,
-            prompt_text: p.prompt_text.substring(0, 50) + '...'
-          })));
-          setPrompts(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching prompt markers:', error);
-      } finally {
-        setIsLoading(false);
+    fetchPrompts();
+  }, [panelId, fetchPrompts]);
+  
+  // Listen for new prompts being added
+  useEffect(() => {
+    if (!panelId) return;
+    
+    const unsubscribe = window.electronAPI?.events?.onPanelPromptAdded?.((data: { panelId: string; content: string }) => {
+      if (data.panelId === panelId) {
+        // Refresh the prompts list when a new prompt is added to this panel
+        fetchPrompts();
+      }
+    });
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
       }
     };
-
-    fetchPrompts();
+  }, [panelId, fetchPrompts]);
+  
+  // Listen for assistant responses to stop duration timers
+  useEffect(() => {
+    if (!panelId) return;
     
-    // Only refresh prompts when session status changes, not on a timer
-    // This reduces unnecessary API calls from every 5 seconds to only when needed
-  }, [panelId]);
+    const unsubscribe = window.electronAPI?.events?.onPanelResponseAdded?.((data: { panelId: string; content: string }) => {
+      console.log('[PromptNavigation] Received panel:response-added event for panel:', data.panelId, 'current panel:', panelId);
+      if (data.panelId === panelId) {
+        console.log('[PromptNavigation] Refreshing prompts after assistant response');
+        // Refresh the prompts list when an assistant response is added
+        // This will update completion_timestamps and stop the duration from incrementing
+        fetchPrompts();
+      }
+    });
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [panelId, fetchPrompts]);
 
   // Use requestAnimationFrame for smooth UI updates for ongoing durations
   useEffect(() => {
-    // Always update ongoing durations for the last prompt
-    // Since we don't have session status in panel context
+    // Only run the animation if there's a prompt without a completion timestamp
+    const hasOngoingPrompt = prompts.length > 0 && 
+      prompts[prompts.length - 1] && 
+      !prompts[prompts.length - 1].completion_timestamp;
+    
+    if (!hasOngoingPrompt) {
+      return; // No need to animate if there's no ongoing prompt
+    }
 
     let animationId: number;
     let lastUpdate = 0;
@@ -231,10 +213,14 @@ export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigati
                     </div>
                     <div className="flex items-center space-x-2 text-xs text-text-tertiary mt-1">
                       <span>{formatDistanceToNow(parseTimestamp(marker.timestamp))} ago</span>
-                      <span className="text-text-tertiary">•</span>
-                      <span className="font-medium text-text-secondary">
-                        {calculateDuration(marker, index)}
-                      </span>
+                      {calculateDuration(marker, index) && (
+                        <>
+                          <span className="text-text-tertiary">•</span>
+                          <span className="font-medium text-text-secondary">
+                            {calculateDuration(marker, index)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

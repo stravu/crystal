@@ -578,7 +578,9 @@ export class SessionManager extends EventEmitter {
       
       if (assistantText) {
         // Add to panel conversation messages for continuation support
-        this.db.addPanelConversationMessage(panelId, 'assistant', assistantText);
+        console.log('[SessionManager] Adding assistant message to panel:', panelId, 'text length:', assistantText.length);
+        // Use the sessionManager method instead of db method directly to ensure event emission
+        this.addPanelConversationMessage(panelId, 'assistant', assistantText);
       }
     }
     
@@ -606,7 +608,8 @@ export class SessionManager extends EventEmitter {
         // this.db.addPanelPromptMarker(panelId, promptText, outputs.length - 1);
         
         // Add to panel conversation messages for continuation support
-        this.db.addPanelConversationMessage(panelId, 'user', promptText);
+        // Use the sessionManager method instead of db method directly to ensure event emission
+        this.addPanelConversationMessage(panelId, 'user', promptText);
       }
     }
 
@@ -646,6 +649,18 @@ export class SessionManager extends EventEmitter {
 
   addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string): void {
     this.db.addPanelConversationMessage(panelId, messageType, content);
+    
+    // Emit event when a user message is added (new prompt)
+    if (messageType === 'user') {
+      console.log('[SessionManager] Emitting panel-prompt-added for panel:', panelId);
+      this.emit('panel-prompt-added', { panelId, content });
+    }
+    
+    // Emit event when an assistant message is added (response received)
+    if (messageType === 'assistant') {
+      console.log('[SessionManager] Emitting panel-response-added for panel:', panelId);
+      this.emit('panel-response-added', { panelId, content });
+    }
   }
 
   getPanelConversationMessages(panelId: string): ConversationMessage[] {
@@ -658,17 +673,9 @@ export class SessionManager extends EventEmitter {
   }
 
   addPanelInitialPromptMarker(panelId: string, prompt: string): void {
-    console.log('[SessionManager] Adding initial prompt marker for panel:', panelId);
-    console.log('[SessionManager] Prompt text:', prompt);
-    
-    try {
-      // Add the initial prompt as the first prompt marker (index 0)
-      this.db.addPanelPromptMarker(panelId, prompt, 0, 0);
-      console.log('[SessionManager] Panel initial prompt marker added successfully');
-    } catch (error) {
-      console.error('[SessionManager] Failed to add panel initial prompt marker:', error);
-      throw error;
-    }
+    // Prompt markers are no longer needed for panels - using conversation_messages instead
+    // The prompt is already being added to conversation_messages in addPanelConversationMessage
+    console.log('[SessionManager] Skipping prompt marker for panel (using conversation_messages instead):', panelId);
   }
 
   continueConversation(id: string, userMessage: string): void {

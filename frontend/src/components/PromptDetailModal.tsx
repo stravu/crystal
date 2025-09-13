@@ -7,7 +7,8 @@ import { IconButton } from './ui/IconButton';
 
 interface PromptMarker {
   id: number;
-  session_id: string;
+  session_id?: string;
+  panel_id?: string;
   prompt_text: string;
   output_index: number;
   output_line?: number;
