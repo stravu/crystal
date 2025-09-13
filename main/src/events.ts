@@ -224,8 +224,21 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     try {
       const session = await sessionManager.getSession(sessionId);
       if (session && session.worktreePath) {
-        // Get the latest prompt from prompt markers or use the session prompt
-        const promptMarkers = sessionManager.getPromptMarkers(sessionId);
+        // MIGRATION FIX: Get the latest prompt from prompt markers or use the session prompt
+        // Check if session has Claude panels and use appropriate method
+        const eventsPanels = panelManager.getPanelsForSession(sessionId);
+        const eventsClaudePanels = eventsPanels.filter((p: any) => p.type === 'claude');
+        
+        let promptMarkers;
+        if (eventsClaudePanels.length > 0 && sessionManager.getPanelPromptMarkers) {
+          // Use panel-based method for migrated sessions
+          console.log(`[Events] Using panel-based prompt markers for session ${sessionId} with Claude panel ${eventsClaudePanels[0].id}`);
+          promptMarkers = sessionManager.getPanelPromptMarkers(eventsClaudePanels[0].id);
+        } else {
+          // Use session-based method for non-migrated sessions
+          promptMarkers = sessionManager.getPromptMarkers(sessionId);
+        }
+        
         const latestPrompt = promptMarkers.length > 0
           ? promptMarkers[promptMarkers.length - 1].prompt_text
           : session.prompt;

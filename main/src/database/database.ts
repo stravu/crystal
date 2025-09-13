@@ -2506,6 +2506,16 @@ export class DatabaseService {
     return result?.count || 0;
   }
 
+  getPanelConversationMessageCount(panelId: string): number {
+    const result = this.db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM conversation_messages 
+      WHERE panel_id = ?
+    `).get(panelId) as any;
+    
+    return result?.count || 0;
+  }
+
   getSessionToolUsage(sessionId: string): {
     tools: Array<{
       name: string;

@@ -485,8 +485,19 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         }
       }
 
-      // Get conversation history
-      const conversationHistory = sessionManager.getConversationMessages(sessionId);
+      // MIGRATION FIX: Get conversation history using appropriate method
+      const continuePanelsAfterCheck = panelManager.getPanelsForSession(sessionId);
+      const continueClaudePanelsAfterCheck = continuePanelsAfterCheck.filter(p => p.type === 'claude');
+      
+      let conversationHistory;
+      if (continueClaudePanelsAfterCheck.length > 0 && sessionManager.getPanelConversationMessages) {
+        // Use panel-based method for migrated sessions
+        console.log(`[IPC] Using panel-based conversation history for session ${sessionId} with Claude panel ${continueClaudePanelsAfterCheck[0].id}`);
+        conversationHistory = sessionManager.getPanelConversationMessages(continueClaudePanelsAfterCheck[0].id);
+      } else {
+        // Use session-based method for non-migrated sessions
+        conversationHistory = sessionManager.getConversationMessages(sessionId);
+      }
 
       // If no prompt provided, use empty string (for resuming)
       const continuePrompt = prompt || '';
@@ -635,7 +646,19 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         });
       }
       
-      const outputs = await sessionManager.getSessionOutputs(sessionId, outputLimit);
+      // MIGRATION FIX: Check if session has Claude panels and use panel-based data retrieval
+      const sessionPanels = panelManager.getPanelsForSession(sessionId);
+      const sessionClaudePanels = sessionPanels.filter(p => p.type === 'claude');
+      
+      let outputs;
+      if (sessionClaudePanels.length > 0 && sessionManager.getPanelOutputs) {
+        // Use panel-based method for migrated sessions
+        console.log(`[IPC] Using panel-based output retrieval for session ${sessionId} with Claude panel ${sessionClaudePanels[0].id}`);
+        outputs = await sessionManager.getPanelOutputs(sessionClaudePanels[0].id, outputLimit);
+      } else {
+        // Use session-based method for non-migrated sessions
+        outputs = await sessionManager.getSessionOutputs(sessionId, outputLimit);
+      }
       console.log(`[IPC] Retrieved ${outputs.length} outputs for session ${sessionId}`);
 
       // Performance optimization: Process outputs in batches to avoid blocking
@@ -676,7 +699,20 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('sessions:get-conversation', async (_event, sessionId: string) => {
     try {
-      const messages = await sessionManager.getConversationMessages(sessionId);
+      // MIGRATION FIX: Check if session has Claude panels and use panel-based data retrieval
+      const sessionPanels = panelManager.getPanelsForSession(sessionId);
+      const sessionClaudePanels = sessionPanels.filter(p => p.type === 'claude');
+      
+      let messages;
+      if (sessionClaudePanels.length > 0 && sessionManager.getPanelConversationMessages) {
+        // Use panel-based method for migrated sessions
+        console.log(`[IPC] Using panel-based conversation retrieval for session ${sessionId} with Claude panel ${sessionClaudePanels[0].id}`);
+        messages = await sessionManager.getPanelConversationMessages(sessionClaudePanels[0].id);
+      } else {
+        // Use session-based method for non-migrated sessions
+        messages = await sessionManager.getConversationMessages(sessionId);
+      }
+      
       return { success: true, data: messages };
     } catch (error) {
       console.error('Failed to get conversation messages:', error);
@@ -686,7 +722,20 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('sessions:get-conversation-messages', async (_event, sessionId: string) => {
     try {
-      const messages = await sessionManager.getConversationMessages(sessionId);
+      // MIGRATION FIX: Check if session has Claude panels and use panel-based data retrieval
+      const sessionPanels = panelManager.getPanelsForSession(sessionId);
+      const sessionClaudePanels = sessionPanels.filter(p => p.type === 'claude');
+      
+      let messages;
+      if (sessionClaudePanels.length > 0 && sessionManager.getPanelConversationMessages) {
+        // Use panel-based method for migrated sessions
+        console.log(`[IPC] Using panel-based conversation messages retrieval for session ${sessionId} with Claude panel ${sessionClaudePanels[0].id}`);
+        messages = await sessionManager.getPanelConversationMessages(sessionClaudePanels[0].id);
+      } else {
+        // Use session-based method for non-migrated sessions
+        messages = await sessionManager.getConversationMessages(sessionId);
+      }
+      
       return { success: true, data: messages };
     } catch (error) {
       console.error('Failed to get conversation messages:', error);
@@ -917,10 +966,39 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         return { success: false, error: 'Session not found in database' };
       }
 
-      const conversationMessages = await sessionManager.getConversationMessages(sessionId);
-      const promptMarkers = databaseService.getPromptMarkers(sessionId);
-      const executionDiffs = databaseService.getExecutionDiffs(sessionId);
-      const sessionOutputs = await sessionManager.getSessionOutputs(sessionId);
+      // MIGRATION FIX: Use panel-based data retrieval if session has Claude panels
+      const compactPanels = panelManager.getPanelsForSession(sessionId);
+      const compactClaudePanels = compactPanels.filter(p => p.type === 'claude');
+      
+      let conversationMessages, promptMarkers, executionDiffs, sessionOutputs;
+      
+      if (compactClaudePanels.length > 0) {
+        // Use panel-based methods for migrated sessions
+        const claudePanel = compactClaudePanels[0];
+        console.log(`[IPC] Using panel-based data retrieval for context compaction, session ${sessionId} with Claude panel ${claudePanel.id}`);
+        
+        conversationMessages = sessionManager.getPanelConversationMessages ? 
+          await sessionManager.getPanelConversationMessages(claudePanel.id) :
+          await sessionManager.getConversationMessages(sessionId);
+          
+        promptMarkers = databaseService.getPanelPromptMarkers ? 
+          databaseService.getPanelPromptMarkers(claudePanel.id) :
+          databaseService.getPromptMarkers(sessionId);
+          
+        executionDiffs = databaseService.getPanelExecutionDiffs ? 
+          databaseService.getPanelExecutionDiffs(claudePanel.id) :
+          databaseService.getExecutionDiffs(sessionId);
+          
+        sessionOutputs = sessionManager.getPanelOutputs ? 
+          await sessionManager.getPanelOutputs(claudePanel.id) :
+          await sessionManager.getSessionOutputs(sessionId);
+      } else {
+        // Use session-based methods for non-migrated sessions
+        conversationMessages = await sessionManager.getConversationMessages(sessionId);
+        promptMarkers = databaseService.getPromptMarkers(sessionId);
+        executionDiffs = databaseService.getExecutionDiffs(sessionId);
+        sessionOutputs = await sessionManager.getSessionOutputs(sessionId);
+      }
       
       // Import the compactor utility
       const { ProgrammaticCompactor } = await import('../utils/contextCompactor');
@@ -973,7 +1051,20 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('sessions:get-json-messages', async (_event, sessionId: string) => {
     try {
       console.log(`[IPC] sessions:get-json-messages called for session: ${sessionId}`);
-      const outputs = await sessionManager.getSessionOutputs(sessionId);
+      
+      // MIGRATION FIX: Check if session has Claude panels and use panel-based data retrieval
+      const jsonPanels = panelManager.getPanelsForSession(sessionId);
+      const jsonClaudePanels = jsonPanels.filter(p => p.type === 'claude');
+      
+      let outputs;
+      if (jsonClaudePanels.length > 0 && sessionManager.getPanelOutputs) {
+        // Use panel-based method for migrated sessions
+        console.log(`[IPC] Using panel-based output retrieval for JSON messages, session ${sessionId} with Claude panel ${jsonClaudePanels[0].id}`);
+        outputs = await sessionManager.getPanelOutputs(jsonClaudePanels[0].id);
+      } else {
+        // Use session-based method for non-migrated sessions
+        outputs = await sessionManager.getSessionOutputs(sessionId);
+      }
       console.log(`[IPC] Retrieved ${outputs.length} total outputs for session ${sessionId}`);
       
       // Helper function to check if stdout/stderr contains git operation output
@@ -1332,9 +1423,28 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         }
       });
 
-      // Get prompt count and messages
-      const promptMarkers = databaseService.getPromptMarkers(sessionId);
-      const messageCount = databaseService.getConversationMessageCount(sessionId);
+      // MIGRATION FIX: Get prompt count and messages using appropriate method
+      const statsPanels = panelManager.getPanelsForSession(sessionId);
+      const statsClaudePanels = statsPanels.filter(p => p.type === 'claude');
+      
+      let promptMarkers, messageCount;
+      if (statsClaudePanels.length > 0) {
+        // Use panel-based methods for migrated sessions
+        const claudePanel = statsClaudePanels[0];
+        console.log(`[IPC] Using panel-based prompt/message counts for session ${sessionId} with Claude panel ${claudePanel.id}`);
+        
+        promptMarkers = databaseService.getPanelPromptMarkers ? 
+          databaseService.getPanelPromptMarkers(claudePanel.id) :
+          databaseService.getPromptMarkers(sessionId);
+          
+        messageCount = databaseService.getPanelConversationMessageCount ? 
+          databaseService.getPanelConversationMessageCount(claudePanel.id) :
+          databaseService.getConversationMessageCount(sessionId);
+      } else {
+        // Use session-based methods for non-migrated sessions
+        promptMarkers = databaseService.getPromptMarkers(sessionId);
+        messageCount = databaseService.getConversationMessageCount(sessionId);
+      }
       
       // Get session outputs count by type
       const outputCounts = databaseService.getSessionOutputCounts(sessionId);
