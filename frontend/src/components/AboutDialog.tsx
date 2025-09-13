@@ -10,6 +10,7 @@ interface VersionInfo {
   releaseNotes?: string;
   publishedAt?: string;
   workingDirectory?: string;
+  crystalDirectory?: string;
   buildDate?: string;
   gitCommit?: string;
   buildTimestamp?: number;
@@ -43,6 +44,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           latest: result.data.current,
           hasUpdate: false,
           workingDirectory: result.data.workingDirectory,
+          crystalDirectory: result.data.crystalDirectory,
           buildDate: result.data.buildDate,
           gitCommit: result.data.gitCommit,
           buildTimestamp: result.data.buildTimestamp,
@@ -167,6 +169,17 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 {versionInfo?.current || 'Loading...'}
               </span>
             </div>
+
+            {versionInfo?.crystalDirectory && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-text-secondary">
+                  Crystal Directory
+                </span>
+                <span className="text-sm text-text-primary font-mono truncate max-w-[200px]" title={versionInfo.crystalDirectory}>
+                  {versionInfo.crystalDirectory.replace(/^\/Users\/[^/]+/, '~')}
+                </span>
+              </div>
+            )}
 
             {versionInfo?.workingDirectory && (
               <div className="flex items-center justify-between">

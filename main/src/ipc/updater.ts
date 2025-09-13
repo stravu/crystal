@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { commandExecutor } from '../utils/commandExecutor';
 import { getCurrentWorktreeName } from '../utils/worktreeUtils';
+import { getCrystalDirectory } from '../utils/crystalDirectory';
 
 export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker }: AppServices): void {
   // Version checking handlers
@@ -79,6 +80,7 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
         current: app.getVersion(),
         name: app.getName(),
         workingDirectory: process.cwd(),
+        crystalDirectory: getCrystalDirectory(),
         buildDate,
         gitCommit,
         buildTimestamp
