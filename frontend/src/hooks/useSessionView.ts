@@ -1364,12 +1364,15 @@ export const useSessionView = (
         if ((response as any).gitError) {
           const gitError = (response as any).gitError;
           setGitErrorDetails({
-            title: 'Rebase Failed',
+            title: gitError.hasConflicts ? 'Rebase Conflicts Detected' : 'Rebase Failed',
             message: response.error || 'Failed to rebase main into worktree',
             command: gitError.command,
             output: gitError.output || 'No output available',
             workingDirectory: gitError.workingDirectory,
-            isRebaseConflict: gitError.output?.toLowerCase().includes('conflict') || false,
+            isRebaseConflict: gitError.output?.toLowerCase().includes('conflict') || gitError.hasConflicts || false,
+            hasConflicts: gitError.hasConflicts,
+            conflictingFiles: gitError.conflictingFiles,
+            conflictingCommits: gitError.conflictingCommits,
           });
           setShowGitErrorDialog(true);
         } else {
@@ -1568,7 +1571,18 @@ export const useSessionView = (
     const output = details.output?.toLowerCase() || '';
     const message = details.message?.toLowerCase() || '';
     
-    if (output.includes('conflict') || message.includes('conflict')) {
+    // Check if conflicts were detected before rebase (new pre-check)
+    if (details.hasConflicts) {
+      tips.push('• Conflicts were detected before starting the rebase');
+      tips.push('• Click "Use Claude Code to Resolve" to let Claude handle the conflicts');
+      tips.push('• Alternatively, you can manually resolve conflicts by:');
+      tips.push('  1. Running the rebase manually: git rebase <branch>');
+      tips.push('  2. Fixing conflicts in the listed files');
+      tips.push('  3. Running: git add <fixed-files> && git rebase --continue');
+      if (details.conflictingFiles && details.conflictingFiles.length > 0) {
+        tips.push(`• ${details.conflictingFiles.length} file(s) have conflicts that need resolution`);
+      }
+    } else if (output.includes('conflict') || message.includes('conflict')) {
       tips.push('• You have merge conflicts that need to be resolved manually');
       tips.push('• Use "git status" to see conflicted files');
       tips.push('• Edit the conflicted files to resolve conflicts, then stage and commit');

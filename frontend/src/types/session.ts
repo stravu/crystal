@@ -92,4 +92,10 @@ export interface GitErrorDetails {
   workingDirectory?: string;
   projectPath?: string;
   isRebaseConflict?: boolean;
+  hasConflicts?: boolean;
+  conflictingFiles?: string[];
+  conflictingCommits?: {
+    ours: string[];
+    theirs: string[];
+  };
 }

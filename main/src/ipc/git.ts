@@ -2,6 +2,7 @@ import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
+import { panelManager } from '../services/panelManager';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService } = services;
@@ -471,6 +472,43 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
   });
 
   // Git rebase operations
+  ipcMain.handle('sessions:check-rebase-conflicts', async (_event, sessionId: string) => {
+    try {
+      console.log(`[IPC:git] Checking for rebase conflicts for session ${sessionId}`);
+      const session = await sessionManager.getSession(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found' };
+      }
+
+      if (!session.worktreePath) {
+        return { success: false, error: 'Session has no worktree path' };
+      }
+
+      // Get the project to find the main branch
+      const project = sessionManager.getProjectForSession(sessionId);
+      if (!project) {
+        return { success: false, error: 'Project not found for session' };
+      }
+
+      // Always get the current branch from the project directory
+      const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
+      
+      // Check for conflicts
+      const conflictInfo = await worktreeManager.checkForRebaseConflicts(session.worktreePath, mainBranch);
+      
+      return { 
+        success: true, 
+        data: conflictInfo 
+      };
+    } catch (error: any) {
+      console.error(`[IPC:git] Failed to check for rebase conflicts:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to check for rebase conflicts'
+      };
+    }
+  });
+
   ipcMain.handle('sessions:rebase-main-into-worktree', async (_event, sessionId: string) => {
     console.log(`[IPC:git] Starting rebase-main-into-worktree for session ${sessionId}`);
     try {
@@ -499,6 +537,69 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         new Promise((_, reject) => setTimeout(() => reject(new Error('getProjectMainBranch timeout')), 30000))
       ]) as string;
       console.log(`[IPC:git] Main branch: ${mainBranch}`);
+
+      // Check for conflicts before attempting rebase
+      console.log(`[IPC:git] Checking for potential conflicts before rebase`);
+      const conflictCheck = await worktreeManager.checkForRebaseConflicts(session.worktreePath, mainBranch);
+      
+      if (conflictCheck.hasConflicts) {
+        console.log(`[IPC:git] Conflicts detected, aborting rebase`);
+        
+        // Build detailed error message
+        let errorMessage = `Rebase would result in conflicts. Cannot proceed automatically.\n\n`;
+        
+        if (conflictCheck.conflictingFiles && conflictCheck.conflictingFiles.length > 0) {
+          errorMessage += `Conflicting files:\n`;
+          conflictCheck.conflictingFiles.forEach(file => {
+            errorMessage += `  • ${file}\n`;
+          });
+          errorMessage += '\n';
+        }
+        
+        if (conflictCheck.conflictingCommits) {
+          if (conflictCheck.conflictingCommits.ours.length > 0) {
+            errorMessage += `Your commits:\n`;
+            conflictCheck.conflictingCommits.ours.slice(0, 5).forEach(commit => {
+              errorMessage += `  ${commit}\n`;
+            });
+            if (conflictCheck.conflictingCommits.ours.length > 5) {
+              errorMessage += `  ... and ${conflictCheck.conflictingCommits.ours.length - 5} more\n`;
+            }
+            errorMessage += '\n';
+          }
+          
+          if (conflictCheck.conflictingCommits.theirs.length > 0) {
+            errorMessage += `Incoming commits from ${mainBranch}:\n`;
+            conflictCheck.conflictingCommits.theirs.slice(0, 5).forEach(commit => {
+              errorMessage += `  ${commit}\n`;
+            });
+            if (conflictCheck.conflictingCommits.theirs.length > 5) {
+              errorMessage += `  ... and ${conflictCheck.conflictingCommits.theirs.length - 5} more\n`;
+            }
+          }
+        }
+        
+        // Add error message to session output
+        sessionManager.addSessionOutput(sessionId, {
+          type: 'stderr',
+          data: `✗ Rebase aborted: Conflicts detected\n\n${errorMessage}`,
+          timestamp: new Date()
+        });
+        
+        // Return detailed conflict information
+        return {
+          success: false,
+          error: 'Rebase would result in conflicts',
+          gitError: {
+            command: `git rebase ${mainBranch}`,
+            output: errorMessage,
+            workingDirectory: session.worktreePath,
+            hasConflicts: true,
+            conflictingFiles: conflictCheck.conflictingFiles,
+            conflictingCommits: conflictCheck.conflictingCommits
+          }
+        };
+      }
 
       // Add message to session output about starting the rebase
       const startMessage = `🔄 GIT OPERATION\nRebasing from ${mainBranch}...`;
@@ -566,6 +667,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
   ipcMain.handle('sessions:abort-rebase-and-use-claude', async (_event, sessionId: string) => {
     try {
+      console.log(`[IPC:git] Starting abort-rebase-and-use-claude for session ${sessionId}`);
+      
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
         return { success: false, error: 'Session not found' };
@@ -584,70 +687,100 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       // Get the main branch from the project directory's current branch
       const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
 
-      // First, abort the rebase
+      // Check if we're actually in a rebase state (could have been pre-detected conflicts)
+      // Try to abort any existing rebase, but don't fail if there isn't one
       try {
-        await worktreeManager.abortRebase(session.worktreePath);
+        const statusOutput = execSync('git status --porcelain=v1', { cwd: session.worktreePath }).toString();
+        if (statusOutput.includes('rebase')) {
+          console.log(`[IPC:git] Aborting existing rebase in ${session.worktreePath}`);
+          await worktreeManager.abortRebase(session.worktreePath);
+          
+          // Add message to session output about aborting the rebase
+          const abortMessage = `🔄 GIT OPERATION\nAborted rebase successfully`;
+          sessionManager.addSessionOutput(sessionId, {
+            type: 'stdout',
+            data: abortMessage,
+            timestamp: new Date()
+          });
+        } else {
+          console.log(`[IPC:git] No rebase in progress, proceeding to create Claude panel`);
+        }
+      } catch (abortError: any) {
+        // Not in a rebase state or already clean - that's fine
+        console.log('[IPC:git] No rebase to abort or already clean:', abortError.message);
+      }
 
-        // Add message to session output about aborting the rebase
-        const abortMessage = `🔄 GIT OPERATION\nAborted rebase successfully`;
+      // Create a new Claude panel to handle the rebase and conflicts
+      const prompt = `Please rebase the local ${mainBranch} branch (not origin/${mainBranch}) into this branch and resolve all conflicts`;
+      
+      try {
+        console.log(`[IPC:git] Creating new Claude panel for session ${sessionId} to handle rebase`);
+        
+        // Create a new Claude panel
+        const panel = await panelManager.createPanel({
+          sessionId: sessionId,
+          type: 'claude',
+          title: 'Claude - Resolve Conflicts'
+        });
+        
+        console.log(`[IPC:git] Created Claude panel ${panel.id} for session ${sessionId}`);
+        
+        // Get the claudePanelManager from the claudePanel module
+        const { claudePanelManager } = require('./claudePanel');
+        
+        // Register the panel with the Claude panel manager
+        console.log(`[IPC:git] Registering panel ${panel.id} with claudePanelManager`);
+        claudePanelManager.registerPanel(panel.id, sessionId, panel.state.customState);
+        
+        // Start Claude in the new panel with the rebase prompt
+        console.log(`[IPC:git] Starting Claude in panel ${panel.id} with rebase prompt`);
+        await claudePanelManager.startPanel(
+          panel.id,
+          session.worktreePath,
+          prompt,
+          session.permissionMode,
+          session.model
+        );
+        
+        // Add message to session output
+        const message = `🤖 CLAUDE CODE\nCreated new Claude panel to handle rebase and resolve conflicts\nPrompt: ${prompt}`;
         sessionManager.addSessionOutput(sessionId, {
           type: 'stdout',
-          data: abortMessage,
+          data: message,
           timestamp: new Date()
         });
-      } catch (abortError: any) {
-        console.error('Failed to abort rebase:', abortError);
-        // Continue anyway - the user might have already resolved it
-      }
-
-      // Send the prompt to Claude Code to handle the rebase
-      const prompt = `Please rebase the local ${mainBranch} branch (not origin/${mainBranch}) into this branch and resolve all conflicts`;
-
-      // Check if session is waiting for input or stopped
-      const currentSession = await sessionManager.getSession(sessionId);
-      if (!currentSession) {
-        return { success: false, error: 'Session not found' };
-      }
-
-      if (currentSession.status === 'waiting' || currentSession.status === 'running') {
-        // Session is already running, just send the input
-        const userInputDisplay = `> ${prompt.trim()}\n`;
-        await sessionManager.addSessionOutput(sessionId, {
-          type: 'stdout',
-          data: userInputDisplay,
-          timestamp: new Date()
+        
+        console.log(`[IPC:git] Successfully created Claude panel to handle rebase`);
+        return { 
+          success: true, 
+          data: { 
+            message: 'Claude Code panel created to handle rebase and resolve conflicts',
+            panelId: panel.id
+          } 
+        };
+      } catch (error: any) {
+        console.error('[IPC:git] Failed to create Claude panel:', error);
+        console.error('[IPC:git] Error details:', {
+          sessionId,
+          worktreePath: session.worktreePath,
+          errorMessage: error.message,
+          errorStack: error.stack
         });
-
-        claudeCodeManager.sendInput(sessionId, prompt + '\n');
-        return { success: true, data: { message: 'Sent rebase prompt to Claude Code' } };
-      } else {
-        // Session is stopped, need to continue the conversation
-        try {
-          // Get conversation history
-          const conversationHistory = sessionManager.getConversationMessages(sessionId);
-
-          // Update session status to initializing
-          sessionManager.updateSession(sessionId, {
-            status: 'initializing',
-            run_started_at: null
-          });
-
-          // Add the prompt to conversation
-          if (prompt) {
-            sessionManager.continueConversation(sessionId, prompt);
-          }
-
-          // Continue the session with proper worktree path
-          await claudeCodeManager.continueSession(sessionId, session.worktreePath, prompt, conversationHistory);
-
-          return { success: true, data: { message: 'Rebase aborted and Claude Code prompted to handle conflicts' } };
-        } catch (error: any) {
-          console.error('Failed to continue session:', error);
-          return { success: false, error: 'Failed to continue Claude Code session' };
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to create Claude panel';
+        if (error.message?.includes('API key')) {
+          errorMessage = 'Failed to create Claude panel: API key not configured';
+        } else if (error.message?.includes('not found')) {
+          errorMessage = 'Failed to create Claude panel: Session or worktree not found';
+        } else if (error.message) {
+          errorMessage = `Failed to create Claude panel: ${error.message}`;
         }
+        
+        return { success: false, error: errorMessage };
       }
     } catch (error: any) {
-      console.error('Failed to abort rebase and use Claude:', error);
+      console.error('[IPC:git] Failed to abort rebase and use Claude:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to abort rebase and use Claude'

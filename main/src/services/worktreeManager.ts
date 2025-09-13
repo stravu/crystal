@@ -317,6 +317,141 @@ export class WorktreeManager {
     }
   }
 
+  async checkForRebaseConflicts(worktreePath: string, mainBranch: string): Promise<{
+    hasConflicts: boolean;
+    conflictingFiles?: string[];
+    conflictingCommits?: { ours: string[]; theirs: string[] };
+    canAutoMerge?: boolean;
+  }> {
+    try {
+      console.log(`[WorktreeManager] Checking for potential rebase conflicts with ${mainBranch} in ${worktreePath}`);
+      
+      // First check if there are any changes to rebase
+      const hasChanges = await this.hasChangesToRebase(worktreePath, mainBranch);
+      if (!hasChanges) {
+        console.log(`[WorktreeManager] No changes to rebase, no conflicts possible`);
+        return { hasConflicts: false, canAutoMerge: true };
+      }
+
+      // Get the merge base
+      const { stdout: mergeBase } = await execWithShellPath(
+        `git merge-base HEAD ${mainBranch}`,
+        { cwd: worktreePath }
+      );
+      const base = mergeBase.trim();
+      console.log(`[WorktreeManager] Merge base: ${base}`);
+
+      // Try a dry-run merge to detect conflicts
+      // We use merge-tree to check for conflicts without modifying the working tree
+      try {
+        const { stdout: mergeTreeOutput } = await execWithShellPath(
+          `git merge-tree ${base} HEAD ${mainBranch}`,
+          { cwd: worktreePath }
+        );
+        
+        // Parse merge-tree output for conflicts
+        const conflictMarkers = mergeTreeOutput.match(/<<<<<<< /g);
+        const hasConflicts = conflictMarkers && conflictMarkers.length > 0;
+        
+        if (hasConflicts) {
+          // Get list of files that would conflict
+          const { stdout: diffOutput } = await execWithShellPath(
+            `git diff --name-only ${base}...HEAD`,
+            { cwd: worktreePath }
+          );
+          const ourFiles = diffOutput.trim().split('\n').filter(f => f);
+          
+          const { stdout: theirDiffOutput } = await execWithShellPath(
+            `git diff --name-only ${base}...${mainBranch}`,
+            { cwd: worktreePath }
+          );
+          const theirFiles = theirDiffOutput.trim().split('\n').filter(f => f);
+          
+          // Find files modified in both branches
+          const conflictingFiles = ourFiles.filter(f => theirFiles.includes(f));
+          
+          // Get commit info for better error reporting
+          const { stdout: ourCommits } = await execWithShellPath(
+            `git log --oneline ${base}..HEAD`,
+            { cwd: worktreePath }
+          );
+          const { stdout: theirCommits } = await execWithShellPath(
+            `git log --oneline ${base}..${mainBranch}`,
+            { cwd: worktreePath }
+          );
+          
+          console.log(`[WorktreeManager] Found conflicts in files: ${conflictingFiles.join(', ')}`);
+          
+          return {
+            hasConflicts: true,
+            conflictingFiles,
+            conflictingCommits: {
+              ours: ourCommits.trim().split('\n').filter(c => c),
+              theirs: theirCommits.trim().split('\n').filter(c => c)
+            },
+            canAutoMerge: false
+          };
+        }
+        
+        console.log(`[WorktreeManager] No conflicts detected, rebase should succeed`);
+        return { hasConflicts: false, canAutoMerge: true };
+        
+      } catch (error: any) {
+        // If merge-tree is not available (older git), fall back to checking modified files
+        console.log(`[WorktreeManager] merge-tree not available, using fallback conflict detection`);
+        
+        // Get files changed in both branches
+        const { stdout: diffOutput } = await execWithShellPath(
+          `git diff --name-only ${base}...HEAD`,
+          { cwd: worktreePath }
+        );
+        const ourFiles = diffOutput.trim().split('\n').filter(f => f);
+        
+        const { stdout: theirDiffOutput } = await execWithShellPath(
+          `git diff --name-only ${base}...${mainBranch}`,
+          { cwd: worktreePath }
+        );
+        const theirFiles = theirDiffOutput.trim().split('\n').filter(f => f);
+        
+        // Find files modified in both branches (potential conflicts)
+        const conflictingFiles = ourFiles.filter(f => theirFiles.includes(f));
+        
+        if (conflictingFiles.length > 0) {
+          // Get commit info
+          const { stdout: ourCommits } = await execWithShellPath(
+            `git log --oneline ${base}..HEAD`,
+            { cwd: worktreePath }
+          );
+          const { stdout: theirCommits } = await execWithShellPath(
+            `git log --oneline ${base}..${mainBranch}`,
+            { cwd: worktreePath }
+          );
+          
+          console.log(`[WorktreeManager] Potential conflicts in files: ${conflictingFiles.join(', ')}`);
+          
+          return {
+            hasConflicts: true,
+            conflictingFiles,
+            conflictingCommits: {
+              ours: ourCommits.trim().split('\n').filter(c => c),
+              theirs: theirCommits.trim().split('\n').filter(c => c)
+            },
+            canAutoMerge: false
+          };
+        }
+        
+        return { hasConflicts: false, canAutoMerge: true };
+      }
+    } catch (error: any) {
+      console.error(`[WorktreeManager] Error checking for rebase conflicts:`, error);
+      // On error, return unknown status
+      return { 
+        hasConflicts: false, 
+        canAutoMerge: false 
+      };
+    }
+  }
+
   async rebaseMainIntoWorktree(worktreePath: string, mainBranch: string): Promise<void> {
     const executedCommands: string[] = [];
     let lastOutput = '';

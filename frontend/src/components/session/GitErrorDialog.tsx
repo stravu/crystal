@@ -41,6 +41,47 @@ export const GitErrorDialog: React.FC<GitErrorDialogProps> = ({
               </Card>
             </div>
 
+            {errorDetails.conflictingFiles && errorDetails.conflictingFiles.length > 0 && (
+              <Card variant="bordered" className="border-2 border-status-warning/30 bg-status-warning/10">
+                <h3 className="text-base font-semibold text-status-warning mb-3 flex items-center">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  Conflicting Files
+                </h3>
+                <Card variant="bordered" padding="md" className="bg-surface-tertiary">
+                  <ul className="text-sm font-mono space-y-1">
+                    {errorDetails.conflictingFiles.map((file, idx) => (
+                      <li key={idx} className="text-text-primary">• {file}</li>
+                    ))}
+                  </ul>
+                </Card>
+              </Card>
+            )}
+
+            {errorDetails.conflictingCommits && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {errorDetails.conflictingCommits.ours.length > 0 && (
+                  <Card variant="bordered" className="border-interactive/30 bg-interactive/10">
+                    <h4 className="text-sm font-semibold text-interactive-on-dark mb-2">Your Commits</h4>
+                    <div className="text-xs font-mono space-y-1 max-h-32 overflow-y-auto">
+                      {errorDetails.conflictingCommits.ours.map((commit, idx) => (
+                        <div key={idx} className="text-interactive-on-dark/80">{commit}</div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+                {errorDetails.conflictingCommits.theirs.length > 0 && (
+                  <Card variant="bordered" className="border-status-success/30 bg-status-success/10">
+                    <h4 className="text-sm font-semibold text-status-success-hover mb-2">Incoming Commits</h4>
+                    <div className="text-xs font-mono space-y-1 max-h-32 overflow-y-auto">
+                      {errorDetails.conflictingCommits.theirs.map((commit, idx) => (
+                        <div key={idx} className="text-status-success-hover/80">{commit}</div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </div>
+            )}
+
             <Card variant="bordered" className="border-2 border-status-error/30 bg-status-error/10">
               <h3 className="text-base font-semibold text-status-error mb-3 flex items-center">
                 <FileText className="w-5 h-5 mr-2" />
@@ -105,7 +146,7 @@ export const GitErrorDialog: React.FC<GitErrorDialogProps> = ({
 
       <ModalFooter className="flex justify-between items-center">
         <div className="flex items-center space-x-3">
-          {errorDetails.isRebaseConflict && (
+          {(errorDetails.isRebaseConflict || errorDetails.hasConflicts) && (
             <Button onClick={onAbortAndUseClaude} className="bg-status-success hover:bg-status-success-hover">
               <CheckCircle className="w-4 h-4 mr-2" />
               Use Claude Code to Resolve
