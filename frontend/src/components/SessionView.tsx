@@ -2,22 +2,22 @@ import { useRef, useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { EmptyState } from './EmptyState';
-import CombinedDiffView from './panels/diff/CombinedDiffView';
+// import CombinedDiffView from './panels/diff/CombinedDiffView'; // Removed - now in panels
 import { StravuFileSearch } from './StravuFileSearch';
 import { Inbox } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSessionView } from '../hooks/useSessionView';
 import { SessionHeader } from './session/SessionHeader';
-import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages';
+// import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages'; // Removed - now in panels
 import { GitErrorDialog } from './session/GitErrorDialog';
 import { CommitMessageDialog } from './session/CommitMessageDialog';
-import { FileEditor } from './panels/editor/FileEditor';
+// import { FileEditor } from './panels/editor/FileEditor'; // Removed - now in panels
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
-import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar';
-import { RichOutputSettings } from './panels/claude/RichOutputView';
-import { LogsView } from './panels/logPanel/LogsView';
-import { MessagesView } from './panels/claude/MessagesView';
+// import { RichOutputWithSidebar } from './panels/claude/RichOutputWithSidebar'; // Removed - now in panels
+// import { RichOutputSettings } from './panels/claude/RichOutputView'; // Removed - not needed
+// import { LogsView } from './panels/logPanel/LogsView'; // Removed - now in panels
+// import { MessagesView } from './panels/claude/MessagesView'; // Removed - now in panels
 import { usePanelStore } from '../stores/panelStore';
 import { panelApi } from '../services/panelApi';
 import { PanelTabBar } from './panels/PanelTabBar';
@@ -277,9 +277,9 @@ export const SessionView = memo(() => {
   };
 
   const terminalRef = useRef<HTMLDivElement>(null);
-  const scriptTerminalRef = useRef<HTMLDivElement>(null);
+  // scriptTerminalRef removed - terminals now handled by panels
 
-  const hook = useSessionView(activeSession, terminalRef, scriptTerminalRef);
+  const hook = useSessionView(activeSession, terminalRef);
   
   // Create branch actions for the panel bar
   const branchActions = useMemo(() => {
@@ -335,27 +335,7 @@ export const SessionView = memo(() => {
     ];
   }, [activeSession, hook.isMerging, hook.gitCommands, hook.hasChangesToRebase, hook.handleGitPull, hook.handleGitPush, hook.handleRebaseMainIntoWorktree, hook.handleSquashAndRebaseToMain, hook.handleOpenIDE, hook.isOpeningIDE, sessionProject?.open_ide_command]);
   
-  // Settings state for Rich Output view
-  const [richOutputSettings, setRichOutputSettings] = useState<RichOutputSettings>(() => {
-    const saved = localStorage.getItem('richOutputSettings');
-    return saved ? JSON.parse(saved) : {
-      showToolCalls: true,
-      compactMode: false,
-      collapseTools: false,
-      showThinking: true,
-      showSessionInit: false,
-    };
-  });
-  
-  const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
-    setRichOutputSettings(newSettings);
-    localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
-  };
-
-  
-  // Memoize props to prevent unnecessary re-renders
-  const emptySelectedExecutions = useMemo(() => [], []);
-  const isMainRepo = useMemo(() => activeSession?.isMainRepo || false, [activeSession?.isMainRepo]);
+  // Removed unused variables - now handled by panels
 
   // Show project view if navigation is set to project
   if (activeView === 'project' && activeProjectId) {
@@ -407,10 +387,6 @@ export const SessionView = memo(() => {
         handleSaveEditName={hook.handleSaveEditName}
         handleStartEditName={hook.handleStartEditName}
         mergeError={hook.mergeError}
-        viewMode={hook.viewMode}
-        setViewMode={hook.setViewMode}
-        unreadActivity={hook.unreadActivity}
-        setUnreadActivity={hook.setUnreadActivity}
       />
       
       {/* Tool Panel Bar - ALWAYS VISIBLE */}
@@ -444,124 +420,13 @@ export const SessionView = memo(() => {
             </SessionProvider>
           ) : (
             <>
-              {hook.isLoadingOutput && hook.viewMode !== 'richOutput' && (
-                <div className="absolute top-4 left-4 text-text-secondary z-10">Loading output...</div>
-              )}
-              {hook.viewMode === 'richOutput' && !hasClaudePanels && (
-            <div className="h-full block">
-              <RichOutputWithSidebar 
-                sessionId={activeSession.id}
-                settings={richOutputSettings}
-                onSettingsChange={handleRichOutputSettingsChange}
-              />
-            </div>
-          )}
-          {hook.viewMode === 'changes' && (
-            <div className="h-full block overflow-hidden">
-              <CombinedDiffView 
-                sessionId={activeSession.id} 
-                selectedExecutions={emptySelectedExecutions} 
-                isGitOperationRunning={hook.isMerging}
-                isMainRepo={isMainRepo}
-                isVisible={true}
-              />
-            </div>
-          )}
-          <div className={`h-full ${hook.viewMode === 'terminal' ? 'flex flex-col' : 'hidden'} bg-bg-primary`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-primary">
-              <div className="text-sm text-text-secondary">
-                Terminal
-              </div>
-              {!activeSession.archived && (
-                <button
-                  onClick={hook.handleClearTerminal}
-                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors"
-                  title="Clear terminal"
-                >
-                  <svg 
-                    className="w-4 h-4" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
-            {activeSession.archived ? (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="text-center max-w-md">
-                  <div className="mb-4">
-                    <svg className="w-16 h-16 mx-auto text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-text-primary mb-2">
-                    No Terminal History Available
-                  </h3>
-                  <p className="text-sm text-text-secondary">
-                    This session has been archived. Terminal history is not preserved for archived sessions to save resources.
-                  </p>
-                  <p className="text-sm text-text-secondary mt-2">
-                    The session outputs and conversation history are still available in the Output and Messages views.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div ref={scriptTerminalRef} className="flex-1" />
-                <div className="h-2" />
-              </>
-            )}
-          </div>
-          {hook.viewMode === 'logs' && (
-            <div className="h-full block">
-              <LogsView sessionId={activeSession.id} isVisible={true} />
-            </div>
-          )}
-          {hook.viewMode === 'editor' && (
-            <div className="h-full block">
-              <FileEditor sessionId={activeSession.id} />
-            </div>
-          )}
-          {hook.viewMode === 'messages' && !hasClaudePanels && (
-            <div className="h-full flex flex-col overflow-hidden">
-              <MessagesView sessionId={activeSession.id} />
-            </div>
-          )}
+              {/* Legacy view content removed - all functionality now in panels */}
             </>
           )}
         </div>
       </div>
       
-      {/* Session-level prompt bar - Comment out when Claude panels exist */}
-      {hook.viewMode !== 'terminal' && !currentActivePanel && !hasClaudePanels && (
-        <SessionInputWithImages
-          activeSession={activeSession}
-          viewMode={hook.viewMode}
-          input={hook.input}
-          setInput={hook.setInput}
-          textareaRef={hook.textareaRef}
-          handleTerminalCommand={hook.handleTerminalCommand}
-          handleSendInput={hook.handleSendInput}
-          handleContinueConversation={hook.handleContinueConversation}
-          isStravuConnected={hook.isStravuConnected}
-          setShowStravuSearch={hook.setShowStravuSearch}
-          ultrathink={hook.ultrathink}
-          setUltrathink={hook.setUltrathink}
-          gitCommands={hook.gitCommands}
-          handleCompactContext={hook.handleCompactContext}
-          hasConversationHistory={hook.hasConversationHistory}
-          contextCompacted={hook.contextCompacted}
-          handleCancelRequest={hook.handleStopSession}
-        />
-      )}
+      {/* Legacy session-level prompt bar removed - now handled by panels */}
       
       {/* Legacy session-level prompt bar - COMMENTED OUT for Claude panel integration
       {hook.viewMode !== 'terminal' && !currentActivePanel && (

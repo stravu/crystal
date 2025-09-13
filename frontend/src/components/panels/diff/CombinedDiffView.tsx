@@ -63,7 +63,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   useEffect(() => {
     if (isVisible && !lastVisibleState) {
       // Tab just became visible - force refresh to get latest git state
-      console.log('View Diff tab became visible, forcing refresh of git data...');
+      console.log('Diff panel became visible, forcing refresh of git data...');
       setForceRefresh(prev => prev + 1); // Increment to trigger reload
       setCombinedDiff(null); // Clear diff data
       setSelectedExecutions([]); // Clear selection to force re-selection

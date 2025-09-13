@@ -46,7 +46,7 @@ export default function Help({ isOpen, onClose }: HelpProps) {
                     </li>
                     <li><strong>Work with results:</strong>
                       <ul className="list-disc list-inside ml-4 mt-1 text-sm">
-                        <li>View changes in the View Diff tab</li>
+                        <li>View changes in the Diff panel</li>
                         <li>Continue conversations to refine the solution</li>
                         <li>Rebase back to your main branch when done</li>
                       </ul>

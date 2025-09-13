@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../../types/session';
-import { ViewMode } from '../../../hooks/useSessionView';
+// ViewMode removed - no longer needed
 import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square } from 'lucide-react';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { API } from '../../../utils/api';
@@ -19,7 +19,7 @@ interface AttachedImage {
 
 interface SessionInputWithImagesProps {
   activeSession: Session;
-  viewMode: ViewMode;
+  viewMode?: any; // ViewMode removed - kept for compatibility
   input: string;
   setInput: (input: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;

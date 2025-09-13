@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '../../types/session';
-import { ViewMode } from '../../hooks/useSessionView';
+// ViewMode removed - no longer needed
 import { Cpu } from 'lucide-react';
 import { API } from '../../utils/api';
 
 interface SessionInputProps {
   activeSession: Session;
-  viewMode: ViewMode;
   input: string;
   setInput: (input: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  handleTerminalCommand: () => void;
   handleSendInput: () => void;
   handleContinueConversation: (model?: string) => void;
   isStravuConnected: boolean;
@@ -22,11 +20,9 @@ interface SessionInputProps {
 
 export const SessionInput: React.FC<SessionInputProps> = ({
   activeSession,
-  viewMode,
   input,
   setInput,
   textareaRef,
-  handleTerminalCommand,
   handleSendInput,
   handleContinueConversation,
   isStravuConnected,
@@ -62,9 +58,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
       setIsSubmitting(true);
       
       try {
-        if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
-          await handleTerminalCommand();
-        } else if (activeSession.status === 'waiting') {
+        if (activeSession.status === 'waiting') {
           await handleSendInput();
         } else {
           await handleContinueConversation(selectedModel);
@@ -86,9 +80,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
     setIsSubmitting(true);
     
     try {
-      if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
-        await handleTerminalCommand();
-      } else if (activeSession.status === 'waiting') {
+      if (activeSession.status === 'waiting') {
         await handleSendInput();
       } else {
         await handleContinueConversation(selectedModel);
@@ -99,18 +91,10 @@ export const SessionInput: React.FC<SessionInputProps> = ({
     }
   };
 
-  const placeholder = viewMode === 'terminal'
-    ? (activeSession.isRunning ? "Script is running..." : (activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Enter terminal command... (⌘↵ to send)"))
-    : (activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Continue conversation... (⌘↵ to send)");
+  const placeholder = activeSession.status === 'waiting' ? "Enter your response... (⌘↵ to send)" : "Continue conversation... (⌘↵ to send)";
 
   return (
     <div className="border-t border-border-primary p-4 bg-surface-primary flex-shrink-0">
-      {viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting' && (
-        <div className="mb-2 flex items-center text-sm text-text-tertiary">
-          <svg className="w-4 h-4 mr-1 text-status-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          Terminal mode: Commands will execute in the worktree directory
-        </div>
-      )}
       <div className="flex items-start gap-2">
         <div className="flex-1 relative">
           <textarea
@@ -138,7 +122,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
           }`}
           style={{ height: '67px' }}
         >
-          {isSubmitting ? 'Processing...' : (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting' ? 'Run' : (activeSession.status === 'waiting' ? 'Send' : 'Continue'))}
+          {isSubmitting ? 'Processing...' : (activeSession.status === 'waiting' ? 'Send' : 'Continue')}
         </button>
       </div>
       <div className="mt-2 flex items-center gap-4">
@@ -151,7 +135,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
           <span className="text-sm text-text-secondary">auto-commit</span>
         </label>
         {/* Model selector for continue conversation */}
-        {activeSession.status !== 'waiting' && !(viewMode === 'terminal' && !activeSession.isRunning) && (
+        {activeSession.status !== 'waiting' && (
           <div className="flex items-center gap-2">
             <Cpu className="w-4 h-4 text-text-tertiary" />
             <select
@@ -181,7 +165,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
           </div>
         )}
       </div>
-      {activeSession.status !== 'waiting' && !(viewMode === 'terminal' && !activeSession.isRunning) && (
+      {activeSession.status !== 'waiting' && (
         <p className="text-sm text-text-tertiary mt-2">
           This will interrupt the current session if running and restart with conversation history.
         </p>

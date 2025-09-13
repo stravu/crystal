@@ -9,12 +9,10 @@ import { Session, GitCommands, GitErrorDetails } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
-export type ViewMode = 'richOutput' | 'changes' | 'terminal' | 'logs' | 'editor' | 'messages';
 
 export const useSessionView = (
   activeSession: Session | undefined,
-  terminalRef: React.RefObject<HTMLDivElement | null> | undefined,
-  scriptTerminalRef: React.RefObject<HTMLDivElement | null>
+  terminalRef: React.RefObject<HTMLDivElement | null> | undefined
 ) => {
   const { theme } = useTheme();
   const activeSessionId = activeSession?.id;
@@ -26,15 +24,6 @@ export const useSessionView = (
   const scriptFitAddon = useRef<FitAddon | null>(null);
 
   // States
-  const [viewMode, setViewMode] = useState<ViewMode>('richOutput');
-  const [unreadActivity, setUnreadActivity] = useState({
-    changes: false,
-    terminal: false,
-    logs: false,
-    editor: false,
-    richOutput: false,
-    messages: false,
-  });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const [scriptOutput, setScriptOutput] = useState<string[]>([]);
@@ -92,11 +81,10 @@ export const useSessionView = (
       formattedOutputLength: formattedOutput.length,
       lastProcessedOutputLength: lastProcessedOutputLength.current,
       terminalExists: !!terminalInstance.current,
-      viewMode,
       abortController: !!abortControllerRef.current,
       pendingTimeout: !!outputLoadTimeoutRef.current
     });
-  }, [outputLoadState, activeSessionId, currentSessionIdForOutput, formattedOutput.length, viewMode]);
+  }, [outputLoadState, activeSessionId, currentSessionIdForOutput, formattedOutput.length]);
   
   // Force reset stuck state
   const forceResetLoadingState = useCallback(() => {
@@ -323,7 +311,7 @@ export const useSessionView = (
     });
     setScriptOutput(useSessionStore.getState().terminalOutput[activeSession.id] || []);
     return unsubscribe;
-  }, [activeSession?.id, viewMode]);
+  }, [activeSession?.id]);
 
   useEffect(() => {
     const currentSessionId = activeSession?.id || null;
@@ -335,18 +323,7 @@ export const useSessionView = (
     // Force reset any stuck loading state when switching sessions
     forceResetLoadingState();
     
-    // Reset view mode to output when switching sessions
-    setViewMode('richOutput');
-    
-    // Reset unread activity indicators
-    setUnreadActivity({
-      changes: false,
-      terminal: false,
-      logs: false,
-      editor: false,
-      richOutput: false,
-      messages: false,
-    });
+    // View mode and activity tracking removed - handled by panels
     
     // Reset context compaction state when switching sessions
     setContextCompacted(false);
@@ -590,7 +567,8 @@ export const useSessionView = (
     };
   }, [activeSession?.id, outputLoadState]);
 
-  const initTerminal = useCallback((termRef: React.RefObject<HTMLDivElement | null> | undefined, instanceRef: React.MutableRefObject<Terminal | null>, fitAddonRef: React.MutableRefObject<FitAddon | null>, isScript: boolean) => {
+  // Terminal initialization removed - now handled by panels
+  /* const initTerminal = useCallback((termRef: React.RefObject<HTMLDivElement | null> | undefined, instanceRef: React.MutableRefObject<Terminal | null>, fitAddonRef: React.MutableRefObject<FitAddon | null>, isScript: boolean) => {
     console.log(`[initTerminal] Called - termRef.current: ${!!termRef?.current}, instanceRef.current: ${!!instanceRef.current}, isScript: ${isScript}`);
     
     if (!termRef?.current) {
@@ -653,51 +631,12 @@ export const useSessionView = (
           }, 100);
         }
     }
-  }, [theme, activeSession]);
+  }, [theme, activeSession]); */
 
   // Terminal output view has been removed - no terminal initialization needed  
   // Terminal is now created on-demand when user clicks the terminal tab
   // No pre-initialization to avoid unnecessary terminal output and activity indicators
 
-  useEffect(() => {
-    if (viewMode === 'terminal') {
-      // Check if terminal is already initialized
-      const wasAlreadyInitialized = scriptTerminalInstance.current !== null;
-      
-      initTerminal(scriptTerminalRef, scriptTerminalInstance, scriptFitAddon, true);
-      
-      // After initializing the terminal, immediately write any existing output
-      if (activeSession) {
-        // Use setTimeout to ensure terminal is fully initialized
-        setTimeout(() => {
-          const currentTerminalOutput = useSessionStore.getState().terminalOutput[activeSession.id] || [];
-          if (scriptTerminalInstance.current && currentTerminalOutput.length > 0 && lastProcessedScriptOutputLength.current === 0) {
-            const existingOutput = currentTerminalOutput.join('');
-            console.log('[Terminal] Writing existing output to newly initialized terminal', existingOutput.length, 'chars');
-            scriptTerminalInstance.current.write(existingOutput);
-            lastProcessedScriptOutputLength.current = existingOutput.length;
-          }
-          
-          // Only send empty input if this is a fresh terminal initialization
-          // Don't send it when just switching back to terminal view
-          if (!wasAlreadyInitialized && !activeSession.archived) {
-            console.log('[Terminal] Sending empty input to trigger PTY prompt (fresh initialization)');
-            API.sessions.sendTerminalInput(activeSession.id, '').catch(error => {
-              console.error('Failed to send terminal trigger input:', error);
-            });
-          } else {
-            console.log('[Terminal] Terminal already initialized, skipping prompt trigger');
-          }
-          
-          // Focus the terminal after everything is set up
-          if (scriptTerminalInstance.current) {
-            console.log('[Terminal] Focusing terminal');
-            scriptTerminalInstance.current.focus();
-          }
-        }, 100);
-      }
-    }
-  }, [viewMode, scriptTerminalRef, initTerminal, activeSession]);
   
 
 
@@ -762,20 +701,20 @@ export const useSessionView = (
   }, [activeSessionId, fullScriptOutputMemo, activeSession]);
   
   useEffect(() => {
-    if (!scriptTerminalInstance.current || viewMode !== 'terminal' || !activeSession) return;
+    if (!scriptTerminalInstance.current || !activeSession) return;
     const currentTerminalOutput = useSessionStore.getState().terminalOutput[activeSession.id] || [];
     if (lastProcessedScriptOutputLength.current === 0 && currentTerminalOutput.length > 0) {
       const existingOutput = currentTerminalOutput.join('');
       scriptTerminalInstance.current.write(existingOutput);
       lastProcessedScriptOutputLength.current = existingOutput.length;
     }
-  }, [viewMode, activeSessionId]);
+  }, [activeSessionId]);
 
   // Terminal writing useEffect - disabled since output view was removed
   /* useEffect(() => {
     // Output view removed - skip terminal writing entirely
     if (!activeSession || !terminalInstance.current) return;
-    console.log(`[Terminal Write Effect] Called, formatted output length: ${formattedOutput.length}, session: ${currentSessionIdForOutput}, lastProcessed: ${lastProcessedOutputLength.current}, viewMode: ${viewMode}`);
+    console.log(`[Terminal Write Effect] Called, formatted output length: ${formattedOutput.length}, session: ${currentSessionIdForOutput}, lastProcessed: ${lastProcessedOutputLength.current}`);
     
     // Skip if not in output view mode
     // Output view removed - skip terminal writing
@@ -844,7 +783,7 @@ export const useSessionView = (
         terminalInstance.current.scrollToBottom();
       }
     }
-  }, [formattedOutput, currentSessionIdForOutput, initTerminal, terminalRef, viewMode]); */
+  }, [formattedOutput, currentSessionIdForOutput, initTerminal, terminalRef]); */
 
   useEffect(() => {
     if (!scriptTerminalInstance.current || !activeSession) return;
@@ -922,8 +861,8 @@ export const useSessionView = (
     const handleSwitchToViewDiff = (event: CustomEvent) => {
       const { sessionId } = event.detail;
       if (sessionId && activeSession?.id === sessionId) {
-        console.log('[useSessionView] Switching to View Diff tab for session:', sessionId);
-        setViewMode('changes');
+        console.log('[useSessionView] View Diff switch event - now handled by panels');
+        // Panels handle their own switching now
       }
     };
 
@@ -944,10 +883,10 @@ export const useSessionView = (
         await useSessionStore.getState().setActiveSession(sessionId);
       }
       
-      // Then switch to View Diff tab after a short delay to ensure session is loaded
-      setTimeout(() => {
-        setViewMode('changes');
-      }, 100);
+      // Panels handle their own switching now
+      // setTimeout(() => {
+      //   setViewMode('changes');
+      // }, 100);
     };
 
     const wrappedHandler = (event: Event) => handleSelectAndViewDiff(event as CustomEvent);
@@ -957,13 +896,7 @@ export const useSessionView = (
     };
   }, [activeSession?.id]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Output view removed, only handle terminal
-      if (viewMode === 'terminal') scriptFitAddon.current?.fit();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [viewMode]);
+  // Terminal fitAddon effect removed - terminals are now handled in panels
 
   useEffect(() => {
     if (!terminalRef?.current) return;
@@ -972,7 +905,7 @@ export const useSessionView = (
     });
     observer.observe(terminalRef.current);
     return () => observer.disconnect();
-  }, [terminalRef, viewMode]);
+  }, [terminalRef]);
 
   // Terminal output view has been removed - no resize needed
 
@@ -1001,33 +934,16 @@ export const useSessionView = (
     return () => clearTimeout(timer);
   }, [theme]);
 
-  useEffect(() => {
-    if (!scriptTerminalRef.current) return;
-    let resizeTimer: NodeJS.Timeout;
-    const observer = new ResizeObserver(() => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(async () => {
-        if (viewMode === 'terminal' && scriptFitAddon.current && scriptTerminalInstance.current) {
-          scriptFitAddon.current.fit();
-          const { cols, rows } = scriptTerminalInstance.current;
-          if (activeSession) await API.sessions.resizeTerminal(activeSession.id, cols, rows);
-        }
-      }, 100);
-    });
-    observer.observe(scriptTerminalRef.current);
-    return () => observer.disconnect();
-  }, [scriptTerminalRef, viewMode, activeSession]);
+  // Script terminal resize observer removed - terminals are now handled in panels
 
   useEffect(() => {
     if (!activeSession) return;
     const currentMessageCount = activeSession.jsonMessages?.length || 0;
     if (currentMessageCount > previousMessageCountRef.current) {
-      if (viewMode !== 'richOutput') {
-        setUnreadActivity(prev => ({ ...prev, richOutput: true }));
-      }
+      // Activity tracking removed - now handled by panels
     }
     previousMessageCountRef.current = currentMessageCount;
-  }, [activeSession?.jsonMessages?.length, viewMode]);
+  }, [activeSession?.jsonMessages?.length]);
 
   useEffect(() => {
     if (!activeSession) return;
@@ -1050,7 +966,7 @@ export const useSessionView = (
   }, [activeSession?.status, activeSession?.runStartedAt, activeSessionId]);
 
   useEffect(() => {
-    setUnreadActivity({ changes: false, terminal: false, logs: false, editor: false, richOutput: false, messages: false });
+    // Activity tracking removed - handled by panels
   }, [activeSessionId]);
 
 
@@ -1114,7 +1030,7 @@ export const useSessionView = (
     if (!terminalInstance.current) return;
     // Output view removed - always navigate directly
     navigateToPromptInTerminal(marker);
-  }, [viewMode]);
+  }, []);
 
   const navigateToPromptInTerminal = (marker: any) => {
     if (!terminalInstance.current || !activeSession) return;
@@ -1314,8 +1230,7 @@ export const useSessionView = (
         } else {
           setMergeError(response.error || 'Failed to pull from remote');
         }
-      } else if (viewMode === 'changes') {
-        window.location.reload();
+      // Removed viewMode check - panels handle their own refresh
       }
     } catch (error) {
       setMergeError(error instanceof Error ? error.message : 'Failed to pull from remote');
@@ -1665,10 +1580,6 @@ export const useSessionView = (
   
   return {
     theme,
-    viewMode,
-    setViewMode,
-    unreadActivity,
-    setUnreadActivity,
     isEditingName,
     editName,
     setEditName,

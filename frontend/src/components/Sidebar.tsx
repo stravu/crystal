@@ -238,7 +238,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
               {/* Git Status Indicators */}
               <div>
                 <h4 className="text-sm font-medium text-text-primary mb-2">Git Status Indicators</h4>
-                <p className="text-text-tertiary text-sm mb-3">Click any indicator to view detailed changes in the View Diff tab</p>
+                <p className="text-text-tertiary text-sm mb-3">Click any indicator to view detailed changes in the Diff panel</p>
                 
                 {/* HIGH PRIORITY */}
                 <div className="mb-3">

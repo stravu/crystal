@@ -1,8 +1,6 @@
 import React from 'react';
 import { Session } from '../../types/session';
 import { StatusIndicator } from '../StatusIndicator';
-import { ViewTabs } from './ViewTabs';
-import { ViewMode } from '../../hooks/useSessionView';
 import { CommitModeIndicator } from '../CommitModeIndicator';
 
 interface SessionHeaderProps {
@@ -14,16 +12,6 @@ interface SessionHeaderProps {
   handleSaveEditName: () => void;
   handleStartEditName: () => void;
   mergeError: string | null;
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  unreadActivity: {
-    changes: boolean;
-    terminal: boolean;
-    logs: boolean;
-    editor: boolean;
-    richOutput: boolean;
-  };
-  setUnreadActivity: (activity: any) => void;
 }
 
 export const SessionHeader: React.FC<SessionHeaderProps> = ({
@@ -35,10 +23,6 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   handleSaveEditName,
   handleStartEditName,
   mergeError,
-  viewMode,
-  setViewMode,
-  unreadActivity,
-  setUnreadActivity,
 }) => {
 
   return (
@@ -94,16 +78,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
         )}
       </div>
 
-      {/* Cluster 2: Workspace Views (below, full width) */}
-      <div className="border-t border-border-primary">
-        <ViewTabs
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          unreadActivity={unreadActivity}
-          setUnreadActivity={setUnreadActivity}
-          isTerminalRunning={activeSession.isRunning || false}
-        />
-      </div>
+      {/* Old tab bar removed - now using panel system */}
     </div>
   );
 };
