@@ -1,41 +1,38 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { useRequiredSession } from '../../contexts/SessionContext';
+import { useSession } from '../../contexts/SessionContext';
 import { TerminalPanelProps } from '../../types/panelComponents';
 import '@xterm/xterm/css/xterm.css';
 
 export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive }) => {
   console.log('[TerminalPanel] Component rendering, panel:', panel.id, 'isActive:', isActive);
   
-  // FIX: Get session data only from context, not props
-  let sessionContext;
-  try {
-    sessionContext = useRequiredSession();
-    console.log('[TerminalPanel] Session context:', sessionContext);
-  } catch (error) {
-    console.error('[TerminalPanel] Failed to get session context:', error);
-    return (
-      <div className="flex items-center justify-center h-full text-red-500">
-        Session context error: {error instanceof Error ? error.message : 'Unknown error'}
-      </div>
-    );
-  }
-  
-  const { sessionId, workingDirectory } = sessionContext;
+  // All hooks must be called at the top level, before any conditional returns
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  
+  // Get session data from context using the safe hook
+  const sessionContext = useSession();
+  const sessionId = sessionContext?.sessionId;
+  const workingDirectory = sessionContext?.workingDirectory;
+  
+  if (sessionContext) {
+    console.log('[TerminalPanel] Session context:', sessionContext);
+  } else {
+    console.error('[TerminalPanel] No session context available');
+  }
 
   // Initialize terminal only once when component first mounts
   // Keep it alive even when switching tabs
   useEffect(() => {
     console.log('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
     
-    if (!terminalRef.current) {
-      console.log('[TerminalPanel] No terminal ref, skipping initialization');
+    if (!terminalRef.current || !sessionId || !workingDirectory) {
+      console.log('[TerminalPanel] Missing dependencies, skipping initialization');
       return;
     }
 
@@ -174,7 +171,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
       
       setIsInitialized(false);
     };
-  }, [panel.id]); // Only depend on panel.id, not isActive
+  }, [panel.id, sessionId, workingDirectory]); // Depend on panel.id and session info
 
   // Handle visibility changes (resize when becoming visible)
   useEffect(() => {
@@ -192,6 +189,15 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
       }, 50);
     }
   }, [isActive, panel.id]);
+
+  // Handle missing session context (show after all hooks have been called)
+  if (!sessionContext) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500">
+        Session context not available
+      </div>
+    );
+  }
 
   if (initError) {
     return (
