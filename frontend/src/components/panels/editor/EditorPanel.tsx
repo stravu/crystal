@@ -15,7 +15,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   
-  const editorState = panel.state?.customState as EditorPanelState;
+  // Extract editor state each render to ensure we get updates
+  const editorState = React.useMemo(() => 
+    panel.state?.customState as EditorPanelState,
+    [panel.state?.customState]
+  );
+  
+  console.log('[EditorPanel] Rendering with state:', {
+    panelId: panel.id,
+    isActive,
+    editorState,
+    panelState: panel.state
+  });
   
   // Mark panel as viewed when it becomes active
   useEffect(() => {
@@ -43,17 +54,28 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   // Initialize debounced function only once
   useEffect(() => {
     debouncedUpdateRef.current = debounce((panelId: string, newState: Partial<EditorPanelState>) => {
+      console.log('[EditorPanel] Saving state to database:', {
+        panelId,
+        newState
+      });
+      
       // Get the latest panel state from the store when actually saving
       const currentPanel = panel; // This might be stale, but we use panelId
+      const stateToSave = {
+        isActive: currentPanel.state?.isActive || false,
+        isPinned: currentPanel.state?.isPinned,
+        hasBeenViewed: currentPanel.state?.hasBeenViewed,
+        customState: newState // Just save the new state directly
+      };
+      
+      console.log('[EditorPanel] Full state being saved:', stateToSave);
+      
       panelApi.updatePanel(panelId, {
-        state: {
-          isActive: currentPanel.state?.isActive || false,
-          isPinned: currentPanel.state?.isPinned,
-          hasBeenViewed: currentPanel.state?.hasBeenViewed,
-          customState: newState // Just save the new state directly
-        }
+        state: stateToSave
+      }).then(() => {
+        console.log('[EditorPanel] State saved successfully');
       }).catch(err => {
-        console.error('Failed to update editor panel state:', err);
+        console.error('[EditorPanel] Failed to update editor panel state:', err);
       });
     }, 500);
     
@@ -67,17 +89,27 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   
   // Save state changes to the panel
   const handleStateChange = useCallback((newState: Partial<EditorPanelState>) => {
+    console.log('[EditorPanel] handleStateChange called with:', newState);
+    
+    // Get the current state directly from panel prop to avoid stale closure
+    const currentState = panel.state?.customState as EditorPanelState;
+    
     // Merge with existing state
     const mergedState = {
-      ...editorState,
+      ...currentState,
       ...newState
     };
     
+    console.log('[EditorPanel] Merged state:', mergedState);
+    
     // Call debounced update
     if (debouncedUpdateRef.current) {
+      console.log('[EditorPanel] Calling debounced update');
       debouncedUpdateRef.current(panel.id, mergedState);
+    } else {
+      console.error('[EditorPanel] No debounced update function!');
     }
-  }, [panel.id, editorState]);
+  }, [panel.id, panel.state?.customState]);
   
   // Update panel title when file changes
   const handleFileChange = useCallback((filePath: string | undefined, isDirty: boolean) => {

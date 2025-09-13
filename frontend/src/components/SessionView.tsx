@@ -52,6 +52,7 @@ export const SessionView = memo(() => {
     setActivePanel: setActivePanelInStore,
     addPanel,
     removePanel,
+    updatePanelState,
   } = usePanelStore();
 
   // Load panels when session changes
@@ -71,6 +72,31 @@ export const SessionView = memo(() => {
       });
     }
   }, [activeSession?.id, setPanels, setActivePanelInStore]);
+  
+  // Listen for panel updates from the backend
+  useEffect(() => {
+    if (!activeSession?.id) return;
+    
+    const handlePanelUpdated = (updatedPanel: ToolPanel) => {
+      console.log('[SessionView] Received panel:updated event:', updatedPanel);
+      
+      // Only update if it's for the current session
+      if (updatedPanel.sessionId === activeSession.id) {
+        console.log('[SessionView] Updating panel in store:', updatedPanel);
+        updatePanelState(updatedPanel);
+      }
+    };
+    
+    // Listen for panel update events
+    const removeListener = window.electronAPI.events.onPanelUpdated(handlePanelUpdated);
+    
+    // Cleanup
+    return () => {
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, [activeSession?.id, updatePanelState]);
 
   // Get panels for current session with memoization
   const sessionPanels = useMemo(

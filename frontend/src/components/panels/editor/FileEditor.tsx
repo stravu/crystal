@@ -391,15 +391,25 @@ function FileTree({
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      console.log('[FileTree] Skipping initial mount state update');
       return; // Skip the first render
     }
     
+    console.log('[FileTree] State changed:', {
+      expandedDirs: Array.from(expandedDirs),
+      searchQuery,
+      showSearch
+    });
+    
     if (onTreeStateChange) {
+      console.log('[FileTree] Calling onTreeStateChange');
       onTreeStateChange({
         expandedDirs: Array.from(expandedDirs),
         searchQuery,
         showSearch
       });
+    } else {
+      console.log('[FileTree] No onTreeStateChange callback');
     }
   }, [expandedDirs, searchQuery, showSearch]); // Remove onTreeStateChange from deps to avoid loops
   
@@ -561,6 +571,13 @@ export function FileEditor({
   onFileChange,
   onStateChange 
 }: FileEditorProps) {
+  console.log('[FileEditor] Mounting with:', {
+    sessionId,
+    initialFilePath,
+    initialState,
+    hasOnStateChange: !!onStateChange
+  });
+  
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [originalContent, setOriginalContent] = useState<string>('');
@@ -575,6 +592,7 @@ export function FileEditor({
   
   // Wrap onResize callback to avoid recreating
   const handleTreeResize = useCallback((width: number) => {
+    console.log('[FileEditor] Tree resized to:', width);
     if (onStateChange) {
       onStateChange({ fileTreeWidth: width });
     }
@@ -700,12 +718,16 @@ export function FileEditor({
 
   // Memoize the tree state change handler to prevent infinite loops
   const handleTreeStateChange = useCallback((treeState: { expandedDirs: string[]; searchQuery: string; showSearch: boolean }) => {
+    console.log('[FileEditor] handleTreeStateChange called with:', treeState);
     if (onStateChange) {
+      console.log('[FileEditor] Calling onStateChange');
       onStateChange({
         expandedDirs: treeState.expandedDirs,
         searchQuery: treeState.searchQuery,
         showSearch: treeState.showSearch
       });
+    } else {
+      console.log('[FileEditor] No onStateChange callback');
     }
   }, [onStateChange]);
 

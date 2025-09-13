@@ -56,13 +56,25 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   ipcMain.handle('panels:update', async (_, panelId: string, updates: any) => {
-    console.log('[IPC] Updating panel:', panelId, updates);
-    return panelManager.updatePanel(panelId, updates);
+    console.log('[IPC] Updating panel:', panelId);
+    console.log('[IPC] Updates:', JSON.stringify(updates, null, 2));
+    
+    const result = await panelManager.updatePanel(panelId, updates);
+    console.log('[IPC] Update result:', result);
+    
+    return result;
   });
   
   ipcMain.handle('panels:list', async (_, sessionId: string) => {
     console.log('[IPC] Listing panels for session:', sessionId);
-    return panelManager.getPanelsForSession(sessionId);
+    const panels = panelManager.getPanelsForSession(sessionId);
+    console.log('[IPC] Found panels:', panels.map(p => ({
+      id: p.id,
+      type: p.type,
+      title: p.title,
+      state: p.state
+    })));
+    return panels;
   });
   
   ipcMain.handle('panels:setActive', async (_, sessionId: string, panelId: string) => {
