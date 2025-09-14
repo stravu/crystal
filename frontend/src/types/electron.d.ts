@@ -61,7 +61,7 @@ interface ElectronAPI {
     hasRunScript: (sessionId: string) => Promise<IPCResponse>;
     getRunningSession: () => Promise<IPCResponse>;
     runScript: (sessionId: string) => Promise<IPCResponse>;
-    stopScript: () => Promise<IPCResponse>;
+    stopScript: (sessionId?: string) => Promise<IPCResponse>;
     runTerminalCommand: (sessionId: string, command: string) => Promise<IPCResponse>;
     sendTerminalInput: (sessionId: string, data: string) => Promise<IPCResponse>;
     preCreateTerminal: (sessionId: string) => Promise<IPCResponse>;
@@ -260,6 +260,13 @@ interface ElectronAPI {
     stop: (panelId: string) => Promise<IPCResponse>;
     resizeTerminal: (panelId: string, cols: number, rows: number) => Promise<IPCResponse>;
     sendTerminalInput: (panelId: string, data: string) => Promise<IPCResponse>;
+  };
+
+  // Logs panel operations
+  logs: {
+    runScript: (sessionId: string, command: string, cwd: string) => Promise<IPCResponse>;
+    stopScript: (panelId: string) => Promise<IPCResponse>;
+    isRunning: (sessionId: string) => Promise<IPCResponse>;
   };
 
   // Debug utilities

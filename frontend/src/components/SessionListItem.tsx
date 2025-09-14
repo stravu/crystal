@@ -200,7 +200,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     try {
       // Set closing state for this session
       setIsClosing(true);
-      const response = await API.sessions.stopScript();
+      const response = await API.sessions.stopScript(session.id);
 
       if (!response.success) {
         throw new Error(response.error || 'Failed to stop script');

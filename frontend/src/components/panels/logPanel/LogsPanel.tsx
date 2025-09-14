@@ -54,9 +54,7 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ panel, isActive }) => {
   
   const handleStop = async () => {
     try {
-      // TODO: Implement stop functionality
-      // await window.electronAPI.logs.stopScript(panel.id);
-      console.log('Stop script not yet implemented');
+      await window.electronAPI.logs.stopScript(panel.id);
     } catch (error) {
       console.error('Failed to stop script:', error);
     }
