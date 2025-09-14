@@ -1,5 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
+import { app } from 'electron';
 
 let customCrystalDir: string | undefined;
 
@@ -9,6 +10,31 @@ let customCrystalDir: string | undefined;
  */
 export function setCrystalDirectory(dir: string): void {
   customCrystalDir = dir;
+}
+
+/**
+ * Determines if Crystal is running from an installed application (DMG/Applications folder)
+ * rather than a development build
+ */
+function isInstalledApp(): boolean {
+  // Check if app is packaged (built for distribution)
+  if (!app.isPackaged) {
+    return false;
+  }
+  
+  // On macOS, check if running from /Applications or a mounted DMG volume
+  if (process.platform === 'darwin') {
+    const appPath = app.getPath('exe');
+    // Apps installed from DMG or in /Applications will have these paths
+    const isInApplications = appPath.startsWith('/Applications/');
+    const isInVolumes = appPath.startsWith('/Volumes/');
+    const isInPrivateTmp = appPath.includes('/private/var/folders/'); // Temp mount for DMG
+    
+    return isInApplications || isInVolumes || isInPrivateTmp;
+  }
+  
+  // For other platforms, being packaged is sufficient
+  return true;
 }
 
 /**
@@ -28,13 +54,20 @@ export function getCrystalDirectory(): string {
     return envDir;
   }
 
-  // 3. If running inside Crystal (detected by bundle identifier), use development directory
-  if (process.env.__CFBundleIdentifier === 'com.stravu.crystal') {
-    console.log('[Crystal] Detected running inside Crystal, using ~/.crystal_dev for isolation');
+  // 3. If running as an installed app (from DMG, /Applications, etc), always use ~/.crystal
+  if (isInstalledApp()) {
+    console.log('[Crystal] Running as installed app, using ~/.crystal');
+    return join(homedir(), '.crystal');
+  }
+
+  // 4. If running inside Crystal (detected by bundle identifier) in development, use development directory
+  // This prevents development Crystal from interfering with production Crystal
+  if (process.env.__CFBundleIdentifier === 'com.stravu.crystal' && !app.isPackaged) {
+    console.log('[Crystal] Detected running inside Crystal development, using ~/.crystal_dev for isolation');
     return join(homedir(), '.crystal_dev');
   }
 
-  // 4. Default to ~/.crystal
+  // 5. Default to ~/.crystal
   return join(homedir(), '.crystal');
 }
 

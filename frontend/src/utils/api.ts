@@ -67,6 +67,11 @@ export class API {
       return window.electronAPI.sessions.getJsonMessages(sessionId);
     },
 
+    async getStatistics(sessionId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.sessions.getStatistics(sessionId);
+    },
+
     async getConversation(sessionId: string) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.getConversation(sessionId);
