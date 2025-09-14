@@ -9,7 +9,7 @@ jobs:
   release:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
             release_cmd: release:mac
@@ -25,12 +25,6 @@ jobs:
               dist-electron/*.deb
               dist-electron/*.AppImage
               dist-electron/latest-linux.yml
-          - os: windows-latest
-            release_cmd: release:win
-            artifact_name: crystal-windows
-            artifact_path: |
-              dist-electron/*.exe
-              dist-electron/latest.yml
     
     runs-on: ${{ matrix.os }}
     
@@ -80,7 +74,6 @@ jobs:
         CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'true' || 'false' }}
 
     - name: List release artifacts
-      shell: bash
       run: ls -la dist-electron/
 
     # - name: Build Flatpak

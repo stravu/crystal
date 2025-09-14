@@ -11,8 +11,8 @@ jobs:
   build:
     strategy:
       matrix:
-        # Build all three platforms for validation
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        # Build both platforms for validation, but use different commands for speed
+        os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
             build_cmd: canary:mac
@@ -28,12 +28,6 @@ jobs:
               dist-electron/*.deb
               dist-electron/*.AppImage
               dist-electron/latest-linux.yml
-          - os: windows-latest
-            build_cmd: canary:win
-            artifact_name: crystal-windows-canary
-            artifact_path: |
-              dist-electron/*.exe
-              dist-electron/latest.yml
     
     runs-on: ${{ matrix.os }}
     
@@ -99,7 +93,6 @@ jobs:
 
     # Build frontend and main process in parallel for faster builds (skip if cached)
     - name: Build frontend and main process
-      shell: bash
       run: |
         # Check if builds exist from cache
         if [ ! -d "frontend/dist" ] || [ ! -d "main/dist" ]; then
@@ -113,7 +106,6 @@ jobs:
         fi
 
     - name: Rebuild native modules (if needed)
-      shell: bash
       run: |
         # Only rebuild if native modules cache missed or build files changed
         if [ ! -f "main/node_modules/.bin/electron-rebuild" ] || [ ! -f "main/build/Release/better_sqlite3.node" ]; then
@@ -146,7 +138,6 @@ jobs:
         CSC_DISABLE: ${{ (matrix.os == 'macos-latest' && !secrets.APPLE_CERTIFICATE) && 'true' || 'false' }}
 
     - name: List build artifacts
-      shell: bash
       run: ls -la dist-electron/
 
     # Skip Flatpak build for CI speed - saves 4+ minutes
@@ -162,4 +153,3 @@ jobs:
         path: ${{ matrix.artifact_path }}
         if-no-files-found: error
         retention-days: 30
-
