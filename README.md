@@ -81,6 +81,8 @@ When everything looks good:
   - Open the DMG file and drag Crystal to your Applications folder
   - On first launch, you may need to right-click and select "Open" due to macOS security settings
 
+- **Windows**: Windows installer coming soon! For now, see [Building from Source](#building-from-source) below to build locally.
+
 ### Homebrew 
 ```bash
 brew install --cask stravu-crystal
@@ -102,10 +104,28 @@ pnpm run electron-dev
 
 ## Building for Production
 
+### macOS
 ```bash
-# Build for macOS
 pnpm build:mac
 ```
+
+### Windows
+```bash
+# Prerequisites:
+# - Node.js and pnpm installed
+# - Git installed and configured
+# - Claude Code installed (`npm install -g @anthropic-ai/claude-code`)
+
+# Clone and setup
+git clone https://github.com/stravu/crystal.git
+cd crystal
+pnpm run setup
+
+# Build for Windows
+pnpm build:win
+```
+
+The Windows build will create an executable in the `dist-electron` directory. A Windows installer (.exe) will be available in future releases.
 
 
 
