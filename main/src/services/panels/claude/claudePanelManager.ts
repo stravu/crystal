@@ -1,7 +1,8 @@
 import { ClaudeCodeManager } from './claudeCodeManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
-import { ClaudePanelState } from '../../../../../shared/types/panels';
+import { ClaudePanelState, PanelEvent } from '../../../../../shared/types/panels';
+import { panelEventBus } from '../../panelEventBus';
 
 interface PanelMapping {
   panelId: string;
@@ -110,7 +111,55 @@ export class ClaudePanelManager {
       this.resumeIdToPanel.set(mapping.claudeResumeId, panelId);
     }
 
+    // Subscribe this panel to git operation events
+    this.subscribeToGitEvents(panelId, sessionId);
+
     this.logger?.info(`[ClaudePanelManager] Registered panel ${panelId} for session ${sessionId} with resumeId ${mapping.claudeResumeId}`);
+  }
+  
+  private subscribeToGitEvents(panelId: string, sessionId: string): void {
+    // Subscribe to git operation events for this panel
+    const gitEventCallback = (event: PanelEvent) => {
+      // Only process git events for the same project
+      if (event.source.panelId !== panelId && event.type.startsWith('git:')) {
+        // Check if this event is for the same project
+        const dbSession = this.sessionManager.getDbSession(sessionId);
+        
+        if (dbSession?.project_id && event.data.projectId === dbSession.project_id) {
+          // Format the git operation message for Claude
+          const gitMessage = {
+            type: 'system',
+            subtype: 'git_operation',
+            timestamp: event.timestamp,
+            message: event.data.message,
+            details: {
+              operation: event.data.operation,
+              triggeringSession: event.data.triggeringSessionName || event.data.triggeringSessionId,
+              ...event.data
+            }
+          };
+          
+          // Send the git operation message to this Claude panel
+          // This will automatically be saved to session output by the output handler
+          this.claudeCodeManager.emit('output', {
+            panelId,
+            sessionId,
+            type: 'json',
+            data: gitMessage,
+            timestamp: new Date()
+          });
+        }
+      }
+    };
+    
+    // Subscribe to git events
+    panelEventBus.subscribe({
+      panelId,
+      eventTypes: ['git:operation_started', 'git:operation_completed', 'git:operation_failed'],
+      callback: gitEventCallback
+    });
+    
+    this.logger?.verbose(`Panel ${panelId} subscribed to git operation events`);
   }
 
   unregisterPanel(panelId: string): void {
@@ -120,6 +169,10 @@ export class ClaudePanelManager {
         this.resumeIdToPanel.delete(mapping.claudeResumeId);
       }
       this.panelMappings.delete(panelId);
+      
+      // Unsubscribe from panel events
+      panelEventBus.unsubscribePanel(panelId);
+      
       this.logger?.info(`[ClaudePanelManager] Unregistered panel ${panelId}`);
     }
   }
