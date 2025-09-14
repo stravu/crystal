@@ -24,6 +24,7 @@ export const Modal: React.FC<ModalProps> = ({
   className,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const mouseDownTargetRef = useRef<EventTarget | null>(null);
   
   // Handle escape key
   useEffect(() => {
@@ -74,19 +75,38 @@ export const Modal: React.FC<ModalProps> = ({
     full: 'max-w-full mx-4',
   };
   
+  const handleOverlayMouseDown = (e: React.MouseEvent) => {
+    // Store where the mouse down occurred
+    mouseDownTargetRef.current = e.target;
+  };
+  
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (closeOnOverlayClick && e.target === e.currentTarget) {
-      onClose();
+    // Check if the click target is the modal content or its children
+    const modalContent = modalRef.current;
+    const isClickInsideModal = modalContent && modalContent.contains(e.target as Node);
+    
+    // Only close if:
+    // 1. closeOnOverlayClick is enabled
+    // 2. The click is not inside the modal content
+    // 3. The mousedown also started outside the modal content
+    if (closeOnOverlayClick && !isClickInsideModal) {
+      const wasMouseDownInsideModal = modalContent && modalContent.contains(mouseDownTargetRef.current as Node);
+      if (!wasMouseDownInsideModal) {
+        onClose();
+      }
     }
+    // Reset the ref after handling
+    mouseDownTargetRef.current = null;
   };
   
   return (
     <div
       className="fixed inset-0 z-modal-backdrop flex items-center justify-center p-4 overflow-y-auto"
+      onMouseDown={handleOverlayMouseDown}
       onClick={handleOverlayClick}
     >
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-modal-overlay" aria-hidden="true" />
+      <div className="fixed inset-0 bg-modal-overlay pointer-events-none" aria-hidden="true" />
       
       {/* Modal */}
       <div
