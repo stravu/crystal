@@ -1,7 +1,7 @@
 import React from 'react';
 import { Wrench, Brain, Terminal, Maximize2, Package } from 'lucide-react';
 import { SwitchSimple } from '../ui/SwitchSimple';
-import { RichOutputSettings } from '../panels/claude/RichOutputView';
+import { RichOutputSettings } from '../panels/ai/RichOutputView';
 
 interface RichOutputSettingsPanelProps {
   settings: RichOutputSettings;

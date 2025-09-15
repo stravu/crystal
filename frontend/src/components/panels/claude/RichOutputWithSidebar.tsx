@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, History } from 'lucide-react';
-import { RichOutputView } from './RichOutputView';
+import { RichOutputView } from '../ai/RichOutputView';
 import { PromptNavigation } from './PromptNavigation';
 import { cn } from '../../../utils/cn';
-import { RichOutputSettings } from './RichOutputView';
+import { RichOutputSettings } from '../ai/RichOutputView';
+import { MessageTransformer } from '../ai/transformers/MessageTransformer';
+import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
 
 interface RichOutputWithSidebarProps {
   panelId?: string;
@@ -14,6 +16,7 @@ interface RichOutputWithSidebarProps {
   onSettingsChange?: (settings: RichOutputSettings) => void;
   showSettings?: boolean;
   onSettingsClick?: () => void;
+  transformer?: MessageTransformer;
 }
 
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
@@ -21,6 +24,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionId,
   sessionStatus,
   settings,
+  transformer,
 }) => {
   // Use panelId if available, otherwise fall back to sessionId for backward compatibility
   const id = panelId || sessionId;
@@ -62,6 +66,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           panelId={id}
           sessionStatus={sessionStatus}
           settings={settings}
+          transformer={transformer || new ClaudeMessageTransformer()}
         />
       </div>
 
