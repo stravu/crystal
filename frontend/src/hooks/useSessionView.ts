@@ -1103,7 +1103,7 @@ export const useSessionView = (
     return () => window.removeEventListener('keydown', handleDebugKeyboard);
   }, [debugState, forceResetLoadingState]);
 
-  const handleSendInput = async (attachedImages?: any[]) => {
+  const handleSendInput = async (attachedImages?: any[], attachedTexts?: any[]) => {
     console.log('[useSessionView] handleSendInput called', { input, activeSession: activeSession?.id, hasActiveSession: !!activeSession });
     if (!input.trim() || !activeSession) {
       console.log('[useSessionView] handleSendInput early return', { inputTrimmed: !input.trim(), noActiveSession: !activeSession });
@@ -1122,7 +1122,29 @@ export const useSessionView = (
       setCompactedContext(null);
     }
     
-    // If there are attached images, save them and append paths to input
+    // Collect all attachments (text and images)
+    const attachmentPaths = [];
+    
+    // If there are attached texts, save them and collect paths
+    if (attachedTexts && attachedTexts.length > 0) {
+      try {
+        for (const text of attachedTexts) {
+          // Save text to file via IPC
+          const textFilePath = await window.electronAPI.sessions.saveLargeText(
+            activeSession.id,
+            text.content
+          );
+          
+          attachmentPaths.push(textFilePath);
+          console.log(`[Attached Text] Saved ${text.size} characters to: ${textFilePath}`);
+        }
+      } catch (error) {
+        console.error('Failed to save attached text to file:', error);
+        // Continue without text files on error
+      }
+    }
+    
+    // If there are attached images, save them and collect paths
     if (attachedImages && attachedImages.length > 0) {
       try {
         // Save images via IPC
@@ -1135,13 +1157,18 @@ export const useSessionView = (
           }))
         );
         
-        // Append image paths to the prompt
-        const imagePathsText = imagePaths.map(path => `Image: ${path}`).join('\n');
-        finalInput = `${finalInput}\n\n${imagePathsText}`;
+        attachmentPaths.push(...imagePaths);
+        console.log(`[Attached Images] Saved ${imagePaths.length} images`);
       } catch (error) {
         console.error('Failed to save images:', error);
         // Continue without images on error
       }
+    }
+    
+    // If we have any attachments, wrap them in <attachments> tags
+    if (attachmentPaths.length > 0) {
+      const attachmentsMessage = `\n\n<attachments>\nPlease look at these files which may provide additional instructions or context:\n${attachmentPaths.join('\n')}\n</attachments>`;
+      finalInput = `${finalInput}${attachmentsMessage}`;
     }
     
     const response = await API.sessions.sendInput(activeSession.id, `${finalInput}\n`);
@@ -1151,7 +1178,7 @@ export const useSessionView = (
     }
   };
 
-  const handleContinueConversation = async (attachedImages?: any[], model?: string) => {
+  const handleContinueConversation = async (attachedImages?: any[], attachedTexts?: any[], model?: string) => {
     if (!input.trim() || !activeSession) return;
     
     // Mark that we're continuing a conversation to prevent output reload
@@ -1169,7 +1196,29 @@ export const useSessionView = (
       setCompactedContext(null);
     }
     
-    // If there are attached images, save them and append paths to input
+    // Collect all attachments (text and images)
+    const attachmentPaths = [];
+    
+    // If there are attached texts, save them and collect paths
+    if (attachedTexts && attachedTexts.length > 0) {
+      try {
+        for (const text of attachedTexts) {
+          // Save text to file via IPC
+          const textFilePath = await window.electronAPI.sessions.saveLargeText(
+            activeSession.id,
+            text.content
+          );
+          
+          attachmentPaths.push(textFilePath);
+          console.log(`[Attached Text] Saved ${text.size} characters to: ${textFilePath}`);
+        }
+      } catch (error) {
+        console.error('Failed to save attached text to file:', error);
+        // Continue without text files on error
+      }
+    }
+    
+    // If there are attached images, save them and collect paths
     if (attachedImages && attachedImages.length > 0) {
       try {
         // Save images via IPC
@@ -1182,13 +1231,18 @@ export const useSessionView = (
           }))
         );
         
-        // Append image paths to the prompt
-        const imagePathsText = imagePaths.map(path => `Image: ${path}`).join('\n');
-        finalInput = `${finalInput}\n\n${imagePathsText}`;
+        attachmentPaths.push(...imagePaths);
+        console.log(`[Attached Images] Saved ${imagePaths.length} images`);
       } catch (error) {
         console.error('Failed to save images:', error);
         // Continue without images on error
       }
+    }
+    
+    // If we have any attachments, wrap them in <attachments> tags
+    if (attachmentPaths.length > 0) {
+      const attachmentsMessage = `\n\n<attachments>\nPlease look at these files which may provide additional instructions or context:\n${attachmentPaths.join('\n')}\n</attachments>`;
+      finalInput = `${finalInput}${attachmentsMessage}`;
     }
     
     const response = await API.sessions.continue(activeSession.id, finalInput, model);

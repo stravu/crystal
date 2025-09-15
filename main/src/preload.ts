@@ -145,6 +145,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>): Promise<string[]> => ipcRenderer.invoke('sessions:save-images', sessionId, images),
     
+    // Text file operations
+    saveLargeText: (sessionId: string, text: string): Promise<string> => ipcRenderer.invoke('sessions:save-large-text', sessionId, text),
+    
     // Log operations
     getLogs: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-logs', sessionId),
     clearLogs: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:clear-logs', sessionId),
