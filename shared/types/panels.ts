@@ -164,6 +164,10 @@ export type PanelEventType =
   | 'process:started'            // When a script process starts
   | 'process:output'             // When process produces output
   | 'process:ended'              // When process exits
+  // Git operation events
+  | 'git:operation_started'      // When a git operation begins
+  | 'git:operation_completed'    // When a git operation succeeds
+  | 'git:operation_failed'        // When a git operation fails
 
 export interface PanelEventSubscription {
   panelId: string;

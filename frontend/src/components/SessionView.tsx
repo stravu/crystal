@@ -319,9 +319,12 @@ export const SessionView = memo(() => {
         label: `Rebase to ${hook.gitCommands?.mainBranch || 'main'}`,
         icon: GitMerge,
         onClick: hook.handleSquashAndRebaseToMain,
-        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing',
+        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || 
+                  (!activeSession.gitStatus?.totalCommits || activeSession.gitStatus?.totalCommits === 0 || activeSession.gitStatus?.ahead === 0),
         variant: 'success' as const,
-        description: hook.gitCommands?.getSquashAndRebaseToMainCommand ? hook.gitCommands.getSquashAndRebaseToMainCommand() : `Squashes all commits and rebases onto ${hook.gitCommands?.mainBranch || 'main'}`
+        description: (!activeSession.gitStatus?.totalCommits || activeSession.gitStatus?.totalCommits === 0 || activeSession.gitStatus?.ahead === 0) ? 
+                     'No commits to rebase' : 
+                     (hook.gitCommands?.getSquashAndRebaseToMainCommand ? hook.gitCommands.getSquashAndRebaseToMainCommand() : `Squashes all commits and rebases onto ${hook.gitCommands?.mainBranch || 'main'}`)
       },
       {
         id: 'open-ide',
@@ -333,7 +336,7 @@ export const SessionView = memo(() => {
         description: sessionProject?.open_ide_command ? 'Open the worktree in your default IDE' : 'No IDE command configured'
       }
     ];
-  }, [activeSession, hook.isMerging, hook.gitCommands, hook.hasChangesToRebase, hook.handleGitPull, hook.handleGitPush, hook.handleRebaseMainIntoWorktree, hook.handleSquashAndRebaseToMain, hook.handleOpenIDE, hook.isOpeningIDE, sessionProject?.open_ide_command]);
+  }, [activeSession, hook.isMerging, hook.gitCommands, hook.hasChangesToRebase, hook.handleGitPull, hook.handleGitPush, hook.handleRebaseMainIntoWorktree, hook.handleSquashAndRebaseToMain, hook.handleOpenIDE, hook.isOpeningIDE, sessionProject?.open_ide_command, activeSession?.gitStatus]);
   
   // Removed unused variables - now handled by panels
 

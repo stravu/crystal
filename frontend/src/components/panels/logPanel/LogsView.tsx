@@ -339,7 +339,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ sessionId, isVisible }) => {
       {/* Logs Container */}
       <div 
         ref={logContainerRef}
-        className="flex-1 overflow-y-auto overflow-x-auto font-mono text-sm p-4 bg-bg-primary text-text-primary whitespace-pre-wrap break-all"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-auto font-mono text-sm p-4 bg-bg-primary text-text-primary whitespace-pre-wrap break-all"
         onScroll={(e) => {
           const target = e.target as HTMLDivElement;
           const isAtBottom = target.scrollHeight - target.scrollTop === target.clientHeight;

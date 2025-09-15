@@ -54,9 +54,7 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ panel, isActive }) => {
   
   const handleStop = async () => {
     try {
-      // TODO: Implement stop functionality
-      // await window.electronAPI.logs.stopScript(panel.id);
-      console.log('Stop script not yet implemented');
+      await window.electronAPI.logs.stopScript(panel.id);
     } catch (error) {
       console.error('Failed to stop script:', error);
     }
@@ -101,7 +99,7 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ panel, isActive }) => {
       
       {/* Use the existing LogsView for now */}
       {/* In a full refactor, we'd adapt LogsView to work with panel state */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-hidden">
         <LogsView 
           sessionId={panel.sessionId} 
           isVisible={isActive}
