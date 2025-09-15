@@ -104,6 +104,9 @@ interface ElectronAPI {
     // Image operations
     saveImages: (sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>) => Promise<string[]>;
     
+    // Large text operations
+    saveLargeText: (sessionId: string, text: string) => Promise<string>;
+    
     // Log operations
     getLogs: (sessionId: string) => Promise<IPCResponse>;
     clearLogs: (sessionId: string) => Promise<IPCResponse>;
