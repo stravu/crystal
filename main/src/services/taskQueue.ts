@@ -276,10 +276,15 @@ export class TaskQueue {
                 console.warn('[TaskQueue] Failed to add initial panel conversation message:', e);
               }
 
+              // Log prompt details for debugging
+              console.log(`[TaskQueue] Starting Claude with prompt length: ${prompt.length} characters`);
+              if (prompt.includes('<attachments>')) {
+                console.log(`[TaskQueue] Prompt contains attachments`);
+              }
+              
               // Use the claude panel manager directly instead of calling IPC handlers
               await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, model);
-              console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);
-            } catch (error) {
+              console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            } catch (error) {
               console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
               throw new Error(`Failed to start Claude panel: ${error}`);
             }

@@ -489,6 +489,21 @@ export class ClaudeCodeManager extends EventEmitter {
           // Append the system prompt to the user's prompt
           finalPrompt = `${finalPrompt}\n\n${systemPromptAppend}`;
         }
+        
+        // Log the prompt to help debug attachment issues
+        console.log(`[ClaudeCodeManager] Final prompt length: ${finalPrompt.length} characters`);
+        if (finalPrompt.includes('<attachments>')) {
+          console.log(`[ClaudeCodeManager] Prompt contains <attachments> tag`);
+          const attachmentStart = finalPrompt.indexOf('<attachments>');
+          const attachmentEnd = finalPrompt.indexOf('</attachments>');
+          if (attachmentStart !== -1 && attachmentEnd !== -1) {
+            const attachmentContent = finalPrompt.substring(attachmentStart, attachmentEnd + '</attachments>'.length);
+            console.log(`[ClaudeCodeManager] Attachment section (${attachmentContent.length} chars):`, attachmentContent.substring(0, 500) + (attachmentContent.length > 500 ? '...' : ''));
+          }
+        } else {
+          console.log(`[ClaudeCodeManager] Prompt does NOT contain <attachments> tag`);
+        }
+        
         args.push('-p', finalPrompt);
       }
 
@@ -496,8 +511,14 @@ export class ClaudeCodeManager extends EventEmitter {
         throw new Error('node-pty not available');
       }
       
-      // Log the full command being executed
-      const fullCommand = `claude ${args.join(' ')}`;
+      // Log the full command being executed (but truncate long prompts for readability)
+      const argsForLogging = args.map((arg, index) => {
+        if (index > 0 && args[index - 1] === '-p' && arg.length > 200) {
+          return arg.substring(0, 200) + `... (${arg.length} total chars)`;
+        }
+        return arg;
+      });
+      const fullCommand = `claude ${argsForLogging.join(' ')}`;
       console.log(`[ClaudeCodeManager] Executing Claude Code command in worktree ${worktreePath}: ${fullCommand}`);
       
       // Get the user's shell PATH to ensure we have access to all their tools

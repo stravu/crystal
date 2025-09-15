@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../../types/session';
 // ViewMode removed - no longer needed
-import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square, FileText } from 'lucide-react';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { API } from '../../../utils/api';
 import { CommitModePill, AutoCommitSwitch } from '../../CommitModeToggle';
@@ -17,6 +17,13 @@ interface AttachedImage {
   type: string;
 }
 
+interface AttachedText {
+  id: string;
+  name: string;
+  content: string;
+  size: number;
+}
+
 interface SessionInputWithImagesProps {
   activeSession: Session;
   viewMode?: any; // ViewMode removed - kept for compatibility
@@ -24,8 +31,8 @@ interface SessionInputWithImagesProps {
   setInput: (input: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleTerminalCommand: () => void;
-  handleSendInput: (attachedImages?: AttachedImage[]) => void;
-  handleContinueConversation: (attachedImages?: AttachedImage[], model?: string) => void;
+  handleSendInput: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
+  handleContinueConversation: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[], model?: string) => void;
   isStravuConnected: boolean;
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
@@ -61,6 +68,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   handleCancelRequest,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
@@ -116,6 +124,27 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     const items = e.clipboardData?.items;
     if (!items) return;
 
+    // Check for text content first
+    const textData = e.clipboardData.getData('text/plain');
+    const LARGE_TEXT_THRESHOLD = 5000;
+    
+    if (textData && textData.length > LARGE_TEXT_THRESHOLD) {
+      // Large text pasted - convert to attachment
+      e.preventDefault();
+      
+      const textAttachment: AttachedText = {
+        id: generateTextId(),
+        name: `Pasted Text (${textData.length.toLocaleString()} chars)`,
+        content: textData,
+        size: textData.length,
+      };
+      
+      setAttachedTexts(prev => [...prev, textAttachment]);
+      console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
+      return;
+    }
+
+    // Check for images
     const imageItems: DataTransferItem[] = [];
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.startsWith('image/')) {
@@ -165,6 +194,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     setAttachedImages(prev => prev.filter(img => img.id !== id));
   }, []);
 
+  const removeText = useCallback((id: string) => {
+    setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
+  }, []);
+
+  const generateTextId = () => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     const shouldSend = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
     const shouldCancel = e.key === 'Escape' && activeSession.status === 'running' && handleCancelRequest;
@@ -187,11 +222,13 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
           await handleTerminalCommand();
         } else if (activeSession.status === 'waiting') {
-          await handleSendInput(attachedImages);
+          await handleSendInput(attachedImages, attachedTexts);
           setAttachedImages([]);
+          setAttachedTexts([]);
         } else {
-          await handleContinueConversation(attachedImages, selectedModel);
+          await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
           setAttachedImages([]);
+          setAttachedTexts([]);
         }
       } finally {
         // Reset submission state after a short delay to prevent rapid resubmissions
@@ -213,11 +250,13 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
         await handleTerminalCommand();
       } else if (activeSession.status === 'waiting') {
-        await handleSendInput(attachedImages);
+        await handleSendInput(attachedImages, attachedTexts);
         setAttachedImages([]);
+        setAttachedTexts([]);
       } else {
-        await handleContinueConversation(attachedImages, selectedModel);
+        await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
         setAttachedImages([]);
+        setAttachedTexts([]);
       }
     } finally {
       // Reset submission state after a short delay to prevent rapid resubmissions
@@ -388,9 +427,28 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             }, 0);
           }}
         >
-          {/* Attached images */}
-          {attachedImages.length > 0 && (
+          {/* Attached items (images and text) */}
+          {(attachedImages.length > 0 || attachedTexts.length > 0) && (
             <div className="mb-3 flex flex-wrap gap-2">
+              {/* Attached text files */}
+              {attachedTexts.map(text => (
+                <div key={text.id} className="relative group">
+                  <div className="h-12 px-3 flex items-center gap-2 bg-surface-secondary rounded border border-border-primary">
+                    <FileText className="w-4 h-4 text-text-secondary" />
+                    <span className="text-xs text-text-secondary max-w-[150px] truncate">
+                      {text.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeText(text.id)}
+                    className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  >
+                    <X className="w-2.5 h-2.5 text-text-secondary" />
+                  </button>
+                </div>
+              ))}
+              
+              {/* Attached images */}
               {attachedImages.map(image => (
                 <div key={image.id} className="relative group">
                   <img

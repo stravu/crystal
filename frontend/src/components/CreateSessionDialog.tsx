@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
-import { Shield, ShieldOff, Sparkles, GitBranch, ChevronRight, ChevronDown, Zap, Brain, Target } from 'lucide-react';
+import { Shield, ShieldOff, Sparkles, GitBranch, ChevronRight, ChevronDown, Zap, Brain, Target, X, FileText, Paperclip } from 'lucide-react';
 import FilePathAutocomplete from './FilePathAutocomplete';
 import { CommitModeSettings } from './CommitModeSettings';
 import type { CommitModeSettings as CommitModeSettingsType } from '../../../shared/types';
@@ -11,6 +11,21 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Checkbox } from './ui/Input';
 import { Card } from './ui/Card';
+
+interface AttachedImage {
+  id: string;
+  name: string;
+  dataUrl: string;
+  size: number;
+  type: string;
+}
+
+interface AttachedText {
+  id: string;
+  name: string;
+  content: string;
+  size: number;
+}
 
 interface CreateSessionDialogProps {
   isOpen: boolean;
@@ -40,6 +55,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     checkpointPrefix: 'checkpoint: '
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { showError } = useErrorStore();
   
   // Fetch project details to get last used model
@@ -173,6 +191,96 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     return null;
   };
 
+  const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const generateTextId = () => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const processFile = async (file: File): Promise<AttachedImage | null> => {
+    if (!file.type.startsWith('image/')) {
+      console.warn('File is not an image:', file.name);
+      return null;
+    }
+
+    // Limit file size to 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      console.warn('Image file too large (max 10MB):', file.name);
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          resolve({
+            id: generateImageId(),
+            name: file.name,
+            dataUrl: e.target.result as string,
+            size: file.size,
+            type: file.type,
+          });
+        } else {
+          resolve(null);
+        }
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // Check for text content first
+    const textData = e.clipboardData.getData('text/plain');
+    const LARGE_TEXT_THRESHOLD = 5000;
+    
+    if (textData && textData.length > LARGE_TEXT_THRESHOLD) {
+      // Large text pasted - convert to attachment
+      e.preventDefault();
+      
+      const textAttachment: AttachedText = {
+        id: generateTextId(),
+        name: `Pasted Text (${textData.length.toLocaleString()} chars)`,
+        content: textData,
+        size: textData.length,
+      };
+      
+      setAttachedTexts(prev => [...prev, textAttachment]);
+      console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
+      return;
+    }
+
+    // Check for images
+    const imageItems: DataTransferItem[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        imageItems.push(items[i]);
+      }
+    }
+
+    if (imageItems.length === 0) return;
+
+    e.preventDefault();
+
+    for (const item of imageItems) {
+      const file = item.getAsFile();
+      if (file) {
+        const image = await processFile(file);
+        if (image) {
+          setAttachedImages(prev => [...prev, image]);
+        }
+      }
+    }
+  }, []);
+
+  const removeImage = useCallback((id: string) => {
+    setAttachedImages(prev => prev.filter(img => img.id !== id));
+  }, []);
+
+  const removeText = useCallback((id: string) => {
+    setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -199,8 +307,60 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     
     try {
       // Append ultrathink to prompt if checkbox is checked
-      const finalPrompt = ultrathink ? formData.prompt + '\nultrathink' : formData.prompt;
+      let finalPrompt = ultrathink ? formData.prompt + '\nultrathink' : formData.prompt;
       
+      // Process attachments
+      const attachmentPaths: string[] = [];
+      
+      // Save attached text files
+      if (attachedTexts.length > 0) {
+        const tempId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        
+        for (const text of attachedTexts) {
+          try {
+            console.log(`[Large Text] Saving attached text (${text.size} chars) to temporary file`);
+            const textFilePath = await window.electronAPI.sessions.saveLargeText(
+              tempId,
+              text.content
+            );
+            attachmentPaths.push(textFilePath);
+            console.log(`[Large Text] Text saved to: ${textFilePath}`);
+          } catch (error) {
+            console.error('Failed to save attached text to file:', error);
+          }
+        }
+      }
+      
+      // Save attached images
+      if (attachedImages.length > 0) {
+        const tempId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        
+        try {
+          console.log(`[Image] Saving ${attachedImages.length} attached image(s) to temporary files`);
+          const imagePaths = await window.electronAPI.sessions.saveImages(
+            tempId,
+            attachedImages.map(img => ({
+              name: img.name,
+              dataUrl: img.dataUrl,
+              type: img.type,
+            }))
+          );
+          attachmentPaths.push(...imagePaths);
+          console.log(`[Image] Images saved to:`, imagePaths);
+        } catch (error) {
+          console.error('Failed to save attached images:', error);
+        }
+      }
+      
+      // Add attachments to prompt if any
+      if (attachmentPaths.length > 0) {
+        const attachmentsMessage = `\n\n<attachments>\nPlease look at these files which may provide additional instructions or context:\n${attachmentPaths.join('\n')}\n</attachments>`;
+        finalPrompt = `${finalPrompt}${attachmentsMessage}`;
+        console.log('[CreateSessionDialog] Final prompt with attachments:', finalPrompt);
+        console.log('[CreateSessionDialog] Attachment paths:', attachmentPaths);
+      }
+      
+      console.log('[CreateSessionDialog] Sending API request with prompt:', finalPrompt);
       const response = await API.sessions.create({
         ...formData,
         prompt: finalPrompt,
@@ -244,6 +404,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       setUltrathink(false);
       setAutoCommit(true); // Reset to default
       setShowAdvanced(false); // Close advanced options
+      setAttachedImages([]); // Clear attachments
+      setAttachedTexts([]); // Clear attachments
     } catch (error: any) {
       console.error('Error creating session:', error);
       showError({
@@ -280,14 +442,85 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <label htmlFor="prompt" className="block text-sm font-medium text-text-secondary mb-2">
                   What would you like to work on?
                 </label>
-                <FilePathAutocomplete
-                  value={formData.prompt}
-                  onChange={(value) => setFormData({ ...formData, prompt: value })}
-                  projectId={projectId?.toString()}
-                  placeholder="Describe your task... (use @ to reference files)"
-                  className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
-                  isTextarea={true}
-                  rows={3}
+                {/* Attached items */}
+                {(attachedImages.length > 0 || attachedTexts.length > 0) && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {/* Attached text files */}
+                    {attachedTexts.map(text => (
+                      <div key={text.id} className="relative group">
+                        <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
+                          <FileText className="w-3.5 h-3.5 text-text-secondary" />
+                          <span className="text-xs text-text-secondary max-w-[120px] truncate">
+                            {text.name}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeText(text.id)}
+                          className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        >
+                          <X className="w-2.5 h-2.5 text-text-secondary" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {/* Attached images */}
+                    {attachedImages.map(image => (
+                      <div key={image.id} className="relative group">
+                        <img
+                          src={image.dataUrl}
+                          alt={image.name}
+                          className="h-10 w-10 object-cover rounded border border-border-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(image.id)}
+                          className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        >
+                          <X className="w-2.5 h-2.5 text-text-secondary" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="relative">
+                  <FilePathAutocomplete
+                    value={formData.prompt}
+                    onChange={(value) => setFormData({ ...formData, prompt: value })}
+                    projectId={projectId?.toString()}
+                    placeholder="Describe your task... (use @ to reference files)"
+                    className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
+                    isTextarea={true}
+                    rows={3}
+                    onPaste={handlePaste}
+                  />
+                  {/* Attachment button */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 p-1.5 rounded hover:bg-surface-hover transition-colors"
+                    title="Attach images"
+                  >
+                    <Paperclip className="w-4 h-4 text-text-tertiary hover:text-text-secondary" />
+                  </button>
+                </div>
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    for (const file of files) {
+                      const image = await processFile(file);
+                      if (image) {
+                        setAttachedImages(prev => [...prev, image]);
+                      }
+                    }
+                    e.target.value = ''; // Reset input
+                  }}
                 />
               </div>
               

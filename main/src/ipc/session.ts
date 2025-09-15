@@ -86,7 +86,21 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   });
 
   ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) => {
-    console.log('[IPC] sessions:create handler called with request:', request);
+    console.log('[IPC] sessions:create handler called with request:', {
+      ...request,
+      prompt: request.prompt ? `${request.prompt.substring(0, 200)}... (${request.prompt.length} chars total)` : 'no prompt'
+    });
+    
+    // Log if prompt contains attachments
+    if (request.prompt && request.prompt.includes('<attachments>')) {
+      console.log('[IPC] Prompt contains <attachments> tag');
+      const attachmentStart = request.prompt.indexOf('<attachments>');
+      const attachmentEnd = request.prompt.indexOf('</attachments>');
+      if (attachmentStart !== -1 && attachmentEnd !== -1) {
+        const attachmentSection = request.prompt.substring(attachmentStart, attachmentEnd + '</attachments>'.length);
+        console.log('[IPC] Attachment section preview:', attachmentSection.substring(0, 300) + '...');
+      }
+    }
     try {
       let targetProject;
 
@@ -1297,9 +1311,16 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   // Save images for a session
   ipcMain.handle('sessions:save-images', async (_event, sessionId: string, images: Array<{ name: string; dataUrl: string; type: string }>) => {
     try {
-      const session = await sessionManager.getSession(sessionId);
-      if (!session) {
-        throw new Error('Session not found');
+      // For pending sessions (those created before the actual session), we still need to save the files
+      // Check if this is a pending session ID (starts with 'pending_')
+      const isPendingSession = sessionId.startsWith('pending_');
+      
+      if (!isPendingSession) {
+        // For real sessions, verify it exists
+        const session = await sessionManager.getSession(sessionId);
+        if (!session) {
+          throw new Error('Session not found');
+        }
       }
 
       // Create images directory in CRYSTAL_DIR/artifacts/{sessionId}
@@ -1332,6 +1353,46 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       return savedPaths;
     } catch (error) {
       console.error('Failed to save images:', error);
+      throw error;
+    }
+  });
+
+  // Save large text for a session
+  ipcMain.handle('sessions:save-large-text', async (_event, sessionId: string, text: string) => {
+    try {
+      // For pending sessions (those created before the actual session), we still need to save the files
+      // Check if this is a pending session ID (starts with 'pending_')
+      const isPendingSession = sessionId.startsWith('pending_');
+      
+      if (!isPendingSession) {
+        // For real sessions, verify it exists
+        const session = await sessionManager.getSession(sessionId);
+        if (!session) {
+          throw new Error('Session not found');
+        }
+      }
+
+      // Create text directory in CRYSTAL_DIR/artifacts/{sessionId}
+      const textDir = getCrystalSubdirectory('artifacts', sessionId);
+      if (!existsSync(textDir)) {
+        await fs.mkdir(textDir, { recursive: true });
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 9);
+      const filename = `text_${timestamp}_${randomStr}.txt`;
+      const filePath = path.join(textDir, filename);
+
+      // Save the text content
+      await fs.writeFile(filePath, text, 'utf8');
+      
+      console.log(`[Large Text] Saved ${text.length} characters to ${filePath}`);
+      
+      // Return the absolute path that Claude Code can access
+      return filePath;
+    } catch (error) {
+      console.error('Failed to save large text:', error);
       throw error;
     }
   });
