@@ -10,12 +10,14 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
   const {
     sessionManager,
     databaseService,
-    claudeCodeManager,
+    cliManagerFactory,
+    claudeCodeManager, // For backward compatibility
     logger,
     configManager
   } = services;
 
   // Initialize the Claude panel manager wrapper
+  // TODO: Future versions will use cliManagerFactory to support multiple CLI tools
   claudePanelManager = new ClaudePanelManager(claudeCodeManager, sessionManager, logger, configManager);
   
   // Register existing Claude panels from the database (only for active sessions)

@@ -1,4 +1,5 @@
 import { ClaudeCodeManager } from './claudeCodeManager';
+import { AbstractCliManager } from '../cli/AbstractCliManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { ClaudePanelState, PanelEvent } from '../../../../../shared/types/panels';
@@ -15,7 +16,7 @@ export class ClaudePanelManager {
   private resumeIdToPanel = new Map<string, string>(); // claudeResumeId -> panelId
 
   constructor(
-    private claudeCodeManager: ClaudeCodeManager,
+    private claudeCodeManager: AbstractCliManager,
     private sessionManager: any, // SessionManager with panel-based methods
     private logger?: Logger,
     private configManager?: ConfigManager

@@ -11,7 +11,7 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
     console.log('[IPC] Creating panel:', request);
     const panel = await panelManager.createPanel(request);
 
-    // Auto-register Claude panels so they’re hooked to the Claude runtime
+    // Auto-register Claude panels so they're hooked to the Claude runtime
     if (panel.type === 'claude') {
       try {
         const { claudePanelManager } = require('./claudePanel');
@@ -22,6 +22,20 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
         }
       } catch (err) {
         console.error('[Panels IPC] Failed to register Claude panel with ClaudePanelManager:', err);
+      }
+    }
+
+    // Auto-register Codex panels so they're hooked to the Codex runtime
+    if (panel.type === 'codex') {
+      try {
+        const { codexPanelManager } = require('./codexPanel');
+        if (codexPanelManager) {
+          codexPanelManager.registerPanel(panel.id, panel.sessionId, panel.state.customState);
+        } else {
+          console.warn('[Panels IPC] CodexPanelManager not initialized yet; will register later');
+        }
+      } catch (err) {
+        console.error('[Panels IPC] Failed to register Codex panel with CodexPanelManager:', err);
       }
     }
 
@@ -46,6 +60,21 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
         }
       } catch (err) {
         console.warn('[Panels IPC] Failed to unregister Claude panel during delete:', err);
+      }
+    }
+    // Unregister Codex panels from CodexPanelManager
+    if (panel?.type === 'codex') {
+      try {
+        const { codexPanelManager } = require('./codexPanel');
+        if (codexPanelManager) {
+          // Stop if running, then unregister
+          if (codexPanelManager.isPanelRunning(panelId)) {
+            await codexPanelManager.stopPanel(panelId);
+          }
+          codexPanelManager.unregisterPanel(panelId);
+        }
+      } catch (err) {
+        console.warn('[Panels IPC] Failed to unregister Codex panel during delete:', err);
       }
     }
     if (panel?.type === 'terminal') {
@@ -125,6 +154,11 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
     }
     
     if (panel.type === 'claude') {
+      const customState = panel.state.customState as any;
+      return customState?.isInitialized || false;
+    }
+    
+    if (panel.type === 'codex') {
       const customState = panel.state.customState as any;
       return customState?.isInitialized || false;
     }

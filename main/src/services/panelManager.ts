@@ -193,6 +193,23 @@ export class PanelManager {
     // Load from database if not cached
     const panel = databaseService.getPanel(panelId);
     if (panel) {
+      // Fix any panels that have state stored as a string (defensive programming)
+      if (typeof panel.state === 'string') {
+        try {
+          panel.state = JSON.parse(panel.state);
+        } catch (e) {
+          console.error(`[PanelManager] Failed to parse panel state for ${panel.id}:`, e);
+          panel.state = { isActive: false, hasBeenViewed: false, customState: {} };
+        }
+      }
+      if (typeof panel.metadata === 'string') {
+        try {
+          panel.metadata = JSON.parse(panel.metadata);
+        } catch (e) {
+          console.error(`[PanelManager] Failed to parse panel metadata for ${panel.id}:`, e);
+          panel.metadata = { createdAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(), position: 0 };
+        }
+      }
       this.panels.set(panelId, panel);
       return panel;
     }
@@ -204,8 +221,25 @@ export class PanelManager {
     // Always get fresh from database to ensure consistency
     const panels = databaseService.getPanelsForSession(sessionId);
     
-    // Update cache
+    // Fix any panels that have state stored as a string (defensive programming)
     panels.forEach(panel => {
+      if (typeof panel.state === 'string') {
+        try {
+          panel.state = JSON.parse(panel.state);
+        } catch (e) {
+          console.error(`[PanelManager] Failed to parse panel state for ${panel.id}:`, e);
+          panel.state = { isActive: false, hasBeenViewed: false, customState: {} };
+        }
+      }
+      if (typeof panel.metadata === 'string') {
+        try {
+          panel.metadata = JSON.parse(panel.metadata);
+        } catch (e) {
+          console.error(`[PanelManager] Failed to parse panel metadata for ${panel.id}:`, e);
+          panel.metadata = { createdAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(), position: 0 };
+        }
+      }
+      // Update cache
       this.panels.set(panel.id, panel);
     });
     

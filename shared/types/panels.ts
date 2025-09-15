@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal' | 'claude' | 'diff' | 'editor' | 'logs' | 'dashboard'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude' | 'codex' | 'diff' | 'editor' | 'logs' | 'dashboard'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState;
+  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState;
 }
 
 export interface TerminalPanelState {
@@ -59,6 +59,21 @@ export interface ClaudePanelState {
   lastPrompt?: string;           // Last user prompt
   model?: string;                // Model being used (sonnet, opus, haiku)
   permissionMode?: 'approve' | 'ignore'; // Permission mode
+  lastActivityTime?: string;     // For "idle since" indicators
+}
+
+export interface CodexPanelState {
+  // Basic state
+  isInitialized?: boolean;       // Whether Codex process has been started
+  codexResumeId?: string;        // Codex's internal resume ID for session continuation
+  
+  // Enhanced persistence
+  lastPrompt?: string;           // Last user prompt
+  model?: string;                // Model being used (gpt-5, gpt-4-turbo, etc.)
+  modelProvider?: string;        // Provider (openai, anthropic, etc.)
+  approvalPolicy?: 'auto' | 'manual'; // Approval policy for tool calls
+  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; // Sandbox mode
+  webSearch?: boolean;           // Whether web search is enabled
   lastActivityTime?: string;     // For "idle since" indicators
 }
 
@@ -202,6 +217,14 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     singleton: false,
     canAppearInProjects: true,       // Claude can appear in projects
     canAppearInWorktrees: true       // Claude can appear in worktrees
+  },
+  codex: {
+    canEmit: ['files:changed'], // Codex can change files through tool calls
+    canConsume: [], // Codex doesn't consume events in initial implementation
+    requiresProcess: true,
+    singleton: false,
+    canAppearInProjects: true,       // Codex can appear in projects
+    canAppearInWorktrees: true       // Codex can appear in worktrees
   },
   diff: {
     canEmit: ['diff:refreshed'],
