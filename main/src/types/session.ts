@@ -79,4 +79,5 @@ export interface SessionOutput {
   type: 'stdout' | 'stderr' | 'json' | 'error';
   data: string | any;
   timestamp: Date;
+  panelId?: string;
 }

@@ -493,6 +493,17 @@ export class SessionManager extends EventEmitter {
     }));
   }
 
+  getSessionOutputsForPanel(panelId: string, limit?: number): SessionOutput[] {
+    const dbOutputs = this.db.getSessionOutputsForPanel(panelId, limit);
+    return dbOutputs.map(dbOutput => ({
+      sessionId: dbOutput.session_id,
+      panelId: dbOutput.panel_id,
+      type: dbOutput.type as 'stdout' | 'stderr' | 'json' | 'error',
+      data: (dbOutput.type === 'json' || dbOutput.type === 'error') ? JSON.parse(dbOutput.data) : dbOutput.data,
+      timestamp: new Date(dbOutput.timestamp)
+    }));
+  }
+
   async archiveSession(id: string): Promise<void> {
     const success = this.db.archiveSession(id);
     if (!success) {

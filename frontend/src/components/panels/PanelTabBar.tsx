@@ -1,5 +1,5 @@
 import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
-import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical, BarChart3 } from 'lucide-react';
+import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical, BarChart3, Code2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
 import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
@@ -89,6 +89,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         return <Terminal className="w-4 h-4" />;
       case 'claude':
         return <MessageSquare className="w-4 h-4" />;
+      case 'codex':
+        return <Code2 className="w-4 h-4" />;
       case 'diff':
         return <GitBranch className="w-4 h-4" />;
       case 'editor':

@@ -345,7 +345,7 @@ export class DatabaseService {
         
         // Copy and convert existing data
         this.db.prepare("UPDATE sessions SET last_viewed_at_new = datetime(last_viewed_at) WHERE last_viewed_at IS NOT NULL").run();
-        this.db.prepare("UPDATE sessions SET run_started_at_new = datetime(run_started_at) WHERE run_started_at IS NOT NULL").run();
+        // Note: run_started_at column doesn't exist in the original schema, skip this update
         
         // Create a backup of the table with proper schema
         this.db.prepare(`
@@ -1577,6 +1577,16 @@ export class DatabaseService {
       ORDER BY timestamp ASC 
       ${limitClause}
     `).all(sessionId) as SessionOutput[];
+  }
+
+  getSessionOutputsForPanel(panelId: string, limit?: number): SessionOutput[] {
+    const limitClause = limit ? `LIMIT ${limit}` : '';
+    return this.db.prepare(`
+      SELECT * FROM session_outputs 
+      WHERE panel_id = ? 
+      ORDER BY timestamp ASC 
+      ${limitClause}
+    `).all(panelId) as SessionOutput[];
   }
 
   getRecentSessionOutputs(sessionId: string, since?: Date): SessionOutput[] {

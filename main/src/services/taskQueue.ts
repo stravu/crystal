@@ -3,7 +3,7 @@ import { SimpleQueue } from './simpleTaskQueue';
 import type { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import { WorktreeNameGenerator } from './worktreeNameGenerator';
-import type { ClaudeCodeManager } from './panels/claude/claudeCodeManager';
+import type { AbstractCliManager } from './panels/cli/AbstractCliManager';
 import type { GitDiffManager } from './gitDiffManager';
 import type { ExecutionTracker } from './executionTracker';
 import { formatForDisplay } from '../utils/timestampUtils';
@@ -13,7 +13,7 @@ import { panelManager } from './panelManager';
 interface TaskQueueOptions {
   sessionManager: SessionManager;
   worktreeManager: WorktreeManager;
-  claudeCodeManager: ClaudeCodeManager;
+  claudeCodeManager: AbstractCliManager;
   gitDiffManager: GitDiffManager;
   executionTracker: ExecutionTracker;
   worktreeNameGenerator: WorktreeNameGenerator;

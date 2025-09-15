@@ -13,6 +13,8 @@ import type { VersionChecker } from '../services/versionChecker';
 import type { StravuAuthManager } from '../services/stravuAuthManager';
 import type { StravuNotebookService } from '../services/stravuNotebookService';
 import type { ClaudeCodeManager } from '../services/panels/claude/claudeCodeManager';
+import type { CliManagerFactory } from '../services/cliManagerFactory';
+import type { AbstractCliManager } from '../services/panels/cli/AbstractCliManager';
 import type { Logger } from '../utils/logger';
 import type { ArchiveProgressManager } from '../services/archiveProgressManager';
 
@@ -22,7 +24,8 @@ export interface AppServices {
   databaseService: DatabaseService;
   sessionManager: SessionManager;
   worktreeManager: WorktreeManager;
-  claudeCodeManager: ClaudeCodeManager;
+  cliManagerFactory: CliManagerFactory;
+  claudeCodeManager: AbstractCliManager; // Now uses abstract base class
   gitDiffManager: GitDiffManager;
   gitStatusManager: GitStatusManager;
   executionTracker: ExecutionTracker;

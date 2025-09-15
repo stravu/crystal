@@ -74,6 +74,7 @@ export interface SessionOutput {
   type: 'stdout' | 'stderr' | 'system' | 'json' | 'error';
   data: string;
   timestamp: string;
+  panel_id?: string;
 }
 
 export interface ConversationMessage {

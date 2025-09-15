@@ -189,7 +189,7 @@ export async function testClaudeCodeInDirectory(directory: string, customClaudeP
     const timeout = os.platform() === 'linux' ? 3000 : 10000;  // Shorter timeout for Linux
     
     // Use custom path if provided, otherwise use 'claude' which will be found in PATH
-    const claudeCommand = customClaudePath || findExecutableInPath('claude') || 'claude';
+    const claudeCommand = customClaudePath || 'claude';
     
     console.log(`[ClaudeTest] Running '${claudeCommand} --help' in ${directory} with timeout ${timeout}ms...`);
     const { stdout, stderr } = await execAsync(`"${claudeCommand}" --help`, { 

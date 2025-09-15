@@ -14,11 +14,29 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     databaseService,
     taskQueue,
     worktreeManager,
-    claudeCodeManager,
+    cliManagerFactory,
+    claudeCodeManager, // For backward compatibility
     worktreeNameGenerator,
     gitStatusManager,
     archiveProgressManager
   } = services;
+
+  // Helper function to get CLI manager for a specific tool
+  // TODO: This will be used in the future to support multiple CLI tools
+  const getCliManager = async (toolId: string = 'claude') => {
+    try {
+      return await cliManagerFactory.createManager(toolId, {
+        sessionManager,
+        additionalOptions: {}
+      });
+    } catch (error) {
+      console.warn(`Failed to get CLI manager for ${toolId}, falling back to default:`, error);
+      return claudeCodeManager; // Fallback to default for backward compatibility
+    }
+  };
+
+  // NOTE: Current IPC handlers use claudeCodeManager directly for backward compatibility
+  // Future versions will use getCliManager() to support multiple CLI tools dynamically
 
   // Session management handlers
   ipcMain.handle('sessions:get-all', async () => {
@@ -404,6 +422,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       console.log(`[IPC] Using Claude panel ${claudePanel.id} for input to session ${sessionId}`);
       
       // Check if Claude Code is running for this panel
+      // TODO: In the future, this should detect the panel's CLI tool type and get the appropriate manager
       const isClaudeRunning = claudeCodeManager.isPanelRunning(claudePanel.id);
       
       if (!isClaudeRunning) {

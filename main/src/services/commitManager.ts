@@ -93,9 +93,9 @@ export class CommitManager extends EventEmitter {
       const fullMessage = prefix + commitMessage;
 
       // For checkpoint mode, use a simple commit without the extra signature
-      // Use double quotes which work better cross-platform
-      const escapedMessage = fullMessage.replace(/"/g, '\\"');
-      const commitCommand = `git commit -m "${escapedMessage}" --no-verify`;
+      // Escape the message properly for the shell
+      const escapedMessage = fullMessage.replace(/'/g, "'\\''");
+      const commitCommand = `git commit -m '${escapedMessage}' --no-verify`;
       const result = execSync(commitCommand, { cwd: worktreePath, encoding: 'utf8' });
 
       // Extract commit hash from output

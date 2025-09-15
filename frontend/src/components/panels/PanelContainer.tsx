@@ -1,10 +1,10 @@
 import React, { Suspense, lazy, useMemo } from 'react';
 import { PanelContainerProps } from '../../types/panelComponents';
 import { ErrorBoundary } from 'react-error-boundary';
+import { CliPanelFactory } from './cli/CliPanelFactory';
 
 // Lazy load panel components for better performance
 const TerminalPanel = lazy(() => import('./TerminalPanel'));
-const ClaudePanel = lazy(() => import('./claude/ClaudePanel'));
 const DiffPanel = lazy(() => import('./diff/DiffPanel'));
 const EditorPanel = lazy(() => import('./editor/EditorPanel'));
 const LogsPanel = lazy(() => import('./logPanel/LogsPanel'));
@@ -38,11 +38,17 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
   
   const panelComponent = useMemo(() => {
     console.log('[PanelContainer] Creating component for panel type:', panel.type);
+    
+    // CLI panel types (including Claude and Codex) use the CLI panel factory
+    const cliPanelTypes = ['claude', 'codex', 'aider', 'continue', 'cursor', 'generic-cli'];
+    if (cliPanelTypes.includes(panel.type)) {
+      return <CliPanelFactory panel={panel} isActive={isActive} />;
+    }
+    
+    // Non-CLI panel types use direct components
     switch (panel.type) {
       case 'terminal':
         return <TerminalPanel panel={panel} isActive={isActive} />;
-      case 'claude':
-        return <ClaudePanel panel={panel} isActive={isActive} />;
       case 'diff':
         return <DiffPanel panel={panel} isActive={isActive} sessionId={panel.sessionId} />;
       case 'editor':
@@ -51,9 +57,22 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
         return <LogsPanel panel={panel} isActive={isActive} />;
       case 'dashboard':
         return <DashboardPanel panelId={panel.id} sessionId={panel.sessionId} isActive={isActive} />;
-      // Future panel types...
       default:
-        return <div>Unknown panel type: {panel.type}</div>;
+        return (
+          <div className="h-full w-full flex items-center justify-center p-8">
+            <div className="text-center max-w-md">
+              <h3 className="text-lg font-medium text-text-primary mb-2">
+                Unknown Panel Type
+              </h3>
+              <p className="text-sm text-text-secondary">
+                Panel type "{panel.type}" is not recognized.
+              </p>
+              <p className="text-xs text-text-tertiary mt-2">
+                Panel ID: {panel.id}
+              </p>
+            </div>
+          </div>
+        );
     }
   }, [panel.type, panel.id, isActive]); // Include stable deps only
 

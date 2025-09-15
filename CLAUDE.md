@@ -10,6 +10,7 @@ Crystal is a fully-implemented Electron desktop application for managing multipl
 Use these reference pages for more information:
 - How to invoke Claude Code through the command line as an SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
 - How to run multiple Claude Code instances with Git Worktrees: https://docs.anthropic.com/en/docs/claude-code/tutorials#run-parallel-claude-code-sessions-with-git-worktrees
+- **[Adding New CLI Tools](./docs/ADDING_NEW_CLI_TOOLS.md)**: Guide for extending Crystal to support additional CLI tools beyond Claude Code
 
 ## Implementation Status: ✅ COMPLETE
 

@@ -157,7 +157,40 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
   
-  // Helper functions defined before hooks
+  if (!isOpen) return null;
+  
+  const validateWorktreeName = (name: string): string | null => {
+    if (!name) return null; // Empty is allowed
+    
+    // Check for spaces
+    if (name.includes(' ')) {
+      return 'Session name cannot contain spaces';
+    }
+    
+    // Check for invalid git characters
+    const invalidChars = /[~^:?*\[\]\\]/;
+    if (invalidChars.test(name)) {
+      return 'Session name contains invalid characters (~^:?*[]\\)';
+    }
+    
+    // Check if it starts or ends with dot
+    if (name.startsWith('.') || name.endsWith('.')) {
+      return 'Session name cannot start or end with a dot';
+    }
+    
+    // Check if it starts or ends with slash
+    if (name.startsWith('/') || name.endsWith('/')) {
+      return 'Session name cannot start or end with a slash';
+    }
+    
+    // Check for consecutive dots
+    if (name.includes('..')) {
+      return 'Session name cannot contain consecutive dots';
+    }
+    
+    return null;
+  };
+
   const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const generateTextId = () => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -247,40 +280,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const removeText = useCallback((id: string) => {
     setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
   }, []);
-  
-  if (!isOpen) return null;
-  
-  const validateWorktreeName = (name: string): string | null => {
-    if (!name) return null; // Empty is allowed
-    
-    // Check for spaces
-    if (name.includes(' ')) {
-      return 'Session name cannot contain spaces';
-    }
-    
-    // Check for invalid git characters
-    const invalidChars = /[~^:?*\[\]\\]/;
-    if (invalidChars.test(name)) {
-      return 'Session name contains invalid characters (~^:?*[]\\)';
-    }
-    
-    // Check if it starts or ends with dot
-    if (name.startsWith('.') || name.endsWith('.')) {
-      return 'Session name cannot start or end with a dot';
-    }
-    
-    // Check if it starts or ends with slash
-    if (name.startsWith('/') || name.endsWith('/')) {
-      return 'Session name cannot start or end with a slash';
-    }
-    
-    // Check for consecutive dots
-    if (name.includes('..')) {
-      return 'Session name cannot contain consecutive dots';
-    }
-    
-    return null;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -33,7 +33,8 @@ import { registerIpcHandlers } from './ipc';
 import { setupAutoUpdater } from './autoUpdater';
 import { setupEventListeners } from './events';
 import { AppServices } from './ipc/types';
-import { ClaudeCodeManager } from './services/panels/claude/claudeCodeManager';
+import { CliManagerFactory } from './services/cliManagerFactory';
+import { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
 import { setupConsoleWrapper } from './utils/consoleWrapper';
 import * as fs from 'fs';
 
@@ -69,7 +70,8 @@ let configManager: ConfigManager;
 let logger: Logger;
 let sessionManager: SessionManager;
 let worktreeManager: WorktreeManager;
-let claudeCodeManager: ClaudeCodeManager;
+let cliManagerFactory: CliManagerFactory;
+let defaultCliManager: AbstractCliManager;
 let gitDiffManager: GitDiffManager;
 let gitStatusManager: GitStatusManager;
 let executionTracker: ExecutionTracker;
@@ -438,7 +440,16 @@ async function initializeServices() {
     await worktreeManager.initializeProject(activeProject.path);
   }
 
-  claudeCodeManager = new ClaudeCodeManager(sessionManager, logger, configManager, permissionIpcPath);
+  // Initialize CLI manager factory
+  cliManagerFactory = CliManagerFactory.getInstance(logger, configManager);
+  
+  // Create default CLI manager (Claude) with permission IPC path
+  defaultCliManager = await cliManagerFactory.createManager('claude', {
+    sessionManager,
+    logger,
+    configManager,
+    additionalOptions: { permissionIpcPath }
+  });
   gitDiffManager = new GitDiffManager();
   gitStatusManager = new GitStatusManager(sessionManager, worktreeManager, gitDiffManager, logger);
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
@@ -453,7 +464,7 @@ async function initializeServices() {
   taskQueue = new TaskQueue({
     sessionManager,
     worktreeManager,
-    claudeCodeManager,
+    claudeCodeManager: defaultCliManager, // Use default CLI manager for backward compatibility
     gitDiffManager,
     executionTracker,
     worktreeNameGenerator,
@@ -466,7 +477,8 @@ async function initializeServices() {
     databaseService,
     sessionManager,
     worktreeManager,
-    claudeCodeManager,
+    cliManagerFactory,
+    claudeCodeManager: defaultCliManager, // Backward compatibility
     gitDiffManager,
     gitStatusManager,
     executionTracker,
@@ -600,11 +612,11 @@ app.on('before-quit', async (event) => {
     console.log('[Main] Git status polling stopped');
   }
 
-  // Kill all Claude processes
-  if (claudeCodeManager) {
-    console.log('[Main] Killing all Claude processes...');
-    await claudeCodeManager.killAllProcesses();
-    console.log('[Main] Claude processes killed');
+  // Shutdown CLI manager factory and all CLI processes
+  if (cliManagerFactory) {
+    console.log('[Main] Shutting down CLI manager factory and all CLI processes...');
+    await cliManagerFactory.shutdown();
+    console.log('[Main] CLI manager factory shutdown complete');
   }
 
   // Close task queue

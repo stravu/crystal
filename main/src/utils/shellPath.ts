@@ -366,9 +366,8 @@ export function findExecutableInPath(executable: string): string | null {
   console.log(`[ShellPath] Searching in ${paths.length} PATH directories`);
   
   // On Windows, executables might have .exe, .cmd, or .bat extensions
-  // Prioritize .cmd and .exe over shell scripts on Windows
-  const executableNames = isWindows
-    ? [`${executable}.cmd`, `${executable}.exe`, `${executable}.bat`, executable]
+  const executableNames = isWindows 
+    ? [executable, `${executable}.exe`, `${executable}.cmd`, `${executable}.bat`]
     : [executable];
   
   let searchedPaths = 0;
