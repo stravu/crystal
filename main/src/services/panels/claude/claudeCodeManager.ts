@@ -749,6 +749,9 @@ export class ClaudeCodeManager extends EventEmitter {
       this.processes.set(panelId, claudeProcess);
       this.logger?.verbose(`Claude Code process created for panel ${panelId} (session ${sessionId})`);
       
+      // Note: Git event subscription is now handled in ClaudePanelManager.registerPanel()
+      // This ensures all Claude panels are subscribed, not just those that have been started
+      
       // Emit spawned event to update panel status
       this.emit('spawned', { panelId, sessionId });
 
@@ -1028,6 +1031,9 @@ export class ClaudeCodeManager extends EventEmitter {
 
     const { sessionId } = claudeProcess;
     const pid = claudeProcess.process.pid;
+    
+    // Note: Panel event unsubscription is now handled in ClaudePanelManager.unregisterPanel()
+    // This ensures proper cleanup when panels are destroyed
     
     // Get all child processes before killing
     let killedProcesses: { pid: number; name?: string }[] = [];

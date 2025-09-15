@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ToolPanel, CreatePanelRequest, PanelEventType, ToolPanelState, ToolPanelMetadata } from '../../../shared/types/panels';
+import { ToolPanel, CreatePanelRequest, PanelEventType, ToolPanelState, ToolPanelMetadata, ToolPanelType } from '../../../shared/types/panels';
 import { databaseService } from './database';
 import { panelEventBus } from './panelEventBus';
 import { mainWindow } from '../index';
@@ -210,6 +210,11 @@ export class PanelManager {
     });
     
     return panels;
+  }
+  
+  getPanelsBySessionAndType(sessionId: string, type: ToolPanelType): ToolPanel[] {
+    const panels = this.getPanelsForSession(sessionId);
+    return panels.filter(p => p.type === type);
   }
   
   async emitPanelEvent(panelId: string, eventType: PanelEventType, data: any): Promise<void> {

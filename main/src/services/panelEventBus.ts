@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 
 export class PanelEventBus extends EventEmitter {
   private subscriptions = new Map<string, PanelEventSubscription[]>();
+  private panelListenerMap = new Map<string, Map<PanelEventType | string, (...args: any[]) => void>>(); // Track listeners per panel
   private eventHistory: PanelEvent[] = [];
   private readonly MAX_HISTORY_SIZE = 100;
   
@@ -21,6 +22,12 @@ export class PanelEventBus extends EventEmitter {
     panelSubs.push(subscription);
     this.subscriptions.set(panelId, panelSubs);
     
+    // Get or create listener map for this panel
+    if (!this.panelListenerMap.has(panelId)) {
+      this.panelListenerMap.set(panelId, new Map());
+    }
+    const panelListeners = this.panelListenerMap.get(panelId)!;
+    
     // Set up event listeners for each event type
     eventTypes.forEach(eventType => {
       const listener = (event: PanelEvent) => {
@@ -30,6 +37,8 @@ export class PanelEventBus extends EventEmitter {
         }
       };
       
+      // Store the listener reference so we can remove it later
+      panelListeners.set(eventType, listener);
       this.on(eventType, listener);
     });
     
@@ -72,35 +81,21 @@ export class PanelEventBus extends EventEmitter {
   }
   
   unsubscribePanel(panelId: string): void {
-    const subs = this.subscriptions.get(panelId);
+    // Get the listeners for this panel
+    const panelListeners = this.panelListenerMap.get(panelId);
     
-    if (subs) {
-      // Remove all listeners for this panel
-      subs.forEach(sub => {
-        sub.eventTypes.forEach(eventType => {
-          this.removeAllListeners(eventType);
-        });
+    if (panelListeners) {
+      // Remove only this panel's listeners
+      panelListeners.forEach((listener, eventType) => {
+        this.removeListener(eventType, listener);
       });
       
-      // Remove from subscriptions map
-      this.subscriptions.delete(panelId);
-      
-      // Re-add listeners for remaining panels
-      this.subscriptions.forEach((panelSubs, pid) => {
-        if (pid !== panelId) {
-          panelSubs.forEach(sub => {
-            sub.eventTypes.forEach(eventType => {
-              const listener = (event: PanelEvent) => {
-                if (event.source.panelId !== pid) {
-                  sub.callback(event);
-                }
-              };
-              this.on(eventType, listener);
-            });
-          });
-        }
-      });
+      // Clean up the listener map
+      this.panelListenerMap.delete(panelId);
     }
+    
+    // Remove from subscriptions map
+    this.subscriptions.delete(panelId);
   }
   
   clearHistory(): void {

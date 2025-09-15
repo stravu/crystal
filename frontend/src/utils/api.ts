@@ -139,9 +139,9 @@ export class API {
       return window.electronAPI.sessions.runScript(sessionId);
     },
 
-    async stopScript() {
+    async stopScript(sessionId?: string) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.sessions.stopScript();
+      return window.electronAPI.sessions.stopScript(sessionId);
     },
 
     async runTerminalCommand(sessionId: string, command: string) {
