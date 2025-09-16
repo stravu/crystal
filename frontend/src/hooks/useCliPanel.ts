@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   CliPanel, 
   CliViewMode, 
@@ -67,7 +67,6 @@ export function useCliPanel(
 ): UseCliPanelResult {
   const {
     autoLoadOutputs = true,
-    autoScroll = true,
     maxOutputs = 1000,
     settingsDebounceDelay = 500
   } = config;
@@ -80,9 +79,7 @@ export function useCliPanel(
   const [settings, setSettings] = useState<CliPanelSettings>({
     showToolCalls: true,
     compactMode: false,
-    showTimestamps: true,
-    wordWrap: true,
-    fontSize: 'medium',
+    fontSize: 14,
     theme: 'dark'
   });
   const [processStatus, setProcessStatus] = useState<CliProcessStatus>('stopped');
@@ -92,7 +89,7 @@ export function useCliPanel(
   // Refs for managing updates
   const outputsRef = useRef<CliOutput[]>([]);
   const eventHandlersRef = useRef<Set<(event: CliPanelEvent) => void>>(new Set());
-  const settingsTimerRef = useRef<NodeJS.Timeout>();
+  const settingsTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   /**
    * Load settings from localStorage
@@ -145,8 +142,7 @@ export function useCliPanel(
 
     const inputOptions: CliInputOptions = {
       text: input,
-      timestamp: new Date().toISOString(),
-      metadata: options?.metadata
+      ...options
     };
 
     try {
@@ -165,7 +161,7 @@ export function useCliPanel(
       setOutputs(prev => [...prev.slice(-maxOutputs + 1), userOutput]);
       
       // Update process status
-      setProcessStatus('running');
+      setProcessStatus('processing');
     } catch (err) {
       console.error('Failed to send input:', err);
       setError(err instanceof Error ? err.message : 'Failed to send input');
@@ -184,14 +180,14 @@ export function useCliPanel(
 
     try {
       setError(null);
-      setProcessStatus('starting');
+      setProcessStatus('initializing');
       
       // TODO: Implement proper API when available
       console.log('Starting CLI process for panel:', panelId, initialPrompt);
       
       // Simulate process start
       setTimeout(() => {
-        setProcessStatus('running');
+        setProcessStatus('processing');
       }, 500);
     } catch (err) {
       console.error('Failed to start process:', err);
@@ -307,27 +303,10 @@ export function useCliPanel(
   /**
    * Continue conversation in the CLI panel
    */
-  const continueConversation = useCallback(async (prompt: string) => {
-    if (!panel) {
-      setError('Panel not initialized');
-      return;
-    }
-
-    try {
-      setError(null);
-      setProcessStatus('running');
-      
-      // TODO: Implement proper API when available
-      console.log('Continuing conversation in panel:', panelId, prompt);
-      
-      // Add to outputs
-      await sendInput(prompt);
-    } catch (err) {
-      console.error('Failed to continue conversation:', err);
-      setError(err instanceof Error ? err.message : 'Failed to continue conversation');
-      setProcessStatus('error');
-    }
-  }, [panel, panelId, sendInput]);
+  // Continue conversation is not currently used
+  // const continueConversation = useCallback(async (prompt: string) => {
+  //   ...
+  // }, [panel, panelId, sendInput]);
 
   /**
    * Initialize panel data
@@ -341,12 +320,18 @@ export function useCliPanel(
         const mockPanel: CliPanel = {
           id: panelId,
           sessionId: 'mock-session',
-          type: 'generic-cli',
+          type: 'claude',
+          cliToolId: 'claude',
           title: 'CLI Panel',
-          state: JSON.stringify({}),
-          metadata: JSON.stringify({}),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          state: {
+            isActive: true,
+            hasBeenViewed: true
+          },
+          metadata: {
+            createdAt: new Date().toISOString(),
+            lastActiveAt: new Date().toISOString(),
+            position: 0
+          }
         };
         
         setPanel(mockPanel);
@@ -356,13 +341,11 @@ export function useCliPanel(
           id: 'mock-session',
           name: 'Mock Session',
           status: 'waiting',
-          initial_prompt: '',
-          worktree_name: 'mock-worktree',
-          worktree_path: '/mock/path',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          archived: false,
-          project_id: 'mock-project'
+          prompt: '',
+          worktreePath: '/mock/path',
+          createdAt: new Date().toISOString(),
+          output: [],
+          jsonMessages: []
         };
         
         setActiveSession(mockSession);
@@ -406,9 +389,12 @@ export function useCliPanel(
    * Set up output event listener
    */
   useEffect(() => {
+    // TODO: Set up proper event listener when API is available
+    // This will be implemented once the panels API is ready
+    /*
     if (!panel || !window.electron) return;
 
-    const handlePanelOutput = (event: any, data: any) => {
+    const handlePanelOutput = (_event: any, data: any) => {
       if (data.panelId !== panelId) return;
 
       const newOutput: CliOutput = {
@@ -433,18 +419,20 @@ export function useCliPanel(
 
       // Emit event
       emitEvent({
-        type: 'output',
+        type: 'output:received',
+        panelId,
+        cliToolId: 'claude',
         data: newOutput,
         timestamp: new Date().toISOString()
       });
     };
 
-    // TODO: Set up proper event listener when API is available
-    // const cleanup = window.electron?.claudePanel?.onOutput(handlePanelOutput);
+    const cleanup = window.electron?.claudePanel?.onOutput(handlePanelOutput);
     
     return () => {
-      // cleanup?.();
+      cleanup?.();
     };
+    */
   }, [panel, panelId, maxOutputs, emitEvent]);
 
   return {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, KeyboardEvent } from 'react';
-import { Send, Paperclip, Settings2, StopCircle } from 'lucide-react';
-import type { Session } from '../../../../../shared/types';
+import { Send, Settings2, StopCircle } from 'lucide-react';
+import type { Session } from '../../../types/session';
 
 interface CodexInputPanelProps {
   session: Session;
@@ -11,7 +11,6 @@ interface CodexInputPanelProps {
 
 export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
   session,
-  panelId,
   onSendMessage,
   disabled = false
 }) => {

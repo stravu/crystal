@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { usePanelStore } from '../stores/panelStore';
-import type { Session } from '../../../shared/types';
+import type { Session } from '../types/session';
 
 interface CodexPanelHook {
   activeSession: Session | null;
@@ -87,16 +87,16 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     };
 
     // Subscribe to Codex events
-    window.electron.on('codexPanel:output', handleOutput);
-    window.electron.on('codexPanel:spawned', handleSpawned);
-    window.electron.on('codexPanel:exit', handleExit);
-    window.electron.on('codexPanel:error', handleError);
+    window.electron?.on('codexPanel:output', handleOutput);
+    window.electron?.on('codexPanel:spawned', handleSpawned);
+    window.electron?.on('codexPanel:exit', handleExit);
+    window.electron?.on('codexPanel:error', handleError);
 
     return () => {
-      window.electron.off('codexPanel:output', handleOutput);
-      window.electron.off('codexPanel:spawned', handleSpawned);
-      window.electron.off('codexPanel:exit', handleExit);
-      window.electron.off('codexPanel:error', handleError);
+      window.electron?.off('codexPanel:output', handleOutput);
+      window.electron?.off('codexPanel:spawned', handleSpawned);
+      window.electron?.off('codexPanel:exit', handleExit);
+      window.electron?.off('codexPanel:error', handleError);
     };
   }, [panelId]);
 
@@ -112,11 +112,11 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       
       // Initialize the Codex panel
       console.log(`[codex-debug] Invoking codexPanel:initialize for panel ${panelId}`);
-      await window.electron.invoke('codexPanel:initialize', panelId, sessionId, activeSession.worktreePath);
+      await window.electron?.invoke('codexPanel:initialize', panelId, sessionId, activeSession.worktreePath);
       
       // Check if it's running
       console.log(`[codex-debug] Checking if panel ${panelId} is running`);
-      const { isRunning } = await window.electron.invoke('codexPanel:isRunning', panelId);
+      const { isRunning } = await window.electron?.invoke('codexPanel:isRunning', panelId) || { isRunning: false };
       console.log(`[codex-debug] Panel ${panelId} running status: ${isRunning}`);
       setIsInitialized(isRunning);
       
@@ -159,7 +159,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
         // Start Codex with the initial prompt
         console.log(`[codex-debug] Starting Codex for panel ${panelId} with initial prompt: "${message}"`);
         console.log(`[codex-debug] Options: ${JSON.stringify(options || {})}`); 
-        await window.electron.invoke('codexPanel:start', 
+        await window.electron?.invoke('codexPanel:start', 
           panelId, 
           activeSession.worktreePath, 
           message,
@@ -176,7 +176,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       } else {
         // Send input to existing Codex process
         console.log(`[codex-debug] Sending input to existing Codex process for panel ${panelId}: "${message}"`);
-        await window.electron.invoke('codexPanel:sendInput', panelId, message);
+        await window.electron?.invoke('codexPanel:sendInput', panelId, message);
       }
     } catch (error) {
       console.error(`[codex-debug] Failed to send message for panel ${panelId}:`, error);
@@ -192,7 +192,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     
     try {
       console.log(`[codex-debug] Sending approval for panel ${panelId}: CallId=${callId}, Decision=${decision}, Type=${type}`);
-      await window.electron.invoke('codexPanel:sendApproval', panelId, callId, decision, type);
+      await window.electron?.invoke('codexPanel:sendApproval', panelId, callId, decision, type);
     } catch (error) {
       console.error(`[codex-debug] Failed to send approval for panel ${panelId}:`, error);
     }
@@ -206,7 +206,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     
     try {
       console.log(`[codex-debug] Sending interrupt signal for panel ${panelId}`);
-      await window.electron.invoke('codexPanel:sendInterrupt', panelId);
+      await window.electron?.invoke('codexPanel:sendInterrupt', panelId);
     } catch (error) {
       console.error(`[codex-debug] Failed to send interrupt for panel ${panelId}:`, error);
     }

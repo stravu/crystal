@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AIPanelProps } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
@@ -163,7 +163,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
           handleCompactContext={hook.handleCompactContext}
           hasConversationHistory={hook.hasConversationHistory}
           contextCompacted={hook.contextCompacted}
-          handleCancelRequest={hook.handleCancelRequest}
+          handleCancelRequest={hook.handleStopSession}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { ToolPanel, ToolPanelType, ToolPanelState } from './panels';
+import { ToolPanel, ToolPanelState } from './panels';
 
 /**
  * Base interface for all CLI panel types

@@ -108,6 +108,9 @@ interface ElectronAPI {
     getLogs: (sessionId: string) => Promise<IPCResponse>;
     clearLogs: (sessionId: string) => Promise<IPCResponse>;
     addLog: (sessionId: string, entry: any) => Promise<IPCResponse>;
+    
+    // Large text operations
+    saveLargeText: (sessionId: string, text: string) => Promise<string>;
   };
 
   // Project management

@@ -233,8 +233,7 @@ export const BaseCliPanel: React.FC<BaseCliPanelProps> = ({
   processStatus,
   onRefresh,
   onExport,
-  onHelp,
-  onRestart
+  onHelp
 }) => {
   const [showSettings, setShowSettings] = useState(false);
   
