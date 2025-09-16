@@ -94,7 +94,7 @@ export const MessageSegment: React.FC<MessageSegmentProps> = ({
       // System info segments are handled differently by parent component
       return null;
     
-    case 'diff':
+    case 'diff': {
       if (!segment.diff || !segment.diff.trim()) return null;
       
       // For diffs, show them in a collapsible code block
@@ -147,6 +147,7 @@ export const MessageSegment: React.FC<MessageSegmentProps> = ({
           )}
         </div>
       );
+    }
     
     default:
       return null;
