@@ -247,33 +247,38 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     }
   });
 
-  // Forward Codex events to renderer
-  codexManager.on('output', (data) => {
-    logger?.info(`[codex-debug] Event output: Panel ${data.panelId}, Type: ${data.type}, Data length: ${JSON.stringify(data.data).length}`);
+  // Forward panel-output events from the AbstractAIPanelManager
+  // Note: We only listen to 'panel-output' to avoid duplicates, as AbstractAIPanelManager
+  // already converts 'output' events to 'panel-output' with proper storage
+  codexManager.on('panel-output', (data) => {
+    logger?.info(`[codex-debug] Event panel-output: Panel ${data.panelId}, Type: ${data.type}, Data length: ${JSON.stringify(data.data).length}`);
     const mainWindow = services.getMainWindow();
     if (mainWindow) {
       mainWindow.webContents.send('codexPanel:output', data);
     }
   });
 
-  codexManager.on('spawned', (data) => {
-    logger?.info(`[codex-debug] Event spawned: Panel ${data.panelId}, Session ${data.sessionId}`);
+  // Forward panel-spawned events from the AbstractAIPanelManager  
+  codexManager.on('panel-spawned', (data) => {
+    logger?.info(`[codex-debug] Event panel-spawned: Panel ${data.panelId}, Session ${data.sessionId}`);
     const mainWindow = services.getMainWindow();
     if (mainWindow) {
       mainWindow.webContents.send('codexPanel:spawned', data);
     }
   });
 
-  codexManager.on('exit', (data) => {
-    logger?.info(`[codex-debug] Event exit: Panel ${data.panelId}, Exit code: ${data.exitCode}`);
+  // Forward panel-exit events from the AbstractAIPanelManager
+  codexManager.on('panel-exit', (data) => {
+    logger?.info(`[codex-debug] Event panel-exit: Panel ${data.panelId}, Exit code: ${data.exitCode}`);
     const mainWindow = services.getMainWindow();
     if (mainWindow) {
       mainWindow.webContents.send('codexPanel:exit', data);
     }
   });
 
-  codexManager.on('error', (data) => {
-    logger?.error(`[codex-debug] Event error: Panel ${data.panelId}, Error: ${data.error}`);
+  // Forward panel-error events from the AbstractAIPanelManager
+  codexManager.on('panel-error', (data) => {
+    logger?.error(`[codex-debug] Event panel-error: Panel ${data.panelId}, Error: ${data.error}`);
     const mainWindow = services.getMainWindow();
     if (mainWindow) {
       mainWindow.webContents.send('codexPanel:error', data);

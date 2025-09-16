@@ -446,13 +446,25 @@ contextBridge.exposeInMainWorld('electron', {
   openExternal: (url: string) => ipcRenderer.invoke('openExternal', url),
   invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   on: (channel: string, callback: (...args: any[]) => void) => {
-    const validChannels = ['permission:request'];
+    const validChannels = [
+      'permission:request',
+      'codexPanel:output',
+      'codexPanel:spawned',
+      'codexPanel:exit',
+      'codexPanel:error'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (_event, ...args) => callback(...args));
     }
   },
   off: (channel: string, callback: (...args: any[]) => void) => {
-    const validChannels = ['permission:request'];
+    const validChannels = [
+      'permission:request',
+      'codexPanel:output',
+      'codexPanel:spawned',
+      'codexPanel:exit',
+      'codexPanel:error'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.removeListener(channel, callback);
     }

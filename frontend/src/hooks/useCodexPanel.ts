@@ -58,6 +58,9 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       if (data.panelId === panelId) {
         // Handle output events - could update local state if needed
         console.log(`[codex-debug] Output event received for panel ${panelId}:`, JSON.stringify(data).substring(0, 500));
+        
+        // Dispatch a window event so the RichOutputView can receive it
+        window.dispatchEvent(new CustomEvent('codexPanel:output', { detail: data }));
       }
     };
 

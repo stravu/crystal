@@ -157,18 +157,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          if (outputEventName.includes('codex')) {
-            // For Codex, add the new output directly to maintain real-time display
-            if (detail.data || detail) {
-              const newMessage = messageTransformer.parseMessage(detail);
-              if (newMessage) {
-                setMessages(prev => [...prev, newMessage]);
-              }
-            }
-          } else {
-            // For Claude, reload all messages
-            loadMessagesRef.current?.();
-          }
+          // For both Claude and Codex, reload all messages from database
+          // This ensures consistency and avoids duplicates
+          loadMessagesRef.current?.();
         }, 500); // Wait 500ms after last event
       }
     };
