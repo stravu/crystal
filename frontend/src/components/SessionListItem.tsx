@@ -451,7 +451,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       {/* Context Menu */}
       {isMenuOpen('session', session.id) && menuState.position && (
         <div
-          className="fixed bg-surface-primary border border-border-primary rounded-md shadow-lg py-1 z-50 min-w-[150px]"
+          className="context-menu fixed bg-surface-primary border border-border-primary rounded-md shadow-lg py-1 z-50 min-w-[150px]"
           style={{ top: menuState.position.y, left: menuState.position.x }}
           onClick={(e) => e.stopPropagation()}
         >
