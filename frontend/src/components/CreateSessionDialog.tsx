@@ -2,15 +2,17 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
-import { Shield, ShieldOff, Sparkles, GitBranch, ChevronRight, ChevronDown, Zap, Brain, Target, X, FileText, Paperclip } from 'lucide-react';
+import { Sparkles, GitBranch, ChevronRight, ChevronDown, Brain, X, FileText, Paperclip, Code2, Settings2 } from 'lucide-react';
 import FilePathAutocomplete from './FilePathAutocomplete';
 import { CommitModeSettings } from './CommitModeSettings';
 import type { CommitModeSettings as CommitModeSettingsType } from '../../../shared/types';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Checkbox } from './ui/Input';
 import { Card } from './ui/Card';
+import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/ClaudeCodeConfig';
+import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
+import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
 interface AttachedImage {
   id: string;
@@ -35,6 +37,23 @@ interface CreateSessionDialogProps {
 }
 
 export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }: CreateSessionDialogProps) {
+  const [sessionName, setSessionName] = useState<string>('');
+  const [sessionCount, setSessionCount] = useState<number>(1);
+  const [toolType, setToolType] = useState<'claude' | 'codex' | 'none'>('none');
+  const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
+    prompt: '',
+    model: 'auto',
+    permissionMode: 'ignore',
+    ultrathink: false
+  });
+  const [codexConfig, setCodexConfig] = useState<CodexConfig>({
+    prompt: '',
+    model: DEFAULT_CODEX_MODEL,
+    modelProvider: 'openai',
+    approvalPolicy: 'auto',
+    sandboxMode: 'workspace-write',
+    webSearch: false
+  });
   const [formData, setFormData] = useState<CreateSessionRequest>({
     prompt: '',
     worktreeTemplate: '',
@@ -48,8 +67,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [hasApiKey, setHasApiKey] = useState(false);
   const [branches, setBranches] = useState<Array<{ name: string; isCurrent: boolean; hasWorktree: boolean }>>([]);
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
-  const [ultrathink, setUltrathink] = useState(false);
-  const [autoCommit, setAutoCommit] = useState(true); // Default to true - kept for backwards compatibility
   const [commitModeSettings, setCommitModeSettings] = useState<CommitModeSettingsType>({ 
     mode: 'checkpoint',
     checkpointPrefix: 'checkpoint: '
@@ -211,6 +228,18 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         size: textData.length,
       };
       
+      // Add to the active tool's config
+      if (toolType === 'claude') {
+        setClaudeConfig(prev => ({
+          ...prev,
+          attachedTexts: [...(prev.attachedTexts || []), textAttachment]
+        }));
+      } else if (toolType === 'codex') {
+        setCodexConfig(prev => ({
+          ...prev,
+          attachedTexts: [...(prev.attachedTexts || []), textAttachment]
+        }));
+      }
       setAttachedTexts(prev => [...prev, textAttachment]);
       console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
       return;
@@ -233,19 +262,55 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       if (file) {
         const image = await processFile(file);
         if (image) {
+          // Add to the active tool's config
+          if (toolType === 'claude') {
+            setClaudeConfig(prev => ({
+              ...prev,
+              attachedImages: [...(prev.attachedImages || []), image]
+            }));
+          } else if (toolType === 'codex') {
+            setCodexConfig(prev => ({
+              ...prev,
+              attachedImages: [...(prev.attachedImages || []), image]
+            }));
+          }
           setAttachedImages(prev => [...prev, image]);
         }
       }
     }
-  }, [processFile]);
+  }, [processFile, toolType]);
 
   const removeImage = useCallback((id: string) => {
+    // Remove from active tool's config
+    if (toolType === 'claude') {
+      setClaudeConfig(prev => ({
+        ...prev,
+        attachedImages: (prev.attachedImages || []).filter(img => img.id !== id)
+      }));
+    } else if (toolType === 'codex') {
+      setCodexConfig(prev => ({
+        ...prev,
+        attachedImages: (prev.attachedImages || []).filter(img => img.id !== id)
+      }));
+    }
     setAttachedImages(prev => prev.filter(img => img.id !== id));
-  }, []);
+  }, [toolType]);
 
   const removeText = useCallback((id: string) => {
+    // Remove from active tool's config
+    if (toolType === 'claude') {
+      setClaudeConfig(prev => ({
+        ...prev,
+        attachedTexts: (prev.attachedTexts || []).filter(txt => txt.id !== id)
+      }));
+    } else if (toolType === 'codex') {
+      setCodexConfig(prev => ({
+        ...prev,
+        attachedTexts: (prev.attachedTexts || []).filter(txt => txt.id !== id)
+      }));
+    }
     setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
-  }, []);
+  }, [toolType]);
   
   if (!isOpen) return null;
   
@@ -287,7 +352,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     e.preventDefault();
     
     // Check if session name is required
-    if (!hasApiKey && !formData.worktreeTemplate) {
+    if (!hasApiKey && !sessionName) {
       showError({
         title: 'Session Name Required',
         error: 'Please provide a session name or add an Anthropic API key in Settings to enable auto-naming.'
@@ -296,7 +361,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     }
     
     // Validate worktree name
-    const validationError = validateWorktreeName(formData.worktreeTemplate || '');
+    const validationError = validateWorktreeName(sessionName || '');
     if (validationError) {
       showError({
         title: 'Invalid Session Name',
@@ -308,17 +373,40 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     setIsSubmitting(true);
     
     try {
-      // Only process prompt if it's not empty
-      let finalPrompt = formData.prompt ? (ultrathink ? formData.prompt + '\nultrathink' : formData.prompt) : '';
+      // Prepare the prompt and configuration based on selected tool
+      let finalPrompt = '';
+      let finalModel = 'auto';
+      let finalPermissionMode: 'ignore' | 'approve' = 'ignore';
+      
+      // Get attachments from the active config
+      const activeAttachedImages = toolType === 'claude' ? (claudeConfig.attachedImages || []) :
+                                   toolType === 'codex' ? (codexConfig.attachedImages || []) : [];
+      const activeAttachedTexts = toolType === 'claude' ? (claudeConfig.attachedTexts || []) :
+                                 toolType === 'codex' ? (codexConfig.attachedTexts || []) : [];
+      
+      if (toolType === 'claude') {
+        finalPrompt = claudeConfig.prompt || '';
+        if (claudeConfig.ultrathink && finalPrompt) {
+          finalPrompt += '\nultrathink';
+        }
+        finalModel = claudeConfig.model;
+        finalPermissionMode = claudeConfig.permissionMode;
+      } else if (toolType === 'codex') {
+        // Use Codex config directly
+        finalPrompt = codexConfig.prompt || '';
+        finalModel = (codexConfig.model || DEFAULT_CODEX_MODEL) as string;
+        // Keep session permission mode independent of Codex approval policy; default to ignore unless explicitly set
+        finalPermissionMode = formData.permissionMode || 'ignore';
+      }
       
       // Process attachments
       const attachmentPaths: string[] = [];
       
       // Save attached text files
-      if (attachedTexts.length > 0) {
+      if (activeAttachedTexts.length > 0) {
         const tempId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
-        for (const text of attachedTexts) {
+        for (const text of activeAttachedTexts) {
           try {
             console.log(`[Large Text] Saving attached text (${text.size} chars) to temporary file`);
             const textFilePath = await window.electronAPI.sessions.saveLargeText(
@@ -334,14 +422,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       }
       
       // Save attached images
-      if (attachedImages.length > 0) {
+      if (activeAttachedImages.length > 0) {
         const tempId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         try {
-          console.log(`[Image] Saving ${attachedImages.length} attached image(s) to temporary files`);
+          console.log(`[Image] Saving ${activeAttachedImages.length} attached image(s) to temporary files`);
           const imagePaths = await window.electronAPI.sessions.saveImages(
             tempId,
-            attachedImages.map(img => ({
+            activeAttachedImages.map(img => ({
               name: img.name,
               dataUrl: img.dataUrl,
               type: img.type,
@@ -362,14 +450,22 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         console.log('[CreateSessionDialog] Attachment paths:', attachmentPaths);
       }
       
-      console.log('[CreateSessionDialog] Sending API request with prompt:', finalPrompt || '(no prompt)');
+      console.log('[CreateSessionDialog] Creating session with:', {
+        sessionName: sessionName || '(auto-generate)',
+        count: sessionCount,
+        toolType,
+        prompt: finalPrompt || '(no prompt)'
+      });
       const response = await API.sessions.create({
-        ...formData,
-        prompt: finalPrompt || undefined, // Send undefined if empty to ensure backend doesn't see an empty string as a prompt
+        prompt: finalPrompt || undefined,
+        worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
+        count: sessionCount,
+        model: finalModel,
+        permissionMode: finalPermissionMode,
         projectId,
-        autoCommit, // Keep for backwards compatibility
         commitMode: commitModeSettings.mode,
-        commitModeSettings: JSON.stringify(commitModeSettings)
+        commitModeSettings: JSON.stringify(commitModeSettings),
+        baseBranch: formData.baseBranch
       });
       
       if (!response.success) {
@@ -383,8 +479,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       }
       
       // Save the model as last used for this project
-      if (projectId && formData.model) {
-        API.projects.update(projectId.toString(), { lastUsedModel: formData.model }).catch(err => {
+      if (projectId && finalModel) {
+        API.projects.update(projectId.toString(), { lastUsedModel: finalModel }).catch(err => {
           console.error('Failed to save last used model:', err);
         });
       }
@@ -395,16 +491,32 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       const defaultPermissionMode = configResponse.success && configResponse.data?.defaultPermissionMode 
         ? configResponse.data.defaultPermissionMode 
         : 'ignore';
+      // Reset form
+      setSessionName('');
+      setSessionCount(1);
+      setToolType('none');
+      setClaudeConfig({
+        prompt: '',
+        model: claudeConfig.model, // Keep the same model for next time
+        permissionMode: defaultPermissionMode as 'ignore' | 'approve',
+        ultrathink: false
+      });
+      setCodexConfig({
+        prompt: '',
+        model: DEFAULT_CODEX_MODEL,
+        modelProvider: 'openai',
+        approvalPolicy: 'auto',
+        sandboxMode: 'workspace-write',
+        webSearch: false
+      });
       setFormData({ 
         prompt: '', 
         worktreeTemplate: '', 
         count: 1, 
         permissionMode: defaultPermissionMode as 'ignore' | 'approve', 
-        model: formData.model // Keep the same model for next time
+        model: finalModel // Keep the same model for next time
       });
       setWorktreeError(null);
-      setUltrathink(false);
-      setAutoCommit(true); // Reset to default
       setShowAdvanced(false); // Close advanced options
       setAttachedImages([]); // Clear attachments
       setAttachedTexts([]); // Clear attachments
@@ -437,21 +549,27 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       <ModalBody className="p-0">
         <div className="flex-1 overflow-y-auto">
           <form id="create-session-form" onSubmit={handleSubmit}>
-            {/* Primary Section - Always Visible */}
-            <div className="p-6 space-y-5">
-              {/* Session Name - Moved to top */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">
-                  Session Name {hasApiKey ? '(Optional)' : '(Required)'}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id="worktreeTemplate"
-                    type="text"
-                    value={formData.worktreeTemplate}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, worktreeTemplate: value });
+            {/* Session Configuration Section */}
+            <div className="p-6 border-b border-border-primary">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings2 className="w-4 h-4 text-interactive" />
+                <h3 className="text-sm font-semibold text-text-primary">Session Configuration</h3>
+              </div>
+              <div className="space-y-4">
+                {/* Session Name */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">
+                    Session Name {hasApiKey ? '(Optional)' : '(Required)'}
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="worktreeTemplate"
+                      type="text"
+                      value={sessionName}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSessionName(value);
+                        setFormData({ ...formData, worktreeTemplate: value });
                       // Real-time validation
                       const error = validateWorktreeName(value);
                       setWorktreeError(error);
@@ -467,8 +585,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       onClick={async () => {
                         setIsGeneratingName(true);
                         try {
-                          const response = await API.sessions.generateName(formData.prompt);
+                          // Use the active tool's prompt for name generation
+                          const promptForName = toolType === 'claude' ? claudeConfig.prompt : 
+                                               toolType === 'codex' ? codexConfig.prompt : '';
+                          const response = await API.sessions.generateName(promptForName || 'New session');
                           if (response.success && response.data) {
+                            setSessionName(response.data);
                             setFormData({ ...formData, worktreeTemplate: response.data });
                             setWorktreeError(null);
                           } else {
@@ -488,7 +610,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       }}
                       variant="secondary"
                       loading={isGeneratingName}
-                      disabled={!formData.prompt.trim()}
+                      disabled={toolType === 'none' || 
+                               (toolType === 'claude' && !claudeConfig.prompt?.trim()) ||
+                               (toolType === 'codex' && !codexConfig.prompt?.trim())}
                       title="Generate name from prompt"
                       size="md"
                     >
@@ -497,20 +621,238 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     </Button>
                   )}
                 </div>
-                {!hasApiKey && !formData.worktreeTemplate && (
+                  {!hasApiKey && !sessionName && (
                   <p className="text-xs text-status-warning mt-1">
                     Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
                   </p>
                 )}
-                {!worktreeError && !(!hasApiKey && !formData.worktreeTemplate) && (
+                  {!worktreeError && !(!hasApiKey && !sessionName) && (
                   <p className="text-xs text-text-tertiary mt-1">
                     The name for your session and worktree folder.
                   </p>
                 )}
+                </div>
+                
+                {/* Sessions Count */}
+                <div>
+                  <label htmlFor="count" className="block text-sm font-medium text-text-secondary mb-1">
+                    Number of Sessions: {sessionCount}
+                  </label>
+                  <input
+                    id="count"
+                    type="range"
+                    min="1"
+                    max="5"
+                    value={sessionCount}
+                    onChange={(e) => {
+                      const count = parseInt(e.target.value) || 1;
+                      setSessionCount(count);
+                      setFormData({ ...formData, count });
+                    }}
+                    className="w-full"
+                  />
+                  {sessionCount > 1 && (
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Creating multiple sessions with numbered suffixes
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Tool Configuration Section - Optional */}
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Code2 className="w-4 h-4 text-interactive" />
+                <h3 className="text-sm font-semibold text-text-primary">Tool Configuration</h3>
+                <span className="text-xs text-text-tertiary">(Optional - for launching AI tools in sessions)</span>
               </div>
               
-              {/* Prompt Field - Now optional */}
-              <div>
+              {/* Tool Type Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Select Tool
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Card
+                    variant={toolType === 'none' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
+                      toolType === 'none'
+                        ? 'border-interactive bg-interactive/10'
+                        : ''
+                    }`}
+                    onClick={() => setToolType('none')}
+                  >
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <X className={`w-5 h-5 ${toolType === 'none' ? 'text-interactive' : 'text-text-tertiary'}`} />
+                      <span className={`text-sm font-medium ${toolType === 'none' ? 'text-interactive' : ''}`}>None</span>
+                      <span className="text-xs opacity-75">Empty session</span>
+                    </div>
+                    {toolType === 'none' && (
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+                    )}
+                  </Card>
+                  
+                  <Card
+                    variant={toolType === 'claude' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
+                      toolType === 'claude'
+                        ? 'border-interactive bg-interactive/10'
+                        : ''
+                    }`}
+                    onClick={() => setToolType('claude')}
+                  >
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Brain className={`w-5 h-5 ${toolType === 'claude' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${toolType === 'claude' ? 'text-interactive' : ''}`}>Claude Code</span>
+                      <span className="text-xs opacity-75">AI assistant</span>
+                    </div>
+                    {toolType === 'claude' && (
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+                    )}
+                  </Card>
+                  
+                  <Card
+                    variant={toolType === 'codex' ? 'interactive' : 'bordered'}
+                    padding="sm"
+                    className={`relative cursor-pointer transition-all ${
+                      toolType === 'codex'
+                        ? 'border-interactive bg-interactive/10'
+                        : ''
+                    }`}
+                    onClick={() => setToolType('codex')}
+                  >
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Code2 className={`w-5 h-5 ${toolType === 'codex' ? 'text-interactive' : ''}`} />
+                      <span className={`text-sm font-medium ${toolType === 'codex' ? 'text-interactive' : ''}`}>Codex</span>
+                      <span className="text-xs opacity-75">Multi-model AI</span>
+                    </div>
+                    {toolType === 'codex' && (
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+                    )}
+                  </Card>
+                </div>
+              </div>
+              
+              {/* Tool-specific configuration */}
+              {toolType === 'claude' && (
+                <Card variant="bordered" className="p-4">
+                  <ClaudeCodeConfigComponent
+                    config={claudeConfig}
+                    onChange={setClaudeConfig}
+                    projectId={projectId?.toString()}
+                    onPaste={handlePaste}
+                  />
+                  
+                  {/* Attached items for Claude */}
+                  {((claudeConfig.attachedImages?.length ?? 0) > 0 || (claudeConfig.attachedTexts?.length ?? 0) > 0) && (
+                    <div className="mt-4 pt-4 border-t border-border-primary">
+                      <p className="text-xs text-text-secondary mb-2">Attached Files:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {claudeConfig.attachedTexts?.map(text => (
+                          <div key={text.id} className="relative group">
+                            <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
+                              <FileText className="w-3.5 h-3.5 text-text-secondary" />
+                              <span className="text-xs text-text-secondary max-w-[120px] truncate">
+                                {text.name}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeText(text.id)}
+                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            >
+                              <X className="w-2.5 h-2.5 text-text-secondary" />
+                            </button>
+                          </div>
+                        ))}
+                        
+                        {claudeConfig.attachedImages?.map(image => (
+                          <div key={image.id} className="relative group">
+                            <img
+                              src={image.dataUrl}
+                              alt={image.name}
+                              className="h-10 w-10 object-cover rounded border border-border-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(image.id)}
+                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            >
+                              <X className="w-2.5 h-2.5 text-text-secondary" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+              
+              {toolType === 'codex' && (
+                <Card variant="bordered" className="p-4">
+                  <CodexConfigComponent
+                    config={codexConfig}
+                    onChange={setCodexConfig}
+                    projectId={projectId?.toString()}
+                    onPaste={handlePaste}
+                  />
+                  
+                  {/* Attached items for Codex */}
+                  {((codexConfig.attachedImages?.length ?? 0) > 0 || (codexConfig.attachedTexts?.length ?? 0) > 0) && (
+                    <div className="mt-4 pt-4 border-t border-border-primary">
+                      <p className="text-xs text-text-secondary mb-2">Attached Files:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {codexConfig.attachedTexts?.map(text => (
+                          <div key={text.id} className="relative group">
+                            <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
+                              <FileText className="w-3.5 h-3.5 text-text-secondary" />
+                              <span className="text-xs text-text-secondary max-w-[120px] truncate">
+                                {text.name}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeText(text.id)}
+                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            >
+                              <X className="w-2.5 h-2.5 text-text-secondary" />
+                            </button>
+                          </div>
+                        ))}
+                        
+                        {codexConfig.attachedImages?.map(image => (
+                          <div key={image.id} className="relative group">
+                            <img
+                              src={image.dataUrl}
+                              alt={image.name}
+                              className="h-10 w-10 object-cover rounded border border-border-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(image.id)}
+                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            >
+                              <X className="w-2.5 h-2.5 text-text-secondary" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+              
+              {toolType === 'none' && (
+                <Card variant="bordered" className="p-4 text-center text-text-tertiary">
+                  <p className="text-sm">No tool will be launched. You can add tools later from within the session.</p>
+                </Card>
+              )}
+              
+              {/* Hidden original prompt field for backwards compatibility */}
+              <div className="hidden">
                 <label htmlFor="prompt" className="block text-sm font-medium text-text-secondary mb-2">
                   What would you like to work on? (Optional - leave empty to create session without Claude)
                 </label>
@@ -595,117 +937,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   }}
                 />
               </div>
-              
-              {/* Model Selection - Compact */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
-                  Model
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  <Card
-                    variant={formData.model === 'auto' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      formData.model === 'auto'
-                        ? 'border-interactive bg-interactive/10'
-                        : ''
-                    }`}
-                    onClick={() => setFormData({ ...formData, model: 'auto' })}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <Sparkles className={`w-5 h-5 ${formData.model === 'auto' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'auto' ? 'text-interactive' : ''}`}>Auto</span>
-                      <span className="text-xs opacity-75">Default</span>
-                    </div>
-                    {formData.model === 'auto' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-                    )}
-                  </Card>
-                  
-                  <Card
-                    variant={formData.model === 'sonnet' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      formData.model === 'sonnet'
-                        ? 'border-interactive bg-interactive/10'
-                        : ''
-                    }`}
-                    onClick={() => setFormData({ ...formData, model: 'sonnet' })}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <Target className={`w-5 h-5 ${formData.model === 'sonnet' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'sonnet' ? 'text-interactive' : ''}`}>Sonnet</span>
-                      <span className="text-xs opacity-75">Balanced</span>
-                    </div>
-                    {formData.model === 'sonnet' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-                    )}
-                  </Card>
-                  
-                  <Card
-                    variant={formData.model === 'opus' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      formData.model === 'opus'
-                        ? 'border-interactive bg-interactive/10'
-                        : ''
-                    }`}
-                    onClick={() => setFormData({ ...formData, model: 'opus' })}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <Brain className={`w-5 h-5 ${formData.model === 'opus' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'opus' ? 'text-interactive' : ''}`}>Opus</span>
-                      <span className="text-xs opacity-75">Maximum</span>
-                    </div>
-                    {formData.model === 'opus' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-                    )}
-                  </Card>
-                  
-                  <Card
-                    variant={formData.model === 'haiku' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      formData.model === 'haiku'
-                        ? 'border-status-success bg-status-success/10'
-                        : ''
-                    }`}
-                    onClick={() => setFormData({ ...formData, model: 'haiku' })}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <Zap className={`w-5 h-5 ${formData.model === 'haiku' ? 'text-status-success' : ''}`} />
-                      <span className={`text-sm font-medium ${formData.model === 'haiku' ? 'text-status-success' : ''}`}>Haiku</span>
-                      <span className="text-xs opacity-75">Fast</span>
-                    </div>
-                    {formData.model === 'haiku' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-status-success rounded-full" />
-                    )}
-                  </Card>
-                </div>
-                <p className="text-xs text-text-tertiary mt-2">
-                  {formData.model === 'auto' && 'Uses Claude Code\'s default model selection'}
-                  {formData.model?.includes('opus') && 'Best for complex architecture and challenging problems'}
-                  {formData.model?.includes('haiku') && 'Fast and cost-effective for simple tasks'}
-                  {formData.model?.includes('sonnet') && 'Excellent balance of speed and capability for most tasks'}
-                </p>
-              </div>
-              
-              
-              {/* Sessions Count - Always visible */}
-              <div>
-                <label htmlFor="count" className="block text-sm font-medium text-text-secondary mb-1">
-                  Number of Sessions: {formData.count}
-                </label>
-                <input
-                  id="count"
-                  type="range"
-                  min="1"
-                  max="5"
-                  value={formData.count}
-                  onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-                  className="w-full"
-                />
-              </div>
             </div>
             
             {/* Advanced Options Toggle */}
@@ -775,63 +1006,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   projectId={projectId}
                   mode={commitModeSettings.mode}
                   settings={commitModeSettings}
-                  onChange={(mode, settings) => {
+                  onChange={(_mode, settings) => {
                     setCommitModeSettings(settings);
-                    // Update autoCommit for backwards compatibility
-                    setAutoCommit(mode !== 'disabled');
                   }}
                 />
-                
-                {/* Checkboxes */}
-                <div className="space-y-3">
-                  <Checkbox
-                    id="autoCommit"
-                    label="Auto-commit after each prompt"
-                    checked={autoCommit}
-                    onChange={(e) => setAutoCommit(e.target.checked)}
-                  />
-                  
-                  <Checkbox
-                    id="ultrathink"
-                    label="Enable ultrathink mode"
-                    checked={ultrathink}
-                    onChange={(e) => setUltrathink(e.target.checked)}
-                  />
-                </div>
-                
-                {/* Permission Mode */}
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Permission Mode
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="permissionMode"
-                        value="ignore"
-                        checked={formData.permissionMode === 'ignore' || !formData.permissionMode}
-                        onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
-                        className="text-interactive"
-                      />
-                      <ShieldOff className="w-4 h-4 text-text-tertiary" />
-                      <span className="text-sm text-text-secondary">Skip Permissions</span>
-                      <span className="text-xs text-text-tertiary">(default)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="permissionMode"
-                        value="approve"
-                        checked={formData.permissionMode === 'approve'}
-                        onChange={(e) => setFormData({ ...formData, permissionMode: e.target.value as 'ignore' | 'approve' })}
-                        className="text-interactive"
-                      />
-                      <Shield className="w-4 h-4 text-status-success" />
-                      <span className="text-sm text-text-secondary">Manual Approval</span>
-                    </label>
-                  </div>
-                </div>
               </div>
             )}
           </form>
@@ -857,17 +1035,17 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           <Button
             type="submit"
             form="create-session-form"
-            disabled={isSubmitting || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate)}
+            disabled={isSubmitting || !!worktreeError || (!hasApiKey && !sessionName)}
             loading={isSubmitting}
             title={
               isSubmitting ? 'Creating session...' :
               worktreeError ? 'Please fix the session name error' :
-              (!hasApiKey && !formData.worktreeTemplate) ? 'Please enter a session name (required without API key)' :
-              !formData.prompt ? 'Session will be created without Claude panel' :
+              (!hasApiKey && !sessionName) ? 'Please enter a session name (required without API key)' :
+              toolType === 'none' ? 'Session will be created without AI tool' :
               undefined
             }
           >
-            {isSubmitting ? 'Creating...' : `Create ${(formData.count || 1) > 1 ? (formData.count || 1) + ' Sessions' : 'Session'}`}
+            {isSubmitting ? 'Creating...' : `Create ${sessionCount > 1 ? sessionCount + ' Sessions' : 'Session'}`}
           </Button>
         </div>
       </ModalFooter>

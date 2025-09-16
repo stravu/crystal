@@ -1,0 +1,247 @@
+import React, { useRef } from 'react';
+import { Card } from '../ui/Card';
+import { Checkbox } from '../ui/Input';
+import { Shield, ShieldOff, Cpu, Paperclip } from 'lucide-react';
+import FilePathAutocomplete from '../FilePathAutocomplete';
+import { CODEX_MODELS, type OpenAICodexModel } from '../../../../shared/types/models';
+
+export interface CodexConfig {
+  prompt?: string;
+  model?: OpenAICodexModel;
+  modelProvider?: string;
+  approvalPolicy?: 'auto' | 'manual';
+  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  webSearch?: boolean;
+  attachedImages?: any[];
+  attachedTexts?: any[];
+}
+
+interface CodexConfigProps {
+  config: CodexConfig;
+  onChange: (config: CodexConfig) => void;
+  projectId?: string;
+  disabled?: boolean;
+  onPaste?: (e: React.ClipboardEvent) => void;
+}
+
+export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
+  config,
+  onChange,
+  projectId,
+  disabled = false,
+  onPaste
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const processFile = async (file: File): Promise<any | null> => {
+    const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    if (!file.type.startsWith('image/')) {
+      console.warn('File is not an image:', file.name);
+      return null;
+    }
+
+    // Limit file size to 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      console.warn('Image file too large (max 10MB):', file.name);
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          resolve({
+            id: generateImageId(),
+            name: file.name,
+            dataUrl: e.target.result as string,
+            size: file.size,
+            type: file.type,
+          });
+        } else {
+          resolve(null);
+        }
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+  return (
+    <div className="space-y-4">
+      {/* Prompt Field */}
+      <div>
+        <label htmlFor="codex-prompt" className="block text-sm font-medium text-text-secondary mb-2">
+          Initial Prompt
+        </label>
+        <div className="relative">
+          <FilePathAutocomplete
+            value={config.prompt || ''}
+            onChange={(value) => onChange({ ...config, prompt: value })}
+            projectId={projectId}
+            placeholder="Describe your task... (use @ to reference files)"
+            className="w-full px-3 py-2 pr-10 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
+            isTextarea={true}
+            rows={3}
+            onPaste={onPaste}
+            disabled={disabled}
+          />
+          {/* Attachment button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute bottom-2 right-2 p-1.5 rounded hover:bg-surface-hover transition-colors"
+            title="Attach images"
+            disabled={disabled}
+          >
+            <Paperclip className="w-4 h-4 text-text-tertiary hover:text-text-secondary" />
+          </button>
+        </div>
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          disabled={disabled}
+          onChange={async (e) => {
+            const files = Array.from(e.target.files || []);
+            for (const file of files) {
+              const image = await processFile(file);
+              if (image) {
+                onChange({ 
+                  ...config, 
+                  attachedImages: [...(config.attachedImages || []), image] 
+                });
+              }
+            }
+            e.target.value = ''; // Reset input
+          }}
+        />
+      </div>
+
+      {/* Model Selection */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Model
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {Object.values(CODEX_MODELS).filter(m => m.id !== 'auto').map(modelCfg => (
+            <Card
+              key={modelCfg.id}
+              variant={config.model === modelCfg.id ? 'interactive' : 'bordered'}
+              padding="sm"
+              className={`relative cursor-pointer transition-all ${
+                config.model === modelCfg.id ? 'border-interactive bg-interactive/10' : ''
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => !disabled && onChange({ ...config, model: modelCfg.id as OpenAICodexModel, modelProvider: 'openai' })}
+              title={modelCfg.description}
+            >
+              <div className="flex flex-col items-center gap-1 py-2">
+                <Cpu className={`w-5 h-5 ${config.model === modelCfg.id ? 'text-interactive' : ''}`} />
+                <span className={`text-sm font-medium ${config.model === modelCfg.id ? 'text-interactive' : ''}`}>{modelCfg.label}</span>
+                <span className="text-xs opacity-75">OpenAI</span>
+              </div>
+              {config.model === modelCfg.id && (
+                <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+              )}
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Additional Options */}
+      <div className="space-y-3">
+        {/* Web Search */}
+        <Checkbox
+          id="codex-websearch"
+          label="Enable web search"
+          checked={config.webSearch || false}
+          onChange={(e) => onChange({ ...config, webSearch: e.target.checked })}
+          disabled={disabled}
+        />
+        
+        {/* Approval Policy */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Approval Policy
+          </label>
+          <div className="space-y-2">
+            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="radio"
+                name="codex-approval"
+                value="auto"
+                checked={config.approvalPolicy === 'auto'}
+                onChange={(e) => onChange({ ...config, approvalPolicy: e.target.value as 'auto' | 'manual' })}
+                className="text-interactive"
+                disabled={disabled}
+              />
+              <ShieldOff className="w-4 h-4 text-text-tertiary" />
+              <span className="text-sm text-text-secondary">Auto-approve tools</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="radio"
+                name="codex-approval"
+                value="manual"
+                checked={config.approvalPolicy === 'manual'}
+                onChange={(e) => onChange({ ...config, approvalPolicy: e.target.value as 'auto' | 'manual' })}
+                className="text-interactive"
+                disabled={disabled}
+              />
+              <Shield className="w-4 h-4 text-status-success" />
+              <span className="text-sm text-text-secondary">Manual approval</span>
+            </label>
+          </div>
+        </div>
+        
+        {/* Sandbox Mode */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            Sandbox Mode
+          </label>
+          <div className="space-y-2">
+            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="radio"
+                name="codex-sandbox"
+                value="read-only"
+                checked={config.sandboxMode === 'read-only'}
+                onChange={(e) => onChange({ ...config, sandboxMode: e.target.value as 'read-only' | 'workspace-write' | 'danger-full-access' })}
+                className="text-interactive"
+                disabled={disabled}
+              />
+              <span className="text-sm text-text-secondary">Read-only</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="radio"
+                name="codex-sandbox"
+                value="workspace-write"
+                checked={config.sandboxMode === 'workspace-write'}
+                onChange={(e) => onChange({ ...config, sandboxMode: e.target.value as 'read-only' | 'workspace-write' | 'danger-full-access' })}
+                className="text-interactive"
+                disabled={disabled}
+              />
+              <span className="text-sm text-text-secondary">Workspace write</span>
+              <span className="text-xs text-text-tertiary">(default)</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="radio"
+                name="codex-sandbox"
+                value="danger-full-access"
+                checked={config.sandboxMode === 'danger-full-access'}
+                onChange={(e) => onChange({ ...config, sandboxMode: e.target.value as 'read-only' | 'workspace-write' | 'danger-full-access' })}
+                className="text-interactive"
+                disabled={disabled}
+              />
+              <span className="text-sm text-status-error">Full access (dangerous)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -3,6 +3,7 @@ import { execSync } from './utils/commandExecutor';
 import type { AppServices } from './ipc/types';
 import type { VersionInfo } from './services/versionChecker';
 import { addSessionLog } from './ipc/logs';
+import { getCodexModelConfig } from '../../shared/types/models';
 import { panelManager } from './services/panelManager';
 import { 
   validateSessionExists, 
@@ -34,34 +35,48 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       }
     }
     
-    // Claude Panel Integration: Auto-create Claude panel for sessions with prompts
-    // Check for both undefined/null and empty strings
+    // Auto-create AI panel for sessions with prompts
     console.log(`[Events] Session ${session.id} created with prompt value:`, JSON.stringify(session.prompt), `Type: ${typeof session.prompt}, Length: ${session.prompt ? session.prompt.length : 'N/A'}`);
     if (session.prompt && typeof session.prompt === 'string' && session.prompt.trim().length > 0) {
-      console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating Claude panel`);
+      // Decide whether to create a Codex or Claude panel based on the model
+      const isCodexModel = !!(session.model && getCodexModelConfig(session.model));
+      const panelType = isCodexModel ? 'codex' : 'claude';
+      const panelTitle = isCodexModel ? 'Codex' : 'Claude';
+
+      console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
       try {
         const panel = await panelManager.createPanel({
           sessionId: session.id,
-          type: 'claude',
-          title: 'Claude'
+          type: panelType as any,
+          title: panelTitle,
+          initialState: isCodexModel ? { model: session.model } : undefined
         });
-        console.log(`[Events] Auto-created Claude panel for session ${session.id}`);
+        console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
 
-        // Ensure the newly created Claude panel is registered with ClaudePanelManager
+        // Register with the appropriate panel manager
         try {
-          const { claudePanelManager } = require('./ipc/claudePanel');
-          if (claudePanelManager) {
-            claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-            console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
+          if (isCodexModel) {
+            const { codexPanelManager } = require('./ipc/codexPanel');
+            if (codexPanelManager) {
+              codexPanelManager.registerPanel(panel.id, session.id, panel.state.customState);
+              console.log(`[Events] Registered Codex panel ${panel.id} for session ${session.id}`);
+            } else {
+              console.warn('[Events] CodexPanelManager not initialized yet; panel will register later');
+            }
           } else {
-            console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
+            const { claudePanelManager } = require('./ipc/claudePanel');
+            if (claudePanelManager) {
+              claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
+              console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
+            } else {
+              console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
+            }
           }
         } catch (err) {
-          console.error('[Events] Failed to register Claude panel with ClaudePanelManager:', err);
+          console.error(`[Events] Failed to register ${panelType} panel with its manager:`, err);
         }
       } catch (error) {
-        console.error(`[Events] Failed to auto-create Claude panel for session ${session.id}:`, error);
-        // Don't fail session creation if panel creation fails
+        console.error(`[Events] Failed to auto-create ${panelType} panel for session ${session.id}:`, error);
       }
     }
     
