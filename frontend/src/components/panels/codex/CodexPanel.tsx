@@ -6,7 +6,7 @@ import { RichOutputView } from '../ai/RichOutputView';
 import { MessagesView } from '../ai/MessagesView';
 import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransformer';
 import { CodexStatsView } from './CodexStatsView';
-import { CodexInputPanel } from './CodexInputPanel';
+import { CodexInputPanelStyled } from './CodexInputPanelStyled';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
 
@@ -187,12 +187,13 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
 
       {/* Codex Input - Always visible at bottom */}
       {!activeSession.archived && (
-        <CodexInputPanel
+        <CodexInputPanelStyled
           session={activeSession}
           panelId={panel.id}
           onSendMessage={hook.handleSendMessage}
           disabled={hook.isProcessing}
           initialModel={model}
+          onCancel={hook.handleInterrupt}
         />
       )}
     </div>

@@ -149,6 +149,51 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       return;
     }
     
+    // Process attachments if present
+    let finalMessage = message;
+    const attachmentPaths: string[] = [];
+    
+    // Save text attachments to files and collect paths
+    if (options?.attachedTexts && options.attachedTexts.length > 0) {
+      try {
+        for (const text of options.attachedTexts) {
+          const textFilePath = await window.electronAPI.sessions.saveLargeText(
+            activeSession.id,
+            text.content
+          );
+          attachmentPaths.push(textFilePath);
+          console.log(`[codex-debug] Saved text attachment: ${textFilePath}`);
+        }
+      } catch (error) {
+        console.error('[codex-debug] Failed to save text attachments:', error);
+      }
+    }
+    
+    // Save image attachments to files and collect paths
+    if (options?.attachedImages && options.attachedImages.length > 0) {
+      try {
+        const imagePaths = await window.electronAPI.sessions.saveImages(
+          activeSession.id,
+          options.attachedImages.map((img: any) => ({
+            name: img.name,
+            dataUrl: img.dataUrl,
+            type: img.type,
+          }))
+        );
+        attachmentPaths.push(...imagePaths);
+        console.log(`[codex-debug] Saved ${imagePaths.length} image attachments`);
+      } catch (error) {
+        console.error('[codex-debug] Failed to save image attachments:', error);
+      }
+    }
+    
+    // If we have attachment paths, append them to the message
+    if (attachmentPaths.length > 0) {
+      const attachmentsMessage = `\n\n<attachments>\nPlease look at these files which may provide additional instructions or context:\n${attachmentPaths.join('\n')}\n</attachments>`;
+      finalMessage = message + attachmentsMessage;
+      console.log(`[codex-debug] Added ${attachmentPaths.length} attachment paths to message`);
+    }
+    
     // Immediately display the user's message in the output
     const userOutputEvent = {
       panelId,
@@ -156,7 +201,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       type: 'json',
       data: {
         type: 'user_input',
-        content: message
+        content: finalMessage
       },
       timestamp: new Date().toISOString()
     };
@@ -170,12 +215,12 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     try {
       if (!isInitialized) {
         // Start Codex with the initial prompt
-        console.log(`[codex-debug] Starting Codex for panel ${panelId} with initial prompt: "${message}"`);
+        console.log(`[codex-debug] Starting Codex for panel ${panelId} with initial prompt`);
         console.log(`[codex-debug] Options: ${JSON.stringify(options || {})}`); 
         await window.electron?.invoke('codexPanel:start', 
           panelId, 
           activeSession.worktreePath, 
-          message,
+          finalMessage,
           {
             model: options?.model || DEFAULT_CODEX_MODEL,
             modelProvider: options?.modelProvider || 'openai',
@@ -188,8 +233,8 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
         console.log(`[codex-debug] Codex started for panel ${panelId}`);
       } else {
         // Send input to existing Codex process
-        console.log(`[codex-debug] Sending input to existing Codex process for panel ${panelId}: "${message}"`);
-        await window.electron?.invoke('codexPanel:sendInput', panelId, message);
+        console.log(`[codex-debug] Sending input to existing Codex process for panel ${panelId}`);
+        await window.electron?.invoke('codexPanel:sendInput', panelId, finalMessage);
       }
     } catch (error) {
       console.error(`[codex-debug] Failed to send message for panel ${panelId}:`, error);
