@@ -200,7 +200,7 @@ const formatToolInput = (toolName: string, input: any): React.ReactNode => {
     case 'TodoWrite':
       return (
         <div className="text-sm space-y-1">
-          {input.todos && input.todos.map((todo: any, idx: number) => {
+          {input.todos && Array.isArray(input.todos) && input.todos.map((todo: any, idx: number) => {
             const icon = todo.status === 'completed' ? '✓' : 
                         todo.status === 'in_progress' ? '→' : '○';
             const color = todo.status === 'completed' ? 'text-status-success' : 
