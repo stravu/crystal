@@ -1,0 +1,170 @@
+import React from 'react';
+import { AbstractAIPanel, AIPanelProps } from '../ai/AbstractAIPanel';
+import { RichOutputWithSidebar } from './RichOutputWithSidebar';
+import { MessagesView } from '../ai/MessagesView';
+import { SessionStats } from './SessionStats';
+import { ClaudeInputWithImages } from './ClaudeInputWithImages';
+import { useClaudePanel } from '../../../hooks/useClaudePanel';
+import { ClaudeSettingsPanel } from './ClaudeSettingsPanel';
+import { Session } from '../../../types/session';
+import { MessageTransformer } from '../ai/transformers/MessageTransformer';
+import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
+
+class ClaudePanelClass extends AbstractAIPanel<AIPanelProps> {
+  private transformer: MessageTransformer;
+
+  constructor(props: AIPanelProps) {
+    super(props);
+    this.transformer = new ClaudeMessageTransformer();
+  }
+
+  componentDidMount() {
+    // Initialize hook when component mounts
+    this.updateHook();
+  }
+
+  componentDidUpdate(prevProps: AIPanelProps) {
+    if (prevProps.panel.id !== this.props.panel.id || prevProps.isActive !== this.props.isActive) {
+      this.updateHook();
+    }
+  }
+
+  private updateHook() {
+    // This is a workaround to use hooks in a class component
+    // In a production environment, we'd handle this differently
+    this.forceUpdate();
+  }
+
+  protected getAgentName(): string {
+    return 'Claude';
+  }
+
+  protected getMessageTransformer(): MessageTransformer {
+    return this.transformer;
+  }
+
+  protected getActiveSession(): Session | null {
+    // We need to get the hook value here
+    // This will be set by the wrapper component
+    return (this as any)._hook?.activeSession || null;
+  }
+
+  protected renderRichOutputView(): React.ReactNode {
+    const hook = (this as any)._hook;
+    const activeSession = this.getActiveSession();
+    
+    if (!hook || !activeSession) return null;
+
+    return (
+      <RichOutputWithSidebar 
+        panelId={this.props.panel.id}
+        sessionStatus={activeSession.status}
+        settings={this.state.richOutputSettings}
+        onSettingsChange={this.handleRichOutputSettingsChange}
+        transformer={this.transformer}
+      />
+    );
+  }
+
+  protected renderMessagesView(): React.ReactNode {
+    return (
+      <MessagesView 
+        panelId={this.props.panel.id}
+        agentType="claude"
+        outputEventName="session:output"
+      />
+    );
+  }
+
+  protected renderStatsView(): React.ReactNode {
+    const activeSession = this.getActiveSession();
+    if (!activeSession) return null;
+    
+    return <SessionStats sessionId={activeSession.id} />;
+  }
+
+  protected renderInputComponent(): React.ReactNode {
+    const hook = (this as any)._hook;
+    const activeSession = this.getActiveSession();
+    
+    if (!hook || !activeSession) return null;
+
+    return (
+      <ClaudeInputWithImages
+        activeSession={activeSession}
+        viewMode="richOutput" // Claude panel always uses richOutput mode
+        input={hook.input}
+        setInput={hook.setInput}
+        textareaRef={hook.textareaRef}
+        handleTerminalCommand={hook.handleTerminalCommand}
+        handleSendInput={hook.handleSendInput}
+        handleContinueConversation={hook.handleContinueConversation}
+        isStravuConnected={hook.isStravuConnected}
+        setShowStravuSearch={hook.setShowStravuSearch}
+        ultrathink={hook.ultrathink}
+        setUltrathink={hook.setUltrathink}
+        gitCommands={hook.gitCommands}
+        handleCompactContext={hook.handleCompactContext}
+        hasConversationHistory={hook.hasConversationHistory}
+        contextCompacted={hook.contextCompacted}
+        handleCancelRequest={hook.handleStopSession}
+      />
+    );
+  }
+
+  protected renderSettingsPanel(): React.ReactNode {
+    return (
+      <ClaudeSettingsPanel
+        settings={this.state.richOutputSettings}
+        onSettingsChange={this.handleRichOutputSettingsChange}
+        onClose={() => this.toggleSettings()}
+      />
+    );
+  }
+
+  // Override to ensure localStorage key remains 'richOutputSettings' for backwards compatibility
+  protected loadRichOutputSettings() {
+    const saved = localStorage.getItem('richOutputSettings');
+    return saved ? JSON.parse(saved) : {
+      showToolCalls: true,
+      compactMode: false,
+      collapseTools: false,
+      showThinking: true,
+      showSessionInit: false,
+    };
+  }
+
+  // Override to ensure localStorage key remains 'richOutputSettings' for backwards compatibility
+  protected handleRichOutputSettingsChange = (newSettings: any) => {
+    this.setState({ richOutputSettings: newSettings });
+    localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
+  };
+}
+
+// Functional wrapper to use hooks with class component
+export const ClaudePanel: React.FC<AIPanelProps> = (props) => {
+  const hook = useClaudePanel(props.panel.id, props.isActive);
+  
+  // Create a ref to store the class instance
+  const classRef = React.useRef<ClaudePanelClass | null>(null);
+  
+  // Always update the hook reference when it changes
+  if (classRef.current) {
+    (classRef.current as any)._hook = hook;
+  }
+  
+  return (
+    <ClaudePanelClass 
+      {...props}
+      ref={(ref) => {
+        classRef.current = ref;
+        if (ref) {
+          (ref as any)._hook = hook;
+        }
+      }}
+    />
+  );
+};
+
+// Default export for lazy loading
+export default ClaudePanel;

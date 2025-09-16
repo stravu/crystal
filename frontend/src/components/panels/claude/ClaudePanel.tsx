@@ -1,129 +1,19 @@
-import React from 'react';
-import { AbstractAIPanel, AIPanelProps } from '../ai/AbstractAIPanel';
+import React, { useState, useEffect } from 'react';
+import { AIPanelProps } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
 import { SessionStats } from './SessionStats';
 import { ClaudeInputWithImages } from './ClaudeInputWithImages';
 import { useClaudePanel } from '../../../hooks/useClaudePanel';
 import { ClaudeSettingsPanel } from './ClaudeSettingsPanel';
-import { Session } from '../../../types/session';
-import { MessageTransformer } from '../ai/transformers/MessageTransformer';
 import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
+import { Settings } from 'lucide-react';
 
-class ClaudePanelClass extends AbstractAIPanel<AIPanelProps> {
-  private transformer: MessageTransformer;
-
-  constructor(props: AIPanelProps) {
-    super(props);
-    this.transformer = new ClaudeMessageTransformer();
-  }
-
-  componentDidMount() {
-    // Initialize hook when component mounts
-    this.updateHook();
-  }
-
-  componentDidUpdate(prevProps: AIPanelProps) {
-    if (prevProps.panel.id !== this.props.panel.id || prevProps.isActive !== this.props.isActive) {
-      this.updateHook();
-    }
-  }
-
-  private updateHook() {
-    // This is a workaround to use hooks in a class component
-    // In a production environment, we'd handle this differently
-    this.forceUpdate();
-  }
-
-  protected getAgentName(): string {
-    return 'Claude';
-  }
-
-  protected getMessageTransformer(): MessageTransformer {
-    return this.transformer;
-  }
-
-  protected getActiveSession(): Session | null {
-    // We need to get the hook value here
-    // This will be set by the wrapper component
-    return (this as any)._hook?.activeSession || null;
-  }
-
-  protected renderRichOutputView(): React.ReactNode {
-    const hook = (this as any)._hook;
-    const activeSession = this.getActiveSession();
-    
-    if (!hook || !activeSession) return null;
-
-    return (
-      <RichOutputWithSidebar 
-        panelId={this.props.panel.id}
-        sessionStatus={activeSession.status}
-        settings={this.state.richOutputSettings}
-        onSettingsChange={this.handleRichOutputSettingsChange}
-        transformer={this.transformer}
-      />
-    );
-  }
-
-  protected renderMessagesView(): React.ReactNode {
-    return (
-      <MessagesView 
-        panelId={this.props.panel.id}
-        agentType="claude"
-        outputEventName="session:output"
-      />
-    );
-  }
-
-  protected renderStatsView(): React.ReactNode {
-    const activeSession = this.getActiveSession();
-    if (!activeSession) return null;
-    
-    return <SessionStats sessionId={activeSession.id} />;
-  }
-
-  protected renderInputComponent(): React.ReactNode {
-    const hook = (this as any)._hook;
-    const activeSession = this.getActiveSession();
-    
-    if (!hook || !activeSession) return null;
-
-    return (
-      <ClaudeInputWithImages
-        activeSession={activeSession}
-        viewMode="richOutput" // Claude panel always uses richOutput mode
-        input={hook.input}
-        setInput={hook.setInput}
-        textareaRef={hook.textareaRef}
-        handleTerminalCommand={hook.handleTerminalCommand}
-        handleSendInput={hook.handleSendInput}
-        handleContinueConversation={hook.handleContinueConversation}
-        isStravuConnected={hook.isStravuConnected}
-        setShowStravuSearch={hook.setShowStravuSearch}
-        ultrathink={hook.ultrathink}
-        setUltrathink={hook.setUltrathink}
-        gitCommands={hook.gitCommands}
-        handleCompactContext={hook.handleCompactContext}
-        hasConversationHistory={hook.hasConversationHistory}
-        contextCompacted={hook.contextCompacted}
-        handleCancelRequest={hook.handleStopSession}
-      />
-    );
-  }
-
-  protected renderSettingsPanel(): React.ReactNode {
-    return (
-      <ClaudeSettingsPanel
-        settings={this.state.richOutputSettings}
-        onSettingsChange={this.handleRichOutputSettingsChange}
-        onClose={() => this.toggleSettings()}
-      />
-    );
-  }
-
-  // Override to ensure localStorage key remains 'richOutputSettings' for backwards compatibility
-  protected loadRichOutputSettings() {
+export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
+  const hook = useClaudePanel(panel.id, isActive);
+  const [activeView, setActiveView] = useState<'richOutput' | 'messages' | 'stats'>('richOutput');
+  const [showSettings, setShowSettings] = useState(false);
+  const [richOutputSettings, setRichOutputSettings] = useState(() => {
     const saved = localStorage.getItem('richOutputSettings');
     return saved ? JSON.parse(saved) : {
       showToolCalls: true,
@@ -132,32 +22,158 @@ class ClaudePanelClass extends AbstractAIPanel<AIPanelProps> {
       showThinking: true,
       showSessionInit: false,
     };
-  }
+  });
 
-  // Override to ensure localStorage key remains 'richOutputSettings' for backwards compatibility
-  protected handleRichOutputSettingsChange = (newSettings: any) => {
-    this.setState({ richOutputSettings: newSettings });
+  const transformer = new ClaudeMessageTransformer();
+  const activeSession = hook.activeSession;
+
+  const handleRichOutputSettingsChange = (newSettings: any) => {
+    setRichOutputSettings(newSettings);
     localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
   };
-}
 
-// Functional wrapper to use hooks with class component
-export const ClaudePanel: React.FC<AIPanelProps> = (props) => {
-  const hook = useClaudePanel(props.panel.id, props.isActive);
-  
-  // Create a ref to store the class instance
-  const classRef = React.useRef<ClaudePanelClass | null>(null);
-  
+  const toggleSettings = () => {
+    setShowSettings(!showSettings);
+  };
+
+  if (!activeSession) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-text-secondary">
+        <div className="text-center p-8">
+          <div className="text-4xl mb-4">🤖</div>
+          <h2 className="text-xl font-semibold mb-2">Claude Panel</h2>
+          <p className="text-sm">No active session</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <ClaudePanelClass 
-      {...props}
-      ref={(ref) => {
-        classRef.current = ref;
-        if (ref) {
-          (ref as any)._hook = hook;
-        }
-      }}
-    />
+    <div className="flex-1 flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="border-b border-border-primary bg-surface-primary shadow-sm">
+        <div className="flex items-center justify-between px-4 h-12">
+          <div className="flex items-center gap-2">
+            <div className="flex">
+              <button
+                onClick={() => setActiveView('richOutput')}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeView === 'richOutput'
+                    ? 'text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Output
+                {activeView === 'richOutput' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveView('messages')}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeView === 'messages'
+                    ? 'text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Messages
+                {activeView === 'messages' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveView('stats')}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeView === 'stats'
+                    ? 'text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Stats
+                {activeView === 'stats' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-secondary">Claude</span>
+            {activeView === 'richOutput' && (
+              <button
+                onClick={toggleSettings}
+                className="p-1.5 rounded hover:bg-surface-hover transition-colors"
+                title="Display settings"
+              >
+                <Settings className="w-4 h-4 text-text-secondary" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main content area */}
+      <div className="flex-1 overflow-hidden">
+        {activeView === 'richOutput' && (
+          <RichOutputWithSidebar 
+            panelId={panel.id}
+            sessionStatus={activeSession.status}
+            settings={richOutputSettings}
+            onSettingsChange={handleRichOutputSettingsChange}
+            transformer={transformer}
+          />
+        )}
+        {activeView === 'messages' && (
+          <MessagesView 
+            panelId={panel.id}
+            agentType="claude"
+            outputEventName="session:output"
+          />
+        )}
+        {activeView === 'stats' && (
+          <SessionStats sessionId={activeSession.id} />
+        )}
+      </div>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <ClaudeSettingsPanel
+          settings={richOutputSettings}
+          onSettingsChange={handleRichOutputSettingsChange}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Claude Input - Always visible at bottom if not archived */}
+      {!activeSession.archived && (
+        <ClaudeInputWithImages
+          activeSession={activeSession}
+          viewMode="richOutput"
+          input={hook.input}
+          setInput={hook.setInput}
+          textareaRef={hook.textareaRef}
+          handleTerminalCommand={hook.handleTerminalCommand}
+          handleSendInput={hook.handleSendInput}
+          handleContinueConversation={hook.handleContinueConversation}
+          isStravuConnected={hook.isStravuConnected}
+          setShowStravuSearch={hook.setShowStravuSearch}
+          ultrathink={hook.ultrathink}
+          setUltrathink={hook.setUltrathink}
+          gitCommands={hook.gitCommands}
+          handleCompactContext={hook.handleCompactContext}
+          hasConversationHistory={hook.hasConversationHistory}
+          contextCompacted={hook.contextCompacted}
+          handleCancelRequest={hook.handleCancelRequest}
+        />
+      )}
+
+      {/* Show archived message if session is archived */}
+      {activeSession.archived && (
+        <div className="bg-surface-secondary border-t border-border-primary px-4 py-3 text-center text-text-muted text-sm">
+          This session is archived. Unarchive it to continue the conversation.
+        </div>
+      )}
+    </div>
   );
 };
 
