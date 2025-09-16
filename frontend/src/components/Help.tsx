@@ -218,6 +218,10 @@ export default function Help({ isOpen, onClose }: HelpProps) {
                   <kbd className="px-2 py-1 bg-surface-tertiary rounded text-sm">Cmd/Ctrl + Enter</kbd>
                 </div>
                 <div className="flex justify-between items-center">
+                  <span className="text-text-secondary">Quick Create Session (untitled)</span>
+                  <kbd className="px-2 py-1 bg-surface-tertiary rounded text-sm">Cmd/Ctrl + Shift + N</kbd>
+                </div>
+                <div className="flex justify-between items-center">
                   <span className="text-text-secondary">Open Prompt History</span>
                   <kbd className="px-2 py-1 bg-surface-tertiary rounded text-sm">Cmd/Ctrl + P</kbd>
                 </div>

@@ -398,6 +398,31 @@ export function DraggableProjectTreeView() {
     }
   }, []);
 
+  // Add keyboard shortcut for quick session creation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + Shift + N for quick session
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        
+        // Find the active project (or first project if none active)
+        const activeProject = projectsWithSessions.find(p => p.id === activeProjectId) || projectsWithSessions[0];
+        
+        if (activeProject) {
+          handleQuickAddSession(activeProject);
+        } else {
+          showError({
+            title: 'No Project Available',
+            error: 'Please create or select a project first.'
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [projectsWithSessions, activeProjectId]);
+
   const loadProjectsWithSessions = async () => {
     try {
       setIsLoading(true);
@@ -819,6 +844,40 @@ export function DraggableProjectTreeView() {
     // Just show the dialog for any project
     setSelectedProjectForCreate(project);
     setShowCreateDialog(true);
+  };
+
+  const handleQuickAddSession = async (project: Project) => {
+    try {
+      // Create a session with minimal configuration
+      const response = await API.sessions.create({
+        prompt: undefined, // No initial prompt
+        worktreeTemplate: 'untitled', // Simple name - backend will make it unique
+        count: 1,
+        permissionMode: 'ignore', // Use default permission mode
+        model: project.lastUsedModel || 'auto', // Use last used model or auto
+        projectId: project.id,
+        autoCommit: true,
+        commitMode: 'checkpoint',
+        commitModeSettings: JSON.stringify({ 
+          mode: 'checkpoint',
+          checkpointPrefix: 'checkpoint: '
+        })
+      });
+
+      if (!response.success) {
+        console.error('Failed to create quick session:', response.error);
+        showError({
+          title: 'Failed to create session',
+          error: response.error || 'An error occurred while creating the session.'
+        });
+      }
+    } catch (error) {
+      console.error('Error creating quick session:', error);
+      showError({
+        title: 'Error creating session',
+        error: 'An unexpected error occurred. Please try again.'
+      });
+    }
   };
 
   const detectCurrentBranch = async (path: string) => {
@@ -1674,9 +1733,15 @@ export function DraggableProjectTreeView() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleCreateSession(project);
+                    // Check if cmd/ctrl is held for quick add
+                    if (e.metaKey || e.ctrlKey) {
+                      handleQuickAddSession(project);
+                    } else {
+                      handleCreateSession(project);
+                    }
                   }}
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-all opacity-0 group-hover:opacity-100"
+                  title={`New Session${navigator.platform.includes('Mac') ? ' (⌘' : ' (Ctrl'}+click for quick session)`}
                 >
                   <Plus className="w-3 h-3" />
                   <span>New Session</span>
