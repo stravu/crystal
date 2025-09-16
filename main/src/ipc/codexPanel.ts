@@ -1,7 +1,9 @@
 import { IpcMain } from 'electron';
 import { CodexManager } from '../services/panels/codex/codexManager';
 import { CodexPanelManager } from '../services/panels/codex/codexPanelManager';
+import { panelManager } from '../services/panelManager';
 import type { AppServices } from './types';
+import type { CodexPanelState } from '../../../shared/types/panels';
 
 // Singleton instances will be created in the register function
 let codexManager: CodexManager;
@@ -63,6 +65,28 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         options?.webSearch
       );
       
+      // Update panel state with the model and other settings
+      const panel = panelManager.getPanel(panelId);
+      if (panel) {
+        const updatedState: CodexPanelState = {
+          ...panel.state.customState as CodexPanelState,
+          isInitialized: true,
+          lastPrompt: prompt,
+          model: options?.model || 'gpt-5',
+          modelProvider: options?.modelProvider || 'openai',
+          approvalPolicy: options?.approvalPolicy || 'manual',
+          sandboxMode: options?.sandboxMode || 'workspace-write',
+          lastActivityTime: new Date().toISOString()
+        };
+        
+        await panelManager.updatePanel(panelId, {
+          state: {
+            ...panel.state,
+            customState: updatedState
+          }
+        });
+      }
+      
       return { success: true };
     } catch (error) {
       logger?.error(`[codex-debug] Failed to start panel ${panelId}:`, error as Error);
@@ -86,6 +110,25 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         options?.model,
         options?.modelProvider
       );
+      
+      // Update panel state with the model if provided
+      const panel = panelManager.getPanel(panelId);
+      if (panel && options?.model) {
+        const updatedState: CodexPanelState = {
+          ...panel.state.customState as CodexPanelState,
+          lastPrompt: prompt,
+          model: options.model,
+          modelProvider: options?.modelProvider || (panel.state.customState as CodexPanelState)?.modelProvider || 'openai',
+          lastActivityTime: new Date().toISOString()
+        };
+        
+        await panelManager.updatePanel(panelId, {
+          state: {
+            ...panel.state,
+            customState: updatedState
+          }
+        });
+      }
       
       return { success: true };
     } catch (error) {

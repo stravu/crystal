@@ -33,6 +33,10 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
     };
   });
   
+  // Get the model from panel state
+  const codexState = panel.state?.customState as any;
+  const model = codexState?.model || 'GPT-5';
+  
   const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('codexRichOutputSettings', JSON.stringify(newSettings));
@@ -122,7 +126,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
         {/* Model indicator and settings button */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-tertiary">
-            Model: <span className="text-text-secondary font-medium">GPT-4o</span>
+            Model: <span className="text-text-secondary font-medium">{model}</span>
           </span>
           
           {viewMode === 'richOutput' && (
