@@ -32,6 +32,8 @@ interface ClaudeRawMessage {
 }
 
 export class ClaudeMessageTransformer implements MessageTransformer {
+  private messageIdCounter = 0;
+  
   transform(rawMessages: ClaudeRawMessage[]): UnifiedMessage[] {
     const transformed: UnifiedMessage[] = [];
     
@@ -158,7 +160,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
       
       if (textContent) {
         return {
-          id: msg.id || `user-${msg.timestamp}`,
+          id: msg.id || `user_msg_${++this.messageIdCounter}`,
           role: 'user',
           timestamp: msg.timestamp,
           segments: [{ type: 'text', content: textContent }],
@@ -213,7 +215,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
            seg.content.includes('error')));
       
       return {
-        id: msg.id || `assistant-${msg.timestamp}`,
+        id: msg.id || `assistant_msg_${++this.messageIdCounter}`,
         role: isSyntheticError ? 'system' : 'assistant',
         timestamp: msg.timestamp,
         segments,
@@ -236,7 +238,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
   private parseSystemMessage(msg: ClaudeRawMessage): UnifiedMessage | null {
     if (msg.subtype === 'init') {
       return {
-        id: msg.id || `system-init-${msg.timestamp}`,
+        id: msg.id || `system_init_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
         segments: [{ 
@@ -257,7 +259,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
       };
     } else if (msg.subtype === 'context_compacted') {
       return {
-        id: msg.id || `context-compacted-${msg.timestamp}`,
+        id: msg.id || `context_compacted_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
         segments: [
@@ -270,7 +272,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
       };
     } else if (msg.subtype === 'error') {
       return {
-        id: msg.id || `error-${msg.timestamp}`,
+        id: msg.id || `error_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
         segments: [{ 
@@ -287,7 +289,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
       };
     } else if (msg.subtype === 'git_operation') {
       return {
-        id: msg.id || `git-operation-${msg.timestamp}`,
+        id: msg.id || `git_operation_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
         segments: [{ 
@@ -300,7 +302,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
       };
     } else if (msg.subtype === 'git_error') {
       return {
-        id: msg.id || `git-error-${msg.timestamp}`,
+        id: msg.id || `git_error_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
         segments: [{ 
@@ -320,7 +322,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
     // Handle execution result messages - especially errors
     if (msg.is_error && msg.result) {
       return {
-        id: msg.id || `error-${msg.timestamp}`,
+        id: msg.id || `error_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
         segments: [{ 

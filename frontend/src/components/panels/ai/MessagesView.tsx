@@ -419,7 +419,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           
           return (
             <div
-              key={index}
+              key={`message_${panelId}_${index}_${message.timestamp}`}
               className="bg-surface-secondary rounded-lg border border-border-primary"
             >
               <div
