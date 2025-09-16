@@ -3,6 +3,7 @@ import { CreateSessionDialog } from './CreateSessionDialog';
 import { API } from '../utils/api';
 import { Button } from './ui/Button';
 import { Plus, Zap } from 'lucide-react';
+import { getCodexModelConfig } from '../../../shared/types/models';
 
 export function CreateSessionButton() {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,12 +44,16 @@ export function CreateSessionButton() {
       
       // Create a session with minimal configuration
       // The backend will handle making "untitled" unique (untitled-1, untitled-2, etc.)
+      const lastModel = activeProject.lastUsedModel || 'auto';
+      const toolType = getCodexModelConfig(lastModel) ? 'codex' : 'claude';
+
       const response = await API.sessions.create({
         prompt: undefined, // No initial prompt
         worktreeTemplate: 'untitled', // Simple name - backend will make it unique
         count: 1,
         permissionMode: 'ignore', // Use default permission mode
-        model: activeProject.lastUsedModel || 'auto', // Use last used model or auto
+        model: lastModel, // Use last used model or auto
+        toolType,
         projectId: activeProject.id,
         autoCommit: true,
         commitMode: 'checkpoint',

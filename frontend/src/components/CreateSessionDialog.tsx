@@ -461,6 +461,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
         model: finalModel,
+        toolType,
         permissionMode: finalPermissionMode,
         projectId,
         commitMode: commitModeSettings.mode,

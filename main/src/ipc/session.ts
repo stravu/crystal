@@ -155,7 +155,19 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
       if (count > 1) {
         console.log('[IPC] Creating multiple sessions...');
-        const jobs = await taskQueue.createMultipleSessions(request.prompt, request.worktreeTemplate || '', count, request.permissionMode, targetProject.id, request.baseBranch, request.autoCommit, request.model, request.commitMode, request.commitModeSettings);
+        const jobs = await taskQueue.createMultipleSessions(
+          request.prompt,
+          request.worktreeTemplate || '',
+          count,
+          request.permissionMode,
+          targetProject.id,
+          request.baseBranch,
+          request.autoCommit,
+          request.model,
+          request.toolType,
+          request.commitMode,
+          request.commitModeSettings
+        );
         console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
         
         // Update project's lastUsedModel
@@ -174,6 +186,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           baseBranch: request.baseBranch,
           autoCommit: request.autoCommit,
           model: request.model,
+          toolType: request.toolType,
           commitMode: request.commitMode,
           commitModeSettings: request.commitModeSettings
         });
@@ -399,31 +412,51 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         console.log(`[IPC] Added structured commit instructions to input`);
       }
 
-      // Claude Panel Integration: Find or create Claude panel for input
-      console.log(`[IPC] Checking for Claude panels for session ${sessionId}`);
-      const inputPanels = panelManager.getPanelsForSession(sessionId);
-      const inputClaudePanels = inputPanels.filter(p => p.type === 'claude');
-      
-      if (inputClaudePanels.length === 0) {
-        console.log(`[IPC] No Claude panel found, creating one for session ${sessionId}`);
-        try {
-          await panelManager.createPanel({
-            sessionId: sessionId,
-            type: 'claude',
-            title: 'Claude'
-          });
-          console.log(`[IPC] Created Claude panel for session ${sessionId}`);
-        } catch (error) {
-          console.error(`[IPC] Failed to create Claude panel for session ${sessionId}:`, error);
-          // Continue without panel - fallback to session-level handling
-        }
-      } else {
-        console.log(`[IPC] Found ${inputClaudePanels.length} Claude panel(s) for session ${sessionId}`);
-        // Route to panel-based handler if panels exist
-        // For now, continue with session-level handling but panels will handle the UI
+      // Get session to determine tool type
+      const session = await sessionManager.getSession(sessionId);
+      if (!session) {
+        return { success: false, error: 'Session not found' };
       }
 
-      // Get Claude panels for this session after potential creation
+      // Determine which tool type to use for panel operations
+      const sessionToolType = session.toolType || 'claude'; // Default to claude for backward compatibility
+      
+      // Panel Integration: Find or create appropriate panel for input based on session's tool type
+      console.log(`[IPC] Checking for ${sessionToolType} panels for session ${sessionId}`);
+      const inputPanels = panelManager.getPanelsForSession(sessionId);
+      const inputToolPanels = inputPanels.filter(p => p.type === sessionToolType);
+      
+      if (inputToolPanels.length === 0 && sessionToolType !== 'none') {
+        console.log(`[IPC] No ${sessionToolType} panel found, creating one for session ${sessionId}`);
+        try {
+          const panelTitle = sessionToolType === 'codex' ? 'Codex' : 'Claude';
+          await panelManager.createPanel({
+            sessionId: sessionId,
+            type: sessionToolType as any,
+            title: panelTitle
+          });
+          console.log(`[IPC] Created ${sessionToolType} panel for session ${sessionId}`);
+        } catch (error) {
+          console.error(`[IPC] Failed to create ${sessionToolType} panel for session ${sessionId}:`, error);
+          // Continue without panel - fallback to session-level handling
+        }
+      } else if (sessionToolType !== 'none') {
+        console.log(`[IPC] Found ${inputToolPanels.length} ${sessionToolType} panel(s) for session ${sessionId}`);
+      }
+
+      // Handle based on tool type
+      if (sessionToolType === 'codex') {
+        // For Codex sessions, sendInput is not supported
+        console.log(`[IPC] Session ${sessionId} is a Codex session - sendInput not supported`);
+        return { success: false, error: 'Direct input not supported for Codex sessions. Use the Codex panel interface.' };
+      }
+      
+      if (sessionToolType === 'none') {
+        console.log(`[IPC] Session ${sessionId} has no tool type - cannot send input`);
+        return { success: false, error: 'Session has no tool configured' };
+      }
+
+      // Get Claude panels for this session after potential creation (only for Claude sessions)
       const postCreatePanels = panelManager.getPanelsForSession(sessionId);
       const postCreateClaudePanels = postCreatePanels.filter(p => p.type === 'claude');
       
@@ -443,11 +476,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       if (!isClaudeRunning) {
         console.log(`[IPC] Claude Code not running for panel ${claudePanel.id}, starting it now...`);
         
-        // Get session details
-        const session = await sessionManager.getSession(sessionId);
-        if (!session) {
-          return { success: false, error: 'Session not found' };
-        }
+        // Session already fetched above, no need to fetch again
         
         // Start Claude Code via the panel with the input as the initial prompt
         await claudeCodeManager.startPanel(claudePanel.id, sessionId, session.worktreePath, finalInput, session.permissionMode);
@@ -507,13 +536,27 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         throw new Error('Session not found');
       }
 
+      // Determine tool type for this session
+      const sessionToolType = session.toolType || 'claude'; // Default to claude for backward compatibility
+      
+      // For Codex sessions, continuing is not supported
+      if (sessionToolType === 'codex') {
+        console.log(`[IPC] Session ${sessionId} is a Codex session - continue not supported`);
+        return { success: false, error: 'Continue not supported for Codex sessions. Use the Codex panel interface.' };
+      }
+      
+      if (sessionToolType === 'none') {
+        console.log(`[IPC] Session ${sessionId} has no tool type - cannot continue`);
+        return { success: false, error: 'Session has no tool configured' };
+      }
+
       // Check if Claude is already running for this session to prevent duplicate starts
       if (claudeCodeManager.isSessionRunning(sessionId)) {
         console.log(`[IPC] Session ${sessionId} is already running, preventing duplicate continue`);
         return { success: false, error: 'Session is already processing a request' };
       }
 
-      // Claude Panel Integration: Find or create Claude panel for continuation
+      // Claude Panel Integration: Find or create Claude panel for continuation (only for Claude sessions)
       if (prompt) {
         console.log(`[IPC] Checking for Claude panels for session ${sessionId}`);
         const continuePanels = panelManager.getPanelsForSession(sessionId);

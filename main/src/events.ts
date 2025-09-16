@@ -38,45 +38,52 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     // Auto-create AI panel for sessions with prompts
     console.log(`[Events] Session ${session.id} created with prompt value:`, JSON.stringify(session.prompt), `Type: ${typeof session.prompt}, Length: ${session.prompt ? session.prompt.length : 'N/A'}`);
     if (session.prompt && typeof session.prompt === 'string' && session.prompt.trim().length > 0) {
-      // Decide whether to create a Codex or Claude panel based on the model
-      const isCodexModel = !!(session.model && getCodexModelConfig(session.model));
-      const panelType = isCodexModel ? 'codex' : 'claude';
-      const panelTitle = isCodexModel ? 'Codex' : 'Claude';
+      // Decide whether to create a Codex or Claude panel based on the explicit tool type when available
+      const inferredToolType: 'claude' | 'codex' | 'none' = session.toolType
+        ? session.toolType
+        : (session.model && getCodexModelConfig(session.model)) ? 'codex' : 'claude';
 
-      console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
-      try {
-        const panel = await panelManager.createPanel({
-          sessionId: session.id,
-          type: panelType as any,
-          title: panelTitle,
-          initialState: isCodexModel ? { model: session.model } : undefined
-        });
-        console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
+      if (inferredToolType === 'none') {
+        console.log(`[Events] Session ${session.id} configured with no default tool. Skipping automatic panel creation.`);
+      } else {
+        const panelType = inferredToolType === 'codex' ? 'codex' : 'claude';
+        const panelTitle = inferredToolType === 'codex' ? 'Codex' : 'Claude';
 
-        // Register with the appropriate panel manager
+        console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
         try {
-          if (isCodexModel) {
-            const { codexPanelManager } = require('./ipc/codexPanel');
-            if (codexPanelManager) {
-              codexPanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-              console.log(`[Events] Registered Codex panel ${panel.id} for session ${session.id}`);
+          const panel = await panelManager.createPanel({
+            sessionId: session.id,
+            type: panelType as any,
+            title: panelTitle,
+            initialState: panelType === 'codex' ? { model: session.model } : undefined
+          });
+          console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
+
+          // Register with the appropriate panel manager
+          try {
+            if (panelType === 'codex') {
+              const { codexPanelManager } = require('./ipc/codexPanel');
+              if (codexPanelManager) {
+                codexPanelManager.registerPanel(panel.id, session.id, panel.state.customState);
+                console.log(`[Events] Registered Codex panel ${panel.id} for session ${session.id}`);
+              } else {
+                console.warn('[Events] CodexPanelManager not initialized yet; panel will register later');
+              }
             } else {
-              console.warn('[Events] CodexPanelManager not initialized yet; panel will register later');
+              const { claudePanelManager } = require('./ipc/claudePanel');
+              if (claudePanelManager) {
+                claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
+                console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
+              } else {
+                console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
+              }
             }
-          } else {
-            const { claudePanelManager } = require('./ipc/claudePanel');
-            if (claudePanelManager) {
-              claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-              console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
-            } else {
-              console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
-            }
+          } catch (err) {
+            console.error(`[Events] Failed to register ${panelType} panel with its manager:`, err);
           }
-        } catch (err) {
-          console.error(`[Events] Failed to register ${panelType} panel with its manager:`, err);
+        } catch (error) {
+          console.error(`[Events] Failed to auto-create ${panelType} panel for session ${session.id}:`, error);
         }
-      } catch (error) {
-        console.error(`[Events] Failed to auto-create ${panelType} panel for session ${session.id}:`, error);
       }
     }
     

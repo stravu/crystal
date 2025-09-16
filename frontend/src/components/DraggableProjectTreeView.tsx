@@ -19,6 +19,7 @@ import { Button } from './ui/Button';
 import { EnhancedInput } from './ui/EnhancedInput';
 import { FieldWithTooltip } from './ui/FieldWithTooltip';
 import { Card } from './ui/Card';
+import { getCodexModelConfig } from '../../../shared/types/models';
 
 interface ProjectWithSessions extends Project {
   sessions: Session[];
@@ -855,6 +856,7 @@ export function DraggableProjectTreeView() {
         count: 1,
         permissionMode: 'ignore', // Use default permission mode
         model: project.lastUsedModel || 'auto', // Use last used model or auto
+        toolType: getCodexModelConfig(project.lastUsedModel || 'auto') ? 'codex' : 'claude',
         projectId: project.id,
         autoCommit: true,
         commitMode: 'checkpoint',

@@ -31,6 +31,7 @@ interface CreateSessionJob {
   baseBranch?: string;
   autoCommit?: boolean;
   model?: string;
+  toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
 }
@@ -128,7 +129,7 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model, toolType } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
       console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
@@ -195,6 +196,7 @@ export class TaskQueue {
           autoCommit,
           job.data.folderId,
           model,
+          toolType,
           baseCommit,
           actualBaseBranch,
           job.data.commitMode,
@@ -253,8 +255,11 @@ export class TaskQueue {
 
         // Only start an AI panel if there's a prompt
         if (prompt && prompt.trim().length > 0) {
-          const isCodexModel = !!(model && getCodexModelConfig(model));
-          if (isCodexModel) {
+          const resolvedToolType: 'claude' | 'codex' | 'none' = toolType
+            ? toolType
+            : (model && getCodexModelConfig(model)) ? 'codex' : 'claude';
+
+          if (resolvedToolType === 'codex') {
             console.log(`[TaskQueue] Starting Codex for session ${session.id} with model: ${model}`);
 
             // Wait for the Codex panel to be created by the session-created event handler in events.ts
@@ -298,7 +303,7 @@ export class TaskQueue {
               console.error('[TaskQueue] This indicates the panel creation failed in events.ts.');
               throw new Error('No Codex panel found - cannot start Codex without a real panel ID');
             }
-          } else {
+          } else if (resolvedToolType === 'claude') {
             console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
             
             // Wait for the Claude panel to be created by the session-created event handler in events.ts
@@ -350,6 +355,8 @@ export class TaskQueue {
               console.error(`[TaskQueue] This indicates the panel creation failed in events.ts. Cannot proceed without a real panel.`);
               throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
             }
+          } else {
+            console.log(`[TaskQueue] Tool type '${resolvedToolType}' selected - skipping automatic AI start for session ${session.id}`);
           }
         } else {
           console.log(`[TaskQueue] No prompt provided for session ${session.id}, skipping AI initialization`);
@@ -425,7 +432,19 @@ export class TaskQueue {
     return job;
   }
 
-  async createMultipleSessions(prompt: string, worktreeTemplate: string, count: number, permissionMode?: 'approve' | 'ignore', projectId?: number, baseBranch?: string, autoCommit?: boolean, model?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
+  async createMultipleSessions(
+    prompt: string,
+    worktreeTemplate: string,
+    count: number,
+    permissionMode?: 'approve' | 'ignore',
+    projectId?: number,
+    baseBranch?: string,
+    autoCommit?: boolean,
+    model?: string,
+    toolType?: 'claude' | 'codex' | 'none',
+    commitMode?: 'structured' | 'checkpoint' | 'disabled',
+    commitModeSettings?: string
+  ): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
     
@@ -482,7 +501,7 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model, commitMode, commitModeSettings }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model, toolType, commitMode, commitModeSettings }));
     }
     return Promise.all(jobs);
   }

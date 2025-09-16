@@ -21,6 +21,7 @@ export interface Session {
   isFavorite?: boolean;
   autoCommit?: boolean;
   model?: string;
+  toolType?: 'claude' | 'codex' | 'none';
   archived?: boolean;
   gitStatus?: GitStatus;
   baseCommit?: string;
@@ -60,6 +61,7 @@ export interface CreateSessionRequest {
   baseBranch?: string;
   autoCommit?: boolean;
   model?: string;
+  toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
 }

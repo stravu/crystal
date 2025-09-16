@@ -675,6 +675,26 @@ export class DatabaseService {
       console.log('[Database] Added model column to sessions table');
     }
 
+    // Add tool_type column to sessions table if it doesn't exist
+    const sessionTableInfoToolType = this.db.prepare("PRAGMA table_info(sessions)").all();
+    const hasToolTypeColumn = sessionTableInfoToolType.some((col: any) => col.name === 'tool_type');
+
+    if (!hasToolTypeColumn) {
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN tool_type TEXT DEFAULT 'claude'").run();
+      console.log('[Database] Added tool_type column to sessions table');
+
+      // Best effort: mark known Codex sessions based on model values
+      try {
+        this.db.prepare(`
+          UPDATE sessions
+          SET tool_type = 'codex'
+          WHERE model IN ('gpt-5', 'gpt-5-codex')
+        `).run();
+      } catch (error) {
+        console.error('[Database] Failed to backfill tool_type for Codex sessions:', error);
+      }
+    }
+
     // Add user_preferences table to store all user preferences
     const userPreferencesTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'").all();
     if (userPreferencesTable.length === 0) {
@@ -1438,9 +1458,27 @@ export class DatabaseService {
       const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
       
       this.db.prepare(`
-        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch, commit_mode, commit_mode_settings)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'sonnet', data.base_commit || null, data.base_branch || null, data.commit_mode || null, data.commit_mode_settings || null);
+        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, model, base_commit, base_branch, commit_mode, commit_mode_settings)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        data.id,
+        data.name,
+        data.initial_prompt,
+        data.worktree_name,
+        data.worktree_path,
+        data.project_id,
+        data.folder_id || null,
+        data.permission_mode || 'ignore',
+        data.is_main_repo ? 1 : 0,
+        displayOrder,
+        data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1,
+        data.tool_type || 'claude',
+        data.model || 'sonnet',
+        data.base_commit || null,
+        data.base_branch || null,
+        data.commit_mode || null,
+        data.commit_mode_settings || null
+      );
       
       const session = this.getSession(data.id);
       if (!session) {

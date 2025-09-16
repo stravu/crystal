@@ -119,6 +119,13 @@ export class SessionManager extends EventEmitter {
   }
 
   private convertDbSessionToSession(dbSession: DbSession): Session {
+    const toolTypeFromDb = (dbSession as any).tool_type as 'claude' | 'codex' | 'none' | null | undefined;
+    const normalizedToolType: 'claude' | 'codex' | 'none' = toolTypeFromDb === 'codex'
+      ? 'codex'
+      : toolTypeFromDb === 'none'
+        ? 'none'
+        : 'claude';
+
     return {
       id: dbSession.id,
       name: dbSession.name,
@@ -141,6 +148,7 @@ export class SessionManager extends EventEmitter {
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
       model: dbSession.model,
+      toolType: normalizedToolType,
       archived: dbSession.archived || false,
       baseCommit: dbSession.base_commit,
       baseBranch: dbSession.base_branch,
@@ -195,13 +203,63 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  async createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Promise<Session> {
+  async createSession(
+    name: string,
+    worktreePath: string,
+    prompt: string,
+    worktreeName: string,
+    permissionMode?: 'approve' | 'ignore',
+    projectId?: number,
+    isMainRepo?: boolean,
+    autoCommit?: boolean,
+    folderId?: string,
+    model?: string,
+    toolType?: 'claude' | 'codex' | 'none',
+    baseCommit?: string,
+    baseBranch?: string,
+    commitMode?: 'structured' | 'checkpoint' | 'disabled',
+    commitModeSettings?: string
+  ): Promise<Session> {
     return await withLock(`session-creation`, async () => {
-      return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model, baseCommit, baseBranch, commitMode, commitModeSettings);
+      return this.createSessionWithId(
+        randomUUID(),
+        name,
+        worktreePath,
+        prompt,
+        worktreeName,
+        permissionMode,
+        projectId,
+        isMainRepo,
+        autoCommit,
+        folderId,
+        model,
+        toolType,
+        baseCommit,
+        baseBranch,
+        commitMode,
+        commitModeSettings
+      );
     });
   }
 
-  createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Session {
+  createSessionWithId(
+    id: string,
+    name: string,
+    worktreePath: string,
+    prompt: string,
+    worktreeName: string,
+    permissionMode?: 'approve' | 'ignore',
+    projectId?: number,
+    isMainRepo?: boolean,
+    autoCommit?: boolean,
+    folderId?: string,
+    model?: string,
+    toolType?: 'claude' | 'codex' | 'none',
+    baseCommit?: string,
+    baseBranch?: string,
+    commitMode?: 'structured' | 'checkpoint' | 'disabled',
+    commitModeSettings?: string
+  ): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
     // Ensure this session ID isn't already being created
@@ -243,6 +301,7 @@ export class SessionManager extends EventEmitter {
       model: model,
       base_commit: baseCommit,
       base_branch: baseBranch,
+      tool_type: toolType,
       commit_mode: commitMode,
       commit_mode_settings: commitModeSettings
     };
@@ -252,6 +311,7 @@ export class SessionManager extends EventEmitter {
     console.log(`[SessionManager] Database session created:`, dbSession);
     
     const session = this.convertDbSessionToSession(dbSession);
+    session.toolType = toolType || session.toolType;
     console.log(`[SessionManager] Converted session:`, session);
     
     this.activeSessions.set(session.id, session);
@@ -300,6 +360,9 @@ export class SessionManager extends EventEmitter {
         true, // autoCommit = true (default for main repo sessions)
         undefined, // folderId
         'sonnet', // default model for main repo sessions
+        'claude',
+        undefined,
+        undefined,
         project.commit_mode, // Use project's commit mode
         undefined // commit_mode_settings - let it use project defaults
       );
