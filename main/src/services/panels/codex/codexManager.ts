@@ -21,6 +21,8 @@ interface CodexSpawnOptions {
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   approvalPolicy?: 'auto' | 'manual';
   webSearch?: boolean;
+  isResume?: boolean;
+  resumeSessionId?: string;
 }
 
 interface CodexProcess {
@@ -165,6 +167,20 @@ export class CodexManager extends AbstractCliManager {
   }
 
   protected buildCommandArgs(options: CodexSpawnOptions): string[] {
+    // If resuming a session, use the resume command
+    if (options.isResume && options.resumeSessionId) {
+      const args: string[] = ['resume', options.resumeSessionId];
+      
+      // Add the prompt if provided
+      if (options.prompt && options.prompt.trim()) {
+        args.push(options.prompt);
+      }
+      
+      this.logger?.info(`[codex-debug] Built resume command args: ${args.join(' ')}`);
+      return args;
+    }
+    
+    // Otherwise use the proto command for new sessions
     const args: string[] = ['proto'];
     
     // Model configuration - 'auto' means don't pass a model parameter
@@ -276,6 +292,30 @@ export class CodexManager extends AbstractCliManager {
       try {
         const jsonMessage = JSON.parse(line);
         this.logger?.info(`[codex-debug] JSON message received from panel ${panelId}: ${JSON.stringify(jsonMessage).substring(0, 500)}`);
+        
+        // Check if this is a session_configured message with session_id
+        if (jsonMessage.msg?.type === 'session_configured' && jsonMessage.msg?.session_id) {
+          const codexSessionId = jsonMessage.msg.session_id;
+          this.logger?.info(`[codex-debug] Received Codex session ID for panel ${panelId}: ${codexSessionId}`);
+          
+          // Store the session ID in the panel's custom state
+          if (this.sessionManager) {
+            const db = (this.sessionManager as any).db;
+            if (db) {
+              const panel = db.getPanel(panelId);
+              if (panel) {
+                const currentState = panel.state || {};
+                const customState = currentState.customState || {};
+                const updatedState = {
+                  ...currentState,
+                  customState: { ...customState, codexSessionId }
+                };
+                db.updatePanel(panelId, { state: updatedState });
+                this.logger?.info(`[codex-debug] Stored Codex session_id for panel ${panelId}: ${codexSessionId}`);
+              }
+            }
+          }
+        }
         
         // Check if this is the initial protocol handshake
         const handshakeComplete = this.protocolHandshakeComplete.get(panelId);
@@ -605,10 +645,45 @@ export class CodexManager extends AbstractCliManager {
     prompt: string,
     conversationHistory: any[]
   ): Promise<void> {
-    // For now, just start a new session with the prompt
-    // TODO: Implement conversation history resumption if Codex supports it
-    // GPT-5 (released August 7, 2025) has improved context handling
-    await this.startPanel(panelId, sessionId, worktreePath, prompt);
+    // Check if we have a stored Codex session ID to resume from
+    const codexSessionId = this.sessionManager?.getPanelCodexSessionId?.(panelId);
+    
+    if (codexSessionId) {
+      this.logger?.info(`[codex-debug] Resuming Codex session ${codexSessionId} for panel ${panelId}`);
+      
+      // Use Codex's resume command to continue the conversation
+      const options: CodexSpawnOptions = {
+        panelId,
+        sessionId,
+        worktreePath,
+        prompt,
+        isResume: true,
+        resumeSessionId: codexSessionId
+      };
+      
+      // Initialize message ID counter for this panel
+      this.messageIdCounters.set(panelId, 1);
+      
+      // If we have a prompt, store it to send after connection
+      if (prompt && prompt.trim()) {
+        this.pendingInitialPrompts.set(panelId, prompt);
+        this.logger?.info(`[codex-debug] Stored pending prompt for resumed panel ${panelId}: "${prompt}"`);
+      }
+      
+      await this.spawnCliProcess(options);
+      
+      // Verify the process was spawned successfully
+      const processCheck = this.codexProcesses.get(panelId);
+      if (!processCheck) {
+        throw new Error(`Failed to spawn Codex process for panel ${panelId} - process not found after spawn`);
+      }
+      
+      this.logger?.info(`[codex-debug] Resume process verified for panel ${panelId}, PID: ${processCheck.pid}`);
+    } else {
+      // No session ID to resume from, start a new session
+      this.logger?.warn(`[codex-debug] No Codex session ID found for panel ${panelId}, starting new session`);
+      await this.startPanel(panelId, sessionId, worktreePath, prompt);
+    }
   }
 
   async stopPanel(panelId: string): Promise<void> {

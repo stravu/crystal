@@ -81,6 +81,18 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  // Panel-scoped Codex session ID for conversation continuation
+  getPanelCodexSessionId(panelId: string): string | undefined {
+    try {
+      const panel = this.db.getPanel(panelId);
+      const codexSessionId = (panel as any)?.state?.customState?.codexSessionId;
+      console.log(`[SessionManager] Getting Codex session ID for panel ${panelId}: ${codexSessionId || 'not found'}`);
+      return codexSessionId;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   getProjectById(id: number): Project | undefined {
     return this.db.getProject(id);
   }

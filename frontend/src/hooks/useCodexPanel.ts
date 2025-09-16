@@ -60,6 +60,18 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
         // Handle output events - could update local state if needed
         console.log(`[codex-debug] Output event received for panel ${panelId}:`, JSON.stringify(data).substring(0, 500));
         
+        // Check if this is a task_complete message to reset processing state
+        if (data.type === 'json' && data.data?.msg?.type === 'task_complete') {
+          console.log(`[codex-debug] Task complete received for panel ${panelId}, resetting processing state`);
+          setIsProcessing(false);
+        }
+        
+        // Also reset processing on agent_message (completion of response)
+        if (data.type === 'json' && data.data?.msg?.type === 'agent_message') {
+          console.log(`[codex-debug] Agent message received for panel ${panelId}, resetting processing state`);
+          setIsProcessing(false);
+        }
+        
         // Dispatch a window event so the RichOutputView can receive it
         window.dispatchEvent(new CustomEvent('codexPanel:output', { detail: data }));
       }

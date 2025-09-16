@@ -1001,6 +1001,54 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
       // Route to appropriate panel type handler
       switch (panel.type) {
+        case 'codex':
+          try {
+            const { codexPanelManager } = require('./codexPanel');
+            if (!codexPanelManager) {
+              return { success: false, error: 'Codex panel manager not available' };
+            }
+
+            // Get session to retrieve worktreePath
+            const session = await sessionManager.getSession(panel.sessionId);
+            if (!session) {
+              return { success: false, error: 'Session not found' };
+            }
+
+            // Save the user input as a conversation message
+            if (input) {
+              sessionManager.addPanelConversationMessage(panelId, 'user', input);
+            }
+
+            // Check if there's a Codex session ID for resumption
+            const isRunning = codexPanelManager.isPanelRunning(panelId);
+            const hasCodexSessionId = !!sessionManager.getPanelCodexSessionId(panelId);
+
+            if (!isRunning && !hasCodexSessionId) {
+              // No running process and no session ID, start fresh
+              console.log('[IPC] panels:continue starting fresh Codex session (no running process, no codex_session_id)');
+              await codexPanelManager.startPanel(panelId, panel.sessionId, session.worktreePath, input || '', model);
+              return { success: true };
+            }
+
+            // Otherwise continue with resume
+            const conversationHistory = sessionManager.getPanelConversationMessages
+              ? await sessionManager.getPanelConversationMessages(panelId)
+              : [];
+              
+            console.log('[IPC] panels:continue resuming Codex conversation via continuePanel');
+            await codexPanelManager.continuePanel(
+              panelId,
+              session.worktreePath,
+              input || '',
+              conversationHistory,
+              model
+            );
+            return { success: true };
+          } catch (err) {
+            console.error('Failed to continue Codex panel:', err);
+            return { success: false, error: 'Failed to continue Codex panel' };
+          }
+          
         case 'claude':
           try {
             const { claudePanelManager } = require('./claudePanel');
