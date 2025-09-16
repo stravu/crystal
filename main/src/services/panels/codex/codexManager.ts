@@ -6,6 +6,7 @@ import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
+import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -141,9 +142,11 @@ export class CodexManager extends AbstractCliManager {
   protected buildCommandArgs(options: CodexSpawnOptions): string[] {
     const args: string[] = ['proto'];
     
-    // Model configuration (defaults to GPT-5)
-    const model = options.model || 'gpt-5';
-    args.push('-c', `model="${model}"`);
+    // Model configuration - 'auto' means don't pass a model parameter
+    const model = options.model || DEFAULT_CODEX_MODEL;
+    if (model !== 'auto') {
+      args.push('-c', `model="${model}"`);
+    }
     
     if (options.modelProvider) {
       args.push('-c', `model_provider="${options.modelProvider}"`);
@@ -504,7 +507,7 @@ export class CodexManager extends AbstractCliManager {
       sessionId,
       worktreePath,
       prompt,
-      model: model || 'gpt-5', // Default to GPT-5 (released August 7, 2025)
+      model: model || DEFAULT_CODEX_MODEL,
       modelProvider: modelProvider || 'openai'
     };
     

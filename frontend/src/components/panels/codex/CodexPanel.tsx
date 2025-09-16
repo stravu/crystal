@@ -8,6 +8,7 @@ import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransfor
 import { CodexStatsView } from './CodexStatsView';
 import { CodexInputPanel } from './CodexInputPanel';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
+import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
 
 interface CodexPanelProps {
   panel: ToolPanel;
@@ -35,7 +36,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
   
   // Get the model from panel state
   const codexState = panel.state?.customState as any;
-  const model = codexState?.model || 'GPT-5';
+  const model = codexState?.model || DEFAULT_CODEX_MODEL;
   
   const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
     setRichOutputSettings(newSettings);
@@ -191,6 +192,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
           panelId={panel.id}
           onSendMessage={hook.handleSendMessage}
           disabled={hook.isProcessing}
+          initialModel={model}
         />
       )}
     </div>

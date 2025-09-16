@@ -4,6 +4,7 @@ import { CodexPanelManager } from '../services/panels/codex/codexPanelManager';
 import { panelManager } from '../services/panelManager';
 import type { AppServices } from './types';
 import type { CodexPanelState } from '../../../shared/types/panels';
+import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
 // Singleton instances will be created in the register function
 let codexManager: CodexManager;
@@ -72,7 +73,7 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
           ...panel.state.customState as CodexPanelState,
           isInitialized: true,
           lastPrompt: prompt,
-          model: options?.model || 'gpt-5',
+          model: options?.model || DEFAULT_CODEX_MODEL,
           modelProvider: options?.modelProvider || 'openai',
           approvalPolicy: options?.approvalPolicy || 'manual',
           sandboxMode: options?.sandboxMode || 'workspace-write',
