@@ -80,20 +80,60 @@ export class CodexManager extends AbstractCliManager {
 
       // Test codex availability
       this.logger?.info(`[codex-debug] Testing Codex command: "${command}" --version`);
-      const version = execSync(`"${command}" --version`, { encoding: 'utf8' }).trim();
-      this.logger?.info(`[codex-debug] Codex version detected: ${version}`);
       
-      return {
-        available: true,
-        version,
-        path: command
-      };
+      // Try direct execution first
+      try {
+        const version = execSync(`"${command}" --version`, { 
+          encoding: 'utf8',
+          timeout: 5000
+        }).trim();
+        this.logger?.info(`[codex-debug] Codex version detected: ${version}`);
+        
+        return {
+          available: true,
+          version,
+          path: command
+        };
+      } catch (directError: any) {
+        // Check if it's a shebang/node error
+        const errorMsg = directError.message || String(directError);
+        if (errorMsg.includes('env: node:') || errorMsg.includes('No such file or directory')) {
+          this.logger?.warn('[codex-debug] Codex appears to be a Node.js script with shebang issue, trying Node.js fallback...');
+          
+          // Try to find Node.js and run the script directly
+          const { findNodeExecutable } = require('../../../utils/nodeFinder');
+          try {
+            const nodePath = await findNodeExecutable();
+            this.logger?.info(`[codex-debug] Found Node.js at: ${nodePath}`);
+            
+            // Test with Node.js directly
+            const version = execSync(`"${nodePath}" "${command}" --version`, {
+              encoding: 'utf8',
+              timeout: 5000
+            }).trim();
+            this.logger?.info(`[codex-debug] Codex version detected via Node.js: ${version}`);
+            
+            // Store that we need Node.js fallback
+            (global as any).codexNeedsNodeFallback = true;
+            
+            return {
+              available: true,
+              version,
+              path: command
+            };
+          } catch (nodeError) {
+            this.logger?.error('[codex-debug] Node.js fallback also failed:', nodeError instanceof Error ? nodeError : undefined);
+            throw directError; // Re-throw original error
+          }
+        }
+        throw directError;
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger?.error(`[codex-debug] Codex availability test failed: ${errorMessage}`);
       return {
         available: false,
-        error: `Codex not found: ${errorMessage}`
+        error: `${errorMessage}`
       };
     }
   }
@@ -341,9 +381,27 @@ export class CodexManager extends AbstractCliManager {
       const systemEnv = await this.getSystemEnvironment();
       const env = { ...process.env, ...systemEnv, ...cliEnv };
 
+      // Check if we need Node.js fallback
+      let finalCommand = cliCommand;
+      let finalArgs = args;
+      
+      if ((global as any).codexNeedsNodeFallback) {
+        this.logger?.info('[codex-debug] Using Node.js fallback for Codex');
+        const { findNodeExecutable } = require('../../../utils/nodeFinder');
+        try {
+          const nodePath = await findNodeExecutable();
+          this.logger?.info(`[codex-debug] Using Node.js at: ${nodePath}`);
+          finalCommand = nodePath;
+          finalArgs = [cliCommand, ...args];
+        } catch (nodeError) {
+          this.logger?.error('[codex-debug] Failed to find Node.js for fallback:', nodeError instanceof Error ? nodeError : undefined);
+          // Continue with original command and hope for the best
+        }
+      }
+
       // Spawn the process with pipes (not PTY)
-      this.logger?.info(`[codex-debug] Spawning Codex process:\n  Command: ${cliCommand}\n  Args: ${args.join(' ')}\n  Working directory: ${worktreePath}\n  Environment vars: ${Object.keys(cliEnv).join(', ')}`);
-      const childProcess = spawn(cliCommand, args, {
+      this.logger?.info(`[codex-debug] Spawning Codex process:\n  Command: ${finalCommand}\n  Args: ${finalArgs.join(' ')}\n  Working directory: ${worktreePath}\n  Environment vars: ${Object.keys(cliEnv).join(', ')}`);
+      const childProcess = spawn(finalCommand, finalArgs, {
         cwd: worktreePath,
         env,
         stdio: ['pipe', 'pipe', 'pipe']
@@ -682,12 +740,15 @@ export class CodexManager extends AbstractCliManager {
       }
     }
     
-    // Finally check PATH
+    // Finally check PATH - findExecutableInPath is synchronous
+    this.logger?.info('[codex-debug] Checking PATH for codex executable...');
     const pathResult = findExecutableInPath('codex');
     if (pathResult) {
+      this.logger?.info(`[codex-debug] Found Codex in PATH at: ${pathResult}`);
       return pathResult;
     }
     
+    this.logger?.info('[codex-debug] Codex not found in any location');
     return null;
   }
 
