@@ -4,6 +4,7 @@ import { panelManager } from './panelManager';
 import { mainWindow } from '../index';
 import * as os from 'os';
 import * as path from 'path';
+import { getShellPath } from '../utils/shellPath';
 
 interface TerminalProcess {
   pty: pty.IPty;
@@ -30,7 +31,10 @@ export class TerminalPanelManager {
     // Determine shell based on platform
     const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
     
-    // Create PTY process
+    // Get enhanced PATH from shellPath utility
+    const enhancedPath = getShellPath();
+    
+    // Create PTY process with enhanced environment
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-color',
       cols: 80,
@@ -38,6 +42,7 @@ export class TerminalPanelManager {
       cwd: cwd,
       env: {
         ...process.env,
+        PATH: enhancedPath,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
         CRYSTAL_SESSION_ID: panel.sessionId,

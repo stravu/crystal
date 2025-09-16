@@ -38,6 +38,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'approve' | 'ignore'>('ignore');
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [devMode, setDevMode] = useState(false);
+  const [additionalPathsText, setAdditionalPathsText] = useState('');
+  const [platform, setPlatform] = useState<string>('darwin');
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: true,
     playSound: true,
@@ -55,6 +57,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   useEffect(() => {
     if (isOpen) {
       fetchConfig();
+      // Get platform for PATH help text
+      window.electronAPI.getPlatform().then(setPlatform);
     }
   }, [isOpen]);
 
@@ -71,6 +75,10 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
       setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
       setDevMode(data.devMode || false);
+      
+      // Load additional paths
+      const paths = data.additionalPaths || [];
+      setAdditionalPathsText(paths.join('\n'));
       
       // Load notification settings
       if (data.notifications) {
@@ -89,6 +97,12 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
     setError(null);
 
     try {
+      // Parse the additional paths text into an array
+      const parsedPaths = additionalPathsText
+        .split('\n')
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+      
       const response = await API.config.update({ 
         verbose, 
         anthropicApiKey, 
@@ -97,6 +111,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         defaultPermissionMode,
         autoCheckUpdates,
         devMode,
+        additionalPaths: parsedPaths,
         notifications: notificationSettings
       });
 
@@ -369,6 +384,34 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                     Adds a "Messages" tab to each session showing raw JSON responses from Claude Code. Useful for debugging and development.
                   </p>
                 </div>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Additional PATH Directories"
+                description="Add custom directories to the PATH environment variable"
+                icon={<FileText className="w-4 h-4" />}
+              >
+                <Textarea
+                  label=""
+                  value={additionalPathsText}
+                  onChange={(e) => setAdditionalPathsText(e.target.value)}
+                  placeholder={
+                    platform === 'win32' 
+                      ? "C:\\tools\\bin\nC:\\Program Files\\MyApp\n%USERPROFILE%\\bin"
+                      : platform === 'darwin'
+                      ? "/opt/homebrew/bin\n/usr/local/bin\n~/bin\n~/.cargo/bin"
+                      : "/usr/local/bin\n/opt/bin\n~/bin\n~/.local/bin"
+                  }
+                  rows={4}
+                  fullWidth
+                  helperText={
+                    `Enter one directory path per line. These will be added to PATH for all tools.\n${
+                      platform === 'win32' 
+                        ? "Windows: Use backslashes (C:\\path) or forward slashes (C:/path). Environment variables like %USERPROFILE% are supported."
+                        : "Unix/macOS: Use forward slashes (/path). The tilde (~) expands to your home directory."
+                    }\nNote: Changes require restarting Crystal to take full effect.`
+                  }
+                />
               </SettingsSection>
 
               <SettingsSection

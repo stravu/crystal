@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { getCrystalDirectory } from '../utils/crystalDirectory';
+import { clearShellPathCache } from '../utils/shellPath';
 
 export class ConfigManager extends EventEmitter {
   private config: AppConfig;
@@ -72,6 +73,13 @@ export class ConfigManager extends EventEmitter {
     const { theme, ...filteredUpdates } = updates;
     this.config = { ...this.config, ...filteredUpdates };
     await this.saveConfig();
+    
+    // Clear PATH cache if additional paths were updated
+    if ('additionalPaths' in filteredUpdates) {
+      clearShellPathCache();
+      console.log('[ConfigManager] Additional paths updated, cleared PATH cache');
+    }
+    
     this.emit('config-updated', this.config);
     return this.getConfig();
   }

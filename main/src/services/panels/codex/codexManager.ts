@@ -704,51 +704,32 @@ export class CodexManager extends AbstractCliManager {
   }
 
   private async findCodexExecutable(): Promise<string | null> {
-    // Check environment variable override
+    // Check environment variable override first
     if (process.env.CODEX_PATH) {
+      this.logger?.info(`[codex-debug] Using CODEX_PATH environment variable: ${process.env.CODEX_PATH}`);
       return process.env.CODEX_PATH;
     }
     
-    // Check common installation locations
-    const locations = [
-      // Bun
-      path.join(os.homedir(), '.bun/install/global/node_modules/@openai/codex/bin/codex-' + this.getPlatformBinary()),
-      // NPM (user)
-      path.join(os.homedir(), '.local/share/npm/lib/node_modules/@openai/codex/bin/codex-' + this.getPlatformBinary()),
-      // NPM (system)
-      '/usr/local/lib/node_modules/@openai/codex/bin/codex-' + this.getPlatformBinary(),
-      '/opt/homebrew/lib/node_modules/@openai/codex/bin/codex-' + this.getPlatformBinary(),
-      // Native binaries
-      path.join(os.homedir(), '.cargo/bin/codex'),
-      '/usr/local/bin/codex',
-      '/opt/homebrew/bin/codex'
-    ];
-    
-    // Windows specific
-    if (process.platform === 'win32') {
-      locations.push(
-        path.join(process.env.APPDATA || '', 'npm/codex.cmd'),
-        path.join(process.env.APPDATA || '', 'npm/codex.ps1')
-      );
-    }
-    
-    // Check each location
-    for (const location of locations) {
-      if (fs.existsSync(location)) {
-        this.logger?.info(`[codex-debug] Found Codex executable at: ${location}`);
-        return location;
-      }
-    }
-    
-    // Finally check PATH - findExecutableInPath is synchronous
-    this.logger?.info('[codex-debug] Checking PATH for codex executable...');
+    // Use centralized path finding utility with enhanced PATH
+    this.logger?.info('[codex-debug] Searching for codex executable using centralized PATH utility...');
     const pathResult = findExecutableInPath('codex');
+    
     if (pathResult) {
-      this.logger?.info(`[codex-debug] Found Codex in PATH at: ${pathResult}`);
+      this.logger?.info(`[codex-debug] Found Codex at: ${pathResult}`);
       return pathResult;
     }
     
-    this.logger?.info('[codex-debug] Codex not found in any location');
+    // As a fallback, check for platform-specific codex binaries with full names
+    const platformBinary = `codex-${this.getPlatformBinary()}`;
+    this.logger?.info(`[codex-debug] Checking for platform-specific binary: ${platformBinary}`);
+    const platformResult = findExecutableInPath(platformBinary);
+    
+    if (platformResult) {
+      this.logger?.info(`[codex-debug] Found platform-specific Codex at: ${platformResult}`);
+      return platformResult;
+    }
+    
+    this.logger?.info('[codex-debug] Codex not found in PATH or as platform-specific binary');
     return null;
   }
 

@@ -28,6 +28,8 @@ export interface AppConfig {
   };
   // Dev mode for debugging
   devMode?: boolean;
+  // Additional paths to add to PATH environment variable
+  additionalPaths?: string[];
 }
 
 export interface UpdateConfigRequest {
@@ -49,4 +51,5 @@ export interface UpdateConfigRequest {
     notifyOnComplete: boolean;
   };
   devMode?: boolean;
+  additionalPaths?: string[];
 }

@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync, exec } from 'child_process';
@@ -447,37 +446,18 @@ export abstract class AbstractCliManager extends EventEmitter {
 
   /**
    * Get enhanced system environment with PATH
+   * Uses centralized shellPath utility for consistent PATH management
    */
   protected async getSystemEnvironment(): Promise<{ [key: string]: string }> {
-    // Get the user's shell PATH
-    const isLinux = os.platform() === 'linux';
-    let shellPath: string;
-
-    if (isLinux) {
-      // For Linux, enhance current PATH with common locations
-      const currentPath = process.env.PATH || '';
-      const pathSeparator = ':';
-      const commonLinuxPaths = [
-        '/usr/local/bin',
-        '/snap/bin',
-        path.join(os.homedir(), '.local', 'bin'),
-        path.join(os.homedir(), 'bin'),
-        '/usr/bin',
-        '/bin'
-      ];
-
-      const currentPaths = new Set(currentPath.split(pathSeparator));
-      const additionalPaths = commonLinuxPaths.filter(p => !currentPaths.has(p) && fs.existsSync(p));
-      
-      shellPath = currentPath + (additionalPaths.length > 0 ? pathSeparator + additionalPaths.join(pathSeparator) : '');
-    } else {
-      shellPath = getShellPath();
-    }
+    // Get the enhanced PATH from centralized utility (includes Linux-specific paths)
+    const shellPath = getShellPath();
 
     // Find Node.js and ensure it's in the PATH
     const nodePath = await findNodeExecutable();
     const nodeDir = path.dirname(nodePath);
     const pathSeparator = process.platform === 'win32' ? ';' : ':';
+    
+    // Combine Node.js directory with enhanced PATH
     const pathWithNode = nodeDir + pathSeparator + shellPath;
 
     return {

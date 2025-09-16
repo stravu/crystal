@@ -12,6 +12,31 @@ try {
   // Electron not available (e.g., in worker threads)
 }
 
+// Try to get config manager for additional paths
+let getAdditionalPaths: () => string[] = () => [];
+try {
+  // Lazy import to avoid circular dependencies
+  const getConfigManager = () => {
+    try {
+      const { configManager } = require('../services/configManager');
+      return configManager;
+    } catch {
+      return null;
+    }
+  };
+  
+  getAdditionalPaths = () => {
+    const configManager = getConfigManager();
+    if (configManager) {
+      const config = configManager.getConfig();
+      return config?.additionalPaths || [];
+    }
+    return [];
+  };
+} catch {
+  // ConfigManager not available
+}
+
 let cachedPath: string | null = null;
 let isFirstCall: boolean = true;
 
@@ -246,6 +271,28 @@ export function getShellPath(): string {
         path.join(os.homedir(), '.config', 'yarn', 'global', 'node_modules', '.bin')
       );
       
+      // Linux-specific common paths
+      if (isLinux) {
+        const commonLinuxPaths = [
+          '/usr/local/bin',
+          '/snap/bin',
+          path.join(os.homedir(), '.local', 'bin'),
+          path.join(os.homedir(), 'bin'),
+          '/usr/bin',
+          '/bin',
+          '/usr/sbin',
+          '/sbin'
+        ];
+        
+        // Only add Linux paths that exist and aren't already in PATH
+        const existingPaths = new Set([...shellPath.split(pathSep), ...currentPath.split(pathSep)]);
+        commonLinuxPaths.forEach(linuxPath => {
+          if (!existingPaths.has(linuxPath) && fs.existsSync(linuxPath)) {
+            additionalPaths.push(linuxPath);
+          }
+        });
+      }
+      
       // Check for nvm directories - look for all versions
       const nvmDir = path.join(os.homedir(), '.nvm/versions/node');
       if (fs.existsSync(nvmDir)) {
@@ -261,6 +308,29 @@ export function getShellPath(): string {
           // Ignore nvm directory read errors
         }
       }
+    }
+    
+    // Add user-configured additional paths
+    const userAdditionalPaths = getAdditionalPaths();
+    if (userAdditionalPaths.length > 0) {
+      console.log(`[ShellPath] Adding ${userAdditionalPaths.length} user-configured paths`);
+      // Expand ~ to home directory and Windows environment variables
+      const expandedUserPaths = userAdditionalPaths.map(p => {
+        // Expand tilde for Unix/macOS
+        if (p.startsWith('~')) {
+          return path.join(os.homedir(), p.slice(1));
+        }
+        
+        // Expand Windows environment variables like %USERPROFILE%
+        if (isWindows && p.includes('%')) {
+          return p.replace(/%([^%]+)%/g, (match, envVar) => {
+            return process.env[envVar] || match;
+          });
+        }
+        
+        return p;
+      });
+      additionalPaths.push(...expandedUserPaths);
     }
     
     const combinedPaths = new Set([
@@ -347,10 +417,11 @@ export function getShellPath(): string {
 }
 
 /**
- * Clear the cached PATH (useful for development/testing)
+ * Clear the cached PATH (useful for development/testing and config changes)
  */
 export function clearShellPathCache(): void {
   cachedPath = null;
+  console.log('[ShellPath] PATH cache cleared - will be rebuilt on next access');
 }
 
 /**
