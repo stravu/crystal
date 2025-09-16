@@ -376,16 +376,21 @@ export class GitDiffManager {
 
       // Get diff of both staged and unstaged changes against HEAD
       // Using 'git diff HEAD' to include both staged and unstaged changes
-      const diff = execSync('git diff HEAD', { 
+      let diff = execSync('git diff HEAD', { 
         cwd: worktreePath, 
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large diffs
       });
       console.log(`Git diff in ${worktreePath}: ${diff.length} characters`);
       
-      // If no diff but status shows changes, might be untracked files
-      if (!diff && status) {
-        console.log('No diff but status shows changes - might be untracked files only');
+      // Get untracked files and create diff-like output for them
+      const untrackedFiles = this.getUntrackedFiles(worktreePath);
+      if (untrackedFiles.length > 0) {
+        console.log(`Found ${untrackedFiles.length} untracked files`);
+        const untrackedDiff = this.createDiffForUntrackedFiles(worktreePath, untrackedFiles);
+        if (untrackedDiff) {
+          diff = diff ? diff + '\n' + untrackedDiff : untrackedDiff;
+        }
       }
       
       return diff;
@@ -410,11 +415,18 @@ export class GitDiffManager {
 
   private getChangedFiles(worktreePath: string): string[] {
     try {
-      const output = execSync('git diff --name-only HEAD', { 
+      // Get tracked changed files
+      const trackedOutput = execSync('git diff --name-only HEAD', { 
         cwd: worktreePath, 
         encoding: 'utf8' 
       });
-      return output.trim().split('\n').filter((f: string) => f.length > 0);
+      const trackedFiles = trackedOutput.trim().split('\n').filter((f: string) => f.length > 0);
+      
+      // Get untracked files
+      const untrackedFiles = this.getUntrackedFiles(worktreePath);
+      
+      // Combine both lists
+      return [...trackedFiles, ...untrackedFiles];
     } catch (error) {
       this.logger?.warn(`Could not get changed files in ${worktreePath}`);
       return [];
@@ -441,7 +453,39 @@ export class GitDiffManager {
         encoding: 'utf8' 
       });
       
-      return this.parseDiffStats(output);
+      const trackedStats = this.parseDiffStats(output);
+      
+      // Add stats for untracked files
+      const untrackedFiles = this.getUntrackedFiles(worktreePath);
+      if (untrackedFiles.length > 0) {
+        let untrackedAdditions = 0;
+        for (const file of untrackedFiles) {
+          // Skip invalid filenames
+          if (!file || file.trim().length === 0) {
+            continue;
+          }
+          
+          try {
+            const cleanFile = file.trim();
+            const filePath = `${worktreePath}/${cleanFile}`;
+            const lines = execSync(`wc -l < "${filePath}"`, { 
+              encoding: 'utf8',
+              cwd: worktreePath
+            });
+            untrackedAdditions += parseInt(lines.trim()) || 0;
+          } catch {
+            // Skip files that can't be counted
+          }
+        }
+        
+        return {
+          additions: trackedStats.additions + untrackedAdditions,
+          deletions: trackedStats.deletions,
+          filesChanged: trackedStats.filesChanged + untrackedFiles.length
+        };
+      }
+      
+      return trackedStats;
     } catch (error) {
       this.logger?.warn(`Could not get diff stats in ${worktreePath}`);
       return { additions: 0, deletions: 0, filesChanged: 0 };
@@ -492,5 +536,72 @@ export class GitDiffManager {
       this.logger?.warn(`Could not check git status in ${worktreePath}`);
       return false;
     }
+  }
+
+  /**
+   * Get list of untracked files
+   */
+  private getUntrackedFiles(worktreePath: string): string[] {
+    try {
+      const output = execSync('git ls-files --others --exclude-standard', { 
+        cwd: worktreePath, 
+        encoding: 'utf8' 
+      });
+      
+      // Handle empty output case
+      if (!output || output.trim().length === 0) {
+        return [];
+      }
+      
+      return output.trim().split('\n').filter((f: string) => f && f.trim().length > 0);
+    } catch (error) {
+      this.logger?.warn(`Could not get untracked files in ${worktreePath}`);
+      return [];
+    }
+  }
+
+  /**
+   * Create diff-like output for untracked files
+   */
+  private createDiffForUntrackedFiles(worktreePath: string, untrackedFiles: string[]): string {
+    let diffOutput = '';
+    
+    for (const file of untrackedFiles) {
+      // Skip invalid filenames
+      if (!file || file.trim().length === 0) {
+        continue;
+      }
+      
+      try {
+        const cleanFile = file.trim();
+        const filePath = `${worktreePath}/${cleanFile}`;
+        const fileContent = execSync(`cat "${filePath}"`, { 
+          encoding: 'utf8',
+          maxBuffer: 1024 * 1024 // 1MB max per file
+        });
+        
+        // Create a diff-like format for the new file
+        diffOutput += `diff --git a/${cleanFile} b/${cleanFile}\n`;
+        diffOutput += `new file mode 100644\n`;
+        diffOutput += `index 0000000..0000000\n`;
+        diffOutput += `--- /dev/null\n`;
+        diffOutput += `+++ b/${cleanFile}\n`;
+        
+        // Add the file content with '+' prefix for each line
+        const lines = fileContent.split('\n');
+        if (lines.length > 0) {
+          diffOutput += `@@ -0,0 +1,${lines.length} @@\n`;
+          for (const line of lines) {
+            diffOutput += `+${line}\n`;
+          }
+        }
+      } catch (error) {
+        // Skip files that can't be read (binary files, etc.)
+        const cleanFile = file.trim();
+        this.logger?.verbose(`Could not read untracked file ${cleanFile}: ${error}`);
+      }
+    }
+    
+    return diffOutput;
   }
 }
