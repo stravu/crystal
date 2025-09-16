@@ -10,6 +10,7 @@ import { findExecutableInPath } from '../../../utils/shellPath';
 import { PermissionManager } from '../../permissionManager';
 import { findNodeExecutable, findClaudeCodeScript } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
+import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 
 interface ClaudeSpawnOptions {
   panelId: string;
@@ -569,7 +570,6 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }
 
       // Get structured prompt template from settings or use default
-      const { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } = require('../../../shared/types');
       const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
 
       // Add structured commit instructions to the prompt
