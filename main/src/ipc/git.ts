@@ -18,6 +18,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const project = sessionManager.getProjectForSession(sessionId);
       if (!project) return;
       
+      console.log(`[Git] Emitting git operation for session ${sessionId} (${session.name})`);
+      
       // Create a virtual event as if it came from the git system
       const event = {
         type: eventType,
@@ -35,6 +37,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         },
         timestamp: new Date().toISOString()
       };
+      
+      console.log(`[Git] Event data - triggeringSessionId: ${event.data.triggeringSessionId}, projectId: ${event.data.projectId}`);
       
       // Emit the event once to the panel event bus
       // All Claude panels that have subscribed will receive it

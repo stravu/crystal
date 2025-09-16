@@ -121,12 +121,18 @@ export class ClaudePanelManager {
   private subscribeToGitEvents(panelId: string, sessionId: string): void {
     // Subscribe to git operation events for this panel
     const gitEventCallback = (event: PanelEvent) => {
-      // Only process git events for the same project
+      // Only process git events from the same session
       if (event.source.panelId !== panelId && event.type.startsWith('git:')) {
-        // Check if this event is for the same project
-        const dbSession = this.sessionManager.getDbSession(sessionId);
+        // Debug logging to understand what's happening
+        this.logger?.verbose(`[Claude] Git event received in panel ${panelId} (session: ${sessionId})`);
+        this.logger?.verbose(`[Claude] Event triggeringSessionId: ${event.data.triggeringSessionId}`);
+        this.logger?.verbose(`[Claude] Panel sessionId: ${sessionId}`);
+        this.logger?.verbose(`[Claude] Match: ${event.data.triggeringSessionId === sessionId}`);
         
-        if (dbSession?.project_id && event.data.projectId === dbSession.project_id) {
+        // Only show git operation messages in panels from the same session
+        if (event.data.triggeringSessionId === sessionId) {
+          this.logger?.info(`[Claude] Forwarding git event to panel ${panelId} for session ${sessionId}`);
+          
           // Format the git operation message for Claude
           const gitMessage = {
             type: 'system',
@@ -149,6 +155,8 @@ export class ClaudePanelManager {
             data: gitMessage,
             timestamp: new Date()
           });
+        } else {
+          this.logger?.verbose(`[Claude] Skipping git event for panel ${panelId} - different session`);
         }
       }
     };
@@ -160,7 +168,7 @@ export class ClaudePanelManager {
       callback: gitEventCallback
     });
     
-    this.logger?.verbose(`Panel ${panelId} subscribed to git operation events`);
+    this.logger?.verbose(`Claude panel ${panelId} subscribed to git operation events`);
   }
 
   unregisterPanel(panelId: string): void {

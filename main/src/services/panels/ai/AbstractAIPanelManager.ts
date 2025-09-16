@@ -112,15 +112,22 @@ export abstract class AbstractAIPanelManager {
   }
 
   /**
-   * Subscribe panel to git events for the same project
+   * Subscribe panel to git events for the same session only
    */
   protected subscribeToGitEvents(panelId: string, sessionId: string): void {
     const gitEventCallback = (event: PanelEvent) => {
-      // Only process git events for the same project
+      // Only process git events from the same session
       if (event.source.panelId !== panelId && event.type.startsWith('git:')) {
-        const dbSession = this.sessionManager.getDbSession(sessionId);
+        // Debug logging to understand what's happening
+        this.logger?.verbose(`[${this.getAgentName()}] Git event received in panel ${panelId} (session: ${sessionId})`);
+        this.logger?.verbose(`[${this.getAgentName()}] Event triggeringSessionId: ${event.data.triggeringSessionId}`);
+        this.logger?.verbose(`[${this.getAgentName()}] Panel sessionId: ${sessionId}`);
+        this.logger?.verbose(`[${this.getAgentName()}] Match: ${event.data.triggeringSessionId === sessionId}`);
         
-        if (dbSession?.project_id && event.data.projectId === dbSession.project_id) {
+        // Only show git operation messages in panels from the same session
+        if (event.data.triggeringSessionId === sessionId) {
+          this.logger?.info(`[${this.getAgentName()}] Forwarding git event to panel ${panelId} for session ${sessionId}`);
+          
           // Format the git operation message for the AI agent
           const gitMessage = {
             type: 'system',
@@ -142,6 +149,8 @@ export abstract class AbstractAIPanelManager {
             data: gitMessage,
             timestamp: new Date()
           });
+        } else {
+          this.logger?.verbose(`[${this.getAgentName()}] Skipping git event for panel ${panelId} - different session`);
         }
       }
     };
