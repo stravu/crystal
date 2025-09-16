@@ -47,7 +47,7 @@ interface FileSearchRequest {
 }
 
 export function registerFileHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, databaseService } = services;
+  const { sessionManager, databaseService, gitStatusManager } = services;
 
   // Read file contents from a session's worktree
   ipcMain.handle('file:read', async (_, request: FileReadRequest) => {
@@ -247,6 +247,14 @@ EOF
 
         await execAsync(command, { cwd: session.worktreePath });
 
+        // Refresh git status for this session after commit
+        try {
+          await gitStatusManager.refreshSessionGitStatus(request.sessionId, false);
+        } catch (error) {
+          // Git status refresh failures are logged by GitStatusManager
+          console.error('Failed to refresh git status after commit:', error);
+        }
+
         return { success: true };
       } catch (error: any) {
         // Check if it's a pre-commit hook failure
@@ -263,6 +271,15 @@ Co-Authored-By: Crystal <noreply@stravu.com>
 EOF
 )"`;
             await execAsync(command, { cwd: session.worktreePath });
+            
+            // Refresh git status for this session after commit
+            try {
+              await gitStatusManager.refreshSessionGitStatus(request.sessionId, false);
+            } catch (error) {
+              // Git status refresh failures are logged by GitStatusManager
+              console.error('Failed to refresh git status after commit (retry):', error);
+            }
+            
             return { success: true };
           } catch (retryError: any) {
             throw new Error(`Git commit failed: ${retryError.message || retryError}`);
