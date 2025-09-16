@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync, spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import { v4 as uuidv4 } from 'uuid';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { findExecutableInPath } from '../../../utils/shellPath';
@@ -836,10 +837,11 @@ export class CodexManager extends AbstractCliManager {
     }
   }
 
-  private getNextMessageId(panelId: string): number {
+  private getNextMessageId(panelId: string): string {
     const current = this.messageIdCounters.get(panelId) || 1;
     this.messageIdCounters.set(panelId, current + 1);
-    return current;
+    const uuid = uuidv4();
+    return `${current}-${uuid}`;
   }
 
   /**
