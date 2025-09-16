@@ -22,7 +22,8 @@ export type MessageSegment =
   | { type: 'tool_result'; result: ToolResult & { toolCallId: string } }
   | { type: 'system_info'; info: any }
   | { type: 'thinking'; content: string }
-  | { type: 'diff'; diff: string };
+  | { type: 'diff'; diff: string }
+  | { type: 'error'; error: { message: string; details?: string } };
 
 export interface ToolCall {
   id: string;

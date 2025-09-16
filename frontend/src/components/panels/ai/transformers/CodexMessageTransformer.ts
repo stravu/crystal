@@ -506,6 +506,56 @@ export class CodexMessageTransformer implements MessageTransformer {
       };
     }
     
+    // Handle session messages (e.g., errors, status updates)
+    if (message.type === 'session' && message.data) {
+      const data = message.data;
+      // Check if it's an error message
+      if (data.status === 'error') {
+        // Build the error message
+        let content = data.message || 'Session error';
+        if (data.details) {
+          content = data.details; // The details field contains the full error message with instructions
+        }
+        
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'system',
+          timestamp: timestamp || new Date().toISOString(),
+          segments: [{
+            type: 'error',
+            error: {
+              message: data.message || 'Error',
+              details: content
+            }
+          }],
+          metadata: {
+            agent: 'codex',
+            sessionStatus: data.status
+          }
+        };
+      }
+      
+      // Handle other session status messages
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: timestamp || new Date().toISOString(),
+        segments: [{
+          type: 'system_info',
+          info: {
+            type: 'session_status',
+            status: data.status,
+            message: data.message || '',
+            details: data.details
+          }
+        }],
+        metadata: {
+          agent: 'codex',
+          sessionStatus: data.status
+        }
+      };
+    }
+    
     // Default fallback: show raw JSON for unrecognized message types
     return {
       id: `msg_${++this.messageIdCounter}`,

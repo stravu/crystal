@@ -94,6 +94,22 @@ export const MessageSegment: React.FC<MessageSegmentProps> = ({
       // System info segments are handled differently by parent component
       return null;
     
+    case 'error':
+      if (!segment.error) return null;
+      
+      return (
+        <div className="my-2 p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+          <div className="text-red-400 font-semibold text-sm mb-2">
+            {segment.error.message || 'Error'}
+          </div>
+          {segment.error.details && (
+            <div className="text-red-300 text-sm whitespace-pre-wrap font-mono">
+              {segment.error.details}
+            </div>
+          )}
+        </div>
+      );
+    
     case 'diff': {
       if (!segment.diff || !segment.diff.trim()) return null;
       
