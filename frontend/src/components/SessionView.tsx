@@ -97,25 +97,24 @@ export const SessionView = memo(() => {
       }
     };
     
-    // const handlePanelUpdated = (updatedPanel: ToolPanel) => {
-    //   console.log('[SessionView] Received panel:updated event:', updatedPanel);
-    //   
-    //   // Only update if it's for the current session
-    //   if (updatedPanel.sessionId === activeSession.id) {
-    //     console.log('[SessionView] Updating panel in store:', updatedPanel);
-    //     updatePanelState(updatedPanel);
-    //   }
-    // };
+    const handlePanelUpdated = (updatedPanel: ToolPanel) => {
+      console.log('[SessionView] Received panel:updated event:', updatedPanel);
+      
+      // Only update if it's for the current session
+      if (updatedPanel.sessionId === activeSession.id) {
+        console.log('[SessionView] Updating panel in store:', updatedPanel);
+        updatePanelState(updatedPanel);
+      }
+    };
     
     // Listen for panel events
     const unsubscribeCreated = window.electronAPI?.events?.onPanelCreated?.(handlePanelCreated);
-    // TODO: Implement onPanelUpdated event
-    // const unsubscribeUpdated = window.electronAPI.events.onPanelUpdated(handlePanelUpdated);
+    const unsubscribeUpdated = window.electronAPI?.events?.onPanelUpdated?.(handlePanelUpdated);
     
     // Cleanup
     return () => {
       unsubscribeCreated?.();
-      // unsubscribeUpdated?.();
+      unsubscribeUpdated?.();
     };
   }, [activeSession?.id, addPanel, updatePanelState, panels]);
 

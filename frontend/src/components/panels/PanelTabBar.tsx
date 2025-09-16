@@ -1,5 +1,5 @@
 import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
-import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical, BarChart3, Code2 } from 'lucide-react';
+import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical, BarChart3, Code2, Edit2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
 import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
@@ -19,6 +19,9 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   const { gitBranchActions, isMerging } = sessionContext || {};
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [editingPanelId, setEditingPanelId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
   
   // Memoize event handlers to prevent unnecessary re-renders
   const handlePanelClick = useCallback((panel: ToolPanel) => {
@@ -45,6 +48,46 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     setShowDropdown(false);
   }, [onPanelCreate]);
   
+  const handleStartRename = useCallback((e: React.MouseEvent, panel: ToolPanel) => {
+    e.stopPropagation();
+    setEditingPanelId(panel.id);
+    setEditingTitle(panel.title);
+  }, []);
+  
+  const handleRenameSubmit = useCallback(async () => {
+    if (editingPanelId && editingTitle.trim()) {
+      try {
+        // Update the panel title via IPC
+        await window.electron?.invoke('panels:update', editingPanelId, {
+          title: editingTitle.trim()
+        });
+        
+        // Update the local panel in the store
+        const panel = panels.find(p => p.id === editingPanelId);
+        if (panel) {
+          panel.title = editingTitle.trim();
+        }
+      } catch (error) {
+        console.error('Failed to rename panel:', error);
+      }
+    }
+    setEditingPanelId(null);
+    setEditingTitle('');
+  }, [editingPanelId, editingTitle, panels]);
+  
+  const handleRenameCancel = useCallback(() => {
+    setEditingPanelId(null);
+    setEditingTitle('');
+  }, []);
+  
+  const handleRenameKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleRenameSubmit();
+    } else if (e.key === 'Escape') {
+      handleRenameCancel();
+    }
+  }, [handleRenameSubmit, handleRenameCancel]);
+  
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -58,6 +101,14 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showDropdown]);
+  
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingPanelId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingPanelId]);
   
   // Get available panel types (excluding permanent panels, logs, and enforcing singleton)
   const availablePanelTypes = (Object.keys(PANEL_CAPABILITIES) as ToolPanelType[])
@@ -112,22 +163,50 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         {/* Render panel tabs */}
         {panels.map((panel) => {
           const isPermanent = panel.metadata?.permanent === true;
+          const isEditing = editingPanelId === panel.id;
           
           return (
             <div
               key={panel.id}
               className={cn(
-                "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700 h-8 whitespace-nowrap",
+                "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700 h-8 whitespace-nowrap group",
                 activePanel?.id === panel.id && "bg-gray-700"
               )}
-              onClick={() => handlePanelClick(panel)}
+              onClick={() => !isEditing && handlePanelClick(panel)}
               title={isPermanent ? "This panel cannot be closed" : undefined}
             >
               {getPanelIcon(panel.type)}
-              <span className="ml-2 text-sm">{panel.title}</span>
-              {!isPermanent && (
+              
+              {isEditing ? (
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onKeyDown={handleRenameKeyDown}
+                  onBlur={handleRenameSubmit}
+                  className="ml-2 px-1 text-sm bg-gray-900 border border-gray-600 rounded outline-none focus:border-blue-500"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ width: `${Math.max(50, editingTitle.length * 8)}px` }}
+                />
+              ) : (
+                <>
+                  <span className="ml-2 text-sm">{panel.title}</span>
+                  {!isPermanent && (
+                    <button
+                      className="ml-1 p-0.5 hover:bg-gray-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => handleStartRename(e, panel)}
+                      title="Rename panel"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </>
+              )}
+              
+              {!isPermanent && !isEditing && (
                 <button
-                  className="ml-2 p-0.5 hover:bg-gray-600 rounded"
+                  className="ml-1 p-0.5 hover:bg-gray-600 rounded"
                   onClick={(e) => handlePanelClose(e, panel)}
                 >
                   <X className="w-3 h-3" />
