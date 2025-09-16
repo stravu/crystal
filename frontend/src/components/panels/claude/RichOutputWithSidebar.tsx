@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { RichOutputView } from '../ai/RichOutputView';
 import { PromptNavigation } from './PromptNavigation';
 import { cn } from '../../../utils/cn';
-import { RichOutputSettings } from '../ai/RichOutputView';
+import { RichOutputSettings } from '../ai/AbstractAIPanel';
 import { MessageTransformer } from '../ai/transformers/MessageTransformer';
 import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
 
@@ -66,7 +66,9 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           panelId={id}
           sessionStatus={sessionStatus}
           settings={settings}
-          transformer={transformer || new ClaudeMessageTransformer()}
+          messageTransformer={transformer || new ClaudeMessageTransformer()}
+          outputEventName="session-output-available"
+          getOutputsHandler="panels:getJsonMessages"
         />
       </div>
 

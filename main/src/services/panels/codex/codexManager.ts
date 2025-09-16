@@ -556,6 +556,17 @@ export class CodexManager extends AbstractCliManager {
     try {
       const written = childProcess.stdin.write(jsonStr);
       this.logger?.info(`[codex-debug] STDIN write successful for panel ${panelId}, bytes written: ${written}`);
+      
+      // Save the user input to the database so it persists across refreshes
+      if (this.sessionManager) {
+        this.sessionManager.addPanelOutput(panelId, {
+          panelId,
+          type: 'json',
+          data: message,
+          timestamp: new Date()
+        });
+        this.logger?.info(`[codex-debug] Saved user input to database for panel ${panelId}`);
+      }
     } catch (error) {
       this.logger?.error(`[codex-debug] STDIN write failed for panel ${panelId}: ${error}`);
       throw error;

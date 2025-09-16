@@ -19,8 +19,10 @@ export interface UnifiedMessage {
 export type MessageSegment = 
   | { type: 'text'; content: string }
   | { type: 'tool_call'; tool: ToolCall }
+  | { type: 'tool_result'; result: ToolResult & { toolCallId: string } }
   | { type: 'system_info'; info: any }
-  | { type: 'thinking'; content: string };
+  | { type: 'thinking'; content: string }
+  | { type: 'diff'; diff: string };
 
 export interface ToolCall {
   id: string;
@@ -37,6 +39,7 @@ export interface ToolCall {
 export interface ToolResult {
   content: string;
   isError?: boolean;
+  metadata?: any;
 }
 
 // Message transformer interface for converting agent-specific formats to unified format

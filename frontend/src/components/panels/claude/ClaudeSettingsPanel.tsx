@@ -1,7 +1,7 @@
 import React from 'react';
 import { Wrench, Brain, Terminal, Maximize2, Package } from 'lucide-react';
 import { SwitchSimple } from '../../ui/SwitchSimple';
-import { RichOutputSettings } from '../ai/RichOutputView';
+import { RichOutputSettings } from '../ai/AbstractAIPanel';
 
 interface ClaudeSettingsPanelProps {
   settings: RichOutputSettings;

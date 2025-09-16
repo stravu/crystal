@@ -4,8 +4,10 @@ import { cn } from '../../../utils/cn';
 import { ChevronRight, ChevronDown, Copy, Check, Terminal, FileText } from 'lucide-react';
 
 interface MessagesViewProps {
-  panelId?: string;
-  sessionId?: string; // Support both for backward compatibility
+  panelId: string;
+  agentType: 'claude' | 'codex' | 'generic-cli';
+  outputEventName: string;
+  getMessagesHandler?: string; // For IPC-based panels like Codex
 }
 
 interface JSONMessage {
@@ -16,20 +18,22 @@ interface JSONMessage {
 
 interface SessionInfo {
   type: 'session_info';
-  initial_prompt: string;
-  claude_command: string;
-  worktree_path: string;
-  model: string;
-  permission_mode: string;
+  initial_prompt?: string;
+  claude_command?: string;
+  codex_command?: string;
+  worktree_path?: string;
+  model?: string;
+  permission_mode?: string;
+  approval_policy?: string;
   timestamp: string;
 }
 
-export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }) => {
-  // Use panelId if available, otherwise fall back to sessionId for backward compatibility
-  const id = panelId || sessionId;
-  if (!id) {
-    throw new Error('MessagesView requires either panelId or sessionId');
-  }
+export const MessagesView: React.FC<MessagesViewProps> = ({ 
+  panelId, 
+  agentType,
+  outputEventName,
+  getMessagesHandler
+}) => {
   const [messages, setMessages] = useState<JSONMessage[]>([]);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set());
@@ -43,9 +47,25 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
   useEffect(() => {
     const loadMessages = async () => {
       try {
-        const response = panelId 
-        ? await API.panels.getJsonMessages(panelId)
-        : await API.sessions.getJsonMessages(id);
+        let response: any;
+        
+        // Use appropriate method based on agent type
+        if (getMessagesHandler && window.electron) {
+          // For Codex and other IPC-based panels
+          const outputs = await window.electron.invoke(getMessagesHandler, panelId, 1000);
+          const jsonMessages = outputs
+            .filter((output: any) => output.type === 'json')
+            .map((output: any) => ({
+              type: 'json' as const,
+              data: typeof output.data === 'object' ? JSON.stringify(output.data) : output.data,
+              timestamp: output.timestamp || new Date().toISOString()
+            }));
+          response = { success: true, data: jsonMessages };
+        } else {
+          // For Claude panels using API
+          response = await API.panels.getJsonMessages(panelId);
+        }
+        
         if (response.success && response.data) {
           // Filter out session_info messages and handle them separately
           const regularMessages: JSONMessage[] = [];
@@ -67,6 +87,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
                   });
                   return;
                 }
+              } else if (msg.data) {
+                // Handle messages with data field (from IPC)
+                msgData = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
               } else {
                 msgData = msg;
               }
@@ -74,11 +97,19 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
               // Check if this is a session_info message
               if (msgData && msgData.type === 'session_info') {
                 foundSessionInfo = msgData as SessionInfo;
+              } else if (msgData && msgData.msg && msgData.msg.type === 'session_configured') {
+                // Handle Codex session configuration
+                foundSessionInfo = {
+                  type: 'session_info',
+                  model: msgData.msg.model || 'default',
+                  timestamp: msg.timestamp || new Date().toISOString()
+                };
               } else {
                 // Regular JSON message
                 regularMessages.push({
                   type: 'json' as const,
-                  data: typeof msg === 'string' ? msg : JSON.stringify(msg),
+                  data: msg.data ? (typeof msg.data === 'string' ? msg.data : JSON.stringify(msg.data)) :
+                        (typeof msg === 'string' ? msg : JSON.stringify(msg)),
                   timestamp: msg.timestamp || new Date().toISOString()
                 });
               }
@@ -87,7 +118,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
               // If there's any error, treat it as a regular message
               regularMessages.push({
                 type: 'json' as const,
-                data: typeof msg === 'string' ? msg : JSON.stringify(msg),
+                data: msg.data ? (typeof msg.data === 'string' ? msg.data : JSON.stringify(msg.data)) :
+                      (typeof msg === 'string' ? msg : JSON.stringify(msg)),
                 timestamp: msg.timestamp || new Date().toISOString()
               });
             }
@@ -102,40 +134,46 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
     };
 
     loadMessages();
-  }, [panelId, id]);
+  }, [panelId, getMessagesHandler]);
 
   // Subscribe to new messages
   useEffect(() => {
-    const handleSessionOutput = (data: any) => {
-      // Match based on panelId when provided, otherwise fallback to sessionId for legacy mode
-      const matchesTarget = panelId ? (data.panelId === panelId) : (data.sessionId === sessionId);
-      if (matchesTarget && data.type === 'json') {
+    const handleOutput = (data: any) => {
+      const detail = data.detail || data;
+      if ((detail.panelId === panelId || detail.sessionId === panelId) && detail.type === 'json') {
         try {
           // Check if this is a session_info message
           let parsedData: any;
-          if (typeof data.data === 'string') {
+          if (typeof detail.data === 'string') {
             try {
-              parsedData = JSON.parse(data.data);
+              parsedData = JSON.parse(detail.data);
             } catch {
               // If it's not valid JSON, treat as regular message
               setMessages(prev => [...prev, {
                 type: 'json',
-                data: data.data,
-                timestamp: new Date().toISOString()
+                data: detail.data,
+                timestamp: detail.timestamp || new Date().toISOString()
               }]);
               return;
             }
           } else {
-            parsedData = data.data;
+            parsedData = detail.data;
           }
           
           if (parsedData && parsedData.type === 'session_info') {
             setSessionInfo(parsedData as SessionInfo);
+          } else if (parsedData && parsedData.msg && parsedData.msg.type === 'session_configured') {
+            // Handle Codex session configuration
+            setSessionInfo({
+              type: 'session_info',
+              model: parsedData.msg.model || 'default',
+              timestamp: detail.timestamp || new Date().toISOString()
+            });
           } else {
             setMessages(prev => [...prev, {
               type: 'json',
-              data: typeof data.data === 'string' ? data.data : JSON.stringify(data.data),
-              timestamp: new Date().toISOString()
+              data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data),
+              timestamp: detail.timestamp || new Date().toISOString()
             }]);
             
             // Auto-scroll to bottom if enabled
@@ -146,22 +184,34 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
             }
           }
         } catch (error) {
-          console.error('Error handling session output:', error, data);
+          console.error('Error handling output:', error, data);
           // On error, just add as regular message
           setMessages(prev => [...prev, {
             type: 'json',
-            data: typeof data.data === 'string' ? data.data : JSON.stringify(data.data),
-            timestamp: new Date().toISOString()
+            data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data),
+            timestamp: detail.timestamp || new Date().toISOString()
           }]);
         }
       }
     };
 
-    window.electron?.on('session:output', handleSessionOutput);
+    // Listen for the appropriate event based on the agent type
+    if (outputEventName.includes('codex')) {
+      window.electron?.on(outputEventName, handleOutput);
+      window.addEventListener(outputEventName, handleOutput as any);
+    } else {
+      window.electron?.on('session:output', handleOutput);
+    }
+    
     return () => {
-      window.electron?.off('session:output', handleSessionOutput);
+      if (outputEventName.includes('codex')) {
+        window.electron?.off(outputEventName, handleOutput);
+        window.removeEventListener(outputEventName, handleOutput as any);
+      } else {
+        window.electron?.off('session:output', handleOutput);
+      }
     };
-  }, [panelId, sessionId]);
+  }, [panelId, outputEventName]);
 
   // Handle scroll to detect if user is at bottom
   useEffect(() => {
@@ -212,6 +262,16 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
   const getMessagePreview = (jsonString: string): string => {
     try {
       const parsed = JSON.parse(jsonString);
+      
+      // Handle Codex protocol messages
+      if (parsed.op) {
+        return `Operation: ${parsed.op.type}`;
+      }
+      if (parsed.msg) {
+        return `Message: ${parsed.msg.type}`;
+      }
+      
+      // Handle standard messages
       if (parsed.type) {
         return `${parsed.type}${parsed.role ? ` (${parsed.role})` : ''}`;
       }
@@ -221,13 +281,24 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
     }
   };
 
+  const getAgentName = () => {
+    switch (agentType) {
+      case 'claude':
+        return 'Claude Code';
+      case 'codex':
+        return 'Codex';
+      default:
+        return 'CLI Tool';
+    }
+  };
+
   if (messages.length === 0 && !sessionInfo) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center">
           <div className="text-text-tertiary mb-2">No JSON messages yet</div>
           <div className="text-sm text-text-quaternary">
-            JSON messages from Claude Code will appear here
+            JSON messages from {getAgentName()} will appear here
           </div>
         </div>
       </div>
@@ -265,7 +336,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  const infoText = `User Prompt:\n${sessionInfo.initial_prompt}\n\nClaude Command:\n${sessionInfo.claude_command}\n\nWorktree Path:\n${sessionInfo.worktree_path}\n\nModel: ${sessionInfo.model}\nPermission Mode: ${sessionInfo.permission_mode}`;
+                  const infoText = sessionInfo.initial_prompt ? 
+                    `User Prompt:\n${sessionInfo.initial_prompt}\n\nCommand:\n${sessionInfo.claude_command || sessionInfo.codex_command || ''}\n\nWorktree Path:\n${sessionInfo.worktree_path}\n\nModel: ${sessionInfo.model}` :
+                    `Model: ${sessionInfo.model || 'Unknown'}`;
                   copyToClipboard(infoText, -1);
                 }}
                 className={cn(
@@ -287,40 +360,48 @@ export const MessagesView: React.FC<MessagesViewProps> = ({ panelId, sessionId }
             {showSessionInfo && (
               <div className="border-t border-border-primary">
                 <div className="p-4 space-y-3">
-                  {/* User Prompt */}
-                  <div>
-                    <div className="flex items-center gap-2 text-text-secondary mb-1">
-                      <FileText className="w-3.5 h-3.5" />
-                      <span className="text-xs font-semibold uppercase tracking-wider">User Prompt</span>
+                  {/* User Prompt (if available) */}
+                  {sessionInfo.initial_prompt && (
+                    <div>
+                      <div className="flex items-center gap-2 text-text-secondary mb-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span className="text-xs font-semibold uppercase tracking-wider">User Prompt</span>
+                      </div>
+                      <div className="bg-surface-primary rounded p-3 text-text-primary whitespace-pre-wrap break-words">
+                        {sessionInfo.initial_prompt}
+                      </div>
                     </div>
-                    <div className="bg-surface-primary rounded p-3 text-text-primary whitespace-pre-wrap break-words">
-                      {sessionInfo.initial_prompt}
-                    </div>
-                  </div>
+                  )}
                   
-                  {/* Claude Command */}
-                  <div>
-                    <div className="flex items-center gap-2 text-text-secondary mb-1">
-                      <Terminal className="w-3.5 h-3.5" />
-                      <span className="text-xs font-semibold uppercase tracking-wider">Claude Command</span>
+                  {/* Command (if available) */}
+                  {(sessionInfo.claude_command || sessionInfo.codex_command) && (
+                    <div>
+                      <div className="flex items-center gap-2 text-text-secondary mb-1">
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span className="text-xs font-semibold uppercase tracking-wider">
+                          {agentType === 'claude' ? 'Claude' : 'Codex'} Command
+                        </span>
+                      </div>
+                      <div className="bg-surface-primary rounded p-3 text-text-primary font-mono text-xs overflow-x-auto">
+                        {sessionInfo.claude_command || sessionInfo.codex_command}
+                      </div>
                     </div>
-                    <div className="bg-surface-primary rounded p-3 text-text-primary font-mono text-xs overflow-x-auto">
-                      {sessionInfo.claude_command}
-                    </div>
-                  </div>
+                  )}
                   
                   {/* Additional Info */}
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-text-quaternary">Worktree Path:</span>
-                      <div className="text-text-secondary mt-1 font-mono truncate" title={sessionInfo.worktree_path}>
-                        {sessionInfo.worktree_path}
+                    {sessionInfo.worktree_path && (
+                      <div>
+                        <span className="text-text-quaternary">Worktree Path:</span>
+                        <div className="text-text-secondary mt-1 font-mono truncate" title={sessionInfo.worktree_path}>
+                          {sessionInfo.worktree_path}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div>
                       <span className="text-text-quaternary">Model:</span>
                       <div className="text-text-secondary mt-1">
-                        {sessionInfo.model}
+                        {sessionInfo.model || 'Unknown'}
                       </div>
                     </div>
                   </div>

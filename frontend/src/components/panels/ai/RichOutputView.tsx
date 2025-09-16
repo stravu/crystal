@@ -5,15 +5,7 @@ import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUti
 import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 import { MessageSegment } from './components/MessageSegment';
 import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransformer';
-
-// Settings stored in localStorage for persistence
-export interface RichOutputSettings {
-  showToolCalls: boolean;
-  compactMode: boolean;
-  collapseTools: boolean;
-  showThinking: boolean;
-  showSessionInit: boolean;
-}
+import { RichOutputSettings } from './AbstractAIPanel';
 
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
@@ -27,11 +19,15 @@ interface RichOutputViewProps {
   panelId: string;
   sessionStatus?: string;
   settings?: RichOutputSettings;
-  transformer: MessageTransformer;
+  onSettingsChange?: (settings: RichOutputSettings) => void;
+  showSettings?: boolean;
+  messageTransformer: MessageTransformer;
+  outputEventName: string;
+  getOutputsHandler: string;
 }
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
-  ({ panelId, sessionStatus, settings: propsSettings, transformer }, ref) => {
+  ({ panelId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings, messageTransformer, outputEventName, getOutputsHandler }, ref) => {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,46 +83,55 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     try {
       setError(null);
       
-      // Load conversation messages and JSON messages using panel-based APIs
-      const [conversationResponse, outputResponse] = await Promise.all([
-        API.panels.getConversationMessages(panelId),
-        API.panels.getJsonMessages(panelId)
-      ]);
-      
-      // Combine both sources - conversation messages have the actual user prompts
-      const userPrompts: any[] = [];
-      if (conversationResponse.success && Array.isArray(conversationResponse.data)) {
-        conversationResponse.data.forEach((msg: any) => {
-          if (msg.message_type === 'user') {
-            userPrompts.push({
-              type: 'user',
-              message: {
-                role: 'user',
-                content: [{ type: 'text', text: msg.content }]
-              },
-              timestamp: msg.timestamp
-            });
-          }
+      // For Codex panels, use the getOutputsHandler to get outputs
+      if (getOutputsHandler.includes('codex')) {
+        const existingOutputs = await window.electron?.invoke(getOutputsHandler, panelId, 1000);
+        if (existingOutputs && existingOutputs.length > 0) {
+          const transformedMessages = messageTransformer.transform(existingOutputs);
+          setMessages(transformedMessages);
+        }
+      } else {
+        // For Claude panels, use the existing API calls
+        const [conversationResponse, outputResponse] = await Promise.all([
+          API.panels.getConversationMessages(panelId),
+          API.panels.getJsonMessages(panelId)
+        ]);
+        
+        // Combine both sources - conversation messages have the actual user prompts
+        const userPrompts: any[] = [];
+        if (conversationResponse.success && Array.isArray(conversationResponse.data)) {
+          conversationResponse.data.forEach((msg: any) => {
+            if (msg.message_type === 'user') {
+              userPrompts.push({
+                type: 'user',
+                message: {
+                  role: 'user',
+                  content: [{ type: 'text', text: msg.content }]
+                },
+                timestamp: msg.timestamp
+              });
+            }
+          });
+        }
+        
+        // Combine user prompts with output messages (filter for JSON messages)
+        const allMessages = [...userPrompts];
+        if (outputResponse.success && outputResponse.data && Array.isArray(outputResponse.data)) {
+          // JSON messages are already in the correct format from getJsonMessages
+          allMessages.push(...outputResponse.data);
+        }
+        
+        // Sort by timestamp to get correct order
+        allMessages.sort((a, b) => {
+          const timeA = new Date(a.timestamp).getTime();
+          const timeB = new Date(b.timestamp).getTime();
+          return timeA - timeB;
         });
+        
+        // Transform messages using the provided transformer
+        const conversationMessages = messageTransformer.transform(allMessages);
+        setMessages(conversationMessages);
       }
-      
-      // Combine user prompts with output messages (filter for JSON messages)
-      const allMessages = [...userPrompts];
-      if (outputResponse.success && outputResponse.data && Array.isArray(outputResponse.data)) {
-        // JSON messages are already in the correct format from getJsonMessages
-        allMessages.push(...outputResponse.data);
-      }
-      
-      // Sort by timestamp to get correct order
-      allMessages.sort((a, b) => {
-        const timeA = new Date(a.timestamp).getTime();
-        const timeB = new Date(b.timestamp).getTime();
-        return timeA - timeB;
-      });
-      
-      // Transform messages using the provided transformer
-      const conversationMessages = transformer.transform(allMessages);
-      setMessages(conversationMessages);
     } catch (err) {
       console.error('Failed to load messages:', err);
       setError('Failed to load conversation history');
@@ -134,7 +139,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       setLoading(false);
       isLoadingRef.current = false;
     }
-  }, [panelId, transformer]);
+  }, [panelId, messageTransformer, getOutputsHandler]);
 
   // Store loadMessages in ref to avoid dependency cycles
   useEffect(() => {
@@ -145,23 +150,47 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
     
-    const handleOutputAvailable = (event: CustomEvent<{ sessionId: string; panelId?: string }>) => {
-      if (event.detail.sessionId === panelId || event.detail.panelId === panelId) {
+    const handleOutputAvailable = (event: any) => {
+      // Handle both CustomEvent and Electron IPC events
+      const detail = event.detail || event;
+      if (detail.sessionId === panelId || detail.panelId === panelId) {
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          loadMessagesRef.current?.();
+          if (outputEventName.includes('codex')) {
+            // For Codex, add the new output directly to maintain real-time display
+            if (detail.data || detail) {
+              const newMessage = messageTransformer.parseMessage(detail);
+              if (newMessage) {
+                setMessages(prev => [...prev, newMessage]);
+              }
+            }
+          } else {
+            // For Claude, reload all messages
+            loadMessagesRef.current?.();
+          }
         }, 500); // Wait 500ms after last event
       }
     };
-
-    window.addEventListener('session-output-available', handleOutputAvailable as any);
+    
+    // Listen for the appropriate event based on the panel type
+    if (outputEventName.includes('codex')) {
+      window.electron?.on(outputEventName, handleOutputAvailable);
+      window.addEventListener(outputEventName, handleOutputAvailable as any);
+    } else {
+      window.addEventListener('session-output-available', handleOutputAvailable as any);
+    }
     
     return () => {
       clearTimeout(debounceTimer);
-      window.removeEventListener('session-output-available', handleOutputAvailable as any);
+      if (outputEventName.includes('codex')) {
+        window.electron?.off(outputEventName, handleOutputAvailable);
+        window.removeEventListener(outputEventName, handleOutputAvailable as any);
+      } else {
+        window.removeEventListener('session-output-available', handleOutputAvailable as any);
+      }
     };
-  }, [panelId]); // Only depend on panelId, not loadMessages
+  }, [panelId, outputEventName, messageTransformer]); // Include dependencies
 
   // Initial load
   useEffect(() => {
@@ -282,9 +311,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       .map(seg => seg.type === 'text' ? seg.content : '')
       .join('\n\n');
     
-    // Check if message has tool calls or thinking
+    // Check if message has tool calls, thinking, diffs or tool results
     const hasToolCalls = message.segments.some(seg => seg.type === 'tool_call');
     const hasThinking = message.segments.some(seg => seg.type === 'thinking');
+    const hasDiffs = message.segments.some(seg => seg.type === 'diff');
+    const hasToolResults = message.segments.some(seg => seg.type === 'tool_result');
     
     // Determine if we need extra spacing before this message
     const prevMessage = index > 0 ? filteredMessages[index - 1] : null;
@@ -296,6 +327,41 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     // Special rendering for system messages
     if (isSystem) {
       return renderSystemMessage(message, needsExtraSpacing || false);
+    }
+    
+    // Check if this message has any renderable content
+    const hasRenderableContent = hasTextContent || hasToolCalls || hasThinking || hasDiffs || hasToolResults;
+    
+    // If no renderable content and not a special system message, skip or show raw
+    if (!hasRenderableContent) {
+      // Check if it's a system_info only message that should be handled differently
+      const hasSystemInfo = message.segments.some(seg => seg.type === 'system_info');
+      if (hasSystemInfo) {
+        // Return null to skip rendering - these are handled in renderSystemMessage
+        return null;
+      }
+      
+      // For other messages with no renderable content, show as raw JSON fallback
+      if (message.segments.length > 0) {
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all bg-surface-tertiary/50 border border-border-primary
+              ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="text-xs text-text-tertiary mb-2">Unhandled message type</div>
+            <pre className="text-xs text-text-secondary font-mono overflow-x-auto">
+              {JSON.stringify(message, null, 2)}
+            </pre>
+          </div>
+        );
+      }
+      
+      // Skip completely empty messages
+      return null;
     }
     
     return (
@@ -322,7 +388,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           </div>
           <div className="flex-1 flex items-baseline gap-2">
             <span className="font-medium text-text-primary text-sm">
-              {isUser ? 'You' : transformer.getAgentName()}
+              {isUser ? 'You' : messageTransformer.getAgentName()}
             </span>
             <span className="text-xs text-text-tertiary">
               {formatDistanceToNow(parseTimestamp(message.timestamp))}
@@ -386,6 +452,44 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             .map((seg, idx) => (
               <MessageSegment
                 key={`${message.id}-tool-${idx}`}
+                segment={seg}
+                messageId={message.id}
+                index={idx}
+                isUser={isUser}
+                expandedTools={expandedTools}
+                collapseTools={settings.collapseTools}
+                showToolCalls={settings.showToolCalls}
+                showThinking={settings.showThinking}
+                onToggleToolExpand={toggleToolExpand}
+              />
+            ))
+          }
+          
+          {/* Diff segments */}
+          {message.segments
+            .filter(seg => seg.type === 'diff')
+            .map((seg, idx) => (
+              <MessageSegment
+                key={`${message.id}-diff-${idx}`}
+                segment={seg}
+                messageId={message.id}
+                index={idx}
+                isUser={isUser}
+                expandedTools={expandedTools}
+                collapseTools={settings.collapseTools}
+                showToolCalls={settings.showToolCalls}
+                showThinking={settings.showThinking}
+                onToggleToolExpand={toggleToolExpand}
+              />
+            ))
+          }
+          
+          {/* Tool results - only show if not already shown as part of tool calls */}
+          {settings.showToolCalls && message.segments
+            .filter(seg => seg.type === 'tool_result')
+            .map((seg, idx) => (
+              <MessageSegment
+                key={`${message.id}-result-${idx}`}
                 segment={seg}
                 messageId={message.id}
                 index={idx}
@@ -636,21 +740,101 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       );
     }
     
-    // Default system message rendering
-    return (
-      <div
-        key={message.id}
-        className={`
-          rounded-lg transition-all bg-surface-tertiary/50 border border-border-primary
-          ${settings.compactMode ? 'p-3' : 'p-4'}
-          ${needsExtraSpacing ? 'mt-4' : ''}
-        `}
-      >
-        <div className="text-sm text-text-secondary">
-          {textContent}
+    // Check if there's system_info to display
+    const systemInfo = message.segments.find(seg => seg.type === 'system_info');
+    if (systemInfo?.type === 'system_info' && systemInfo.info) {
+      const info = systemInfo.info;
+      
+      // Handle specific system_info types
+      if (info.type === 'task_started') {
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all bg-interactive/5 border border-interactive/20
+              ${settings.compactMode ? 'p-2' : 'p-3'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-center gap-2 text-xs text-interactive">
+              <span>📋</span>
+              <span>Task started</span>
+              {info.model_context_window && (
+                <span className="text-text-tertiary">
+                  • Context: {(info.model_context_window / 1000).toFixed(0)}k tokens
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      }
+      
+      if (info.type === 'task_complete') {
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all bg-status-success/5 border border-status-success/20
+              ${settings.compactMode ? 'p-2' : 'p-3'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-center gap-2 text-xs text-status-success">
+              <span>✅</span>
+              <span>Task completed</span>
+              {info.last_message && (
+                <span className="text-text-tertiary">• {info.last_message}</span>
+              )}
+            </div>
+          </div>
+        );
+      }
+      
+      if (info.type === 'token_usage') {
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all bg-surface-tertiary/30 border border-border-primary
+              ${settings.compactMode ? 'p-2' : 'p-3'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-center gap-3 text-xs text-text-tertiary">
+              <span>🔢</span>
+              <span>Tokens:</span>
+              {info.input_tokens && <span>In: {info.input_tokens.toLocaleString()}</span>}
+              {info.output_tokens && <span>Out: {info.output_tokens.toLocaleString()}</span>}
+              {info.total_tokens && <span className="text-text-secondary">Total: {info.total_tokens.toLocaleString()}</span>}
+              {info.cached_tokens && info.cached_tokens > 0 && (
+                <span className="text-interactive">Cached: {info.cached_tokens.toLocaleString()}</span>
+              )}
+            </div>
+          </div>
+        );
+      }
+    }
+    
+    // Default system message rendering - only if there's text content
+    if (textContent) {
+      return (
+        <div
+          key={message.id}
+          className={`
+            rounded-lg transition-all bg-surface-tertiary/50 border border-border-primary
+            ${settings.compactMode ? 'p-3' : 'p-4'}
+            ${needsExtraSpacing ? 'mt-4' : ''}
+          `}
+        >
+          <div className="text-sm text-text-secondary">
+            {textContent}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+    
+    // If no text content and no recognized system_info, return null to skip
+    return null;
   };
 
   // Check if we're waiting for response
@@ -686,7 +870,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       const element = renderMessage(msg, idx, isUser ? userMessageIndex : undefined);
       if (isUser) userMessageIndex++;
       return element;
-    });
+    }).filter(element => element !== null); // Filter out null elements
   }, [filteredMessages, collapsedMessages, expandedTools, settings]);
 
   if (loading) {
@@ -707,7 +891,40 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
 
   return (
     <div className="h-full flex flex-col bg-bg-primary relative">
-      {/* Settings panel is now rendered in SessionView to avoid duplication */}
+      {/* Settings Panel */}
+      {showSettings && onSettingsChange && (
+        <div className="px-4 py-3 border-b border-border-primary bg-surface-secondary">
+          <div className="flex flex-wrap gap-4 text-xs">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={settings.showToolCalls}
+                onChange={(e) => onSettingsChange({ ...settings, showToolCalls: e.target.checked })}
+                className="rounded border-border-primary"
+              />
+              <span>Show Tool Calls</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={settings.compactMode}
+                onChange={(e) => onSettingsChange({ ...settings, compactMode: e.target.checked })}
+                className="rounded border-border-primary"
+              />
+              <span>Compact Mode</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={settings.showThinking}
+                onChange={(e) => onSettingsChange({ ...settings, showThinking: e.target.checked })}
+                className="rounded border-border-primary"
+              />
+              <span>Show Thinking</span>
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div 

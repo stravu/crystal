@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Settings } from 'lucide-react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { AIViewMode, RichOutputSettings } from '../ai/AbstractAIPanel';
-import { CodexRichOutputView } from './CodexRichOutputView';
-import { CodexMessagesView } from './CodexMessagesView';
+import { RichOutputView } from '../ai/RichOutputView';
+import { MessagesView } from '../ai/MessagesView';
+import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransformer';
 import { CodexStatsView } from './CodexStatsView';
 import { CodexInputPanel } from './CodexInputPanel';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
@@ -36,6 +37,9 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('codexRichOutputSettings', JSON.stringify(newSettings));
   };
+  
+  // Create message transformer
+  const messageTransformer = useMemo(() => new CodexMessageTransformer(), []);
 
   // Use the Codex-specific hook
   const hook = useCodexPanel(panel.id, isActive);
@@ -145,19 +149,27 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
       <div className="flex-1 relative min-h-0 overflow-hidden">
         {viewMode === 'richOutput' && (
           <div className="h-full block w-full">
-            <CodexRichOutputView 
+            <RichOutputView 
               panelId={panel.id}
               sessionStatus={activeSession.status}
               settings={richOutputSettings}
               onSettingsChange={handleRichOutputSettingsChange}
               showSettings={showRichOutputSettings}
+              messageTransformer={messageTransformer}
+              outputEventName="codexPanel:output"
+              getOutputsHandler="codexPanel:getOutputs"
             />
           </div>
         )}
         
         {viewMode === 'messages' && (
           <div className="h-full flex flex-col overflow-hidden w-full">
-            <CodexMessagesView panelId={panel.id} />
+            <MessagesView 
+              panelId={panel.id} 
+              agentType="codex"
+              outputEventName="codexPanel:output"
+              getMessagesHandler="codexPanel:getOutputs"
+            />
           </div>
         )}
         

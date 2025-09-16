@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbstractAIPanel, AIPanelProps } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
-import { MessagesView } from './MessagesView';
+import { MessagesView } from '../ai/MessagesView';
 import { SessionStats } from './SessionStats';
 import { ClaudeInputWithImages } from './ClaudeInputWithImages';
 import { useClaudePanel } from '../../../hooks/useClaudePanel';
@@ -67,7 +67,13 @@ class ClaudePanelClass extends AbstractAIPanel<AIPanelProps> {
   }
 
   protected renderMessagesView(): React.ReactNode {
-    return <MessagesView panelId={this.props.panel.id} />;
+    return (
+      <MessagesView 
+        panelId={this.props.panel.id}
+        agentType="claude"
+        outputEventName="session:output"
+      />
+    );
   }
 
   protected renderStatsView(): React.ReactNode {
