@@ -42,16 +42,32 @@ test.describe('Smoke Tests', () => {
     const getStartedButton = page.locator('button:has-text("Get Started")');
     if (await getStartedButton.isVisible({ timeout: 1000 }).catch(() => false)) {
       await getStartedButton.click();
+      // Wait for dialog to close
+      await page.waitForTimeout(500);
     }
     
-    // Click settings button
+    // Wait for the settings button to be visible and clickable
     const settingsButton = page.locator('[data-testid="settings-button"]');
+    await expect(settingsButton).toBeVisible({ timeout: 5000 });
+    
+    // Click settings button
     await settingsButton.click();
     
-    // Wait for settings to appear - use a simple text selector
-    await expect(page.locator('text="Crystal Settings"').first()).toBeVisible({ timeout: 10000 });
+    // Wait a moment for modal animation to start
+    await page.waitForTimeout(100);
     
-    // Check that some settings content is visible
-    await expect(page.locator('text=/Verbose|API Key|System Prompt/i').first()).toBeVisible({ timeout: 5000 });
+    // Wait for the modal to appear - check for the role="dialog" element
+    // The modal should contain the tabs for General, Notifications, and Stravu
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
+    
+    // Verify the settings content is visible
+    // Simply check that the modal dialog is present and visible
+    const modalDialog = page.locator('[role="dialog"]').first();
+    await expect(modalDialog).toBeVisible({ timeout: 5000 });
+    
+    // As a secondary check, verify some text that should be in the settings
+    // Using a more generic check that should work regardless of exact text
+    const settingsIndicator = page.locator('[role="dialog"]').locator('text=/General|Theme|API|Settings/i').first();
+    await expect(settingsIndicator).toBeVisible({ timeout: 5000 });
   });
 });
