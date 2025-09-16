@@ -3,6 +3,7 @@ import { ToolPanel, CreatePanelRequest, PanelEventType, ToolPanelState, ToolPane
 import { databaseService } from './database';
 import { panelEventBus } from './panelEventBus';
 import { mainWindow } from '../index';
+import { withLock } from '../utils/mutex';
 
 export class PanelManager {
   private panels = new Map<string, ToolPanel>();
@@ -19,61 +20,72 @@ export class PanelManager {
   }
   
   async createPanel(request: CreatePanelRequest): Promise<ToolPanel> {
-    // Generate unique ID
-    const panelId = uuidv4();
-    
-    // Auto-generate title if not provided
-    const title = request.title || this.generatePanelTitle(request.sessionId, request.type);
-    
-    // Create initial state
-    const state: ToolPanelState = {
-      isActive: false,
-      hasBeenViewed: false,
-      customState: request.initialState || {}
-    };
-    
-    // Create metadata (merge with any provided overrides)
-    const metadata: ToolPanelMetadata = {
-      createdAt: new Date().toISOString(),
-      lastActiveAt: new Date().toISOString(),
-      position: this.getNextPosition(request.sessionId),
-      ...request.metadata // Apply any metadata overrides (like permanent flag)
-    };
-    
-    // Create panel object
-    const panel: ToolPanel = {
-      id: panelId,
-      sessionId: request.sessionId,
-      type: request.type,
-      title,
-      state,
-      metadata
-    };
-    
-    // Save to database
-    databaseService.createPanel({
-      id: panel.id,
-      sessionId: panel.sessionId,
-      type: panel.type,
-      title: panel.title,
-      state: panel.state,
-      metadata: panel.metadata
+    return await withLock(`panel-creation-${request.sessionId}`, async () => {
+      // Generate unique ID
+      const panelId = uuidv4();
+      
+      // Auto-generate title if not provided
+      const title = request.title || this.generatePanelTitle(request.sessionId, request.type);
+      
+      // Create initial state
+      const state: ToolPanelState = {
+        isActive: false,
+        hasBeenViewed: false,
+        customState: request.initialState || {}
+      };
+      
+      // Create metadata (merge with any provided overrides)
+      const metadata: ToolPanelMetadata = {
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+        position: this.getNextPosition(request.sessionId),
+        ...request.metadata // Apply any metadata overrides (like permanent flag)
+      };
+      
+      // Create panel object
+      const panel: ToolPanel = {
+        id: panelId,
+        sessionId: request.sessionId,
+        type: request.type,
+        title,
+        state,
+        metadata
+      };
+      
+      // Save to database and set as active in a single transaction
+      databaseService.createPanelAndSetActive({
+        id: panel.id,
+        sessionId: panel.sessionId,
+        type: panel.type,
+        title: panel.title,
+        state: panel.state,
+        metadata: panel.metadata
+      });
+      
+      // Cache in memory
+      this.panels.set(panelId, panel);
+      
+      // Update panel states to reflect the new active panel
+      const panels = this.getPanelsForSession(request.sessionId);
+      panels.forEach(p => {
+        const isActive = p.id === panelId;
+        if (p.state.isActive !== isActive) {
+          p.state.isActive = isActive;
+          if (isActive) {
+            p.metadata.lastActiveAt = new Date().toISOString();
+          }
+        }
+      });
+      
+      // Emit IPC event to notify frontend
+      if (mainWindow) {
+        mainWindow.webContents.send('panel:created', panel);
+      }
+      
+      console.log(`[PanelManager] Created panel ${panelId} of type ${request.type} for session ${request.sessionId}`);
+      
+      return panel;
     });
-    
-    // Cache in memory
-    this.panels.set(panelId, panel);
-    
-    // Set as active panel for the session
-    await this.setActivePanel(request.sessionId, panelId);
-    
-    // Emit IPC event to notify frontend
-    if (mainWindow) {
-      mainWindow.webContents.send('panel:created', panel);
-    }
-    
-    console.log(`[PanelManager] Created panel ${panelId} of type ${request.type} for session ${request.sessionId}`);
-    
-    return panel;
   }
   
   async ensureDiffPanel(sessionId: string): Promise<void> {
@@ -92,96 +104,110 @@ export class PanelManager {
   }
   
   async deletePanel(panelId: string): Promise<void> {
-    const panel = this.getPanel(panelId);
-    if (!panel) {
-      console.warn(`[PanelManager] Panel ${panelId} not found for deletion`);
-      return;
-    }
-    
-    // Check if panel is permanent
-    if (panel.metadata.permanent) {
-      console.warn(`[PanelManager] Cannot delete permanent panel ${panelId}`);
-      return;
-    }
-    
-    // Clean up event subscriptions
-    panelEventBus.unsubscribePanel(panelId);
-    
-    // If this was the active panel, activate another one
-    const activePanelId = databaseService.getActivePanel(panel.sessionId)?.id;
-    if (activePanelId === panelId) {
-      const otherPanels = this.getPanelsForSession(panel.sessionId).filter(p => p.id !== panelId);
-      if (otherPanels.length > 0) {
-        await this.setActivePanel(panel.sessionId, otherPanels[0].id);
-      } else {
-        await this.setActivePanel(panel.sessionId, null);
+    return await withLock(`panel-delete-${panelId}`, async () => {
+      const panel = this.getPanel(panelId);
+      if (!panel) {
+        console.warn(`[PanelManager] Panel ${panelId} not found for deletion`);
+        return;
       }
-    }
-    
-    // Remove from database
-    databaseService.deletePanel(panelId);
-    
-    // Remove from cache
-    this.panels.delete(panelId);
-    
-    // Emit IPC event to notify frontend
-    if (mainWindow) {
-      mainWindow.webContents.send('panel:deleted', { panelId, sessionId: panel.sessionId });
-    }
-    
-    console.log(`[PanelManager] Deleted panel ${panelId}`);
+      
+      // Check if panel is permanent
+      if (panel.metadata.permanent) {
+        console.warn(`[PanelManager] Cannot delete permanent panel ${panelId}`);
+        return;
+      }
+      
+      // Clean up event subscriptions
+      panelEventBus.unsubscribePanel(panelId);
+      
+      // If this was the active panel, activate another one
+      const activePanelId = databaseService.getActivePanel(panel.sessionId)?.id;
+      if (activePanelId === panelId) {
+        const otherPanels = this.getPanelsForSession(panel.sessionId).filter(p => p.id !== panelId);
+        if (otherPanels.length > 0) {
+          await this.setActivePanel(panel.sessionId, otherPanels[0].id);
+        } else {
+          await this.setActivePanel(panel.sessionId, null);
+        }
+      }
+      
+      // Remove from database
+      databaseService.deletePanel(panelId);
+      
+      // Remove from cache
+      this.panels.delete(panelId);
+      
+      // Emit IPC event to notify frontend
+      if (mainWindow) {
+        mainWindow.webContents.send('panel:deleted', { panelId, sessionId: panel.sessionId });
+      }
+      
+      console.log(`[PanelManager] Deleted panel ${panelId}`);
+    });
   }
   
   async updatePanel(panelId: string, updates: Partial<ToolPanel>): Promise<void> {
-    const panel = this.getPanel(panelId);
-    if (!panel) {
-      console.warn(`[PanelManager] Panel ${panelId} not found for update`);
-      return;
-    }
-    
-    // Update in database
-    databaseService.updatePanel(panelId, {
-      title: updates.title,
-      state: updates.state,
-      metadata: updates.metadata
+    return await withLock(`panel-update-${panelId}`, async () => {
+      const panel = this.getPanel(panelId);
+      if (!panel) {
+        console.warn(`[PanelManager] Panel ${panelId} not found for update`);
+        return;
+      }
+      
+      // Update in database
+      databaseService.updatePanel(panelId, {
+        title: updates.title,
+        state: updates.state,
+        metadata: updates.metadata
+      });
+      
+      // Update in cache
+      if (updates.title !== undefined) panel.title = updates.title;
+      if (updates.state !== undefined) panel.state = updates.state;
+      if (updates.metadata !== undefined) panel.metadata = updates.metadata;
+      
+      // Emit IPC event to notify frontend
+      if (mainWindow) {
+        mainWindow.webContents.send('panel:updated', panel);
+      }
+      
+      console.log(`[PanelManager] Updated panel ${panelId}`);
     });
-    
-    // Update in cache
-    if (updates.title !== undefined) panel.title = updates.title;
-    if (updates.state !== undefined) panel.state = updates.state;
-    if (updates.metadata !== undefined) panel.metadata = updates.metadata;
-    
-    // Emit IPC event to notify frontend
-    if (mainWindow) {
-      mainWindow.webContents.send('panel:updated', panel);
-    }
-    
-    console.log(`[PanelManager] Updated panel ${panelId}`);
   }
   
   async setActivePanel(sessionId: string, panelId: string | null): Promise<void> {
-    // Update database
-    databaseService.setActivePanel(sessionId, panelId);
-    
-    // Update panel states
-    const panels = this.getPanelsForSession(sessionId);
-    panels.forEach(panel => {
-      const isActive = panel.id === panelId;
-      if (panel.state.isActive !== isActive) {
-        panel.state.isActive = isActive;
-        if (isActive) {
-          panel.metadata.lastActiveAt = new Date().toISOString();
+    return await withLock(`panel-active-${sessionId}`, async () => {
+      // Update database
+      databaseService.setActivePanel(sessionId, panelId);
+      
+      // Update panel states
+      const panels = this.getPanelsForSession(sessionId);
+      panels.forEach(panel => {
+        const isActive = panel.id === panelId;
+        if (panel.state.isActive !== isActive) {
+          panel.state.isActive = isActive;
+          if (isActive) {
+            panel.metadata.lastActiveAt = new Date().toISOString();
+          }
+          // Don't call updatePanel here to avoid nested locks
+          // Update in database directly
+          databaseService.updatePanel(panel.id, {
+            state: panel.state,
+            metadata: panel.metadata
+          });
+          
+          // Update in cache
+          this.panels.set(panel.id, panel);
         }
-        this.updatePanel(panel.id, { state: panel.state, metadata: panel.metadata });
+      });
+      
+      // Emit IPC event to notify frontend
+      if (mainWindow) {
+        mainWindow.webContents.send('panel:activeChanged', { sessionId, panelId });
       }
+      
+      console.log(`[PanelManager] Set active panel for session ${sessionId} to ${panelId}`);
     });
-    
-    // Emit IPC event to notify frontend
-    if (mainWindow) {
-      mainWindow.webContents.send('panel:activeChanged', { sessionId, panelId });
-    }
-    
-    console.log(`[PanelManager] Set active panel for session ${sessionId} to ${panelId}`);
   }
   
   getPanel(panelId: string): ToolPanel | undefined {

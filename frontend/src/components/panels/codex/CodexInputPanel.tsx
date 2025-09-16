@@ -1,30 +1,56 @@
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Send, Settings2, StopCircle } from 'lucide-react';
 import type { Session } from '../../../types/session';
+import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
+
+const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 
 interface CodexInputPanelProps {
   session: Session;
   panelId: string;
   onSendMessage: (message: string, options?: any) => Promise<void>;
   disabled?: boolean;
+  initialModel?: string;
 }
 
 export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
   session,
   onSendMessage,
-  disabled = false
+  disabled = false,
+  initialModel
 }) => {
   const [input, setInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+  
+  // Initialize with initial model prop, then last selected model from localStorage
+  const getInitialModel = (): OpenAICodexModel => {
+    // First priority: initialModel prop (from panel state)
+    if (initialModel && initialModel in CODEX_MODELS) {
+      return initialModel as OpenAICodexModel;
+    }
+    // Second priority: saved model from localStorage
+    const saved = localStorage.getItem(LAST_CODEX_MODEL_KEY);
+    if (saved && saved in CODEX_MODELS) {
+      return saved as OpenAICodexModel;
+    }
+    // Default fallback
+    return DEFAULT_CODEX_MODEL;
+  };
+  
   const [options, setOptions] = useState({
-    model: 'gpt-5',
+    model: getInitialModel(),
     modelProvider: 'openai',
     approvalPolicy: 'manual' as 'manual' | 'auto',
     sandboxMode: 'workspace-write' as 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch: false
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Save model selection to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(LAST_CODEX_MODEL_KEY, options.model);
+  }, [options.model]);
 
   const handleSubmit = async () => {
     if (!input.trim() || isSubmitting || disabled) return;
@@ -70,9 +96,18 @@ export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
           <div className="flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-2">
               <label className="text-text-secondary">Model:</label>
-              <span className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary font-medium">
-                GPT-5
-              </span>
+              <select
+                value={options.model}
+                onChange={(e) => setOptions({ ...options, model: e.target.value as OpenAICodexModel })}
+                className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary font-medium"
+                title={CODEX_MODELS[options.model as OpenAICodexModel]?.description || 'Select model'}
+              >
+                {Object.values(CODEX_MODELS).map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">

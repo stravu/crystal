@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { usePanelStore } from '../stores/panelStore';
 import type { Session } from '../types/session';
+import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
 interface CodexPanelHook {
   activeSession: Session | null;
@@ -164,7 +165,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           activeSession.worktreePath, 
           message,
           {
-            model: options?.model || 'gpt-5',
+            model: options?.model || DEFAULT_CODEX_MODEL,
             modelProvider: options?.modelProvider || 'openai',
             approvalPolicy: options?.approvalPolicy || 'manual',
             sandboxMode: options?.sandboxMode || 'workspace-write',

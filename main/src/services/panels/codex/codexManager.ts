@@ -6,6 +6,7 @@ import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
+import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -45,13 +46,16 @@ export class CodexManager extends AbstractCliManager {
   private pendingInitialPrompts: Map<string, string> = new Map();
   private protocolHandshakeComplete: Map<string, boolean> = new Map();
   
+  // Platform-specific line ending
+  private readonly lineEnding = process.platform === 'win32' ? '\r\n' : '\n';
+  
   constructor(
     sessionManager: any,
     logger?: Logger,
     configManager?: ConfigManager
   ) {
     super(sessionManager, logger, configManager);
-    this.logger?.info('[codex-debug] CodexManager initialized');
+    this.logger?.info(`[codex-debug] CodexManager initialized for platform: ${process.platform}, using line ending: ${this.lineEnding === '\r\n' ? 'CRLF' : 'LF'}`);
   }
 
   // Abstract method implementations
@@ -95,35 +99,57 @@ export class CodexManager extends AbstractCliManager {
           path: command
         };
       } catch (directError: any) {
-        // Check if it's a shebang/node error
+        // Check if it's a shebang/node error (Unix/Linux/macOS) or Windows command error
         const errorMsg = directError.message || String(directError);
-        if (errorMsg.includes('env: node:') || errorMsg.includes('No such file or directory')) {
-          this.logger?.warn('[codex-debug] Codex appears to be a Node.js script with shebang issue, trying Node.js fallback...');
+        const isUnixShebangError = errorMsg.includes('env: node:') || errorMsg.includes('No such file or directory');
+        const isWindowsCommandError = errorMsg.includes('is not recognized as an internal or external command') ||
+                                     errorMsg.includes('cannot find the path specified') ||
+                                     errorMsg.includes('ENOENT') ||
+                                     errorMsg.includes('The system cannot find the file specified');
+        
+        if (isUnixShebangError || isWindowsCommandError) {
+          const errorType = isWindowsCommandError ? 'Windows command execution' : 'Unix shebang';
+          this.logger?.warn(`[codex-debug] Codex appears to be a Node.js script with ${errorType} issue, trying Node.js fallback...`);
+          this.logger?.info(`[codex-debug] Original error details: ${errorMsg}`);
           
           // Try to find Node.js and run the script directly
           const { findNodeExecutable } = require('../../../utils/nodeFinder');
           try {
             const nodePath = await findNodeExecutable();
-            this.logger?.info(`[codex-debug] Found Node.js at: ${nodePath}`);
+            this.logger?.info(`[codex-debug] Found Node.js at: ${nodePath} for fallback execution`);
             
             // Test with Node.js directly
-            const version = execSync(`"${nodePath}" "${command}" --version`, {
+            const nodeCommand = `"${nodePath}" "${command}" --version`;
+            this.logger?.info(`[codex-debug] Testing Node.js fallback command: ${nodeCommand}`);
+            
+            const version = execSync(nodeCommand, {
               encoding: 'utf8',
               timeout: 5000
             }).trim();
-            this.logger?.info(`[codex-debug] Codex version detected via Node.js: ${version}`);
+            this.logger?.info(`[codex-debug] Codex version detected via Node.js fallback: ${version}`);
             
             // Store that we need Node.js fallback
             (global as any).codexNeedsNodeFallback = true;
+            this.logger?.info('[codex-debug] Node.js fallback mode enabled for future executions');
             
             return {
               available: true,
               version,
               path: command
             };
-          } catch (nodeError) {
-            this.logger?.error('[codex-debug] Node.js fallback also failed:', nodeError instanceof Error ? nodeError : undefined);
-            throw directError; // Re-throw original error
+          } catch (nodeError: any) {
+            const nodeErrorMsg = nodeError.message || String(nodeError);
+            this.logger?.error(`[codex-debug] Node.js fallback also failed with error: ${nodeErrorMsg}`);
+            this.logger?.error('[codex-debug] Node.js fallback stack trace:', nodeError instanceof Error ? nodeError : undefined);
+            
+            // Provide more helpful error message
+            const enhancedError = new Error(
+              `Codex execution failed on ${process.platform}. ` +
+              `Original error: ${errorMsg}. ` +
+              `Node.js fallback error: ${nodeErrorMsg}. ` +
+              `Please ensure both Codex and Node.js are properly installed and accessible.`
+            );
+            throw enhancedError;
           }
         }
         throw directError;
@@ -141,9 +167,11 @@ export class CodexManager extends AbstractCliManager {
   protected buildCommandArgs(options: CodexSpawnOptions): string[] {
     const args: string[] = ['proto'];
     
-    // Model configuration (defaults to GPT-5)
-    const model = options.model || 'gpt-5';
-    args.push('-c', `model="${model}"`);
+    // Model configuration - 'auto' means don't pass a model parameter
+    const model = options.model || DEFAULT_CODEX_MODEL;
+    if (model !== 'auto') {
+      args.push('-c', `model="${model}"`);
+    }
     
     if (options.modelProvider) {
       args.push('-c', `model_provider="${options.modelProvider}"`);
@@ -222,11 +250,23 @@ export class CodexManager extends AbstractCliManager {
     // Add new data to buffer
     buffer += data;
     
-    // Process complete lines
-    const lines = buffer.split('\n');
+    // Log raw buffer data for debugging line ending issues
+    this.logger?.info(`[codex-debug] Raw buffer data (${data.length} chars): ${JSON.stringify(data)}`);
+    this.logger?.info(`[codex-debug] Current buffer state (${buffer.length} chars): ${JSON.stringify(buffer.substring(0, 200))}`);
+    
+    // Process complete lines - handle both Windows (CRLF) and Unix (LF) line endings
+    // First normalize CRLF to LF, then split on LF
+    const normalizedBuffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    
+    // Log if we normalized any line endings
+    if (buffer !== normalizedBuffer) {
+      this.logger?.info(`[codex-debug] Normalized line endings in buffer for panel ${panelId}. Original length: ${buffer.length}, normalized length: ${normalizedBuffer.length}`);
+    }
+    
+    const lines = normalizedBuffer.split('\n');
     buffer = lines.pop() || ''; // Keep incomplete line in buffer
     
-    // Update buffer
+    // Update buffer (store normalized version to prevent accumulation of \r characters)
     this.messageBuffers.set(panelId, buffer);
     
     // Process each complete line
@@ -339,6 +379,16 @@ export class CodexManager extends AbstractCliManager {
   }
 
   protected getCliNotAvailableMessage(error?: string): string {
+    const isWindows = process.platform === 'win32';
+    const platformSpecificInstructions = isWindows ? [
+      '',
+      'Windows-specific notes:',
+      '- If Codex is a Node.js script, ensure Node.js is installed and in PATH',
+      '- Windows may have issues with Unix shebang lines - Crystal will attempt Node.js fallback',
+      '- Try running "node codex --version" if direct execution fails',
+      '- Consider using PowerShell or Command Prompt with administrator privileges'
+    ] : [];
+
     return [
       `Error: ${error}`,
       '',
@@ -353,7 +403,8 @@ export class CodexManager extends AbstractCliManager {
       '',
       'If Codex is installed but not in your PATH:',
       '- Add the Codex installation directory to your PATH',
-      '- Or set a custom Codex path in Crystal Settings'
+      '- Or set a custom Codex path in Crystal Settings',
+      ...platformSpecificInstructions
     ].join('\n');
   }
 
@@ -386,16 +437,23 @@ export class CodexManager extends AbstractCliManager {
       let finalArgs = args;
       
       if ((global as any).codexNeedsNodeFallback) {
-        this.logger?.info('[codex-debug] Using Node.js fallback for Codex');
+        this.logger?.info('[codex-debug] Using Node.js fallback for Codex execution due to previous detection');
         const { findNodeExecutable } = require('../../../utils/nodeFinder');
         try {
           const nodePath = await findNodeExecutable();
-          this.logger?.info(`[codex-debug] Using Node.js at: ${nodePath}`);
+          this.logger?.info(`[codex-debug] Using Node.js at: ${nodePath} for Codex execution`);
           finalCommand = nodePath;
           finalArgs = [cliCommand, ...args];
-        } catch (nodeError) {
-          this.logger?.error('[codex-debug] Failed to find Node.js for fallback:', nodeError instanceof Error ? nodeError : undefined);
-          // Continue with original command and hope for the best
+          this.logger?.info(`[codex-debug] Node.js fallback command prepared: "${finalCommand}" with args: [${finalArgs.join(', ')}]`);
+        } catch (nodeError: any) {
+          const nodeErrorMsg = nodeError.message || String(nodeError);
+          this.logger?.error(`[codex-debug] Failed to find Node.js for fallback: ${nodeErrorMsg}`);
+          this.logger?.error('[codex-debug] Node.js fallback preparation stack trace:', nodeError instanceof Error ? nodeError : undefined);
+          
+          // Reset the fallback flag and try original command
+          this.logger?.warn('[codex-debug] Disabling Node.js fallback mode and attempting direct execution');
+          (global as any).codexNeedsNodeFallback = false;
+          // Continue with original command as fallback
         }
       }
 
@@ -448,13 +506,24 @@ export class CodexManager extends AbstractCliManager {
       });
 
       childProcess.on('error', (error) => {
-        this.logger?.error(`[codex-debug] Process error for panel ${panelId}: ${error.message}\nStack: ${error.stack}`);
+        const errorMsg = error.message || String(error);
+        this.logger?.error(`[codex-debug] Process error for panel ${panelId}: ${errorMsg}\nStack: ${error.stack}`);
+        
+        // Enhanced error message for Windows compatibility issues
+        let enhancedErrorMsg = errorMsg;
+        if (errorMsg.includes('ENOENT') || errorMsg.includes('spawn') || errorMsg.includes('is not recognized')) {
+          enhancedErrorMsg = `Codex process failed to start on ${process.platform}. ` +
+                            `This may be due to shebang compatibility issues on Windows. ` +
+                            `Original error: ${errorMsg}. ` +
+                            `Please ensure Codex is properly installed and Node.js is available if using a Node.js-based Codex installation.`;
+        }
+        
         this.codexProcesses.delete(panelId); // Clean up on error
         this.messageBuffers.delete(panelId);
         this.messageIdCounters.delete(panelId);
         this.pendingInitialPrompts.delete(panelId);
         this.protocolHandshakeComplete.delete(panelId);
-        this.emit('error', { panelId, sessionId, error: error.message });
+        this.emit('error', { panelId, sessionId, error: enhancedErrorMsg });
       });
 
       // Emit spawned event
@@ -504,7 +573,7 @@ export class CodexManager extends AbstractCliManager {
       sessionId,
       worktreePath,
       prompt,
-      model: model || 'gpt-5', // Default to GPT-5 (released August 7, 2025)
+      model: model || DEFAULT_CODEX_MODEL,
       modelProvider: modelProvider || 'openai'
     };
     
@@ -608,12 +677,10 @@ export class CodexManager extends AbstractCliManager {
       }
     };
     
-    const jsonStr = JSON.stringify(message) + '\n';
-    this.logger?.info(`[codex-debug] Sending user input to panel ${panelId}:\n  Message ID: ${message.id}\n  Text: "${text}"\n  Full JSON: ${jsonStr}`);
+    this.logger?.info(`[codex-debug] Sending user input to panel ${panelId}:\n  Message ID: ${message.id}\n  Text: "${text}"`);
     
     try {
-      const written = childProcess.stdin.write(jsonStr);
-      this.logger?.info(`[codex-debug] STDIN write successful for panel ${panelId}, bytes written: ${written}`);
+      const written = this.writeJsonMessage(childProcess, message, panelId);
       
       // Save the user input to the database so it persists across refreshes
       if (this.sessionManager) {
@@ -647,10 +714,9 @@ export class CodexManager extends AbstractCliManager {
       }
     };
     
-    const jsonStr = JSON.stringify(message) + '\n';
-    this.logger?.info(`[codex-debug] Sending approval to panel ${panelId}:\n  Call ID: ${callId}\n  Decision: ${decision}\n  Type: ${type}\n  Full JSON: ${jsonStr}`);
+    this.logger?.info(`[codex-debug] Sending approval to panel ${panelId}:\n  Call ID: ${callId}\n  Decision: ${decision}\n  Type: ${type}`);
     
-    childProcess.stdin.write(jsonStr);
+    this.writeJsonMessage(childProcess, message, panelId);
   }
 
   async sendInterrupt(panelId: string): Promise<void> {
@@ -667,10 +733,9 @@ export class CodexManager extends AbstractCliManager {
       }
     };
     
-    const jsonStr = JSON.stringify(message) + '\n';
-    this.logger?.info(`[codex-debug] Sending interrupt to panel ${panelId}: ${jsonStr}`);
+    this.logger?.info(`[codex-debug] Sending interrupt to panel ${panelId}`);
     
-    childProcess.stdin.write(jsonStr);
+    this.writeJsonMessage(childProcess, message, panelId);
   }
 
   private async sendShutdown(panelId: string): Promise<void> {
@@ -687,11 +752,10 @@ export class CodexManager extends AbstractCliManager {
       }
     };
     
-    const jsonStr = JSON.stringify(message) + '\n';
-    this.logger?.info(`[codex-debug] Sending shutdown to panel ${panelId}: ${jsonStr}`);
+    this.logger?.info(`[codex-debug] Sending shutdown to panel ${panelId}`);
     
     try {
-      childProcess.stdin.write(jsonStr);
+      this.writeJsonMessage(childProcess, message, panelId);
     } catch (error) {
       this.logger?.warn(`[codex-debug] Failed to send shutdown to panel ${panelId}: ${error}`);
     }
@@ -703,6 +767,23 @@ export class CodexManager extends AbstractCliManager {
     return current;
   }
 
+  /**
+   * Helper method to write JSON messages to stdin with proper platform line endings
+   */
+  private writeJsonMessage(childProcess: ChildProcessWithoutNullStreams, message: any, panelId: string): boolean {
+    const jsonStr = JSON.stringify(message) + this.lineEnding;
+    this.logger?.info(`[codex-debug] Writing JSON message to panel ${panelId} with ${process.platform} line ending (${this.lineEnding === '\r\n' ? 'CRLF' : 'LF'}): ${JSON.stringify(message)}`);
+    
+    try {
+      const written = childProcess.stdin.write(jsonStr);
+      this.logger?.info(`[codex-debug] STDIN write successful for panel ${panelId}, bytes written: ${written}`);
+      return written;
+    } catch (error) {
+      this.logger?.error(`[codex-debug] STDIN write failed for panel ${panelId}: ${error}`);
+      throw error;
+    }
+  }
+
   private async findCodexExecutable(): Promise<string | null> {
     // Check environment variable override first
     if (process.env.CODEX_PATH) {
@@ -710,26 +791,35 @@ export class CodexManager extends AbstractCliManager {
       return process.env.CODEX_PATH;
     }
     
-    // Use centralized path finding utility with enhanced PATH
-    this.logger?.info('[codex-debug] Searching for codex executable using centralized PATH utility...');
-    const pathResult = findExecutableInPath('codex');
+    // List of executable names to try in order of preference
+    const executablesToTry = [
+      'codex',  // Basic name - findExecutableInPath will try .exe, .cmd, .bat on Windows
+      `codex-${this.getPlatformBinary()}`,  // Platform-specific binary
+    ];
     
-    if (pathResult) {
-      this.logger?.info(`[codex-debug] Found Codex at: ${pathResult}`);
-      return pathResult;
+    // On Windows, also try some common variations
+    if (process.platform === 'win32') {
+      executablesToTry.push(
+        'codex.exe',
+        'codex.cmd', 
+        'codex.bat'
+      );
     }
     
-    // As a fallback, check for platform-specific codex binaries with full names
-    const platformBinary = `codex-${this.getPlatformBinary()}`;
-    this.logger?.info(`[codex-debug] Checking for platform-specific binary: ${platformBinary}`);
-    const platformResult = findExecutableInPath(platformBinary);
+    this.logger?.info(`[codex-debug] Searching for Codex executable. Will try: ${executablesToTry.join(', ')}`);
     
-    if (platformResult) {
-      this.logger?.info(`[codex-debug] Found platform-specific Codex at: ${platformResult}`);
-      return platformResult;
+    // Try each executable name in order
+    for (const executableName of executablesToTry) {
+      this.logger?.info(`[codex-debug] Checking for: ${executableName}`);
+      const result = findExecutableInPath(executableName);
+      
+      if (result) {
+        this.logger?.info(`[codex-debug] Found Codex at: ${result}`);
+        return result;
+      }
     }
     
-    this.logger?.info('[codex-debug] Codex not found in PATH or as platform-specific binary');
+    this.logger?.info(`[codex-debug] Codex not found in PATH. Searched for: ${executablesToTry.join(', ')}`);
     return null;
   }
 
@@ -737,15 +827,24 @@ export class CodexManager extends AbstractCliManager {
     const platform = process.platform;
     const arch = process.arch;
     
+    this.logger?.info(`[codex-debug] Getting platform binary for platform: ${platform}, arch: ${arch}`);
+    
     if (platform === 'darwin') {
-      return arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin';
+      const binary = arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin';
+      this.logger?.info(`[codex-debug] macOS platform binary: ${binary}`);
+      return binary;
     } else if (platform === 'linux') {
-      return arch === 'arm64' ? 'aarch64-unknown-linux-musl' : 'x86_64-unknown-linux-musl';
+      const binary = arch === 'arm64' ? 'aarch64-unknown-linux-musl' : 'x86_64-unknown-linux-musl';
+      this.logger?.info(`[codex-debug] Linux platform binary: ${binary}`);
+      return binary;
     } else if (platform === 'win32') {
-      return 'x86_64-pc-windows-msvc.exe';
+      const binary = 'x86_64-pc-windows-msvc.exe';
+      this.logger?.info(`[codex-debug] Windows platform binary: ${binary}`);
+      return binary;
     }
     
     // Default fallback
+    this.logger?.info(`[codex-debug] Using default fallback platform binary: x86_64-unknown-linux-musl`);
     return 'x86_64-unknown-linux-musl';
   }
 }

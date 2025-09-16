@@ -11,6 +11,7 @@ import { PermissionManager } from '../../permissionManager';
 import { findNodeExecutable, findClaudeCodeScript } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
+import { withLock } from '../../../utils/mutex';
 
 interface ClaudeSpawnOptions {
   panelId: string;
@@ -272,97 +273,104 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
   // Override spawn method to handle resume validation and MCP setup
   async spawnCliProcess(options: ClaudeSpawnOptions): Promise<void> {
-    const { panelId, sessionId, isResume, permissionMode } = options;
+    return await withLock(`claude-spawn-${options.panelId}`, async () => {
+      const { panelId, sessionId, isResume, permissionMode } = options;
 
-    // Handle resume validation before calling parent
-    if (isResume) {
-      const claudeSessionId = this.sessionManager.getPanelClaudeSessionId(panelId);
-      
-      if (!claudeSessionId) {
-        const errMsg = `Cannot resume: no Claude session_id stored for Crystal session ${sessionId}`;
-        this.logger?.error(`[ClaudeCodeManager] ${errMsg}`);
-        
-        const errorMessage = {
-          type: 'system',
-          subtype: 'error',
-          timestamp: new Date().toISOString(),
-          message: 'Unable to resume Claude conversation',
-          details: 'Missing Claude session_id. Please start a new message to begin a fresh conversation.'
-        };
-        
-        this.emit('output', {
-          panelId,
-          sessionId,
-          type: 'json',
-          data: errorMessage,
-          timestamp: new Date()
-        });
-        
-        throw new Error(errMsg);
+      // Check if a process is already running for this panel
+      if (this.processes.has(panelId)) {
+        throw new Error(`Claude process already running for panel ${panelId}`);
       }
-    }
 
-    // Optional: Test claude in the target directory (skip on Linux for performance)
-    const skipDirTest = os.platform() === 'linux';
-    if (!skipDirTest) {
-      const customClaudePath = this.configManager?.getConfig()?.claudeExecutablePath;
-      const directoryTest = await testClaudeCodeInDirectory(options.worktreePath, customClaudePath);
-      if (!directoryTest.success) {
-        this.logger?.error(`Claude test failed in directory ${options.worktreePath}: ${directoryTest.error}`);
-        if (directoryTest.output) {
-          this.logger?.error(`Claude output: ${directoryTest.output}`);
+      // Handle resume validation before calling parent
+      if (isResume) {
+        const claudeSessionId = this.sessionManager.getPanelClaudeSessionId(panelId);
+        
+        if (!claudeSessionId) {
+          const errMsg = `Cannot resume: no Claude session_id stored for Crystal session ${sessionId}`;
+          this.logger?.error(`[ClaudeCodeManager] ${errMsg}`);
+          
+          const errorMessage = {
+            type: 'system',
+            subtype: 'error',
+            timestamp: new Date().toISOString(),
+            message: 'Unable to resume Claude conversation',
+            details: 'Missing Claude session_id. Please start a new message to begin a fresh conversation.'
+          };
+          
+          this.emit('output', {
+            panelId,
+            sessionId,
+            type: 'json',
+            data: errorMessage,
+            timestamp: new Date()
+          });
+          
+          throw new Error(errMsg);
+        }
+      }
+
+      // Optional: Test claude in the target directory (skip on Linux for performance)
+      const skipDirTest = os.platform() === 'linux';
+      if (!skipDirTest) {
+        const customClaudePath = this.configManager?.getConfig()?.claudeExecutablePath;
+        const directoryTest = await testClaudeCodeInDirectory(options.worktreePath, customClaudePath);
+        if (!directoryTest.success) {
+          this.logger?.error(`Claude test failed in directory ${options.worktreePath}: ${directoryTest.error}`);
+          if (directoryTest.output) {
+            this.logger?.error(`Claude output: ${directoryTest.output}`);
+          }
+        } else {
+          this.logger?.verbose(`Claude works in target directory`);
         }
       } else {
-        this.logger?.verbose(`Claude works in target directory`);
+        this.logger?.verbose(`Skipping directory test on Linux for performance`);
       }
-    } else {
-      this.logger?.verbose(`Skipping directory test on Linux for performance`);
-    }
 
-    // Set up MCP configuration if needed and add to args
-    const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
-    const effectiveMode = permissionMode || defaultMode;
-    
-    let mcpConfigPath: string | null = null;
-    if (effectiveMode === 'approve' && this.permissionIpcPath) {
-      mcpConfigPath = await this.setupMcpConfigurationSync(sessionId);
-    }
+      // Set up MCP configuration if needed and add to args
+      const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
+      const effectiveMode = permissionMode || defaultMode;
+      
+      let mcpConfigPath: string | null = null;
+      if (effectiveMode === 'approve' && this.permissionIpcPath) {
+        mcpConfigPath = await this.setupMcpConfigurationSync(sessionId);
+      }
 
-    // Build final command args with MCP if configured
-    const baseArgs = this.buildCommandArgs(options);
-    const finalArgs = mcpConfigPath 
-      ? [...baseArgs, '--mcp-config', mcpConfigPath, '--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission']
-      : baseArgs;
+      // Build final command args with MCP if configured
+      const baseArgs = this.buildCommandArgs(options);
+      const finalArgs = mcpConfigPath 
+        ? [...baseArgs, '--mcp-config', mcpConfigPath, '--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission']
+        : baseArgs;
 
-    // Emit initial session info message
-    const sessionInfoMessage = {
-      type: 'session_info',
-      initial_prompt: options.prompt,
-      claude_command: `claude ${finalArgs.join(' ')}`,
-      worktree_path: options.worktreePath,
-      model: options.model || 'default',
-      permission_mode: options.permissionMode || 'default',
-      timestamp: new Date().toISOString()
-    };
+      // Emit initial session info message
+      const sessionInfoMessage = {
+        type: 'session_info',
+        initial_prompt: options.prompt,
+        claude_command: `claude ${finalArgs.join(' ')}`,
+        worktree_path: options.worktreePath,
+        model: options.model || 'default',
+        permission_mode: options.permissionMode || 'default',
+        timestamp: new Date().toISOString()
+      };
 
-    this.emit('output', {
-      panelId,
-      sessionId,
-      type: 'json',
-      data: sessionInfoMessage,
-      timestamp: new Date()
+      this.emit('output', {
+        panelId,
+        sessionId,
+        type: 'json',
+        data: sessionInfoMessage,
+        timestamp: new Date()
+      });
+
+      // Now call parent with the final args by temporarily overriding buildCommandArgs
+      const originalBuildCommandArgs = this.buildCommandArgs.bind(this);
+      this.buildCommandArgs = () => finalArgs;
+      
+      try {
+        await super.spawnCliProcess(options);
+      } finally {
+        // Restore original method
+        this.buildCommandArgs = originalBuildCommandArgs;
+      }
     });
-
-    // Now call parent with the final args by temporarily overriding buildCommandArgs
-    const originalBuildCommandArgs = this.buildCommandArgs.bind(this);
-    this.buildCommandArgs = () => finalArgs;
-    
-    try {
-      await super.spawnCliProcess(options);
-    } finally {
-      // Restore original method
-      this.buildCommandArgs = originalBuildCommandArgs;
-    }
   }
 
   // Override spawnPtyProcess to add Node.js fallback for Claude
@@ -457,48 +465,69 @@ export class ClaudeCodeManager extends AbstractCliManager {
   // Implementation of abstract methods from AbstractCliManager
 
   async startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
+    // Validate panel ownership before starting
+    const { validatePanelSessionOwnership, logValidationFailure } = require('../../../utils/sessionValidation');
+    const validation = validatePanelSessionOwnership(panelId, sessionId);
+    if (!validation.valid) {
+      logValidationFailure('ClaudeCodeManager.startPanel', validation);
+      throw new Error(`Panel validation failed: ${validation.error}`);
+    }
+
+    console.log(`[ClaudeCodeManager] Validated panel ${panelId} belongs to session ${sessionId}`);
     return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
   }
 
   async continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
-    // Kill any existing process for this panel first
-    if (this.processes.has(panelId)) {
-      console.log(`[ClaudeCodeManager] Killing existing process for panel ${panelId} before continuing`);
-      await this.killProcess(panelId);
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    return await withLock(`claude-continue-${panelId}`, async () => {
+      // Validate panel ownership before continuing
+      const { validatePanelSessionOwnership, logValidationFailure } = require('../../../utils/sessionValidation');
+      const validation = validatePanelSessionOwnership(panelId, sessionId);
+      if (!validation.valid) {
+        logValidationFailure('ClaudeCodeManager.continuePanel', validation);
+        throw new Error(`Panel validation failed: ${validation.error}`);
+      }
 
-    if (this.processes.has(panelId)) {
-      console.error(`[ClaudeCodeManager] Process ${panelId} still exists after kill attempt, aborting continue`);
-      throw new Error('Failed to stop previous panel instance');
-    }
+      console.log(`[ClaudeCodeManager] Validated panel ${panelId} belongs to session ${sessionId}`);
 
-    // Get the session's permission mode from database
-    const dbSession = this.sessionManager.getDbSession(sessionId);
-    const permissionMode = dbSession?.permission_mode;
+      // Kill any existing process for this panel first
+      if (this.processes.has(panelId)) {
+        console.log(`[ClaudeCodeManager] Killing existing process for panel ${panelId} before continuing`);
+        await this.killProcess(panelId);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
-    // Check if we should skip --resume flag this time (after prompt compaction)
-    const skipContinueRaw = dbSession?.skip_continue_next;
-    const shouldSkipContinue = skipContinueRaw === 1 || skipContinueRaw === true;
+      if (this.processes.has(panelId)) {
+        console.error(`[ClaudeCodeManager] Process ${panelId} still exists after kill attempt, aborting continue`);
+        throw new Error('Failed to stop previous panel instance');
+      }
 
-    console.log(`[ClaudeCodeManager] continuePanel called for ${panelId} (session ${sessionId}):`, {
-      skip_continue_next_raw: skipContinueRaw,
-      shouldSkipContinue,
-      permissionMode,
-      model
+      // Get the session's permission mode from database
+      const dbSession = this.sessionManager.getDbSession(sessionId);
+      const permissionMode = dbSession?.permission_mode;
+
+      // Check if we should skip --resume flag this time (after prompt compaction)
+      const skipContinueRaw = dbSession?.skip_continue_next;
+      const shouldSkipContinue = skipContinueRaw === 1 || skipContinueRaw === true;
+
+      console.log(`[ClaudeCodeManager] continuePanel called for ${panelId} (session ${sessionId}):`, {
+        skip_continue_next_raw: skipContinueRaw,
+        shouldSkipContinue,
+        permissionMode,
+        model
+      });
+
+      if (shouldSkipContinue) {
+        // Clear the flag and start a fresh session without --resume
+        console.log(`[ClaudeCodeManager] Clearing skip_continue_next flag for session ${sessionId}`);
+        this.sessionManager.updateSession(sessionId, { skip_continue_next: false });
+        console.log(`[ClaudeCodeManager] Skipping --resume flag for panel ${panelId} due to prompt compaction`);
+        return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, [], false, permissionMode, model);
+      } else {
+        // For continuing a session, we use the --resume flag
+        console.log(`[ClaudeCodeManager] Using --resume flag for panel ${panelId}`);
+        return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, [], true, permissionMode, model);
+      }
     });
-
-    if (shouldSkipContinue) {
-      // Clear the flag and start a fresh session without --resume
-      console.log(`[ClaudeCodeManager] Clearing skip_continue_next flag for session ${sessionId}`);
-      this.sessionManager.updateSession(sessionId, { skip_continue_next: false });
-      console.log(`[ClaudeCodeManager] Skipping --resume flag for panel ${panelId} due to prompt compaction`);
-      return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, [], false, permissionMode, model);
-    } else {
-      // For continuing a session, we use the --resume flag
-      console.log(`[ClaudeCodeManager] Using --resume flag for panel ${panelId}`);
-      return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, [], true, permissionMode, model);
-    }
   }
 
   async stopPanel(panelId: string): Promise<void> {

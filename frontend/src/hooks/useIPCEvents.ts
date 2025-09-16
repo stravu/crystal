@@ -4,6 +4,23 @@ import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
 import type { Session, SessionOutput, GitStatus } from '../types/session';
 
+// Frontend validation helpers
+function validateEventSession(eventData: any, activeSessionId?: string): boolean {
+  if (!eventData || !eventData.sessionId) {
+    console.warn('[useIPCEvents] Event missing sessionId:', eventData);
+    return false;
+  }
+  
+  // If we have an active session context, validate the event matches
+  if (activeSessionId && eventData.sessionId !== activeSessionId) {
+    console.warn(`[useIPCEvents] Event sessionId ${eventData.sessionId} does not match active session ${activeSessionId}`);
+    return false;
+  }
+  
+  return true;
+}
+
+
 // Throttle utility function
 function throttle<T extends (...args: any[]) => any>(
   func: T,
@@ -53,12 +70,21 @@ export function useIPCEvents() {
   // Create throttled handlers for git status events
   const throttledGitStatusLoading = useRef(
     throttle((data: { sessionId: string }) => {
+      // Validate event has required session context
+      if (!validateEventSession(data)) {
+        return; // Ignore invalid events
+      }
       useSessionStore.getState().setGitStatusLoading(data.sessionId, true);
     }, 100)
   ).current;
   
   const throttledGitStatusUpdated = useRef(
     throttle((data: { sessionId: string; gitStatus: GitStatus }) => {
+      // Validate event has required session context
+      if (!validateEventSession(data)) {
+        return; // Ignore invalid events
+      }
+
       // Only log significant status changes in production
       if (data.gitStatus.state !== 'clean' || process.env.NODE_ENV === 'development') {
         console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
@@ -162,6 +188,11 @@ export function useIPCEvents() {
     unsubscribeFunctions.push(unsubscribeSessionsLoaded);
 
     const unsubscribeSessionOutput = window.electronAPI.events.onSessionOutput((output: SessionOutput) => {
+      // Validate event has required session context
+      if (!validateEventSession(output)) {
+        return; // Ignore invalid events
+      }
+
       console.log(`[useIPCEvents] Received session output for ${output.sessionId}, type: ${output.type}`);
 
       // Just emit custom event to notify that new output is available
@@ -173,6 +204,11 @@ export function useIPCEvents() {
     unsubscribeFunctions.push(unsubscribeSessionOutput);
 
     const unsubscribeTerminalOutput = window.electronAPI.events.onTerminalOutput((output: { sessionId: string; type: 'stdout' | 'stderr'; data: string }) => {
+      // Validate event has required session context
+      if (!validateEventSession(output)) {
+        return; // Ignore invalid events
+      }
+
       console.log(`[useIPCEvents] Received terminal output for ${output.sessionId}`);
       // Store terminal output in session store for display
       useSessionStore.getState().addTerminalOutput(output);
@@ -180,6 +216,11 @@ export function useIPCEvents() {
     unsubscribeFunctions.push(unsubscribeTerminalOutput);
     
     const unsubscribeOutputAvailable = window.electronAPI.events.onSessionOutputAvailable((info: { sessionId: string }) => {
+      // Validate event has required session context
+      if (!validateEventSession(info)) {
+        return; // Ignore invalid events
+      }
+
       console.log(`[useIPCEvents] Output available notification for session ${info.sessionId}`);
       
       // Emit custom event to notify that output is available

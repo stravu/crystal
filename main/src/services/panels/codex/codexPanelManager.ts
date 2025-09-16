@@ -2,6 +2,7 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { CodexManager } from './codexManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
 
 /**
  * Codex-specific panel state
@@ -76,7 +77,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex-debug] Starting Codex panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  Model: ${model || 'gpt-5'}\n  Provider: ${modelProvider || 'openai'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Approval: ${approvalPolicy || 'on-request'}\n  Sandbox: ${sandboxMode || 'workspace-write'}\n  Web Search: ${webSearch || false}`);
+    this.logger?.info(`[codex-debug] Starting Codex panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  Model: ${model || DEFAULT_CODEX_MODEL}\n  Provider: ${modelProvider || 'openai'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Approval: ${approvalPolicy || 'on-request'}\n  Sandbox: ${sandboxMode || 'workspace-write'}\n  Web Search: ${webSearch || false}`);
     
     // Use the CodexManager's startPanel method with Codex-specific parameters
     return this.codexManager.startPanel(
@@ -146,7 +147,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       codexResumeId: mapping.resumeId,
       lastActivityTime: new Date().toISOString(),
       // Additional Codex-specific state can be retrieved here
-      model: 'gpt-5', // Default or retrieve from stored state
+      model: DEFAULT_CODEX_MODEL, // Default or retrieve from stored state
       modelProvider: 'openai'
     };
   }
@@ -167,7 +168,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex-debug] Continuing panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  History items: ${conversationHistory.length}\n  Model: ${model || 'gpt-5'}\n  Provider: ${modelProvider || 'openai'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"`);
+    this.logger?.info(`[codex-debug] Continuing panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  History items: ${conversationHistory.length}\n  Model: ${model || DEFAULT_CODEX_MODEL}\n  Provider: ${modelProvider || 'openai'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"`);
     
     // Codex doesn't fully support history replay yet, but GPT-5 has improved context handling
     // For now, we'll start a new session with the prompt

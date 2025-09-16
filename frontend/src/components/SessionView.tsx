@@ -178,9 +178,19 @@ export const SessionView = memo(() => {
     async (type: ToolPanelType) => {
       if (!activeSession) return;
       
+      // For Codex panels, include the last selected model in initial state
+      let initialState: any = undefined;
+      if (type === 'codex') {
+        const savedModel = localStorage.getItem('codex.lastSelectedModel');
+        if (savedModel) {
+          initialState = { model: savedModel };
+        }
+      }
+      
       await panelApi.createPanel({
         sessionId: activeSession.id,
-        type
+        type,
+        initialState
       });
       
       // Don't add to store here - the panel:created event will handle it

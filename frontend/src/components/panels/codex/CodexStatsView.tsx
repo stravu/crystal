@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, Clock, Cpu, Database, GitBranch, Hash } from 'lucide-react';
+import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
 
 interface CodexStatsViewProps {
   sessionId: string;
@@ -20,7 +21,7 @@ export const CodexStatsView: React.FC<CodexStatsViewProps> = ({ sessionId }) => 
     totalTokens: 0,
     executionTime: 0,
     toolCalls: 0,
-    model: 'gpt-5',
+    model: DEFAULT_CODEX_MODEL,
     sessionDuration: 0
   });
 
@@ -45,7 +46,7 @@ export const CodexStatsView: React.FC<CodexStatsViewProps> = ({ sessionId }) => 
         totalTokens: Math.floor(Math.random() * 10000),
         executionTime: Math.floor(Math.random() * 300),
         toolCalls: Math.floor(Math.random() * 20),
-        model: 'gpt-5',
+        model: DEFAULT_CODEX_MODEL,
         sessionDuration: Math.floor(Math.random() * 3600)
       });
     } catch (error) {
@@ -124,7 +125,7 @@ export const CodexStatsView: React.FC<CodexStatsViewProps> = ({ sessionId }) => 
               <span className="text-sm text-text-secondary">Model</span>
             </div>
             <div className="text-2xl font-semibold text-text-primary">
-              {stats.model}
+              {getCodexModelConfig(stats.model)?.label || stats.model}
             </div>
           </div>
 
@@ -150,7 +151,7 @@ export const CodexStatsView: React.FC<CodexStatsViewProps> = ({ sessionId }) => 
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Model Version:</span>
-              <span className="text-text-primary">GPT-5 (Released August 7, 2025)</span>
+              <span className="text-text-primary">{getCodexModelConfig(stats.model)?.label || 'GPT-5'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Provider:</span>
