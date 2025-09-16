@@ -201,24 +201,29 @@ export class TaskQueue {
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
 
-        // Add the initial prompt marker
-        sessionManager.addInitialPromptMarker(session.id, prompt);
-        console.log(`[TaskQueue] Added initial prompt marker for session ${session.id}`);
+        // Only add prompt-related data if there's actually a prompt
+        if (prompt && prompt.trim().length > 0) {
+          // Add the initial prompt marker
+          sessionManager.addInitialPromptMarker(session.id, prompt);
+          console.log(`[TaskQueue] Added initial prompt marker for session ${session.id}`);
 
-        // Add the initial prompt to conversation messages for continuation support
-        sessionManager.addConversationMessage(session.id, 'user', prompt);
-        console.log(`[TaskQueue] Added initial prompt to conversation messages for session ${session.id}`);
+          // Add the initial prompt to conversation messages for continuation support
+          sessionManager.addConversationMessage(session.id, 'user', prompt);
+          console.log(`[TaskQueue] Added initial prompt to conversation messages for session ${session.id}`);
 
-        // Add the initial prompt to output so it's visible
-        const timestamp = formatForDisplay(new Date());
-        const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
-                                     `\x1b[1m\x1b[92m${prompt}\x1b[0m\r\n\r\n`;
-        await sessionManager.addSessionOutput(session.id, {
-          type: 'stdout',
-          data: initialPromptDisplay,
-          timestamp: new Date()
-        });
-        console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
+          // Add the initial prompt to output so it's visible
+          const timestamp = formatForDisplay(new Date());
+          const initialPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
+                                       `\x1b[1m\x1b[92m${prompt}\x1b[0m\r\n\r\n`;
+          await sessionManager.addSessionOutput(session.id, {
+            type: 'stdout',
+            data: initialPromptDisplay,
+            timestamp: new Date()
+          });
+          console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
+        } else {
+          console.log(`[TaskQueue] No prompt provided for session ${session.id}, skipping prompt-related initialization`);
+        }
         
         // Ensure diff panel exists for this session
         await panelManager.ensureDiffPanel(session.id);
@@ -245,57 +250,62 @@ export class TaskQueue {
           console.log(`[TaskQueue] Build script completed. Success: ${buildResult.success}`);
         }
 
-        console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
-        
-        // Wait for the Claude panel to be created by the session-created event handler in events.ts
-        // This ensures Claude starts for the panel, not the session directly
-        let claudePanel = null;
-        let attempts = 0;
-        const maxAttempts = 15; // Increased attempts for better reliability
-        
-        while (!claudePanel && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
-          const { panelManager } = require('./panelManager');
-          const existingPanels = panelManager.getPanelsForSession(session.id);
-          claudePanel = existingPanels.find((p: any) => p.type === 'claude');
-          attempts++;
-        }
-        
-        if (claudePanel) {
-          console.log(`[TaskQueue] Found Claude panel ${claudePanel.id} for session ${session.id}, starting Claude via panel`);
+        // Only start Claude if there's a prompt
+        if (prompt && prompt.trim().length > 0) {
+          console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
           
-          // Import the claude panel manager to start Claude properly
-          const { claudePanelManager } = require('../ipc/claudePanel');
+          // Wait for the Claude panel to be created by the session-created event handler in events.ts
+          // This ensures Claude starts for the panel, not the session directly
+          let claudePanel = null;
+          let attempts = 0;
+          const maxAttempts = 15; // Increased attempts for better reliability
           
-          if (claudePanelManager) {
-            try {
-              // Record the initial prompt in panel conversation history
+          while (!claudePanel && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
+            const { panelManager } = require('./panelManager');
+            const existingPanels = panelManager.getPanelsForSession(session.id);
+            claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+            attempts++;
+          }
+          
+          if (claudePanel) {
+            console.log(`[TaskQueue] Found Claude panel ${claudePanel.id} for session ${session.id}, starting Claude via panel`);
+            
+            // Import the claude panel manager to start Claude properly
+            const { claudePanelManager } = require('../ipc/claudePanel');
+            
+            if (claudePanelManager) {
               try {
-                sessionManager.addPanelConversationMessage(claudePanel.id, 'user', prompt);
-              } catch (e) {
-                console.warn('[TaskQueue] Failed to add initial panel conversation message:', e);
-              }
+                // Record the initial prompt in panel conversation history
+                try {
+                  sessionManager.addPanelConversationMessage(claudePanel.id, 'user', prompt);
+                } catch (e) {
+                  console.warn('[TaskQueue] Failed to add initial panel conversation message:', e);
+                }
 
-              // Log prompt details for debugging
-              console.log(`[TaskQueue] Starting Claude with prompt length: ${prompt.length} characters`);
-              if (prompt.includes('<attachments>')) {
-                console.log(`[TaskQueue] Prompt contains attachments`);
+                // Log prompt details for debugging
+                console.log(`[TaskQueue] Starting Claude with prompt length: ${prompt.length} characters`);
+                if (prompt.includes('<attachments>')) {
+                  console.log(`[TaskQueue] Prompt contains attachments`);
+                }
+                
+                // Use the claude panel manager directly instead of calling IPC handlers
+                await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, model);
+                console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            } catch (error) {
+                console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
+                throw new Error(`Failed to start Claude panel: ${error}`);
               }
-              
-              // Use the claude panel manager directly instead of calling IPC handlers
-              await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, model);
-              console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            } catch (error) {
-              console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
-              throw new Error(`Failed to start Claude panel: ${error}`);
+            } else {
+              console.error(`[TaskQueue] ClaudePanelManager not available, cannot start with real panel ID`);
+              throw new Error('Claude panel manager not available');
             }
           } else {
-            console.error(`[TaskQueue] ClaudePanelManager not available, cannot start with real panel ID`);
-            throw new Error('Claude panel manager not available');
+            console.error(`[TaskQueue] No Claude panel found for session ${session.id} after ${maxAttempts} attempts`);
+            console.error(`[TaskQueue] This indicates the panel creation failed in events.ts. Cannot proceed without a real panel.`);
+            throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
           }
         } else {
-          console.error(`[TaskQueue] No Claude panel found for session ${session.id} after ${maxAttempts} attempts`);
-          console.error(`[TaskQueue] This indicates the panel creation failed in events.ts. Cannot proceed without a real panel.`);
-          throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
+          console.log(`[TaskQueue] No prompt provided for session ${session.id}, skipping Claude Code initialization`);
         }
 
         return { sessionId: session.id };

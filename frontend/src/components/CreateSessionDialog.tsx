@@ -306,8 +306,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     setIsSubmitting(true);
     
     try {
-      // Append ultrathink to prompt if checkbox is checked
-      let finalPrompt = ultrathink ? formData.prompt + '\nultrathink' : formData.prompt;
+      // Only process prompt if it's not empty
+      let finalPrompt = formData.prompt ? (ultrathink ? formData.prompt + '\nultrathink' : formData.prompt) : '';
       
       // Process attachments
       const attachmentPaths: string[] = [];
@@ -360,10 +360,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         console.log('[CreateSessionDialog] Attachment paths:', attachmentPaths);
       }
       
-      console.log('[CreateSessionDialog] Sending API request with prompt:', finalPrompt);
+      console.log('[CreateSessionDialog] Sending API request with prompt:', finalPrompt || '(no prompt)');
       const response = await API.sessions.create({
         ...formData,
-        prompt: finalPrompt,
+        prompt: finalPrompt || undefined, // Send undefined if empty to ensure backend doesn't see an empty string as a prompt
         projectId,
         autoCommit, // Keep for backwards compatibility
         commitMode: commitModeSettings.mode,
@@ -437,10 +437,80 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           <form id="create-session-form" onSubmit={handleSubmit}>
             {/* Primary Section - Always Visible */}
             <div className="p-6 space-y-5">
-              {/* Prompt Field */}
+              {/* Session Name - Moved to top */}
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">
+                  Session Name {hasApiKey ? '(Optional)' : '(Required)'}
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    id="worktreeTemplate"
+                    type="text"
+                    value={formData.worktreeTemplate}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, worktreeTemplate: value });
+                      // Real-time validation
+                      const error = validateWorktreeName(value);
+                      setWorktreeError(error);
+                    }}
+                    error={worktreeError || undefined}
+                    placeholder={hasApiKey ? "Leave empty for AI-generated name" : "Enter a name for your session"}
+                    disabled={isGeneratingName}
+                    className="flex-1"
+                  />
+                  {hasApiKey && formData.prompt.trim() && (
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        setIsGeneratingName(true);
+                        try {
+                          const response = await API.sessions.generateName(formData.prompt);
+                          if (response.success && response.data) {
+                            setFormData({ ...formData, worktreeTemplate: response.data });
+                            setWorktreeError(null);
+                          } else {
+                            showError({
+                              title: 'Failed to Generate Name',
+                              error: response.error || 'Could not generate session name'
+                            });
+                          }
+                        } catch (error) {
+                          showError({
+                            title: 'Failed to Generate Name',
+                            error: 'An error occurred while generating the name'
+                          });
+                        } finally {
+                          setIsGeneratingName(false);
+                        }
+                      }}
+                      variant="secondary"
+                      loading={isGeneratingName}
+                      disabled={!formData.prompt.trim()}
+                      title="Generate name from prompt"
+                      size="md"
+                    >
+                      <Sparkles className="w-4 h-4 mr-1" />
+                      {isGeneratingName ? 'Generating...' : 'Generate'}
+                    </Button>
+                  )}
+                </div>
+                {!hasApiKey && !formData.worktreeTemplate && (
+                  <p className="text-xs text-status-warning mt-1">
+                    Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
+                  </p>
+                )}
+                {!worktreeError && !(!hasApiKey && !formData.worktreeTemplate) && (
+                  <p className="text-xs text-text-tertiary mt-1">
+                    The name for your session and worktree folder.
+                  </p>
+                )}
+              </div>
+              
+              {/* Prompt Field - Now optional */}
               <div>
                 <label htmlFor="prompt" className="block text-sm font-medium text-text-secondary mb-2">
-                  What would you like to work on?
+                  What would you like to work on? (Optional - leave empty to create session without Claude)
                 </label>
                 {/* Attached items */}
                 {(attachedImages.length > 0 || attachedTexts.length > 0) && (
@@ -618,75 +688,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 </p>
               </div>
               
-              {/* Session Name */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">
-                  Session Name {hasApiKey ? '(Optional)' : '(Required)'}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id="worktreeTemplate"
-                    type="text"
-                    value={formData.worktreeTemplate}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, worktreeTemplate: value });
-                      // Real-time validation
-                      const error = validateWorktreeName(value);
-                      setWorktreeError(error);
-                    }}
-                    error={worktreeError || undefined}
-                    placeholder={hasApiKey ? "Leave empty for AI-generated name" : "Enter a name for your session"}
-                    disabled={isGeneratingName}
-                    className="flex-1"
-                  />
-                  {hasApiKey && formData.prompt.trim() && (
-                    <Button
-                      type="button"
-                      onClick={async () => {
-                        setIsGeneratingName(true);
-                        try {
-                          const response = await API.sessions.generateName(formData.prompt);
-                          if (response.success && response.data) {
-                            setFormData({ ...formData, worktreeTemplate: response.data });
-                            setWorktreeError(null);
-                          } else {
-                            showError({
-                              title: 'Failed to Generate Name',
-                              error: response.error || 'Could not generate session name'
-                            });
-                          }
-                        } catch (error) {
-                          showError({
-                            title: 'Failed to Generate Name',
-                            error: 'An error occurred while generating the name'
-                          });
-                        } finally {
-                          setIsGeneratingName(false);
-                        }
-                      }}
-                      variant="secondary"
-                      loading={isGeneratingName}
-                      disabled={!formData.prompt.trim()}
-                      title="Generate name from prompt"
-                      size="md"
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      {isGeneratingName ? 'Generating...' : 'Generate'}
-                    </Button>
-                  )}
-                </div>
-                {!hasApiKey && !formData.worktreeTemplate && (
-                  <p className="text-xs text-status-warning mt-1">
-                    Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
-                  </p>
-                )}
-                {!worktreeError && !(!hasApiKey && !formData.worktreeTemplate) && (
-                  <p className="text-xs text-text-tertiary mt-1">
-                    The name for your session and worktree folder.
-                  </p>
-                )}
-              </div>
               
               {/* Sessions Count - Always visible */}
               <div>
@@ -854,13 +855,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           <Button
             type="submit"
             form="create-session-form"
-            disabled={isSubmitting || !formData.prompt || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate)}
+            disabled={isSubmitting || !!worktreeError || (!hasApiKey && !formData.worktreeTemplate)}
             loading={isSubmitting}
             title={
               isSubmitting ? 'Creating session...' :
-              !formData.prompt ? 'Please enter a prompt' :
               worktreeError ? 'Please fix the session name error' :
               (!hasApiKey && !formData.worktreeTemplate) ? 'Please enter a session name (required without API key)' :
+              !formData.prompt ? 'Session will be created without Claude panel' :
               undefined
             }
           >

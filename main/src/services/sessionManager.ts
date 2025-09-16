@@ -212,7 +212,7 @@ export class SessionManager extends EventEmitter {
     const sessionData: CreateSessionData = {
       id,
       name,
-      initial_prompt: prompt,
+      initial_prompt: prompt || '', // Use empty string if prompt is undefined/null
       worktree_name: worktreeName,
       worktree_path: worktreePath,
       project_id: targetProject.id,

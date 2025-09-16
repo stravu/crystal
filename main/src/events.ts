@@ -29,8 +29,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
     
     // Claude Panel Integration: Auto-create Claude panel for sessions with prompts
-    if (session.prompt && session.prompt.trim()) {
-      console.log(`[Events] Session ${session.id} created with prompt, auto-creating Claude panel`);
+    // Check for both undefined/null and empty strings
+    console.log(`[Events] Session ${session.id} created with prompt value:`, JSON.stringify(session.prompt), `Type: ${typeof session.prompt}, Length: ${session.prompt ? session.prompt.length : 'N/A'}`);
+    if (session.prompt && typeof session.prompt === 'string' && session.prompt.trim().length > 0) {
+      console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating Claude panel`);
       try {
         const panel = await panelManager.createPanel({
           sessionId: session.id,
