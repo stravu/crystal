@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, X, Download, Trash2, ChevronUp, ChevronDown, Filter } from 'lucide-react';
+import { Search, X, Download, Trash2, ChevronUp, ChevronDown, Filter, Copy, Check } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import AnsiToHtml from 'ansi-to-html';
 
@@ -23,6 +23,7 @@ export const LogsView: React.FC<LogsViewProps> = ({ sessionId, isVisible }) => {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [searchMatches, setSearchMatches] = useState<number[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [copied, setCopied] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastLogCount = useRef(0);
@@ -215,6 +216,17 @@ export const LogsView: React.FC<LogsViewProps> = ({ sessionId, isVisible }) => {
     URL.revokeObjectURL(url);
   };
 
+  const handleCopyLogs = async () => {
+    try {
+      const logText = filteredLogs.map(log => log.message).join('\n');
+      await navigator.clipboard.writeText(logText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy logs:', error);
+    }
+  };
+
 
   return (
     <div className="h-full flex flex-col bg-bg-primary relative">
@@ -240,6 +252,15 @@ export const LogsView: React.FC<LogsViewProps> = ({ sessionId, isVisible }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
                 d="M19 14l-7 7m0 0l-7-7m7 7V3" />
             </svg>
+          </button>
+
+          {/* Copy button */}
+          <button
+            onClick={handleCopyLogs}
+            className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors"
+            title="Copy logs to clipboard"
+          >
+            {copied ? <Check className="w-4 h-4 text-status-success" /> : <Copy className="w-4 h-4" />}
           </button>
 
           {/* Export button */}
