@@ -50,8 +50,8 @@ export class PanelManager {
       metadata
     };
     
-    // Save to database
-    databaseService.createPanel({
+    // Save to database and set as active in a single transaction
+    databaseService.createPanelAndSetActive({
       id: panel.id,
       sessionId: panel.sessionId,
       type: panel.type,
@@ -63,8 +63,17 @@ export class PanelManager {
     // Cache in memory
     this.panels.set(panelId, panel);
     
-    // Set as active panel for the session
-    await this.setActivePanel(request.sessionId, panelId);
+    // Update panel states to reflect the new active panel
+    const panels = this.getPanelsForSession(request.sessionId);
+    panels.forEach(p => {
+      const isActive = p.id === panelId;
+      if (p.state.isActive !== isActive) {
+        p.state.isActive = isActive;
+        if (isActive) {
+          p.metadata.lastActiveAt = new Date().toISOString();
+        }
+      }
+    });
     
     // Emit IPC event to notify frontend
     if (mainWindow) {

@@ -15,22 +15,58 @@ export class DatabaseService {
     this.db = new Database(dbPath);
   }
 
+  /**
+   * Execute a function within a database transaction with automatic rollback on error
+   * @param fn Function to execute within the transaction
+   * @returns Result of the function
+   * @throws Error if transaction fails
+   */
+  private transaction<T>(fn: () => T): T {
+    const transaction = this.db.transaction(() => {
+      return fn();
+    });
+    
+    return transaction();
+  }
+
+  /**
+   * Execute an async function within a database transaction with automatic rollback on error
+   * @param fn Async function to execute within the transaction
+   * @returns Promise with result of the function
+   * @throws Error if transaction fails
+   */
+  private async transactionAsync<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(() => {
+        fn().then(resolve).catch(reject);
+      });
+      
+      try {
+        transaction();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   initialize(): void {
     this.initializeSchema();
     this.runMigrations();
   }
 
   private initializeSchema(): void {
-    const schemaPath = join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
-    
-    // Execute schema in parts (sqlite3 doesn't support multiple statements in exec)
-    const statements = schema.split(';').filter(stmt => stmt.trim());
-    for (const statement of statements) {
-      if (statement.trim()) {
-        this.db.prepare(statement.trim()).run();
+    this.transaction(() => {
+      const schemaPath = join(__dirname, 'schema.sql');
+      const schema = readFileSync(schemaPath, 'utf-8');
+      
+      // Execute schema in parts (sqlite3 doesn't support multiple statements in exec)
+      const statements = schema.split(';').filter(stmt => stmt.trim());
+      for (const statement of statements) {
+        if (statement.trim()) {
+          this.db.prepare(statement.trim()).run();
+        }
       }
-    }
+    });
   }
 
   private runMigrations(): void {
@@ -157,57 +193,59 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN permission_mode TEXT DEFAULT 'ignore' CHECK(permission_mode IN ('approve', 'ignore'))").run();
     }
 
-    // Add project support migration
+    // Add project support migration (wrapped in transaction)
     const projectsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'").all();
     if (projectsTable.length === 0) {
-      // Create projects table
-      this.db.prepare(`
-        CREATE TABLE projects (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          path TEXT NOT NULL UNIQUE,
-          system_prompt TEXT,
-          run_script TEXT,
-          active BOOLEAN NOT NULL DEFAULT 0,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `).run();
-      
-      // Add project_id to sessions table
-      const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all();
-      const hasProjectIdColumn = sessionsTableInfoProjects.some((col: any) => col.name === 'project_id');
-      
-      if (!hasProjectIdColumn) {
-        this.db.prepare("ALTER TABLE sessions ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE").run();
-        this.db.prepare("CREATE INDEX idx_sessions_project_id ON sessions(project_id)").run();
-      }
-
-      // Import existing config as default project if it exists
-      try {
-        const configManager = require('../services/configManager').configManager;
-        const gitRepoPath = configManager.getGitRepoPath();
+      this.transaction(() => {
+        // Create projects table
+        this.db.prepare(`
+          CREATE TABLE projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            path TEXT NOT NULL UNIQUE,
+            system_prompt TEXT,
+            run_script TEXT,
+            active BOOLEAN NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `).run();
         
-        if (gitRepoPath) {
-          const projectName = gitRepoPath.split('/').pop() || 'Default Project';
-          const result = this.db.prepare(`
-            INSERT INTO projects (name, path, active)
-            VALUES (?, ?, 1)
-          `).run(projectName, gitRepoPath);
-          
-          // Update existing sessions to use this project
-          if (result.lastInsertRowid) {
-            this.db.prepare(`
-              UPDATE sessions 
-              SET project_id = ?
-              WHERE project_id IS NULL
-            `).run(result.lastInsertRowid);
-          }
+        // Add project_id to sessions table
+        const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all();
+        const hasProjectIdColumn = sessionsTableInfoProjects.some((col: any) => col.name === 'project_id');
+        
+        if (!hasProjectIdColumn) {
+          this.db.prepare("ALTER TABLE sessions ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE").run();
+          this.db.prepare("CREATE INDEX idx_sessions_project_id ON sessions(project_id)").run();
         }
-      } catch {
-        // Config manager not available during initial setup
-        console.log('Skipping default project creation during initial setup');
-      }
+
+        // Import existing config as default project if it exists
+        try {
+          const configManager = require('../services/configManager').configManager;
+          const gitRepoPath = configManager.getGitRepoPath();
+          
+          if (gitRepoPath) {
+            const projectName = gitRepoPath.split('/').pop() || 'Default Project';
+            const result = this.db.prepare(`
+              INSERT INTO projects (name, path, active)
+              VALUES (?, ?, 1)
+            `).run(projectName, gitRepoPath);
+            
+            // Update existing sessions to use this project
+            if (result.lastInsertRowid) {
+              this.db.prepare(`
+                UPDATE sessions 
+                SET project_id = ?
+                WHERE project_id IS NULL
+              `).run(result.lastInsertRowid);
+            }
+          }
+        } catch {
+          // Config manager not available during initial setup
+          console.log('Skipping default project creation during initial setup');
+        }
+      });
     }
 
     // Add is_main_repo column to sessions table if it doesn't exist
@@ -1389,25 +1427,27 @@ export class DatabaseService {
 
   // Session operations
   createSession(data: CreateSessionData): Session {
-    // Get the max display_order for sessions in this project
-    const maxOrderResult = this.db.prepare(`
-      SELECT MAX(display_order) as max_order 
-      FROM sessions 
-      WHERE project_id = ? AND (archived = 0 OR archived IS NULL)
-    `).get(data.project_id) as { max_order: number | null };
-    
-    const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
-    
-    this.db.prepare(`
-      INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch, commit_mode, commit_mode_settings)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'sonnet', data.base_commit || null, data.base_branch || null, data.commit_mode || null, data.commit_mode_settings || null);
-    
-    const session = this.getSession(data.id);
-    if (!session) {
-      throw new Error('Failed to create session');
-    }
-    return session;
+    return this.transaction(() => {
+      // Get the max display_order for sessions in this project
+      const maxOrderResult = this.db.prepare(`
+        SELECT MAX(display_order) as max_order 
+        FROM sessions 
+        WHERE project_id = ? AND (archived = 0 OR archived IS NULL)
+      `).get(data.project_id) as { max_order: number | null };
+      
+      const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
+      
+      this.db.prepare(`
+        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, model, base_commit, base_branch, commit_mode, commit_mode_settings)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(data.id, data.name, data.initial_prompt, data.worktree_name, data.worktree_path, data.project_id, data.folder_id || null, data.permission_mode || 'ignore', data.is_main_repo ? 1 : 0, displayOrder, data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1, data.model || 'sonnet', data.base_commit || null, data.base_branch || null, data.commit_mode || null, data.commit_mode_settings || null);
+      
+      const session = this.getSession(data.id);
+      if (!session) {
+        throw new Error('Failed to create session');
+      }
+      return session;
+    });
   }
 
   getSession(id: string): Session | undefined {
@@ -2196,13 +2236,15 @@ export class DatabaseService {
     state?: any;
     metadata?: any;
   }): void {
-    const stateJson = data.state ? JSON.stringify(data.state) : null;
-    const metadataJson = data.metadata ? JSON.stringify(data.metadata) : null;
-    
-    this.db.prepare(`
-      INSERT INTO tool_panels (id, session_id, type, title, state, metadata)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(data.id, data.sessionId, data.type, data.title, stateJson, metadataJson);
+    this.transaction(() => {
+      const stateJson = data.state ? JSON.stringify(data.state) : null;
+      const metadataJson = data.metadata ? JSON.stringify(data.metadata) : null;
+      
+      this.db.prepare(`
+        INSERT INTO tool_panels (id, session_id, type, title, state, metadata)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(data.id, data.sessionId, data.type, data.title, stateJson, metadataJson);
+    });
   }
 
   updatePanel(panelId: string, updates: {
@@ -2210,38 +2252,68 @@ export class DatabaseService {
     state?: any;
     metadata?: any;
   }): void {
-    const setClauses: string[] = [];
-    const values: any[] = [];
-    
-    if (updates.title !== undefined) {
-      setClauses.push('title = ?');
-      values.push(updates.title);
-    }
-    
-    if (updates.state !== undefined) {
-      setClauses.push('state = ?');
-      values.push(JSON.stringify(updates.state));
-    }
-    
-    if (updates.metadata !== undefined) {
-      setClauses.push('metadata = ?');
-      values.push(JSON.stringify(updates.metadata));
-    }
-    
-    if (setClauses.length > 0) {
-      setClauses.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(panelId);
+    this.transaction(() => {
+      const setClauses: string[] = [];
+      const values: any[] = [];
       
-      this.db.prepare(`
-        UPDATE tool_panels
-        SET ${setClauses.join(', ')}
-        WHERE id = ?
-      `).run(...values);
-    }
+      if (updates.title !== undefined) {
+        setClauses.push('title = ?');
+        values.push(updates.title);
+      }
+      
+      if (updates.state !== undefined) {
+        setClauses.push('state = ?');
+        values.push(JSON.stringify(updates.state));
+      }
+      
+      if (updates.metadata !== undefined) {
+        setClauses.push('metadata = ?');
+        values.push(JSON.stringify(updates.metadata));
+      }
+      
+      if (setClauses.length > 0) {
+        setClauses.push('updated_at = CURRENT_TIMESTAMP');
+        values.push(panelId);
+        
+        this.db.prepare(`
+          UPDATE tool_panels
+          SET ${setClauses.join(', ')}
+          WHERE id = ?
+        `).run(...values);
+      }
+    });
   }
 
   deletePanel(panelId: string): void {
-    this.db.prepare('DELETE FROM tool_panels WHERE id = ?').run(panelId);
+    this.transaction(() => {
+      this.db.prepare('DELETE FROM tool_panels WHERE id = ?').run(panelId);
+    });
+  }
+
+  /**
+   * Create a panel and set it as the active panel for the session in a single transaction
+   */
+  createPanelAndSetActive(data: {
+    id: string;
+    sessionId: string;
+    type: string;
+    title: string;
+    state?: any;
+    metadata?: any;
+  }): void {
+    this.transaction(() => {
+      // Create the panel
+      const stateJson = data.state ? JSON.stringify(data.state) : null;
+      const metadataJson = data.metadata ? JSON.stringify(data.metadata) : null;
+      
+      this.db.prepare(`
+        INSERT INTO tool_panels (id, session_id, type, title, state, metadata)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(data.id, data.sessionId, data.type, data.title, stateJson, metadataJson);
+
+      // Set as active panel
+      this.db.prepare('UPDATE sessions SET active_panel_id = ? WHERE id = ?').run(data.id, data.sessionId);
+    });
   }
 
   getPanel(panelId: string): ToolPanel | null {
