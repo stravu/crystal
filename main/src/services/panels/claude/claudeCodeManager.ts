@@ -457,10 +457,29 @@ export class ClaudeCodeManager extends AbstractCliManager {
   // Implementation of abstract methods from AbstractCliManager
 
   async startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
+    // Validate panel ownership before starting
+    const { validatePanelSessionOwnership, logValidationFailure } = require('../../../utils/sessionValidation');
+    const validation = validatePanelSessionOwnership(panelId, sessionId);
+    if (!validation.valid) {
+      logValidationFailure('ClaudeCodeManager.startPanel', validation);
+      throw new Error(`Panel validation failed: ${validation.error}`);
+    }
+
+    console.log(`[ClaudeCodeManager] Validated panel ${panelId} belongs to session ${sessionId}`);
     return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
   }
 
   async continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
+    // Validate panel ownership before continuing
+    const { validatePanelSessionOwnership, logValidationFailure } = require('../../../utils/sessionValidation');
+    const validation = validatePanelSessionOwnership(panelId, sessionId);
+    if (!validation.valid) {
+      logValidationFailure('ClaudeCodeManager.continuePanel', validation);
+      throw new Error(`Panel validation failed: ${validation.error}`);
+    }
+
+    console.log(`[ClaudeCodeManager] Validated panel ${panelId} belongs to session ${sessionId}`);
+
     // Kill any existing process for this panel first
     if (this.processes.has(panelId)) {
       console.log(`[ClaudeCodeManager] Killing existing process for panel ${panelId} before continuing`);

@@ -7,6 +7,14 @@ import type { CreateSessionRequest } from '../types/session';
 import { getCrystalSubdirectory } from '../utils/crystalDirectory';
 import { convertDbFolderToFolder } from './folders';
 import { panelManager } from '../services/panelManager';
+import { 
+  validateSessionExists, 
+  validatePanelSessionOwnership, 
+  validatePanelExists,
+  validateSessionIsActive,
+  logValidationFailure,
+  createValidationError
+} from '../utils/sessionValidation';
 
 export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices): void {
   const {
@@ -343,6 +351,13 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('sessions:input', async (_event, sessionId: string, input: string) => {
     try {
+      // Validate session exists and is active
+      const sessionValidation = validateSessionIsActive(sessionId);
+      if (!sessionValidation.valid) {
+        logValidationFailure('sessions:input', sessionValidation);
+        return createValidationError(sessionValidation);
+      }
+
       // Update session status back to running when user sends input
       const currentSession = await sessionManager.getSession(sessionId);
       if (currentSession && currentSession.status === 'waiting') {
@@ -479,6 +494,13 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string, model?: string) => {
     try {
+      // Validate session exists and is active
+      const sessionValidation = validateSessionIsActive(sessionId);
+      if (!sessionValidation.valid) {
+        logValidationFailure('sessions:continue', sessionValidation);
+        return createValidationError(sessionValidation);
+      }
+
       // Get session details
       const session = sessionManager.getSession(sessionId);
       if (!session) {
@@ -641,6 +663,13 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('sessions:get-output', async (_event, sessionId: string, limit?: number) => {
     try {
+      // Validate session exists
+      const sessionValidation = validateSessionExists(sessionId);
+      if (!sessionValidation.valid) {
+        logValidationFailure('sessions:get-output', sessionValidation);
+        return createValidationError(sessionValidation);
+      }
+
       // Performance optimization: Default to loading only recent outputs
       const DEFAULT_OUTPUT_LIMIT = 5000;
       const outputLimit = limit || DEFAULT_OUTPUT_LIMIT;
@@ -779,8 +808,15 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   // Panel-based handlers for Claude panels
   ipcMain.handle('panels:get-output', async (_event, panelId: string, limit?: number) => {
     try {
+      // Validate panel exists
+      const panelValidation = validatePanelExists(panelId);
+      if (!panelValidation.valid) {
+        logValidationFailure('panels:get-output', panelValidation);
+        return createValidationError(panelValidation);
+      }
+
       const outputLimit = limit && limit > 0 ? Math.min(limit, 10000) : undefined;
-      console.log(`[IPC] panels:get-output called for panel: ${panelId} with limit: ${outputLimit}`);
+      console.log(`[IPC] panels:get-output called for panel: ${panelId} (session: ${panelValidation.sessionId}) with limit: ${outputLimit}`);
       
       if (!sessionManager.getPanelOutputs) {
         console.error('[IPC] Panel-based output methods not available on sessionManager');
@@ -884,11 +920,27 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     try {
       console.log(`[IPC] panels:send-input called for panel: ${panelId}`);
 
+      // Validate panel exists
+      const panelValidation = validatePanelExists(panelId);
+      if (!panelValidation.valid) {
+        logValidationFailure('panels:send-input', panelValidation);
+        return createValidationError(panelValidation);
+      }
+
+      // Additional validation that the session is active
+      const sessionValidation = validateSessionIsActive(panelValidation.sessionId!);
+      if (!sessionValidation.valid) {
+        logValidationFailure('panels:send-input session check', sessionValidation);
+        return createValidationError(sessionValidation);
+      }
+
       // Get the panel to determine its type
       const panel = panelManager.getPanel(panelId);
       if (!panel) {
         return { success: false, error: 'Panel not found' };
       }
+
+      console.log(`[IPC] Validated panel ${panelId} belongs to session ${panel.sessionId}`);
 
       // Route to appropriate panel type handler
       switch (panel.type) {
@@ -925,11 +977,27 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     try {
       console.log(`[IPC] panels:continue called for panel: ${panelId}`);
 
+      // Validate panel exists
+      const panelValidation = validatePanelExists(panelId);
+      if (!panelValidation.valid) {
+        logValidationFailure('panels:continue', panelValidation);
+        return createValidationError(panelValidation);
+      }
+
+      // Additional validation that the session is active
+      const sessionValidation = validateSessionIsActive(panelValidation.sessionId!);
+      if (!sessionValidation.valid) {
+        logValidationFailure('panels:continue session check', sessionValidation);
+        return createValidationError(sessionValidation);
+      }
+
       // Get the panel to determine its type
       const panel = panelManager.getPanel(panelId);
       if (!panel) {
         return { success: false, error: 'Panel not found' };
       }
+
+      console.log(`[IPC] Validated panel ${panelId} belongs to session ${panel.sessionId}`);
 
       // Route to appropriate panel type handler
       switch (panel.type) {

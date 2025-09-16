@@ -4,6 +4,12 @@ import type { AppServices } from './ipc/types';
 import type { VersionInfo } from './services/versionChecker';
 import { addSessionLog } from './ipc/logs';
 import { panelManager } from './services/panelManager';
+import { 
+  validateSessionExists, 
+  validateEventContext, 
+  validatePanelEventContext,
+  logValidationFailure 
+} from './utils/sessionValidation';
 
 export function setupEventListeners(services: AppServices, getMainWindow: () => BrowserWindow | null): void {
   const {
@@ -121,6 +127,13 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   sessionManager.on('session-output', (output) => {
+    // Validate the output has valid session context
+    const validation = validateEventContext(output);
+    if (!validation.valid) {
+      logValidationFailure('session-output event', validation);
+      return; // Don't broadcast invalid events
+    }
+
     const mw = getMainWindow();
     if (mw) {
       mw.webContents.send('session:output', output);
@@ -171,6 +184,16 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   // Listen to claudeCodeManager events
   claudeCodeManager.on('output', async (output: any) => {
+    // Validate the output has valid context
+    const validation = output.panelId 
+      ? validatePanelEventContext(output, output.panelId, output.sessionId)
+      : validateEventContext(output, output.sessionId);
+
+    if (!validation.valid) {
+      logValidationFailure('claudeCodeManager output event', validation);
+      return; // Don't process invalid events
+    }
+
     // Persist output: let ClaudePanelManager handle panel-based storage to avoid duplicates
     if (!output.panelId) {
       console.log(`[Events] Saving Claude output for session ${output.sessionId} (legacy mode)`);
@@ -204,6 +227,16 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   claudeCodeManager.on('spawned', async ({ panelId, sessionId }: { panelId?: string; sessionId: string }) => {
+    // Validate the event context
+    const validation = panelId 
+      ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
+      : validateEventContext({ sessionId }, sessionId);
+
+    if (!validation.valid) {
+      logValidationFailure('claudeCodeManager spawned event', validation);
+      return; // Don't process invalid events
+    }
+
     if (panelId) {
       console.log(`[Main] Claude Code spawned for panel ${panelId} (session ${sessionId}), updating status to 'running'`);
     } else {
@@ -256,6 +289,16 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   claudeCodeManager.on('exit', async ({ panelId, sessionId, exitCode, signal }: { panelId?: string; sessionId: string; exitCode: number; signal: string }) => {
+    // Validate the event context
+    const validation = panelId 
+      ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
+      : validateEventContext({ sessionId }, sessionId);
+
+    if (!validation.valid) {
+      logValidationFailure('claudeCodeManager exit event', validation);
+      return; // Don't process invalid events
+    }
+
     if (panelId) {
       console.log(`[Main] Claude Code exited for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signal}`);
     } else {
@@ -391,6 +434,16 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   claudeCodeManager.on('error', async ({ panelId, sessionId, error }: { panelId?: string; sessionId: string; error: string }) => {
+    // Validate the event context
+    const validation = panelId 
+      ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
+      : validateEventContext({ sessionId }, sessionId);
+
+    if (!validation.valid) {
+      logValidationFailure('claudeCodeManager error event', validation);
+      return; // Don't process invalid events
+    }
+
     if (panelId) {
       console.log(`Panel ${panelId} (session ${sessionId}) encountered an error: ${error}`);
     } else {

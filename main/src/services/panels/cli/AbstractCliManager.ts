@@ -203,6 +203,13 @@ export abstract class AbstractCliManager extends EventEmitter {
       throw new Error(`No ${this.getCliToolName()} process found for panel ${panelId}`);
     }
 
+    // Validate that the process matches the expected panel and session context
+    if (cliProcess.panelId !== panelId) {
+      this.logger?.error(`[${this.getCliToolName()}] Panel ID mismatch: process has ${cliProcess.panelId}, expected ${panelId}`);
+      throw new Error(`Panel ID mismatch: process belongs to different panel`);
+    }
+
+    this.logger?.verbose(`[${this.getCliToolName()}] Sending input to panel ${panelId} (session ${cliProcess.sessionId})`);
     cliProcess.process.write(input);
   }
 
