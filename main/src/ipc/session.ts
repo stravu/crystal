@@ -471,7 +471,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       console.log('[IPC] sessions:get-or-create-main-repo handler called with projectId:', projectId);
 
       // Get or create the main repo session
-      const session = sessionManager.getOrCreateMainRepoSession(projectId);
+      const session = await sessionManager.getOrCreateMainRepoSession(projectId);
 
       // If it's a newly created session, just emit the created event
       const dbSession = databaseService.getSession(session.id);
@@ -632,7 +632,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       } else {
         // Normal continue for existing sessions
         if (continuePrompt) {
-          sessionManager.continueConversation(sessionId, continuePrompt);
+          await sessionManager.continueConversation(sessionId, continuePrompt);
         }
 
         // Get Claude panels for this session

@@ -9,6 +9,7 @@ import { getShellPath } from '../utils/shellPath';
 import { TerminalSessionManager } from './terminalSessionManager';
 import { formatForDisplay } from '../utils/timestampUtils';
 import { addSessionLog, cleanupSessionLogs } from '../ipc/logs';
+import { withLock } from '../utils/mutex';
 import * as os from 'os';
 
 export class SessionManager extends EventEmitter {
@@ -182,12 +183,19 @@ export class SessionManager extends EventEmitter {
     return dbSession ? this.convertDbSessionToSession(dbSession) : undefined;
   }
 
-  createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Session {
-    return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model, baseCommit, baseBranch, commitMode, commitModeSettings);
+  async createSession(name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Promise<Session> {
+    return await withLock(`session-creation`, async () => {
+      return this.createSessionWithId(randomUUID(), name, worktreePath, prompt, worktreeName, permissionMode, projectId, isMainRepo, autoCommit, folderId, model, baseCommit, baseBranch, commitMode, commitModeSettings);
+    });
   }
 
   createSessionWithId(id: string, name: string, worktreePath: string, prompt: string, worktreeName: string, permissionMode?: 'approve' | 'ignore', projectId?: number, isMainRepo?: boolean, autoCommit?: boolean, folderId?: string, model?: string, baseCommit?: string, baseBranch?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitModeSettings?: string): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
+    
+    // Ensure this session ID isn't already being created
+    if (this.activeSessions.has(id) || this.db.getSession(id)) {
+      throw new Error(`Session with ID ${id} already exists`);
+    }
     
     // Add log entry for session creation
     addSessionLog(id, 'info', `Creating session: ${name}`, 'SessionManager');
@@ -242,49 +250,51 @@ export class SessionManager extends EventEmitter {
     return session;
   }
 
-  getOrCreateMainRepoSession(projectId: number): Session {
-    console.log(`[SessionManager] Getting or creating main repo session for project ${projectId}`);
-    
-    // First check if a main repo session already exists
-    const existingSession = this.db.getMainRepoSession(projectId);
-    if (existingSession) {
-      console.log(`[SessionManager] Found existing main repo session: ${existingSession.id}`);
-      return this.convertDbSessionToSession(existingSession);
-    }
-    
-    // Get the project
-    const project = this.getProjectById(projectId);
-    if (!project) {
-      throw new Error(`Project with ID ${projectId} not found`);
-    }
-    
-    console.log(`[SessionManager] Creating new main repo session for project: ${project.name}`);
-    
-    // Create a new main repo session
-    const sessionId = randomUUID();
-    const sessionName = `${project.name} (Main)`;
-    const worktreePath = project.path; // Use the project path directly
-    const worktreeName = 'main'; // Use 'main' as the worktree name
-    const prompt = ''; // Empty prompt - user hasn't sent anything yet
-    
-    const session = this.createSessionWithId(
-      sessionId,
-      sessionName,
-      worktreePath,
-      prompt,
-      worktreeName,
-      project.default_permission_mode || 'ignore', // Default to 'ignore' if not set
-      projectId,
-      true, // isMainRepo = true
-      true, // autoCommit = true (default for main repo sessions)
-      undefined, // folderId
-      'sonnet', // default model for main repo sessions
-      project.commit_mode, // Use project's commit mode
-      undefined // commit_mode_settings - let it use project defaults
-    );
-    
-    console.log(`[SessionManager] Created main repo session: ${session.id}`);
-    return session;
+  async getOrCreateMainRepoSession(projectId: number): Promise<Session> {
+    return await withLock(`main-repo-session-${projectId}`, async () => {
+      console.log(`[SessionManager] Getting or creating main repo session for project ${projectId}`);
+      
+      // First check if a main repo session already exists
+      const existingSession = this.db.getMainRepoSession(projectId);
+      if (existingSession) {
+        console.log(`[SessionManager] Found existing main repo session: ${existingSession.id}`);
+        return this.convertDbSessionToSession(existingSession);
+      }
+      
+      // Get the project
+      const project = this.getProjectById(projectId);
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+      
+      console.log(`[SessionManager] Creating new main repo session for project: ${project.name}`);
+      
+      // Create a new main repo session
+      const sessionId = randomUUID();
+      const sessionName = `${project.name} (Main)`;
+      const worktreePath = project.path; // Use the project path directly
+      const worktreeName = 'main'; // Use 'main' as the worktree name
+      const prompt = ''; // Empty prompt - user hasn't sent anything yet
+      
+      const session = this.createSessionWithId(
+        sessionId,
+        sessionName,
+        worktreePath,
+        prompt,
+        worktreeName,
+        project.default_permission_mode || 'ignore', // Default to 'ignore' if not set
+        projectId,
+        true, // isMainRepo = true
+        true, // autoCommit = true (default for main repo sessions)
+        undefined, // folderId
+        'sonnet', // default model for main repo sessions
+        project.commit_mode, // Use project's commit mode
+        undefined // commit_mode_settings - let it use project defaults
+      );
+      
+      console.log(`[SessionManager] Created main repo session: ${session.id}`);
+      return session;
+    });
   }
 
   emitSessionCreated(session: Session): void {
@@ -689,29 +699,31 @@ export class SessionManager extends EventEmitter {
     console.log('[SessionManager] Skipping prompt marker for panel (using conversation_messages instead):', panelId);
   }
 
-  continueConversation(id: string, userMessage: string): void {
-    // Store the user's message
-    this.addConversationMessage(id, 'user', userMessage);
-    
-    // Add the continuation prompt to output so it's visible
-    const timestamp = formatForDisplay(new Date());
-    const userPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
-                             `\x1b[1m\x1b[92m${userMessage}\x1b[0m\r\n\r\n`;
-    this.addSessionOutput(id, {
-      type: 'stdout',
-      data: userPromptDisplay,
-      timestamp: new Date()
+  async continueConversation(id: string, userMessage: string): Promise<void> {
+    return await withLock(`session-input-${id}`, async () => {
+      // Store the user's message
+      this.addConversationMessage(id, 'user', userMessage);
+      
+      // Add the continuation prompt to output so it's visible
+      const timestamp = formatForDisplay(new Date());
+      const userPromptDisplay = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[42m\x1b[30m 👤 USER PROMPT \x1b[0m\r\n` +
+                               `\x1b[1m\x1b[92m${userMessage}\x1b[0m\r\n\r\n`;
+      this.addSessionOutput(id, {
+        type: 'stdout',
+        data: userPromptDisplay,
+        timestamp: new Date()
+      });
+      console.log('[SessionManager] Added continuation prompt to session output');
+      
+      // Add a prompt marker for this continued conversation
+      // Get current output count to use as index
+      const outputs = this.db.getSessionOutputs(id);
+      this.db.addPromptMarker(id, userMessage, outputs.length);
+      console.log('[SessionManager] Added prompt marker for continued conversation');
+      
+      // Emit event for the Claude Code manager to handle
+      this.emit('conversation-continue', { sessionId: id, message: userMessage });
     });
-    console.log('[SessionManager] Added continuation prompt to session output');
-    
-    // Add a prompt marker for this continued conversation
-    // Get current output count to use as index
-    const outputs = this.db.getSessionOutputs(id);
-    this.db.addPromptMarker(id, userMessage, outputs.length);
-    console.log('[SessionManager] Added prompt marker for continued conversation');
-    
-    // Emit event for the Claude Code manager to handle
-    this.emit('conversation-continue', { sessionId: id, message: userMessage });
   }
 
   clearConversation(id: string): void {
