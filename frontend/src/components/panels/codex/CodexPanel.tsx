@@ -6,6 +6,7 @@ import { RichOutputView } from '../ai/RichOutputView';
 import { MessagesView } from '../ai/MessagesView';
 import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransformer';
 import { CodexStatsView } from './CodexStatsView';
+import { CodexDebugStateView } from './CodexDebugStateView';
 import { CodexInputPanelStyled } from './CodexInputPanelStyled';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
@@ -121,6 +122,19 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
             >
               Stats
             </button>
+            <button
+              onClick={() => {
+                console.log(`[codex-debug] View mode changed to debugState for panel ${panel.id}`);
+                setViewMode('debugState');
+              }}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'debugState'
+                  ? 'bg-bg-primary text-text-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Debug State
+            </button>
           </div>
         </div>
 
@@ -181,6 +195,12 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
         {viewMode === 'stats' && (
           <div className="h-full flex flex-col overflow-hidden w-full">
             <CodexStatsView sessionId={activeSession.id} />
+          </div>
+        )}
+        
+        {viewMode === 'debugState' && (
+          <div className="h-full flex flex-col overflow-hidden w-full">
+            <CodexDebugStateView sessionId={activeSession.id} panelId={panel.id} />
           </div>
         )}
       </div>

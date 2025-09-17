@@ -924,4 +924,97 @@ export class CodexManager extends AbstractCliManager {
     this.logger?.info(`[codex-debug] Using default fallback platform binary: x86_64-unknown-linux-musl`);
     return 'x86_64-unknown-linux-musl';
   }
+
+  /**
+   * Get debug state information for a panel
+   */
+  async getDebugState(panelId: string): Promise<any> {
+    const cliProcess = this.processes.get(panelId);
+    const childProcess = this.codexProcesses.get(panelId);
+    const messageBuffer = this.messageBuffers.get(panelId);
+    const messageIdCounter = this.messageIdCounters.get(panelId);
+    const pendingPrompt = this.pendingInitialPrompts.get(panelId);
+    const handshakeComplete = this.protocolHandshakeComplete.get(panelId);
+    
+    // Get panel and session information
+    const panel = this.sessionManager.getPanel(panelId);
+    const sessionId = cliProcess?.sessionId || panel?.sessionId || 'unknown';
+    
+    // Track process state and timing
+    const now = Date.now();
+    let processState: string = 'not_started';
+    let pid: number | undefined;
+    let isConnected = false;
+    let startTime: string | undefined;
+    let lastMessageTime: string | undefined;
+    let timeSinceLastMessage: number | undefined;
+    
+    if (childProcess && childProcess.pid) {
+      pid = childProcess.pid;
+      isConnected = !childProcess.killed;
+      processState = childProcess.killed ? 'stopped' : 'running';
+    } else if (cliProcess && cliProcess.process) {
+      pid = cliProcess.process.pid;
+      // Check if PTY process is still running
+      try {
+        // Send null signal to check if process is alive
+        process.kill(pid, 0);
+        isConnected = true;
+        processState = 'running';
+      } catch {
+        isConnected = false;
+        processState = 'stopped';
+      }
+    }
+    
+    // Get panel state for additional info
+    const panelState = panel?.state?.customState as any;
+    if (panelState) {
+      startTime = panelState.startTime;
+      lastMessageTime = panelState.lastActivityTime;
+      
+      if (lastMessageTime) {
+        timeSinceLastMessage = now - new Date(lastMessageTime).getTime();
+      }
+    }
+    
+    // Get message statistics
+    const outputs = this.sessionManager.getSessionOutputsForPanel(panelId, 1000);
+    const messageStats = {
+      totalMessagesReceived: outputs.filter((o: any) => o.type === 'json').length,
+      totalMessagesSent: outputs.filter((o: any) => o.data && typeof o.data === 'object' && o.data.role === 'user').length,
+      messageBufferSize: messageBuffer ? messageBuffer.length : 0
+    };
+    
+    return {
+      // Process information
+      pid,
+      isConnected,
+      
+      // Session information
+      sessionId,
+      panelId,
+      worktreePath: cliProcess?.worktreePath,
+      
+      // Timing information
+      startTime,
+      lastMessageTime,
+      timeSinceLastMessage,
+      
+      // Message statistics
+      ...messageStats,
+      
+      // Process state
+      processState,
+      lastError: panelState?.lastError,
+      
+      // Protocol information
+      protocolHandshakeComplete: handshakeComplete || false,
+      pendingPrompt,
+      
+      // Model information
+      model: panelState?.model,
+      modelProvider: panelState?.modelProvider
+    };
+  }
 }

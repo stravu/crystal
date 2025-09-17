@@ -223,6 +223,19 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     }
   });
 
+  // Get debug state for a panel
+  ipcMain.handle('codexPanel:getDebugState', async (_, { panelId }: { panelId: string }) => {
+    try {
+      logger?.info(`[codex-debug] IPC getDebugState: Panel ${panelId}`);
+      const debugState = await codexManager.getDebugState(panelId);
+      logger?.info(`[codex-debug] Debug state retrieved for panel ${panelId}`);
+      return debugState;
+    } catch (error) {
+      logger?.error(`[codex-debug] Failed to get debug state for panel ${panelId}:`, error as Error);
+      throw error;
+    }
+  });
+
   // Get Codex availability status
   ipcMain.handle('codexPanel:checkAvailability', async (_, customPath?: string) => {
     try {
