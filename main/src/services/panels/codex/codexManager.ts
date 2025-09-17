@@ -929,6 +929,8 @@ export class CodexManager extends AbstractCliManager {
    * Get debug state information for a panel
    */
   async getDebugState(panelId: string): Promise<any> {
+    this.logger?.info(`[codex-debug] Getting debug state for panel ${panelId}`);
+    
     const cliProcess = this.processes.get(panelId);
     const childProcess = this.codexProcesses.get(panelId);
     const messageBuffer = this.messageBuffers.get(panelId);
@@ -936,8 +938,17 @@ export class CodexManager extends AbstractCliManager {
     const pendingPrompt = this.pendingInitialPrompts.get(panelId);
     const handshakeComplete = this.protocolHandshakeComplete.get(panelId);
     
-    // Get panel and session information
-    const panel = this.sessionManager.getPanel(panelId);
+    // Log what we found
+    this.logger?.info(`[codex-debug] Debug state check:
+      - cliProcess exists: ${!!cliProcess}
+      - childProcess exists: ${!!childProcess}
+      - messageBuffer length: ${messageBuffer?.length || 0}
+      - handshake complete: ${handshakeComplete || false}
+      - pending prompt: ${!!pendingPrompt}`);
+    
+    // Get panel and session information from panelManager
+    const { panelManager } = require('../../panelManager');
+    const panel = panelManager.getPanel(panelId);
     const sessionId = cliProcess?.sessionId || panel?.sessionId || 'unknown';
     
     // Track process state and timing
@@ -953,6 +964,7 @@ export class CodexManager extends AbstractCliManager {
       pid = childProcess.pid;
       isConnected = !childProcess.killed;
       processState = childProcess.killed ? 'stopped' : 'running';
+      this.logger?.info(`[codex-debug] Found child process with PID ${pid}, connected: ${isConnected}`);
     } else if (cliProcess && cliProcess.process) {
       pid = cliProcess.process.pid;
       // Check if PTY process is still running
@@ -961,10 +973,14 @@ export class CodexManager extends AbstractCliManager {
         process.kill(pid, 0);
         isConnected = true;
         processState = 'running';
+        this.logger?.info(`[codex-debug] Found PTY process with PID ${pid}, connected: true`);
       } catch {
         isConnected = false;
         processState = 'stopped';
+        this.logger?.info(`[codex-debug] Found PTY process with PID ${pid}, but it's not running`);
       }
+    } else {
+      this.logger?.info(`[codex-debug] No process found for panel ${panelId}`);
     }
     
     // Get panel state for additional info

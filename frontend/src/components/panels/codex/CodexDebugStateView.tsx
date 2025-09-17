@@ -48,10 +48,24 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
     try {
       setLoading(true);
       
-      // Get debug state from backend
-      const state = await (window as any).api.invoke('codexPanel:getDebugState', { panelId });
+      // Get debug state from backend using proper electron IPC
+      const state = await window.electron?.invoke('codexPanel:getDebugState', { panelId });
       
-      setDebugState(state);
+      if (state) {
+        setDebugState(state);
+      } else {
+        // No state returned, set default
+        setDebugState({
+          isConnected: false,
+          sessionId,
+          panelId,
+          processState: 'not_started',
+          totalMessagesReceived: 0,
+          totalMessagesSent: 0,
+          messageBufferSize: 0,
+          protocolHandshakeComplete: false
+        });
+      }
       setLastRefreshTime(new Date());
     } catch (error) {
       console.error('[CodexDebugStateView] Failed to load debug state:', error);
