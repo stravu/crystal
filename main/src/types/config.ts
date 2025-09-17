@@ -30,6 +30,29 @@ export interface AppConfig {
   devMode?: boolean;
   // Additional paths to add to PATH environment variable
   additionalPaths?: string[];
+  // Session creation preferences
+  sessionCreationPreferences?: {
+    sessionCount?: number;
+    toolType?: 'claude' | 'codex' | 'none';
+    claudeConfig?: {
+      model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
+      permissionMode?: 'ignore' | 'approve';
+      ultrathink?: boolean;
+    };
+    codexConfig?: {
+      model?: string;
+      modelProvider?: string;
+      approvalPolicy?: 'auto' | 'manual';
+      sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+      webSearch?: boolean;
+    };
+    showAdvanced?: boolean;
+    baseBranch?: string;
+    commitModeSettings?: {
+      mode?: 'checkpoint' | 'incremental' | 'single';
+      checkpointPrefix?: string;
+    };
+  };
 }
 
 export interface UpdateConfigRequest {
@@ -52,4 +75,26 @@ export interface UpdateConfigRequest {
   };
   devMode?: boolean;
   additionalPaths?: string[];
+  sessionCreationPreferences?: {
+    sessionCount?: number;
+    toolType?: 'claude' | 'codex' | 'none';
+    claudeConfig?: {
+      model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
+      permissionMode?: 'ignore' | 'approve';
+      ultrathink?: boolean;
+    };
+    codexConfig?: {
+      model?: string;
+      modelProvider?: string;
+      approvalPolicy?: 'auto' | 'manual';
+      sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+      webSearch?: boolean;
+    };
+    showAdvanced?: boolean;
+    baseBranch?: string;
+    commitModeSettings?: {
+      mode?: 'checkpoint' | 'incremental' | 'single';
+      checkpointPrefix?: string;
+    };
+  };
 }

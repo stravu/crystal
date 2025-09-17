@@ -357,6 +357,16 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.config.update(updates);
     },
+
+    async getSessionPreferences() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.config.getSessionPreferences();
+    },
+
+    async updateSessionPreferences(preferences: any) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.config.updateSessionPreferences(preferences);
+    },
   };
 
   // Prompts

@@ -13,6 +13,7 @@ import { Card } from './ui/Card';
 import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/ClaudeCodeConfig';
 import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
+import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
 
 interface AttachedImage {
   id: string;
@@ -76,6 +77,50 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showError } = useErrorStore();
+  const { preferences, loadPreferences, updatePreferences } = useSessionPreferencesStore();
+  
+  // Load session creation preferences when dialog opens and clear session name/prompt
+  useEffect(() => {
+    if (isOpen) {
+      loadPreferences();
+      // Always clear session name and prompts when dialog opens
+      setSessionName('');
+      setClaudeConfig(prev => ({ ...prev, prompt: '', attachedImages: [], attachedTexts: [] }));
+      setCodexConfig(prev => ({ ...prev, prompt: '', attachedImages: [], attachedTexts: [] }));
+      setAttachedImages([]);
+      setAttachedTexts([]);
+    }
+  }, [isOpen, loadPreferences]);
+
+  // Apply loaded preferences to state
+  useEffect(() => {
+    if (preferences) {
+      setSessionCount(preferences.sessionCount);
+      setToolType(preferences.toolType);
+      setClaudeConfig(prev => ({
+        ...prev,
+        model: preferences.claudeConfig.model,
+        permissionMode: preferences.claudeConfig.permissionMode,
+        ultrathink: preferences.claudeConfig.ultrathink
+      }));
+      setCodexConfig(prev => ({
+        ...prev,
+        model: preferences.codexConfig.model,
+        modelProvider: preferences.codexConfig.modelProvider,
+        approvalPolicy: preferences.codexConfig.approvalPolicy,
+        sandboxMode: preferences.codexConfig.sandboxMode,
+        webSearch: preferences.codexConfig.webSearch
+      }));
+      setShowAdvanced(preferences.showAdvanced);
+      setCommitModeSettings(preferences.commitModeSettings);
+      // Note: we don't apply baseBranch as it should be project-specific
+    }
+  }, [preferences]);
+
+  // Save preferences when certain settings change
+  const savePreferences = async (updates: Partial<typeof preferences>) => {
+    await updatePreferences(updates);
+  };
   
   // Fetch project details to get last used model
   useEffect(() => {
@@ -487,40 +532,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       }
       
       onClose();
-      // Reset form but fetch the default permission mode again
-      const configResponse = await API.config.get();
-      const defaultPermissionMode = configResponse.success && configResponse.data?.defaultPermissionMode 
-        ? configResponse.data.defaultPermissionMode 
-        : 'ignore';
-      // Reset form
-      setSessionName('');
-      setSessionCount(1);
-      setToolType('none');
-      setClaudeConfig({
-        prompt: '',
-        model: claudeConfig.model, // Keep the same model for next time
-        permissionMode: defaultPermissionMode as 'ignore' | 'approve',
-        ultrathink: false
-      });
-      setCodexConfig({
-        prompt: '',
-        model: DEFAULT_CODEX_MODEL,
-        modelProvider: 'openai',
-        approvalPolicy: 'auto',
-        sandboxMode: 'workspace-write',
-        webSearch: false
-      });
-      setFormData({ 
-        prompt: '', 
-        worktreeTemplate: '', 
-        count: 1, 
-        permissionMode: defaultPermissionMode as 'ignore' | 'approve', 
-        model: finalModel // Keep the same model for next time
-      });
-      setWorktreeError(null);
-      setShowAdvanced(false); // Close advanced options
-      setAttachedImages([]); // Clear attachments
-      setAttachedTexts([]); // Clear attachments
+      // Reset form - name and prompt are cleared, but other settings are preserved from preferences
+      // This will be handled by the useEffect when the dialog opens again
     } catch (error: any) {
       console.error('Error creating session:', error);
       showError({
@@ -649,6 +662,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       const count = parseInt(e.target.value) || 1;
                       setSessionCount(count);
                       setFormData({ ...formData, count });
+                      savePreferences({ sessionCount: count });
                     }}
                     className="w-full"
                   />
@@ -683,7 +697,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setToolType('none')}
+                    onClick={() => {
+                      setToolType('none');
+                      savePreferences({ toolType: 'none' });
+                    }}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <X className={`w-5 h-5 ${toolType === 'none' ? 'text-interactive' : 'text-text-tertiary'}`} />
@@ -703,7 +720,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setToolType('claude')}
+                    onClick={() => {
+                      setToolType('claude');
+                      savePreferences({ toolType: 'claude' });
+                    }}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Brain className={`w-5 h-5 ${toolType === 'claude' ? 'text-interactive' : ''}`} />
@@ -723,7 +743,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setToolType('codex')}
+                    onClick={() => {
+                      setToolType('codex');
+                      savePreferences({ toolType: 'codex' });
+                    }}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Code2 className={`w-5 h-5 ${toolType === 'codex' ? 'text-interactive' : ''}`} />
@@ -742,7 +765,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <Card variant="bordered" className="p-4">
                   <ClaudeCodeConfigComponent
                     config={claudeConfig}
-                    onChange={setClaudeConfig}
+                    onChange={(newConfig) => {
+                      setClaudeConfig(newConfig);
+                      // Save claude config preferences (excluding prompt and attachments)
+                      const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
+                      savePreferences({ claudeConfig: configToSave });
+                    }}
                     projectId={projectId?.toString()}
                     onPaste={handlePaste}
                   />
@@ -796,7 +824,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <Card variant="bordered" className="p-4">
                   <CodexConfigComponent
                     config={codexConfig}
-                    onChange={setCodexConfig}
+                    onChange={(newConfig) => {
+                      setCodexConfig(newConfig);
+                      // Save codex config preferences (excluding prompt and attachments)
+                      const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
+                      savePreferences({ codexConfig: configToSave });
+                    }}
                     projectId={projectId?.toString()}
                     onPaste={handlePaste}
                   />
@@ -944,7 +977,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             <div className="px-6 pb-4">
               <Button
                 type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
+                onClick={() => {
+                  const newShowAdvanced = !showAdvanced;
+                  setShowAdvanced(newShowAdvanced);
+                  savePreferences({ showAdvanced: newShowAdvanced });
+                }}
                 variant="ghost"
                 size="sm"
                 className="text-text-secondary hover:text-text-primary"
@@ -972,6 +1009,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       onChange={(e) => {
                         const selectedBranch = e.target.value;
                         setFormData({ ...formData, baseBranch: selectedBranch });
+                        savePreferences({ baseBranch: selectedBranch });
                       }}
                       className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary"
                       disabled={isLoadingBranches}
@@ -1009,6 +1047,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   settings={commitModeSettings}
                   onChange={(_mode, settings) => {
                     setCommitModeSettings(settings);
+                    savePreferences({ commitModeSettings: settings });
                   }}
                 />
               </div>

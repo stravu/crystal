@@ -189,6 +189,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   config: {
     get: (): Promise<IPCResponse> => ipcRenderer.invoke('config:get'),
     update: (updates: any): Promise<IPCResponse> => ipcRenderer.invoke('config:update', updates),
+    getSessionPreferences: (): Promise<IPCResponse> => ipcRenderer.invoke('config:get-session-preferences'),
+    updateSessionPreferences: (preferences: any): Promise<IPCResponse> => ipcRenderer.invoke('config:update-session-preferences', preferences),
   },
 
   // Prompts
