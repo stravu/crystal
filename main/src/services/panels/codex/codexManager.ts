@@ -498,6 +498,29 @@ export class CodexManager extends AbstractCliManager {
         }
       }
 
+      // Log the complete command being used to start Codex
+      const fullCommand = `${finalCommand} ${finalArgs.join(' ')}`;
+      this.logger?.info(`[codex-debug] Starting Codex with command: ${fullCommand}`);
+      
+      // Emit initial session info message (similar to Claude)
+      const sessionInfoMessage = {
+        type: 'session_info',
+        initial_prompt: options.prompt,
+        codex_command: fullCommand,
+        worktree_path: options.worktreePath,
+        model: options.model || DEFAULT_CODEX_MODEL,
+        model_provider: options.modelProvider || 'openai',
+        timestamp: new Date().toISOString()
+      };
+
+      this.emit('output', {
+        panelId,
+        sessionId,
+        type: 'json',
+        data: sessionInfoMessage,
+        timestamp: new Date()
+      });
+      
       // Spawn the process with pipes (not PTY)
       this.logger?.info(`[codex-debug] Spawning Codex process:\n  Command: ${finalCommand}\n  Args: ${finalArgs.join(' ')}\n  Working directory: ${worktreePath}\n  Environment vars: ${Object.keys(cliEnv).join(', ')}`);
       const childProcess = spawn(finalCommand, finalArgs, {
