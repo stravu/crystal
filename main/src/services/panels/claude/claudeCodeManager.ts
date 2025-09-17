@@ -55,8 +55,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
     return await testClaudeCodeAvailability(customPath);
   }
 
-  protected buildCommandArgs(options: ClaudeSpawnOptions): string[] {
-    const { sessionId, prompt, isResume, permissionMode, model } = options;
+  protected buildCommandArgs(options: ClaudeSpawnOptions & { mcpConfigPath?: string | null }): string[] {
+    const { sessionId, prompt, isResume, permissionMode, model, mcpConfigPath } = options;
     
     // Get session data for Claude-specific features
     const dbSession = this.sessionManager.getDbSession(sessionId);
@@ -84,9 +84,11 @@ export class ClaudeCodeManager extends AbstractCliManager {
     if (effectiveMode === 'ignore') {
       args.push('--dangerously-skip-permissions');
     } else if (effectiveMode === 'approve' && this.permissionIpcPath) {
-      // MCP config will be set up in initializeCliEnvironment
-      // The MCP arguments will be added after environment initialization
-      this.logger?.verbose(`Will set up MCP for permission approval mode`);
+      // If MCP config path is provided, we'll add the MCP args
+      // Otherwise just log that MCP will be set up
+      if (!mcpConfigPath) {
+        this.logger?.verbose(`Will set up MCP for permission approval mode`);
+      }
     } else {
       // Fallback to skip permissions if IPC path not available
       args.push('--dangerously-skip-permissions');
@@ -124,6 +126,11 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }
 
       args.push('-p', finalPrompt);
+    }
+
+    // Add MCP configuration if provided
+    if (mcpConfigPath) {
+      args.push('--mcp-config', mcpConfigPath, '--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission');
     }
 
     return args;
@@ -335,13 +342,14 @@ export class ClaudeCodeManager extends AbstractCliManager {
         mcpConfigPath = await this.setupMcpConfigurationSync(sessionId);
       }
 
-      // Build final command args with MCP if configured
-      const baseArgs = this.buildCommandArgs(options);
-      const finalArgs = mcpConfigPath 
-        ? [...baseArgs, '--mcp-config', mcpConfigPath, '--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission']
-        : baseArgs;
+      // Store MCP config path in options for buildCommandArgs to use
+      const enhancedOptions = {
+        ...options,
+        mcpConfigPath
+      };
 
       // Emit initial session info message
+      const finalArgs = this.buildCommandArgs(enhancedOptions);
       const sessionInfoMessage = {
         type: 'session_info',
         initial_prompt: options.prompt,
@@ -360,16 +368,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
         timestamp: new Date()
       });
 
-      // Now call parent with the final args by temporarily overriding buildCommandArgs
-      const originalBuildCommandArgs = this.buildCommandArgs.bind(this);
-      this.buildCommandArgs = () => finalArgs;
-      
-      try {
-        await super.spawnCliProcess(options);
-      } finally {
-        // Restore original method
-        this.buildCommandArgs = originalBuildCommandArgs;
-      }
+      // Call parent with enhanced options
+      await super.spawnCliProcess(enhancedOptions);
     });
   }
 
