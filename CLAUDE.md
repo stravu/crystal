@@ -11,6 +11,7 @@ Use these reference pages for more information:
 - How to invoke Claude Code through the command line as an SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
 - How to run multiple Claude Code instances with Git Worktrees: https://docs.anthropic.com/en/docs/claude-code/tutorials#run-parallel-claude-code-sessions-with-git-worktrees
 - **[Adding New CLI Tools](./docs/ADDING_NEW_CLI_TOOLS.md)**: Guide for extending Crystal to support additional CLI tools beyond Claude Code
+- **[Codex Protocol Wrapper Documentation](./CODEX_PROTO_WRAPPER_DOCUMENTATION.md)**: Comprehensive documentation for wrapping OpenAI Codex CLI with protocol-based communication. Includes details on resume functionality compatibility with protocol mode (lines 222-386 demonstrate that resume and proto work together seamlessly)
 
 ## Implementation Status: ✅ COMPLETE
 
