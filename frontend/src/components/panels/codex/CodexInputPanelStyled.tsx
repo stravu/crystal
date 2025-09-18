@@ -1,7 +1,7 @@
 import React, { useState, KeyboardEvent, useEffect, useCallback, memo } from 'react';
 import { Send, X, Paperclip, FileText, Square, ChevronRight, Zap, Target, Brain, CheckCircle, Gauge } from 'lucide-react';
 import type { Session, GitCommands } from '../../../types/session';
-import type { ToolPanel } from '../../../../../shared/types/cliPanels';
+import type { ToolPanel } from '../../../../../shared/types/panels';
 import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
 import { useAIInputPanel } from '../../../hooks/useAIInputPanel';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
@@ -50,8 +50,9 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   const [webSearch, setWebSearch] = useState(false);
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
     // First, check if the panel has stored codexConfig with thinkingLevel
-    if (panel?.state?.customState?.codexConfig?.thinkingLevel) {
-      const storedLevel = panel.state.customState.codexConfig.thinkingLevel;
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.thinkingLevel) {
+      const storedLevel = customState.codexConfig.thinkingLevel;
       if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
         return storedLevel;
       }
@@ -114,13 +115,14 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   
   // Update thinking level when panel changes (e.g., when switching sessions)
   useEffect(() => {
-    if (panel?.state?.customState?.codexConfig?.thinkingLevel) {
-      const storedLevel = panel.state.customState.codexConfig.thinkingLevel;
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.thinkingLevel) {
+      const storedLevel = customState.codexConfig.thinkingLevel;
       if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
         setThinkingLevel(storedLevel);
       }
     }
-  }, [panel?.state?.customState?.codexConfig?.thinkingLevel]);
+  }, [(panel?.state?.customState as any)?.codexConfig?.thinkingLevel]);
 
   // Auto-resize textarea
   useEffect(() => {

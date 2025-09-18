@@ -141,13 +141,43 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       
       // Initialize the Codex panel
       console.log(`[codex-debug] Invoking codexPanel:initialize for panel ${panelId}`);
-      await window.electron?.invoke('codexPanel:initialize', panelId, sessionId, activeSession.worktreePath);
+      const initResult = await window.electron?.invoke('codexPanel:initialize', panelId, sessionId, activeSession.worktreePath);
       
-      // Check if it's running
-      console.log(`[codex-debug] Checking if panel ${panelId} is running`);
-      const { isRunning } = await window.electron?.invoke('codexPanel:isRunning', panelId) || { isRunning: false };
-      console.log(`[codex-debug] Panel ${panelId} running status: ${isRunning}`);
-      setIsInitialized(isRunning);
+      if (initResult?.hasExistingSession) {
+        console.log(`[codex-debug] Panel ${panelId} has an existing Codex session ID - marking as initialized for continuation`);
+        // If there's an existing session ID, treat the panel as initialized so we can continue it
+        setIsInitialized(true);
+        
+        // Load existing conversation history for this panel
+        try {
+          console.log(`[codex-debug] Loading conversation history for panel ${panelId}`);
+          const outputs = await window.electron?.invoke('codexPanel:getOutputs', panelId, 1000);
+          if (outputs && outputs.length > 0) {
+            console.log(`[codex-debug] Loaded ${outputs.length} outputs for panel ${panelId}`);
+            // Rebuild conversation history from outputs
+            const history: any[] = [];
+            for (const output of outputs) {
+              if (output.type === 'json' && output.data) {
+                history.push({
+                  type: output.data.type || 'unknown',
+                  content: output.data,
+                  timestamp: output.timestamp || new Date().toISOString()
+                });
+              }
+            }
+            conversationHistoryRef.current = history;
+            console.log(`[codex-debug] Restored ${history.length} conversation history items for panel ${panelId}`);
+          }
+        } catch (error) {
+          console.error(`[codex-debug] Failed to load conversation history for panel ${panelId}:`, error);
+        }
+      } else {
+        // Check if it's running
+        console.log(`[codex-debug] Checking if panel ${panelId} is running`);
+        const { isRunning } = await window.electron?.invoke('codexPanel:isRunning', panelId) || { isRunning: false };
+        console.log(`[codex-debug] Panel ${panelId} running status: ${isRunning}`);
+        setIsInitialized(isRunning);
+      }
       
     } catch (error) {
       console.error(`[codex-debug] Failed to initialize panel ${panelId}:`, error);

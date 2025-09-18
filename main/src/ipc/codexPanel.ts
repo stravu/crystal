@@ -25,19 +25,29 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     try {
       logger?.info(`[codex-debug] IPC initialize: Panel ${panelId}, Session ${sessionId}, Worktree: ${worktreePath}, Prompt: "${prompt?.substring(0, 100) || 'none'}"`);
       
-      // Register the panel with the manager
-      logger?.info(`[codex-debug] Registering panel ${panelId} with session ${sessionId}`);
-      codexPanelManager.registerPanel(panelId, sessionId);
+      // Check if the panel already has a codexSessionId (from a previous session)
+      const existingCodexSessionId = sessionManager.getPanelCodexSessionId(panelId);
       
-      // If a prompt is provided, start the Codex process
-      if (prompt) {
-        logger?.info(`[codex-debug] Starting Codex process with initial prompt`);
-        await codexPanelManager.startPanel(panelId, worktreePath, prompt);
+      if (existingCodexSessionId) {
+        logger?.info(`[codex-debug] Panel ${panelId} has existing codexSessionId: ${existingCodexSessionId}`);
+        // Just register the panel - the frontend will handle resuming when the user sends a message
+        logger?.info(`[codex-debug] Registering panel ${panelId} with session ${sessionId} for potential resume`);
+        codexPanelManager.registerPanel(panelId, sessionId);
       } else {
-        logger?.info(`[codex-debug] No initial prompt provided, panel registered but not started`);
+        // Register the panel with the manager
+        logger?.info(`[codex-debug] Registering new panel ${panelId} with session ${sessionId}`);
+        codexPanelManager.registerPanel(panelId, sessionId);
+        
+        // If a prompt is provided, start the Codex process
+        if (prompt) {
+          logger?.info(`[codex-debug] Starting Codex process with initial prompt`);
+          await codexPanelManager.startPanel(panelId, worktreePath, prompt);
+        } else {
+          logger?.info(`[codex-debug] No initial prompt provided, panel registered but not started`);
+        }
       }
       
-      return { success: true };
+      return { success: true, hasExistingSession: !!existingCodexSessionId };
     } catch (error) {
       logger?.error(`[codex-debug] Failed to initialize panel ${panelId}:`, error as Error);
       throw error;
