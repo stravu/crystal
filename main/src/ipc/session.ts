@@ -1346,6 +1346,49 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         console.log(`[IPC] No Claude panels found, stopping session ${sessionId} directly`);
         await claudeCodeManager.stopSession(sessionId);
       }
+
+      const timestamp = new Date();
+      const cancellationMessage = {
+        type: 'session',
+        data: {
+          status: 'cancelled',
+          message: 'Cancelled by user',
+          source: 'user'
+        }
+      };
+
+      try {
+        if (stopClaudePanels.length > 0 && sessionManager.addPanelOutput) {
+          for (const claudePanel of stopClaudePanels) {
+            sessionManager.addPanelOutput(claudePanel.id, {
+              type: 'json',
+              data: cancellationMessage,
+              timestamp
+            });
+
+            const payload = {
+              panelId: claudePanel.id,
+              sessionId,
+              type: 'json' as const,
+              data: cancellationMessage,
+              timestamp
+            };
+
+            sessionManager.emit('session-output', payload);
+            sessionManager.emit('session-output-available', { sessionId, panelId: claudePanel.id });
+          }
+        } else {
+          sessionManager.addSessionOutput(sessionId, {
+            type: 'json',
+            data: cancellationMessage,
+            timestamp
+          });
+        }
+      } catch (loggingError) {
+        console.warn('[IPC] Failed to record cancellation message for session stop:', loggingError);
+      }
+
+      sessionManager.stopSession(sessionId);
       
       return { success: true };
     } catch (error) {

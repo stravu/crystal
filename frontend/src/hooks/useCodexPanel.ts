@@ -58,32 +58,36 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
   useEffect(() => {
     const handleOutput = (data: any) => {
       if (data.panelId === panelId) {
-        // Handle output events - could update local state if needed
         console.log(`[codex-debug] Output event received for panel ${panelId}:`, JSON.stringify(data).substring(0, 500));
-        
-        // Track conversation messages for history
-        if (data.type === 'json' && data.data) {
-          // Store relevant messages in conversation history
+
+        const isCancellationMessage =
+          data.type === 'json' &&
+          data.data?.type === 'session' &&
+          data.data?.data?.status === 'cancelled';
+
+        if (isCancellationMessage) {
+          console.log(`[codex-debug] Cancellation message received for panel ${panelId}, marking processing as false`);
+          setIsProcessing(false);
+        }
+
+        if (data.type === 'json' && data.data && !isCancellationMessage) {
           conversationHistoryRef.current.push({
             type: data.data.type || 'unknown',
             content: data.data,
             timestamp: data.timestamp || new Date().toISOString()
           });
         }
-        
-        // Check if this is a task_complete message to reset processing state
+
         if (data.type === 'json' && data.data?.msg?.type === 'task_complete') {
           console.log(`[codex-debug] Task complete received for panel ${panelId}, resetting processing state`);
           setIsProcessing(false);
         }
-        
-        // Also reset processing on agent_message (completion of response)
+
         if (data.type === 'json' && data.data?.msg?.type === 'agent_message') {
           console.log(`[codex-debug] Agent message received for panel ${panelId}, resetting processing state`);
           setIsProcessing(false);
         }
-        
-        // Dispatch a window event so the RichOutputView can receive it
+
         window.dispatchEvent(new CustomEvent('codexPanel:output', { detail: data }));
       }
     };
@@ -298,6 +302,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     try {
       console.log(`[codex-debug] Sending interrupt signal for panel ${panelId}`);
       await window.electron?.invoke('codexPanel:sendInterrupt', panelId);
+      setIsProcessing(false);
     } catch (error) {
       console.error(`[codex-debug] Failed to send interrupt for panel ${panelId}:`, error);
     }

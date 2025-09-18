@@ -7,7 +7,7 @@ import type { CodexPanelState } from '../../../shared/types/panels';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
 // Singleton instances will be created in the register function
-let codexManager: CodexManager;
+export let codexManager: CodexManager;
 export let codexPanelManager: CodexPanelManager;
 
 export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServices) {
@@ -224,6 +224,58 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     try {
       logger?.info(`[codex-debug] IPC sendInterrupt: Panel ${panelId}`);
       await codexPanelManager.sendInterrupt(panelId);
+
+      // Record a system message when the user cancels Codex execution
+      const panel = panelManager.getPanel(panelId);
+      const sessionId = panel?.sessionId;
+      const timestamp = new Date();
+      const cancellationMessage = {
+        type: 'session',
+        data: {
+          status: 'cancelled',
+          message: 'Cancelled by user',
+          source: 'user'
+        }
+      };
+
+      try {
+        if (sessionManager?.addPanelOutput) {
+          sessionManager.addPanelOutput(panelId, {
+            type: 'json',
+            data: cancellationMessage,
+            timestamp
+          });
+        } else if (sessionId) {
+          sessionManager.addSessionOutput(sessionId, {
+            type: 'json',
+            data: cancellationMessage,
+            timestamp
+          });
+        }
+
+        const payload = {
+          panelId,
+          sessionId,
+          type: 'json' as const,
+          data: cancellationMessage,
+          timestamp
+        };
+
+        if (sessionId) {
+          sessionManager.emit('session-output', payload);
+          sessionManager.emit('session-output-available', { sessionId, panelId });
+        }
+
+        // Notify Codex-specific listeners so the UI updates immediately
+        codexManager.emit('panel-output', payload);
+
+        // Ensure session status reflects the stop request
+        if (sessionId) {
+          sessionManager.stopSession(sessionId);
+        }
+      } catch (loggingError) {
+        logger?.warn(`[codex-debug] Failed to record cancellation message for panel ${panelId}:`, loggingError as Error);
+      }
       return { success: true };
     } catch (error) {
       logger?.error(`[codex-debug] Failed to send interrupt to panel ${panelId}:`, error as Error);
