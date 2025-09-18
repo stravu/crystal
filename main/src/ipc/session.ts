@@ -722,29 +722,34 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       // Migration: Check if this session needs a Claude panel
       const session = await sessionManager.getSession(sessionId);
       if (session && !session.archived) {
-        console.log(`[IPC] Checking for Claude panels migration for session ${sessionId}`);
-        const existingPanels = panelManager.getPanelsForSession(sessionId);
-        const claudePanels = existingPanels.filter(p => p.type === 'claude');
-        
-        // Check if session has conversation history but no Claude panels
-        const conversationHistory = sessionManager.getConversationMessages(sessionId);
-        const hasConversation = conversationHistory.length > 0;
-        const hasClaudePanels = claudePanels.length > 0;
-        
-        if (hasConversation && !hasClaudePanels) {
-          console.log(`[IPC] Session ${sessionId} has conversation history but no Claude panels, creating one`);
-          try {
-            await panelManager.createPanel({
-              sessionId: sessionId,
-              type: 'claude',
-              title: 'Claude'
-            });
-            console.log(`[IPC] Migrated session ${sessionId} to use Claude panel`);
-          } catch (error) {
-            console.error(`[IPC] Failed to create Claude panel during migration for session ${sessionId}:`, error);
+        const sessionToolType = session.toolType ?? 'claude';
+        if (sessionToolType === 'claude') {
+          console.log(`[IPC] Checking for Claude panels migration for session ${sessionId}`);
+          const existingPanels = panelManager.getPanelsForSession(sessionId);
+          const claudePanels = existingPanels.filter(p => p.type === 'claude');
+
+          // Check if session has conversation history but no Claude panels
+          const conversationHistory = sessionManager.getConversationMessages(sessionId);
+          const hasConversation = conversationHistory.length > 0;
+          const hasClaudePanels = claudePanels.length > 0;
+
+          if (hasConversation && !hasClaudePanels) {
+            console.log(`[IPC] Session ${sessionId} has conversation history but no Claude panels, creating one`);
+            try {
+              await panelManager.createPanel({
+                sessionId: sessionId,
+                type: 'claude',
+                title: 'Claude'
+              });
+              console.log(`[IPC] Migrated session ${sessionId} to use Claude panel`);
+            } catch (error) {
+              console.error(`[IPC] Failed to create Claude panel during migration for session ${sessionId}:`, error);
+            }
           }
+        } else {
+          console.log(`[IPC] Skipping Claude panel migration for session ${sessionId} with tool type ${sessionToolType}`);
         }
-        
+
         // Refresh git status when session is loaded/viewed
         gitStatusManager.refreshSessionGitStatus(sessionId, false).catch(error => {
           console.error(`[IPC] Failed to refresh git status for session ${sessionId}:`, error);
