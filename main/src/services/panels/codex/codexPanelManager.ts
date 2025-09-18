@@ -63,12 +63,17 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     this.logger?.info('[codex-debug] Setting up Codex-specific event handlers');
     this.cliManager.on('panel-exit', (data: any) => {
       const panelId: string | undefined = data?.panelId;
-      if (!panelId || !this.panelMappings.has(panelId)) {
+      if (!panelId) {
+        this.logger?.warn('[codex-debug] Received panel-exit event without panelId');
         return;
       }
 
       const mapping = this.panelMappings.get(panelId);
       const sessionId = data?.sessionId ?? mapping?.sessionId;
+      if (!sessionId) {
+        this.logger?.warn(`[codex-debug] Panel ${panelId} exit event missing sessionId`);
+        return;
+      }
       const rawExitCode = data?.exitCode;
       const exitCode: number | null = typeof rawExitCode === 'number' ? rawExitCode : rawExitCode ?? null;
       const rawSignal = data?.signal;
@@ -131,13 +136,33 @@ export class CodexPanelManager extends AbstractAIPanelManager {
         }
       };
 
-      this.cliManager.emit('output', {
+      const outputEvent = {
         panelId,
         sessionId,
-        type: 'json',
+        type: 'json' as const,
         data: message,
         timestamp: finishedAt
-      });
+      };
+
+      if (this.panelMappings.has(panelId)) {
+        this.cliManager.emit('output', outputEvent);
+        return;
+      }
+
+      this.logger?.info(`[codex-debug] Panel ${panelId} exit received after unregistration; emitting summary directly`);
+      this.cliManager.emit('panel-output', outputEvent);
+
+      try {
+        if (this.sessionManager?.addSessionOutput) {
+          this.sessionManager.addSessionOutput(sessionId, {
+            type: 'json',
+            data: message,
+            timestamp: finishedAt
+          });
+        }
+      } catch (error) {
+        this.logger?.warn(`[codex-debug] Failed to persist Codex session summary for panel ${panelId}:`, error as Error);
+      }
     });
   }
 

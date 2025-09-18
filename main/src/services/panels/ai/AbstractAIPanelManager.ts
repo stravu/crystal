@@ -88,14 +88,25 @@ export abstract class AbstractAIPanelManager {
     // Forward exit events
     this.cliManager.on('exit', (data: any) => {
       const { panelId, sessionId, exitCode, signal } = data;
-      if (panelId && this.panelMappings.has(panelId)) {
-        this.cliManager.emit('panel-exit', {
-          panelId,
-          sessionId,
-          exitCode,
-          signal
-        });
+      if (!panelId) {
+        this.logger?.warn(`[${this.getAgentName()}PanelManager] Received exit event without panelId`);
+        return;
       }
+
+      const mapping = this.panelMappings.get(panelId);
+      const resolvedSessionId = mapping?.sessionId ?? sessionId;
+
+      if (!resolvedSessionId) {
+        this.logger?.warn(`[${this.getAgentName()}PanelManager] Exit event for panel ${panelId} missing sessionId`);
+        return;
+      }
+
+      this.cliManager.emit('panel-exit', {
+        panelId,
+        sessionId: resolvedSessionId,
+        exitCode,
+        signal
+      });
     });
 
     // Forward error events

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { API } from '../../../utils/api';
-import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Copy, Check, FileText, Terminal } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Copy, Check, FileText, Terminal, Info, Loader2, Clock } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 import { MessageSegment } from './components/MessageSegment';
@@ -13,6 +14,69 @@ const defaultSettings: RichOutputSettings = {
   collapseTools: false,
   showThinking: true,
   showSessionInit: false, // Hide by default - it's developer info
+};
+
+const formatStatusLabel = (value: string): string =>
+  value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char: string) => char.toUpperCase());
+
+const sessionStatusStyles: Record<string, {
+  icon: LucideIcon;
+  container: string;
+  iconWrapper: string;
+  title?: string;
+  titleClass: string;
+}> = {
+  completed: {
+    icon: CheckCircle,
+    container: 'bg-status-success/10 border-status-success/30',
+    iconWrapper: 'bg-status-success/20 text-status-success',
+    title: 'Session Completed',
+    titleClass: 'text-status-success'
+  },
+  running: {
+    icon: Loader2,
+    container: 'bg-interactive/10 border-interactive/30',
+    iconWrapper: 'bg-interactive/20 text-interactive-on-dark',
+    title: 'Session Running',
+    titleClass: 'text-interactive-on-dark'
+  },
+  initializing: {
+    icon: Loader2,
+    container: 'bg-interactive/10 border-interactive/30',
+    iconWrapper: 'bg-interactive/20 text-interactive-on-dark',
+    title: 'Session Initializing',
+    titleClass: 'text-interactive-on-dark'
+  },
+  waiting: {
+    icon: Clock,
+    container: 'bg-status-warning/10 border-status-warning/30',
+    iconWrapper: 'bg-status-warning/20 text-status-warning',
+    title: 'Waiting for Input',
+    titleClass: 'text-status-warning'
+  },
+  paused: {
+    icon: Clock,
+    container: 'bg-status-warning/10 border-status-warning/30',
+    iconWrapper: 'bg-status-warning/20 text-status-warning',
+    title: 'Session Paused',
+    titleClass: 'text-status-warning'
+  },
+  error: {
+    icon: XCircle,
+    container: 'bg-status-error/10 border-status-error/30',
+    iconWrapper: 'bg-status-error/20 text-status-error',
+    title: 'Session Error',
+    titleClass: 'text-status-error'
+  },
+  default: {
+    icon: Info,
+    container: 'bg-surface-tertiary/50 border-border-primary',
+    iconWrapper: 'bg-surface-secondary text-text-secondary',
+    title: 'Session Update',
+    titleClass: 'text-text-secondary'
+  }
 };
 
 interface RichOutputViewProps {
@@ -755,6 +819,43 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       );
     }
 
+    const errorSegment = message.segments.find(seg => seg.type === 'error');
+    if (errorSegment?.type === 'error' && errorSegment.error) {
+      const { message: errorMessage, details } = errorSegment.error;
+
+      return (
+        <div
+          key={message.id}
+          className={`
+            rounded-lg transition-all bg-status-error/10 border border-status-error/30
+            ${settings.compactMode ? 'p-3' : 'p-4'}
+            ${needsExtraSpacing ? 'mt-4' : ''}
+          `}
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-full p-2 bg-status-error/20 text-status-error">
+              <XCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-status-error">
+                  {errorMessage || 'Session Error'}
+                </span>
+                <span className="text-sm text-text-tertiary">
+                  {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                </span>
+              </div>
+              {details && (
+                <pre className="bg-status-error/10 border border-status-error/30 rounded p-3 text-xs text-status-error/90 whitespace-pre-wrap font-mono overflow-x-auto">
+                  {typeof details === 'string' ? details : JSON.stringify(details, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     
     if (message.metadata?.systemSubtype === 'init') {
       const info = message.segments.find(seg => seg.type === 'system_info');
@@ -989,6 +1090,60 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       const info = systemInfo.info;
       
       // Handle specific system_info types
+      if (info.type === 'session_status') {
+        const rawStatus = typeof info.status === 'string' ? info.status : 'unknown';
+        const statusKey = rawStatus.toLowerCase();
+        const config = sessionStatusStyles[statusKey] || sessionStatusStyles.default;
+        const StatusIcon = config.icon;
+        const title = config.title ?? formatStatusLabel(rawStatus);
+
+        const statusMessage = typeof info.message === 'string' && info.message.trim().length > 0
+          ? info.message
+          : `Session status updated to ${formatStatusLabel(rawStatus)}`;
+
+        const detailsContent = info.details && typeof info.details === 'string'
+          ? info.details
+          : info.details && typeof info.details === 'object'
+            ? JSON.stringify(info.details, null, 2)
+            : null;
+
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all border
+              ${config.container}
+              ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`rounded-full p-2 ${config.iconWrapper}`}>
+                <StatusIcon className={`w-5 h-5 ${statusKey === 'running' || statusKey === 'initializing' ? 'animate-spin' : ''}`} />
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold ${config.titleClass}`}>
+                    {title}
+                  </span>
+                  <span className="text-sm text-text-tertiary">
+                    {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                  </span>
+                </div>
+                <div className="text-sm text-text-secondary whitespace-pre-wrap">
+                  {statusMessage}
+                </div>
+                {detailsContent && (
+                  <pre className="bg-surface-secondary/70 border border-border-primary rounded p-3 text-xs text-text-secondary whitespace-pre-wrap font-mono overflow-x-auto">
+                    {detailsContent}
+                  </pre>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       if (info.type === 'task_started') {
         return (
           <div
