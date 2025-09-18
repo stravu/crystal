@@ -1,8 +1,22 @@
+import * as os from 'os';
 import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { CodexManager } from './codexManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
+
+const SIGNAL_NAME_BY_VALUE: Map<number, string> = (() => {
+  const map = new Map<number, string>();
+  const signals = (os.constants as any)?.signals as Record<string, number> | undefined;
+  if (signals) {
+    for (const [name, value] of Object.entries(signals)) {
+      if (typeof value === 'number') {
+        map.set(value, name);
+      }
+    }
+  }
+  return map;
+})();
 
 /**
  * Codex-specific panel state
@@ -47,8 +61,84 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    */
   private setupCodexSpecificHandlers(): void {
     this.logger?.info('[codex-debug] Setting up Codex-specific event handlers');
-    // Codex-specific event handling can be added here
-    // For example, handling approval requests, model switches, etc.
+    this.cliManager.on('panel-exit', (data: any) => {
+      const panelId: string | undefined = data?.panelId;
+      if (!panelId || !this.panelMappings.has(panelId)) {
+        return;
+      }
+
+      const mapping = this.panelMappings.get(panelId);
+      const sessionId = data?.sessionId ?? mapping?.sessionId;
+      const rawExitCode = data?.exitCode;
+      const exitCode: number | null = typeof rawExitCode === 'number' ? rawExitCode : rawExitCode ?? null;
+      const rawSignal = data?.signal;
+      const signalNumber: number | null = typeof rawSignal === 'number' && rawSignal > 0 ? rawSignal : null;
+      const signalName = signalNumber !== null ? SIGNAL_NAME_BY_VALUE.get(signalNumber) : undefined;
+      const finishedAt = new Date();
+
+      let status: 'completed' | 'terminated' | 'error';
+      let summary: string;
+
+      if (exitCode === 0 && signalNumber === null) {
+        status = 'completed';
+        summary = 'Codex process completed successfully.';
+      } else if (signalNumber !== null) {
+        status = 'terminated';
+        summary = `Codex process terminated by signal ${signalName || signalNumber}.`;
+      } else if (exitCode === null) {
+        status = 'terminated';
+        summary = 'Codex process exited without reporting an exit code.';
+      } else if (exitCode > 0) {
+        status = 'error';
+        summary = `Codex process exited with code ${exitCode}.`;
+      } else {
+        status = 'completed';
+        summary = `Codex process exited with code ${exitCode}.`;
+      }
+
+      const outcomeDetail =
+        status === 'completed'
+          ? 'Completed successfully'
+          : status === 'terminated'
+            ? 'Terminated before completion'
+            : 'Exited with errors';
+
+      const signalDetail = signalNumber !== null ? `${signalName || 'unknown'} (${signalNumber})` : 'none';
+
+      const detailLines = [
+        `Outcome: ${outcomeDetail}`,
+        `Exit code: ${exitCode !== null ? exitCode : 'not reported'}`,
+        `Signal: ${signalDetail}`,
+        `Finished at: ${finishedAt.toISOString()}`
+      ];
+
+      this.logger?.info(
+        `[codex-debug] Panel ${panelId} process exit recorded: status=${status}, exitCode=${exitCode}, signal=${signalDetail}`
+      );
+
+      const message = {
+        type: 'session',
+        data: {
+          status,
+          message: summary,
+          details: detailLines.join('\n'),
+          diagnostics: {
+            exitCode,
+            signal: signalNumber,
+            signalName,
+            finishedAt: finishedAt.toISOString()
+          }
+        }
+      };
+
+      this.cliManager.emit('output', {
+        panelId,
+        sessionId,
+        type: 'json',
+        data: message,
+        timestamp: finishedAt
+      });
+    });
   }
 
   /**
