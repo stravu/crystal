@@ -474,29 +474,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // Token count information
       if (msg.type === 'token_count') {
-        const info = msg.info || {};
-        const usage = info.last_token_usage || info.total_token_usage || {};
-        
-        return {
-          id: `msg_${++this.messageIdCounter}`,
-          role: 'system',
-          timestamp: this.normalizeTimestamp(timestamp),
-          segments: [{
-            type: 'system_info',
-            info: {
-              type: 'token_usage',
-              input_tokens: usage.input_tokens,
-              output_tokens: usage.output_tokens,
-              reasoning_tokens: usage.reasoning_output_tokens,
-              total_tokens: usage.total_tokens,
-              cached_tokens: usage.cached_input_tokens,
-              context_window: info.model_context_window
-            }
-          }],
-          metadata: {
-            agent: 'codex'
-          }
-        };
+        return null; // Skip showing token usage telemetry in the output view
       }
     }
     
