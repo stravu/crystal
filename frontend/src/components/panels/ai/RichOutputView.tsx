@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { API } from '../../../utils/api';
-import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown } from 'lucide-react';
+import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Copy, Check } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 import { MessageSegment } from './components/MessageSegment';
@@ -34,6 +34,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const [collapsedMessages, setCollapsedMessages] = useState<Set<string>>(new Set());
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   
   // Use parent-controlled settings if provided, otherwise use default
   const localSettings = useMemo<RichOutputSettings>(() => {
@@ -291,6 +292,38 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     });
   };
 
+  const copyMessageContent = async (message: UnifiedMessage) => {
+    // Extract all text content from the message segments
+    const contentParts: string[] = [];
+    
+    message.segments.forEach(seg => {
+      if (seg.type === 'text' && seg.content) {
+        contentParts.push(seg.content);
+      } else if (seg.type === 'thinking' && seg.content) {
+        contentParts.push(`*Thinking:*\n${seg.content}`);
+      } else if (seg.type === 'tool_call' && seg.tool) {
+        contentParts.push(`**Tool: ${seg.tool.name}**\n\`\`\`json\n${JSON.stringify(seg.tool.input, null, 2)}\n\`\`\``);
+        if (seg.tool.result) {
+          contentParts.push(`**Result:**\n${seg.tool.result.content}`);
+        }
+      } else if (seg.type === 'diff' && seg.diff) {
+        contentParts.push(`\`\`\`diff\n${seg.diff}\n\`\`\``);
+      }
+    });
+    
+    const fullContent = contentParts.join('\n\n');
+    
+    try {
+      await navigator.clipboard.writeText(fullContent);
+      setCopiedMessageId(message.id);
+      setTimeout(() => {
+        setCopiedMessageId(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
+  };
+
   // Render a complete message
   const renderMessage = (message: UnifiedMessage, index: number, userMessageIndex?: number) => {
     const isCollapsed = collapsedMessages.has(message.id);
@@ -362,7 +395,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           if (el) userMessageRefs.current.set(userMessageIndex, el);
         } : undefined}
         className={`
-          rounded-lg transition-all
+          rounded-lg transition-all relative group
           ${isUser ? 'bg-surface-secondary' : hasThinking ? 'bg-surface-primary/50' : 'bg-surface-primary'}
           ${hasToolCalls ? 'bg-surface-tertiary/30' : ''}
           ${settings.compactMode ? 'p-3' : 'p-4'}
@@ -390,14 +423,33 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               </span>
             )}
           </div>
-          {hasTextContent && textContent.length > 200 && (
-            <button
-              onClick={() => toggleMessageCollapse(message.id)}
-              className="text-text-tertiary hover:text-text-secondary transition-colors"
-            >
-              {isCollapsed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            </button>
-          )}
+          {/* Action buttons */}
+          <div className="flex items-center gap-1">
+            {/* Copy button - only for assistant messages */}
+            {!isUser && (
+              <button
+                onClick={() => copyMessageContent(message)}
+                className="p-1.5 rounded-lg bg-surface-secondary/80 hover:bg-surface-secondary transition-all opacity-0 group-hover:opacity-100 border border-border-primary"
+                title="Copy message content as markdown"
+              >
+                {copiedMessageId === message.id ? (
+                  <Check className="w-3.5 h-3.5 text-status-success" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-text-tertiary hover:text-text-secondary" />
+                )}
+              </button>
+            )}
+            {/* Hide/Show button for long messages */}
+            {hasTextContent && textContent.length > 200 && (
+              <button
+                onClick={() => toggleMessageCollapse(message.id)}
+                className="p-1.5 rounded-lg hover:bg-surface-secondary/50 transition-colors text-text-tertiary hover:text-text-secondary"
+                title={isCollapsed ? "Show full message" : "Collapse message"}
+              >
+                {isCollapsed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Message Content */}
