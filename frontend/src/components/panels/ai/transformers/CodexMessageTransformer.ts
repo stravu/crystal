@@ -1,7 +1,76 @@
-import { MessageTransformer, UnifiedMessage, ToolCall } from './MessageTransformer';
+import { MessageTransformer, UnifiedMessage, ToolCall, ToolResult } from './MessageTransformer';
 
 export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
+  private toolCalls = new Map<string, ToolCall>();
+  private toolCallIdCounter = 0;
+
+  private resetToolCallState() {
+    this.toolCalls.clear();
+    this.toolCallIdCounter = 0;
+  }
+
+  private createToolCallId(): string {
+    this.toolCallIdCounter += 1;
+    return `tool_${this.toolCallIdCounter}`;
+  }
+
+  private registerToolCall(providedId: string | undefined, name: string, input: any): ToolCall {
+    const id = providedId || this.createToolCallId();
+    let toolCall = this.toolCalls.get(id);
+
+    if (toolCall) {
+      toolCall.name = name;
+      toolCall.input = input;
+      toolCall.status = 'pending';
+      toolCall.result = undefined;
+    } else {
+      toolCall = {
+        id,
+        name,
+        input,
+        status: 'pending'
+      };
+      this.toolCalls.set(id, toolCall);
+    }
+
+    return toolCall;
+  }
+
+  private getMostRecentPendingToolCall(): ToolCall | undefined {
+    const values = Array.from(this.toolCalls.values());
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (values[i].status === 'pending') {
+        return values[i];
+      }
+    }
+    return undefined;
+  }
+
+  private applyResultToToolCall(providedId: string | undefined, result: ToolResult, isError: boolean): string {
+    let id = providedId;
+    let toolCall = id ? this.toolCalls.get(id) : undefined;
+
+    if (!toolCall && !id) {
+      toolCall = this.getMostRecentPendingToolCall();
+      id = toolCall?.id;
+    }
+
+    if (!toolCall) {
+      id = id || this.createToolCallId();
+      toolCall = {
+        id,
+        name: 'unknown',
+        status: 'pending'
+      };
+      this.toolCalls.set(id, toolCall);
+    }
+
+    toolCall.status = isError ? 'error' : 'success';
+    toolCall.result = result;
+
+    return toolCall.id;
+  }
 
   private normalizeTimestamp(timestamp?: string | Date): string {
     if (!timestamp) {
@@ -17,7 +86,8 @@ export class CodexMessageTransformer implements MessageTransformer {
 
   transform(rawOutputs: any[]): UnifiedMessage[] {
     const messages: UnifiedMessage[] = [];
-    
+    this.resetToolCallState();
+
     for (const output of rawOutputs) {
       const message = this.parseOutput(output);
       if (message) {
@@ -256,13 +326,8 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // Tool call
       if (msg.type === 'tool_call') {
-        const toolCall: ToolCall = {
-          id: `tool_${++this.messageIdCounter}`,
-          name: msg.tool || 'unknown',
-          input: msg.args || msg,
-          status: 'pending'
-        };
-        
+        const toolCall = this.registerToolCall(msg.call_id || msg.tool_call_id || msg.id, msg.tool || 'unknown', msg.args || msg);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
@@ -279,6 +344,19 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // Tool result
       if (msg.type === 'tool_result') {
+        const content = typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result);
+        const isError = Boolean(msg.is_error || msg.success === false || msg.status === 'error');
+        const result: ToolResult = {
+          content,
+          isError
+        };
+
+        if (msg.metadata) {
+          result.metadata = msg.metadata;
+        }
+
+        const toolCallId = this.applyResultToToolCall(msg.tool_call_id, result, isError);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
@@ -286,9 +364,10 @@ export class CodexMessageTransformer implements MessageTransformer {
           segments: [{
             type: 'tool_result',
             result: {
-              toolCallId: msg.tool_call_id || `tool_${this.messageIdCounter}`,
-              content: typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result),
-              isError: false
+              toolCallId,
+              content: result.content,
+              isError: result.isError,
+              metadata: result.metadata
             }
           }],
           metadata: {
@@ -344,23 +423,20 @@ export class CodexMessageTransformer implements MessageTransformer {
         const command = Array.isArray(msg.command) 
           ? msg.command.join(' ') 
           : msg.command;
-        
+
+        const toolCall = this.registerToolCall(msg.call_id, 'exec_command', {
+          command,
+          cwd: msg.cwd,
+          parsed_cmd: msg.parsed_cmd
+        });
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
           timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
-            tool: {
-              id: msg.call_id || `tool_${++this.messageIdCounter}`,
-              name: 'exec_command',
-              input: {
-                command,
-                cwd: msg.cwd,
-                parsed_cmd: msg.parsed_cmd
-              },
-              status: 'pending'
-            }
+            tool: toolCall
           }],
           metadata: {
             agent: 'codex'
@@ -376,7 +452,17 @@ export class CodexMessageTransformer implements MessageTransformer {
       if (msg.type === 'exec_command_end') {
         const output = msg.formatted_output || msg.aggregated_output || 
                       `${msg.stdout || ''}${msg.stderr || ''}`;
-        
+        const result: ToolResult = {
+          content: (output || '').trim() || 'Command completed',
+          isError: msg.exit_code !== 0,
+          metadata: {
+            exitCode: msg.exit_code,
+            duration: msg.duration
+          }
+        };
+
+        const toolCallId = this.applyResultToToolCall(msg.call_id, result, result.isError ?? false);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
@@ -384,13 +470,10 @@ export class CodexMessageTransformer implements MessageTransformer {
           segments: [{
             type: 'tool_result',
             result: {
-              toolCallId: msg.call_id || `tool_${this.messageIdCounter}`,
-              content: output.trim() || 'Command completed',
-              isError: msg.exit_code !== 0,
-              metadata: {
-                exitCode: msg.exit_code,
-                duration: msg.duration
-              }
+              toolCallId,
+              content: result.content,
+              isError: result.isError,
+              metadata: result.metadata
             }
           }],
           metadata: {
@@ -410,22 +493,19 @@ export class CodexMessageTransformer implements MessageTransformer {
           return path;
         }).join('\n');
         
+        const toolCall = this.registerToolCall(msg.call_id, 'patch_apply', {
+          files: fileList,
+          changes,
+          auto_approved: msg.auto_approved
+        });
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
           timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
-            tool: {
-              id: msg.call_id || `tool_${++this.messageIdCounter}`,
-              name: 'patch_apply',
-              input: {
-                files: fileList,
-                changes,
-                auto_approved: msg.auto_approved
-              },
-              status: 'pending'
-            }
+            tool: toolCall
           }],
           metadata: {
             agent: 'codex'
@@ -437,7 +517,13 @@ export class CodexMessageTransformer implements MessageTransformer {
         const result = msg.success 
           ? (msg.stdout || 'Patch applied successfully')
           : (msg.stderr || msg.stdout || 'Patch failed');
-        
+        const toolResult: ToolResult = {
+          content: result,
+          isError: !msg.success
+        };
+
+        const toolCallId = this.applyResultToToolCall(msg.call_id, toolResult, toolResult.isError ?? false);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
@@ -445,9 +531,9 @@ export class CodexMessageTransformer implements MessageTransformer {
           segments: [{
             type: 'tool_result',
             result: {
-              toolCallId: msg.call_id || `tool_${this.messageIdCounter}`,
-              content: result,
-              isError: !msg.success
+              toolCallId,
+              content: toolResult.content,
+              isError: toolResult.isError
             }
           }],
           metadata: {
@@ -516,13 +602,8 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     if (message.type === 'tool_call') {
-      const toolCall: ToolCall = {
-        id: `tool_${++this.messageIdCounter}`,
-        name: message.name || 'unknown',
-        input: message.arguments || message,
-        status: 'pending'
-      };
-      
+      const toolCall = this.registerToolCall(message.call_id || message.id, message.name || 'unknown', message.arguments || message);
+
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'assistant',
