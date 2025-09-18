@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Card } from '../ui/Card';
 import { Checkbox } from '../ui/Input';
-import { Shield, ShieldOff, Cpu, Paperclip, X, FileText } from 'lucide-react';
+import { Shield, ShieldOff, Cpu, Paperclip, X, FileText, Brain, Gauge, Zap } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { CODEX_MODELS, type OpenAICodexModel } from '../../../../shared/types/models';
 
@@ -12,6 +12,7 @@ export interface CodexConfig {
   approvalPolicy?: 'auto' | 'manual';
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   webSearch?: boolean;
+  thinkingLevel?: 'low' | 'medium' | 'high';
   attachedImages?: any[];
   attachedTexts?: any[];
 }
@@ -211,6 +212,69 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
               )}
             </Card>
           ))}
+        </div>
+      </div>
+
+      {/* Thinking Level */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Thinking Level
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          <Card
+            variant={(config.thinkingLevel || 'medium') === 'low' ? 'interactive' : 'bordered'}
+            padding="sm"
+            className={`relative cursor-pointer transition-all ${
+              (config.thinkingLevel || 'medium') === 'low' ? 'border-interactive bg-interactive/10' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onChange({ ...config, thinkingLevel: 'low' })}
+            title="Low thinking - Faster responses with less reasoning"
+          >
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Gauge className={`w-5 h-5 ${(config.thinkingLevel || 'medium') === 'low' ? 'text-interactive' : ''}`} />
+              <span className={`text-sm font-medium ${(config.thinkingLevel || 'medium') === 'low' ? 'text-interactive' : ''}`}>Low</span>
+              <span className="text-xs opacity-75">Fast</span>
+            </div>
+            {(config.thinkingLevel || 'medium') === 'low' && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+            )}
+          </Card>
+          <Card
+            variant={(config.thinkingLevel || 'medium') === 'medium' ? 'interactive' : 'bordered'}
+            padding="sm"
+            className={`relative cursor-pointer transition-all ${
+              (config.thinkingLevel || 'medium') === 'medium' ? 'border-interactive bg-interactive/10' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onChange({ ...config, thinkingLevel: 'medium' })}
+            title="Medium thinking - Balanced speed and reasoning (default)"
+          >
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Brain className={`w-5 h-5 ${(config.thinkingLevel || 'medium') === 'medium' ? 'text-interactive' : ''}`} />
+              <span className={`text-sm font-medium ${(config.thinkingLevel || 'medium') === 'medium' ? 'text-interactive' : ''}`}>Medium</span>
+              <span className="text-xs opacity-75">Balanced</span>
+            </div>
+            {(config.thinkingLevel || 'medium') === 'medium' && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+            )}
+          </Card>
+          <Card
+            variant={(config.thinkingLevel || 'medium') === 'high' ? 'interactive' : 'bordered'}
+            padding="sm"
+            className={`relative cursor-pointer transition-all ${
+              (config.thinkingLevel || 'medium') === 'high' ? 'border-interactive bg-interactive/10' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onChange({ ...config, thinkingLevel: 'high' })}
+            title="High thinking - Slower but more thorough reasoning"
+          >
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Zap className={`w-5 h-5 ${(config.thinkingLevel || 'medium') === 'high' ? 'text-interactive' : ''}`} />
+              <span className={`text-sm font-medium ${(config.thinkingLevel || 'medium') === 'high' ? 'text-interactive' : ''}`}>High</span>
+              <span className="text-xs opacity-75">Thorough</span>
+            </div>
+            {(config.thinkingLevel || 'medium') === 'high' && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+            )}
+          </Card>
         </div>
       </div>
 

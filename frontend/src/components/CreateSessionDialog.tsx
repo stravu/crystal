@@ -76,7 +76,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     modelProvider: 'openai',
     approvalPolicy: 'auto',
     sandboxMode: 'workspace-write',
-    webSearch: false
+    webSearch: false,
+    thinkingLevel: 'medium'
   });
   const [formData, setFormData] = useState<CreateSessionRequest>({
     prompt: '',
@@ -178,7 +179,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         modelProvider: preferences.codexConfig.modelProvider,
         approvalPolicy: preferences.codexConfig.approvalPolicy,
         sandboxMode: preferences.codexConfig.sandboxMode,
-        webSearch: preferences.codexConfig.webSearch
+        webSearch: preferences.codexConfig.webSearch,
+        thinkingLevel: preferences.codexConfig.thinkingLevel || 'medium'
       }));
       setShowAdvanced(preferences.showAdvanced);
       setCommitModeSettings(preferences.commitModeSettings);
@@ -638,7 +640,15 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         projectId,
         commitMode: commitModeSettings.mode,
         commitModeSettings: JSON.stringify(commitModeSettings),
-        baseBranch: formData.baseBranch
+        baseBranch: formData.baseBranch,
+        codexConfig: toolType === 'codex' ? {
+          model: codexConfig.model,
+          modelProvider: codexConfig.modelProvider,
+          approvalPolicy: codexConfig.approvalPolicy,
+          sandboxMode: codexConfig.sandboxMode,
+          webSearch: codexConfig.webSearch,
+          thinkingLevel: codexConfig.thinkingLevel
+        } : undefined
       });
       
       if (!response.success) {
@@ -958,7 +968,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                           modelProvider: configToSave.modelProvider ?? 'openai',
                           approvalPolicy: configToSave.approvalPolicy ?? 'auto',
                           sandboxMode: configToSave.sandboxMode ?? 'workspace-write',
-                          webSearch: configToSave.webSearch ?? false
+                          webSearch: configToSave.webSearch ?? false,
+                          thinkingLevel: configToSave.thinkingLevel ?? 'medium'
                         } });
                       }}
                       projectId={projectId?.toString()}

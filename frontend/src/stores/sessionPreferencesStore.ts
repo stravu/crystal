@@ -17,6 +17,7 @@ export interface SessionCreationPreferences {
     approvalPolicy: 'auto' | 'manual';
     sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
     webSearch: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
   };
   showAdvanced: boolean;
   baseBranch?: string;
@@ -36,7 +37,8 @@ const defaultPreferences: SessionCreationPreferences = {
     modelProvider: 'openai',
     approvalPolicy: 'auto',
     sandboxMode: 'workspace-write',
-    webSearch: false
+    webSearch: false,
+    thinkingLevel: 'medium'
   },
   showAdvanced: false,
   commitModeSettings: {

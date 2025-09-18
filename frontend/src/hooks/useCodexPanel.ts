@@ -237,7 +237,8 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
             modelProvider: options?.modelProvider || 'openai',
             approvalPolicy: options?.approvalPolicy || 'manual',
             sandboxMode: options?.sandboxMode || 'workspace-write',
-            webSearch: options?.webSearch || false
+            webSearch: options?.webSearch || false,
+            thinkingLevel: options?.thinkingLevel || 'medium'
           }
         );
         setIsInitialized(true);
@@ -257,7 +258,8 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           conversationHistory,
           {
             model: options?.model || DEFAULT_CODEX_MODEL,
-            modelProvider: options?.modelProvider || 'openai'
+            modelProvider: options?.modelProvider || 'openai',
+            thinkingLevel: options?.thinkingLevel || 'medium'
           }
         );
         console.log(`[codex-debug] Codex continue invoked for panel ${panelId}`);

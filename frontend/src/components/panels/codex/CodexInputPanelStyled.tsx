@@ -1,6 +1,7 @@
 import React, { useState, KeyboardEvent, useEffect, useCallback, memo } from 'react';
-import { Send, X, Paperclip, FileText, Square, ChevronRight, Zap, Target, Brain, CheckCircle } from 'lucide-react';
+import { Send, X, Paperclip, FileText, Square, ChevronRight, Zap, Target, Brain, CheckCircle, Gauge } from 'lucide-react';
 import type { Session, GitCommands } from '../../../types/session';
+import type { ToolPanel } from '../../../../../shared/types/cliPanels';
 import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
 import { useAIInputPanel } from '../../../hooks/useAIInputPanel';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
@@ -9,10 +10,12 @@ import { Pill } from '../../ui/Pill';
 import { SwitchSimple as Switch } from '../../ui/SwitchSimple';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
+const LAST_CODEX_THINKING_LEVEL_KEY = 'codex.lastSelectedThinkingLevel';
 
 interface CodexInputPanelStyledProps {
   session: Session;
   panelId: string;
+  panel?: ToolPanel;
   onSendMessage: (message: string, options?: any) => Promise<void>;
   disabled?: boolean;
   initialModel?: string;
@@ -26,7 +29,8 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   disabled = false,
   initialModel,
   onCancel,
-  gitCommands
+  gitCommands,
+  panel
 }) => {
   // Initialize model
   const getInitialModel = (): OpenAICodexModel => {
@@ -44,6 +48,18 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   const [approvalPolicy, setApprovalPolicy] = useState<'manual' | 'auto'>('manual');
   const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>('workspace-write');
   const [webSearch, setWebSearch] = useState(false);
+  const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
+    // First, check if the panel has stored codexConfig with thinkingLevel
+    if (panel?.state?.customState?.codexConfig?.thinkingLevel) {
+      const storedLevel = panel.state.customState.codexConfig.thinkingLevel;
+      if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
+        return storedLevel;
+      }
+    }
+    // Otherwise fall back to localStorage
+    const saved = localStorage.getItem(LAST_CODEX_THINKING_LEVEL_KEY);
+    return (saved === 'low' || saved === 'medium' || saved === 'high') ? saved : 'medium';
+  });
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
@@ -76,6 +92,7 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
         approvalPolicy,
         sandboxMode,
         webSearch,
+        thinkingLevel,
         attachedImages: images,
         attachedTexts: texts
       };
@@ -89,6 +106,21 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   useEffect(() => {
     localStorage.setItem(LAST_CODEX_MODEL_KEY, selectedModel);
   }, [selectedModel]);
+
+  // Save thinking level to localStorage
+  useEffect(() => {
+    localStorage.setItem(LAST_CODEX_THINKING_LEVEL_KEY, thinkingLevel);
+  }, [thinkingLevel]);
+  
+  // Update thinking level when panel changes (e.g., when switching sessions)
+  useEffect(() => {
+    if (panel?.state?.customState?.codexConfig?.thinkingLevel) {
+      const storedLevel = panel.state.customState.codexConfig.thinkingLevel;
+      if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
+        setThinkingLevel(storedLevel);
+      }
+    }
+  }, [panel?.state?.customState?.codexConfig?.thinkingLevel]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -107,7 +139,8 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
       modelProvider: 'openai',
       approvalPolicy,
       sandboxMode,
-      webSearch
+      webSearch,
+      thinkingLevel
     });
   };
 
@@ -340,6 +373,12 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
               <ModelSelector
                 selectedModel={selectedModel}
                 setSelectedModel={setSelectedModel}
+              />
+
+              {/* Thinking Level Selector */}
+              <ThinkingLevelSelector
+                thinkingLevel={thinkingLevel}
+                setThinkingLevel={setThinkingLevel}
               />
 
               {/* Options Pills */}
@@ -578,6 +617,74 @@ const SandboxSelector: React.FC<SandboxSelectorProps> = ({
       trigger={triggerButton}
       items={dropdownItems}
       selectedId={sandboxMode}
+      position="auto"
+      width="sm"
+      onOpenChange={() => {}}
+    />
+  );
+};
+
+// Thinking Level Selector Component
+interface ThinkingLevelSelectorProps {
+  thinkingLevel: 'low' | 'medium' | 'high';
+  setThinkingLevel: (level: 'low' | 'medium' | 'high') => void;
+}
+
+const ThinkingLevelSelector: React.FC<ThinkingLevelSelectorProps> = ({
+  thinkingLevel,
+  setThinkingLevel,
+}) => {
+  const levelConfigs = {
+    'low': {
+      label: 'Low',
+      icon: Gauge,
+      iconColor: 'text-interactive',
+      description: 'Faster responses with less reasoning'
+    },
+    'medium': {
+      label: 'Medium',
+      icon: Brain,
+      iconColor: 'text-interactive',
+      description: 'Balanced speed and reasoning'
+    },
+    'high': {
+      label: 'High',
+      icon: Zap,
+      iconColor: 'text-status-success',
+      description: 'Slower but more thorough reasoning'
+    }
+  };
+
+  const currentConfig = levelConfigs[thinkingLevel];
+  const Icon = currentConfig.icon;
+
+  const dropdownItems: DropdownItem[] = Object.entries(levelConfigs).map(([level, config]) => ({
+    id: level,
+    label: config.label,
+    description: config.description,
+    icon: config.icon,
+    iconColor: config.iconColor,
+    onClick: () => setThinkingLevel(level as 'low' | 'medium' | 'high'),
+  }));
+
+  const triggerButton = (
+    <Pill
+      icon={<Icon className={`w-3.5 h-3.5 ${currentConfig.iconColor}`} />}
+      title={`Thinking Level: ${currentConfig.description}. Click to change.`}
+    >
+      {currentConfig.label}
+      <svg className="w-3.5 h-3.5 text-text-tertiary" 
+        fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </Pill>
+  );
+
+  return (
+    <Dropdown
+      trigger={triggerButton}
+      items={dropdownItems}
+      selectedId={thinkingLevel}
       position="auto"
       width="sm"
       onOpenChange={() => {}}

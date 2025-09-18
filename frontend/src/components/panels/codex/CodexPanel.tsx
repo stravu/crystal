@@ -207,6 +207,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
         <CodexInputPanelStyled
           session={activeSession}
           panelId={panel.id}
+          panel={panel}
           onSendMessage={hook.handleSendMessage}
           disabled={hook.isProcessing}
           initialModel={model}

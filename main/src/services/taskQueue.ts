@@ -34,6 +34,14 @@ interface CreateSessionJob {
   toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
+  codexConfig?: {
+    model?: string;
+    modelProvider?: string;
+    approvalPolicy?: 'auto' | 'manual';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+  };
 }
 
 interface ContinueSessionJob {
@@ -129,7 +137,7 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model, toolType } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model, toolType, codexConfig } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
       console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
@@ -203,6 +211,11 @@ export class TaskQueue {
           job.data.commitModeSettings
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
+        
+        // Attach codexConfig to the session object for the panel creation in events.ts
+        if (codexConfig) {
+          (session as any).codexConfig = codexConfig;
+        }
 
         // Only add prompt-related data if there's actually a prompt
         if (prompt && prompt.trim().length > 0) {
@@ -288,7 +301,17 @@ export class TaskQueue {
                   }
 
                   console.log(`[TaskQueue] Starting Codex with prompt length: ${prompt.length} characters`);
-                  await codexPanelManager.startPanel(codexPanel.id, session.worktreePath, prompt, model);
+                  await codexPanelManager.startPanel(
+                    codexPanel.id, 
+                    session.worktreePath, 
+                    prompt, 
+                    codexConfig?.model || model,
+                    codexConfig?.modelProvider,
+                    codexConfig?.approvalPolicy,
+                    codexConfig?.sandboxMode,
+                    codexConfig?.webSearch,
+                    codexConfig?.thinkingLevel
+                  );
                   console.log(`[TaskQueue] Codex started successfully via panel manager for panel ${codexPanel.id} (session ${session.id})`);
                 } catch (error) {
                   console.error('[TaskQueue] Failed to start Codex via panel manager:', error);
@@ -443,7 +466,15 @@ export class TaskQueue {
     model?: string,
     toolType?: 'claude' | 'codex' | 'none',
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
-    commitModeSettings?: string
+    commitModeSettings?: string,
+    codexConfig?: {
+      model?: string;
+      modelProvider?: string;
+      approvalPolicy?: 'auto' | 'manual';
+      sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+      webSearch?: boolean;
+      thinkingLevel?: 'low' | 'medium' | 'high';
+    }
   ): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
@@ -501,7 +532,7 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model, toolType, commitMode, commitModeSettings }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model, toolType, commitMode, commitModeSettings, codexConfig }));
     }
     return Promise.all(jobs);
   }

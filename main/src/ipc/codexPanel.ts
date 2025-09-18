@@ -51,9 +51,10 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     approvalPolicy?: 'auto' | 'manual';
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
     webSearch?: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
   }) => {
     try {
-      logger?.info(`[codex-debug] IPC start:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Approval: ${options?.approvalPolicy || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch || false}`);
+      logger?.info(`[codex-debug] IPC start:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Approval: ${options?.approvalPolicy || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch || false}\n  Thinking Level: ${options?.thinkingLevel || 'default'}`);
       
       // Save the user prompt as a conversation message with panel_id
       // This triggers panel-prompt-added event for the prompts sidebar
@@ -67,7 +68,8 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         options?.modelProvider,
         options?.approvalPolicy,
         options?.sandboxMode,
-        options?.webSearch
+        options?.webSearch,
+        options?.thinkingLevel
       );
       
       // Update panel state with the model and other settings
@@ -125,9 +127,10 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
   ipcMain.handle('codexPanel:continue', async (_, panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], options?: {
     model?: string;
     modelProvider?: string;
+    thinkingLevel?: 'low' | 'medium' | 'high';
   }) => {
     try {
-      logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}`);
+      logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Thinking Level: ${options?.thinkingLevel || 'default'}`);
       
       // Save the new user prompt as a conversation message
       // This triggers panel-prompt-added event for the prompts sidebar
@@ -148,7 +151,8 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         prompt,
         conversationHistory,
         options?.model,
-        options?.modelProvider
+        options?.modelProvider,
+        options?.thinkingLevel
       );
       
       // Update panel state with the new prompt

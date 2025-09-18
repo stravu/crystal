@@ -185,7 +185,12 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
             sessionId: session.id,
             type: panelType as any,
             title: panelTitle,
-            initialState: panelType === 'codex' ? { model: session.model } : undefined
+            initialState: panelType === 'codex' ? { 
+              model: session.model,
+              // Store the codexConfig in the panel metadata for retrieval by the frontend
+              // Note: This will be passed through from the session creation request
+              codexConfig: (session as any).codexConfig 
+            } : undefined
           });
           console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
 

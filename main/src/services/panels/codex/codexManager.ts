@@ -20,6 +20,7 @@ interface CodexSpawnOptions {
   modelProvider?: string;
   showRawAgentReasoning?: boolean;
   modelReasoningEffort?: 'low' | 'medium' | 'high';
+  thinkingLevel?: 'low' | 'medium' | 'high';
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   approvalPolicy?: 'auto' | 'manual';
   webSearch?: boolean;
@@ -149,12 +150,13 @@ export class CodexManager extends AbstractCliManager {
   }
 
   protected buildCommandArgs(options: CodexSpawnOptions): string[] {
-    const { prompt, isResume, resumeSessionId, model, modelProvider, sandboxMode, webSearch } = options;
+    const { prompt, isResume, resumeSessionId, model, modelProvider, sandboxMode, webSearch, thinkingLevel } = options;
     
     this.logger?.info(`[codex-command-build] Building command with options:`);
     this.logger?.info(`[codex-command-build]   isResume: ${isResume}`);
     this.logger?.info(`[codex-command-build]   resumeSessionId: ${resumeSessionId || 'none'}`);
     this.logger?.info(`[codex-command-build]   model: ${model || 'not specified'}`);
+    this.logger?.info(`[codex-command-build]   thinkingLevel: ${thinkingLevel || 'not specified'}`);
     this.logger?.info(`[codex-command-build]   prompt: "${prompt || ''}"`);
     
     // If resuming a session, use the resume command
@@ -189,6 +191,13 @@ export class CodexManager extends AbstractCliManager {
     // Sandbox mode (default to workspace-write for safety)
     const sandbox = sandboxMode || 'workspace-write';
     args.push('-s', sandbox);
+    
+    // Thinking level (reasoning effort)
+    if (thinkingLevel) {
+      // Use -c config override for model_reasoning_effort
+      args.push('-c', `model_reasoning_effort="${thinkingLevel}"`);
+      this.logger?.info(`[codex] Setting model_reasoning_effort to: ${thinkingLevel}`);
+    }
     
     // Web search
     if (webSearch) {
@@ -532,7 +541,8 @@ export class CodexManager extends AbstractCliManager {
     worktreePath: string,
     prompt: string,
     model?: string,
-    modelProvider?: string
+    modelProvider?: string,
+    thinkingLevel?: 'low' | 'medium' | 'high'
   ): Promise<void> {
     const options: CodexSpawnOptions = {
       panelId,
@@ -540,7 +550,8 @@ export class CodexManager extends AbstractCliManager {
       worktreePath,
       prompt,
       model: model || DEFAULT_CODEX_MODEL,
-      modelProvider: modelProvider || 'openai'
+      modelProvider: modelProvider || 'openai',
+      thinkingLevel
     };
     
     this.logger?.info(`[codex] Starting panel ${panelId} with interactive mode`);
@@ -857,7 +868,9 @@ export class CodexManager extends AbstractCliManager {
     sessionId: string,
     worktreePath: string,
     prompt: string,
-    conversationHistory: any[]
+    conversationHistory: any[],
+    model?: string,
+    thinkingLevel?: 'low' | 'medium' | 'high'
   ): Promise<void> {
     // Check if we have a stored Codex session ID to resume from
     this.logger?.info(`[session-id-debug] === CONTINUE PANEL CALLED ===`);
@@ -909,6 +922,8 @@ export class CodexManager extends AbstractCliManager {
         sessionId,
         worktreePath,
         prompt,
+        model,
+        thinkingLevel,
         isResume: true,
         resumeSessionId: codexSessionId
       };
@@ -918,7 +933,7 @@ export class CodexManager extends AbstractCliManager {
       // No session ID to resume from, start a new session
       this.logger?.warn(`[session-id-debug] ❌ No Codex session ID found for panel ${panelId}`);
       this.logger?.warn(`[session-id-debug] Starting NEW session instead of resuming`);
-      await this.startPanel(panelId, sessionId, worktreePath, prompt);
+      await this.startPanel(panelId, sessionId, worktreePath, prompt, model, undefined, thinkingLevel);
     }
   }
 
