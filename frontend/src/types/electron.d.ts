@@ -147,6 +147,8 @@ interface ElectronAPI {
   config: {
     get: () => Promise<IPCResponse>;
     update: (updates: any) => Promise<IPCResponse>;
+    getSessionPreferences: () => Promise<IPCResponse>;
+    updateSessionPreferences: (preferences: any) => Promise<IPCResponse>;
   };
 
   // Prompts

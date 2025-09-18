@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { API } from '../utils/api';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
+import type { CommitModeSettings } from '../../../shared/types';
 
 export interface SessionCreationPreferences {
   sessionCount: number;
@@ -19,10 +20,7 @@ export interface SessionCreationPreferences {
   };
   showAdvanced: boolean;
   baseBranch?: string;
-  commitModeSettings: {
-    mode: 'checkpoint' | 'incremental' | 'single';
-    checkpointPrefix: string;
-  };
+  commitModeSettings: CommitModeSettings;
 }
 
 const defaultPreferences: SessionCreationPreferences = {

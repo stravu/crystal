@@ -12,7 +12,7 @@ import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/ClaudeCodeConfig';
 import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
-import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
+import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
 import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
 
 interface AttachedImage {
@@ -105,7 +105,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       }));
       setCodexConfig(prev => ({
         ...prev,
-        model: preferences.codexConfig.model,
+        model: preferences.codexConfig.model as OpenAICodexModel,
         modelProvider: preferences.codexConfig.modelProvider,
         approvalPolicy: preferences.codexConfig.approvalPolicy,
         sandboxMode: preferences.codexConfig.sandboxMode,
@@ -769,7 +769,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       setClaudeConfig(newConfig);
                       // Save claude config preferences (excluding prompt and attachments)
                       const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
-                      savePreferences({ claudeConfig: configToSave });
+                      savePreferences({ claudeConfig: {
+                        model: configToSave.model,
+                        permissionMode: configToSave.permissionMode,
+                        ultrathink: configToSave.ultrathink ?? false
+                      } });
                     }}
                     projectId={projectId?.toString()}
                     onPaste={handlePaste}
@@ -828,7 +832,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       setCodexConfig(newConfig);
                       // Save codex config preferences (excluding prompt and attachments)
                       const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
-                      savePreferences({ codexConfig: configToSave });
+                      savePreferences({ codexConfig: {
+                        model: (configToSave.model ?? DEFAULT_CODEX_MODEL) as string,
+                        modelProvider: configToSave.modelProvider ?? 'openai',
+                        approvalPolicy: configToSave.approvalPolicy ?? 'auto',
+                        sandboxMode: configToSave.sandboxMode ?? 'workspace-write',
+                        webSearch: configToSave.webSearch ?? false
+                      } });
                     }}
                     projectId={projectId?.toString()}
                     onPaste={handlePaste}
