@@ -5,6 +5,7 @@ import { mainWindow } from '../index';
 import * as os from 'os';
 import * as path from 'path';
 import { getShellPath } from '../utils/shellPath';
+import { ShellDetector } from '../utils/shellDetector';
 
 interface TerminalProcess {
   pty: pty.IPty;
@@ -28,14 +29,15 @@ export class TerminalPanelManager {
     
     console.log(`[TerminalPanelManager] Initializing terminal ${panel.id} in ${cwd}`);
     
-    // Determine shell based on platform
-    const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
-    
-    // Get enhanced PATH from shellPath utility
-    const enhancedPath = getShellPath();
+    // Determine shell based on platform using the detector from the legacy terminal manager
+    const shellInfo = ShellDetector.getDefaultShell();
+    console.log(`[TerminalPanelManager] Using shell ${shellInfo.path} (${shellInfo.name})`);
+
+    const isLinux = process.platform === 'linux';
+    const enhancedPath = isLinux ? (process.env.PATH || '') : getShellPath();
     
     // Create PTY process with enhanced environment
-    const ptyProcess = pty.spawn(shell, [], {
+    const ptyProcess = pty.spawn(shellInfo.path, shellInfo.args || [], {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
@@ -45,6 +47,8 @@ export class TerminalPanelManager {
         PATH: enhancedPath,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
+        LANG: process.env.LANG || 'en_US.UTF-8',
+        WORKTREE_PATH: cwd,
         CRYSTAL_SESSION_ID: panel.sessionId,
         CRYSTAL_PANEL_ID: panel.id
       }
@@ -73,7 +77,7 @@ export class TerminalPanelManager {
       ...state.customState,
       isInitialized: true,
       cwd: cwd,
-      shellType: path.basename(shell),
+      shellType: shellInfo.name || path.basename(shellInfo.path),
       dimensions: { cols: 80, rows: 30 }
     } as TerminalPanelState;
     
