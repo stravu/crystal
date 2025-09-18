@@ -15,6 +15,29 @@ import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
 import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
 import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
 
+const LARGE_TEXT_THRESHOLD = 5000;
+const TEXT_FILE_EXTENSIONS = /\.(?:txt|md|markdown|log|json|js|jsx|ts|tsx|py|rb|go|java|cs|c|cpp|h|hpp|rs|yml|yaml|sh|bash|zsh|html|css|scss|less|xml|csv)$/i;
+
+const isLikelyTextFile = (file: File) => {
+  if (file.type && file.type.startsWith('text/')) {
+    return true;
+  }
+
+  const knownTypes = new Set([
+    'application/json',
+    'application/javascript',
+    'application/xml',
+    'application/x-python-code',
+    'application/x-sh',
+  ]);
+
+  if (knownTypes.has(file.type)) {
+    return true;
+  }
+
+  return TEXT_FILE_EXTENSIONS.test(file.name.toLowerCase());
+};
+
 interface AttachedImage {
   id: string;
   name: string;
@@ -75,9 +98,43 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
   const { showError } = useErrorStore();
   const { preferences, loadPreferences, updatePreferences } = useSessionPreferencesStore();
+
+  const addImageAttachment = useCallback((image: AttachedImage) => {
+    setAttachedImages(prev => [...prev, image]);
+
+    if (toolType === 'claude') {
+      setClaudeConfig(prev => ({
+        ...prev,
+        attachedImages: [...(prev.attachedImages || []), image]
+      }));
+    } else if (toolType === 'codex') {
+      setCodexConfig(prev => ({
+        ...prev,
+        attachedImages: [...(prev.attachedImages || []), image]
+      }));
+    }
+  }, [toolType]);
+
+  const addTextAttachment = useCallback((text: AttachedText) => {
+    setAttachedTexts(prev => [...prev, text]);
+
+    if (toolType === 'claude') {
+      setClaudeConfig(prev => ({
+        ...prev,
+        attachedTexts: [...(prev.attachedTexts || []), text]
+      }));
+    } else if (toolType === 'codex') {
+      setCodexConfig(prev => ({
+        ...prev,
+        attachedTexts: [...(prev.attachedTexts || []), text]
+      }));
+    }
+  }, [toolType]);
   
   // Load session creation preferences when dialog opens and clear session name/prompt
   useEffect(() => {
@@ -91,6 +148,18 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       setAttachedTexts([]);
     }
   }, [isOpen, loadPreferences]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+  }, [toolType]);
 
   // Apply loaded preferences to state
   useEffect(() => {
@@ -254,13 +323,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     });
   }, []);
 
+  const generateTextId = useCallback(() => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, []);
+
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
     // Check for text content first
     const textData = e.clipboardData.getData('text/plain');
-    const LARGE_TEXT_THRESHOLD = 5000;
     
     if (textData && textData.length > LARGE_TEXT_THRESHOLD) {
       // Large text pasted - convert to attachment
@@ -273,19 +343,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         size: textData.length,
       };
       
-      // Add to the active tool's config
-      if (toolType === 'claude') {
-        setClaudeConfig(prev => ({
-          ...prev,
-          attachedTexts: [...(prev.attachedTexts || []), textAttachment]
-        }));
-      } else if (toolType === 'codex') {
-        setCodexConfig(prev => ({
-          ...prev,
-          attachedTexts: [...(prev.attachedTexts || []), textAttachment]
-        }));
-      }
-      setAttachedTexts(prev => [...prev, textAttachment]);
+      addTextAttachment(textAttachment);
       console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
       return;
     }
@@ -307,23 +365,94 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       if (file) {
         const image = await processFile(file);
         if (image) {
-          // Add to the active tool's config
-          if (toolType === 'claude') {
-            setClaudeConfig(prev => ({
-              ...prev,
-              attachedImages: [...(prev.attachedImages || []), image]
-            }));
-          } else if (toolType === 'codex') {
-            setCodexConfig(prev => ({
-              ...prev,
-              attachedImages: [...(prev.attachedImages || []), image]
-            }));
-          }
-          setAttachedImages(prev => [...prev, image]);
+          addImageAttachment(image);
         }
       }
     }
-  }, [processFile, toolType]);
+  }, [processFile, addImageAttachment, addTextAttachment, generateTextId]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current += 1;
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files || []);
+
+    if (files.length === 0) {
+      const textData = e.dataTransfer.getData('text/plain');
+      if (textData && textData.length > LARGE_TEXT_THRESHOLD) {
+        const textAttachment: AttachedText = {
+          id: generateTextId(),
+          name: `Dropped Text (${textData.length.toLocaleString()} chars)`,
+          content: textData,
+          size: textData.length,
+        };
+        addTextAttachment(textAttachment);
+        console.log(`[Drop Text] Automatically attached ${textData.length} characters from drop`);
+      }
+      return;
+    }
+
+    for (const file of files) {
+      if (file.type && file.type.startsWith('image/')) {
+        const image = await processFile(file);
+        if (image) {
+          addImageAttachment(image);
+        }
+        continue;
+      }
+
+      if (isLikelyTextFile(file)) {
+        try {
+          const content = await file.text();
+          if (!content) {
+            continue;
+          }
+
+          const textAttachment: AttachedText = {
+            id: generateTextId(),
+            name: `${file.name} (${content.length.toLocaleString()} chars)`,
+            content,
+            size: content.length,
+          };
+          addTextAttachment(textAttachment);
+          console.log(`[Drop Text File] Attached ${file.name} (${content.length} chars)`);
+        } catch (error) {
+          console.error('Failed to read dropped text file:', error);
+        }
+      } else {
+        console.warn('Unsupported file type for drop:', file.name);
+      }
+    }
+  }, [addImageAttachment, addTextAttachment, processFile, generateTextId]);
 
   const removeImage = useCallback((id: string) => {
     // Remove from active tool's config
@@ -390,8 +519,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     
     return null;
   };
-
-  const generateTextId = () => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -762,130 +889,84 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               
               {/* Tool-specific configuration */}
               {toolType === 'claude' && (
-                <Card variant="bordered" className="p-4">
-                  <ClaudeCodeConfigComponent
-                    config={claudeConfig}
-                    onChange={(newConfig) => {
-                      setClaudeConfig(newConfig);
-                      // Save claude config preferences (excluding prompt and attachments)
-                      const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
-                      savePreferences({ claudeConfig: {
-                        model: configToSave.model,
-                        permissionMode: configToSave.permissionMode,
-                        ultrathink: configToSave.ultrathink ?? false
-                      } });
-                    }}
-                    projectId={projectId?.toString()}
-                    onPaste={handlePaste}
-                  />
-                  
-                  {/* Attached items for Claude */}
-                  {((claudeConfig.attachedImages?.length ?? 0) > 0 || (claudeConfig.attachedTexts?.length ?? 0) > 0) && (
-                    <div className="mt-4 pt-4 border-t border-border-primary">
-                      <p className="text-xs text-text-secondary mb-2">Attached Files:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {claudeConfig.attachedTexts?.map(text => (
-                          <div key={text.id} className="relative group">
-                            <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
-                              <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                              <span className="text-xs text-text-secondary max-w-[120px] truncate">
-                                {text.name}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeText(text.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                        
-                        {claudeConfig.attachedImages?.map(image => (
-                          <div key={image.id} className="relative group">
-                            <img
-                              src={image.dataUrl}
-                              alt={image.name}
-                              className="h-10 w-10 object-cover rounded border border-border-primary"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                <Card
+                  variant="bordered"
+                  className={`relative p-4 transition-colors ${
+                    isDragging ? 'border-interactive border-dashed bg-interactive/10' : ''
+                  }`}
+                  onDrop={handleDrop}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                >
+                  {isDragging && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-card border-2 border-dashed border-interactive bg-interactive/10 text-interactive">
+                      <Paperclip className="w-5 h-5 mb-1" />
+                      <span className="text-xs font-medium">Drop files to attach</span>
                     </div>
                   )}
+
+                  <div className={isDragging ? 'opacity-60' : ''}>
+                    <ClaudeCodeConfigComponent
+                      config={claudeConfig}
+                      onChange={(newConfig) => {
+                        setClaudeConfig(newConfig);
+                        // Save claude config preferences (excluding prompt and attachments)
+                        const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
+                        savePreferences({ claudeConfig: {
+                          model: configToSave.model,
+                          permissionMode: configToSave.permissionMode,
+                          ultrathink: configToSave.ultrathink ?? false
+                        } });
+                      }}
+                      projectId={projectId?.toString()}
+                      onPaste={handlePaste}
+                      onRemoveImage={removeImage}
+                      onRemoveText={removeText}
+                    />
+                  </div>
                 </Card>
               )}
               
               {toolType === 'codex' && (
-                <Card variant="bordered" className="p-4">
-                  <CodexConfigComponent
-                    config={codexConfig}
-                    onChange={(newConfig) => {
-                      setCodexConfig(newConfig);
-                      // Save codex config preferences (excluding prompt and attachments)
-                      const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
-                      savePreferences({ codexConfig: {
-                        model: (configToSave.model ?? DEFAULT_CODEX_MODEL) as string,
-                        modelProvider: configToSave.modelProvider ?? 'openai',
-                        approvalPolicy: configToSave.approvalPolicy ?? 'auto',
-                        sandboxMode: configToSave.sandboxMode ?? 'workspace-write',
-                        webSearch: configToSave.webSearch ?? false
-                      } });
-                    }}
-                    projectId={projectId?.toString()}
-                    onPaste={handlePaste}
-                  />
-                  
-                  {/* Attached items for Codex */}
-                  {((codexConfig.attachedImages?.length ?? 0) > 0 || (codexConfig.attachedTexts?.length ?? 0) > 0) && (
-                    <div className="mt-4 pt-4 border-t border-border-primary">
-                      <p className="text-xs text-text-secondary mb-2">Attached Files:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {codexConfig.attachedTexts?.map(text => (
-                          <div key={text.id} className="relative group">
-                            <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
-                              <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                              <span className="text-xs text-text-secondary max-w-[120px] truncate">
-                                {text.name}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeText(text.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                        
-                        {codexConfig.attachedImages?.map(image => (
-                          <div key={image.id} className="relative group">
-                            <img
-                              src={image.dataUrl}
-                              alt={image.name}
-                              className="h-10 w-10 object-cover rounded border border-border-primary"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                <Card
+                  variant="bordered"
+                  className={`relative p-4 transition-colors ${
+                    isDragging ? 'border-interactive border-dashed bg-interactive/10' : ''
+                  }`}
+                  onDrop={handleDrop}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                >
+                  {isDragging && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-card border-2 border-dashed border-interactive bg-interactive/10 text-interactive">
+                      <Paperclip className="w-5 h-5 mb-1" />
+                      <span className="text-xs font-medium">Drop files to attach</span>
                     </div>
                   )}
+
+                  <div className={isDragging ? 'opacity-60' : ''}>
+                    <CodexConfigComponent
+                      config={codexConfig}
+                      onChange={(newConfig) => {
+                        setCodexConfig(newConfig);
+                        // Save codex config preferences (excluding prompt and attachments)
+                        const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
+                        savePreferences({ codexConfig: {
+                          model: (configToSave.model ?? DEFAULT_CODEX_MODEL) as string,
+                          modelProvider: configToSave.modelProvider ?? 'openai',
+                          approvalPolicy: configToSave.approvalPolicy ?? 'auto',
+                          sandboxMode: configToSave.sandboxMode ?? 'workspace-write',
+                          webSearch: configToSave.webSearch ?? false
+                        } });
+                      }}
+                      projectId={projectId?.toString()}
+                      onPaste={handlePaste}
+                      onRemoveImage={removeImage}
+                      onRemoveText={removeText}
+                    />
+                  </div>
                 </Card>
               )}
               
@@ -974,7 +1055,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     for (const file of files) {
                       const image = await processFile(file);
                       if (image) {
-                        setAttachedImages(prev => [...prev, image]);
+                        addImageAttachment(image);
                       }
                     }
                     e.target.value = ''; // Reset input

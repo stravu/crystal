@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Card } from '../ui/Card';
 import { Checkbox } from '../ui/Input';
-import { Shield, ShieldOff, Sparkles, Brain, Target, Zap, Paperclip } from 'lucide-react';
+import { Shield, ShieldOff, Sparkles, Brain, Target, Zap, Paperclip, X, FileText } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 
 export interface ClaudeCodeConfig {
@@ -19,6 +19,8 @@ interface ClaudeCodeConfigProps {
   projectId?: string;
   disabled?: boolean;
   onPaste?: (e: React.ClipboardEvent) => void;
+  onRemoveImage?: (id: string) => void;
+  onRemoveText?: (id: string) => void;
 }
 
 export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
@@ -26,7 +28,9 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
   onChange,
   projectId,
   disabled = false,
-  onPaste
+  onPaste,
+  onRemoveImage,
+  onRemoveText
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -70,6 +74,66 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
         <label htmlFor="claude-prompt" className="block text-sm font-medium text-text-secondary mb-2">
           Initial Prompt
         </label>
+        {(config.attachedImages?.length ?? 0) > 0 || (config.attachedTexts?.length ?? 0) > 0 ? (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {config.attachedTexts?.map(text => (
+              <div key={text.id} className="relative group">
+                <div className="h-12 px-3 flex items-center gap-2 bg-surface-secondary rounded border border-border-primary">
+                  <FileText className="w-4 h-4 text-text-secondary" />
+                  <span className="text-xs text-text-secondary max-w-[150px] truncate">
+                    {text.name}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return;
+                    if (onRemoveText) {
+                      onRemoveText(text.id);
+                    } else {
+                      onChange({
+                        ...config,
+                        attachedTexts: (config.attachedTexts || []).filter(item => item.id !== text.id)
+                      });
+                    }
+                  }}
+                  className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  aria-label={`Remove ${text.name}`}
+                >
+                  <X className="w-2.5 h-2.5 text-text-secondary" />
+                </button>
+              </div>
+            ))}
+
+            {config.attachedImages?.map(image => (
+              <div key={image.id} className="relative group">
+                <img
+                  src={image.dataUrl}
+                  alt={image.name}
+                  className="h-12 w-12 object-cover rounded border border-border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return;
+                    if (onRemoveImage) {
+                      onRemoveImage(image.id);
+                    } else {
+                      onChange({
+                        ...config,
+                        attachedImages: (config.attachedImages || []).filter(item => item.id !== image.id)
+                      });
+                    }
+                  }}
+                  className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  aria-label={`Remove ${image.name}`}
+                >
+                  <X className="w-2.5 h-2.5 text-text-secondary" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="relative">
           <FilePathAutocomplete
             value={config.prompt || ''}
