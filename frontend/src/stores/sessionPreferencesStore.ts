@@ -83,6 +83,7 @@ export const useSessionPreferencesStore = create<SessionPreferencesStore>((set, 
             ...response.data.commitModeSettings
           }
         };
+        mergedPreferences.sessionCount = defaultPreferences.sessionCount;
         set({ preferences: mergedPreferences, isLoading: false });
       } else {
         set({ error: response.error || 'Failed to load session preferences', isLoading: false });
@@ -93,24 +94,26 @@ export const useSessionPreferencesStore = create<SessionPreferencesStore>((set, 
   },
 
   updatePreferences: async (updates: Partial<SessionCreationPreferences>) => {
+    const { sessionCount: _ignoredSessionCount, ...allowedUpdates } = updates;
     const currentPreferences = get().preferences;
     
-    // Deep merge the updates
+    // Deep merge the updates while keeping session count at its default
     const newPreferences: SessionCreationPreferences = {
       ...currentPreferences,
-      ...updates,
+      ...allowedUpdates,
       claudeConfig: {
         ...currentPreferences.claudeConfig,
-        ...(updates.claudeConfig || {})
+        ...(allowedUpdates.claudeConfig || {})
       },
       codexConfig: {
         ...currentPreferences.codexConfig,
-        ...(updates.codexConfig || {})
+        ...(allowedUpdates.codexConfig || {})
       },
       commitModeSettings: {
         ...currentPreferences.commitModeSettings,
-        ...(updates.commitModeSettings || {})
-      }
+        ...(allowedUpdates.commitModeSettings || {})
+      },
+      sessionCount: defaultPreferences.sessionCount
     };
 
     // Update local state immediately

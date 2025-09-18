@@ -195,6 +195,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       loadPreferences();
       // Always clear session name and prompts when dialog opens
       setSessionName('');
+      setSessionCount(1);
+      setFormData(prev => ({ ...prev, count: 1 }));
       syncPromptAcrossConfigs('', 'none');
       syncImageAttachments(() => []);
       syncTextAttachments(() => []);
@@ -216,7 +218,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   // Apply loaded preferences to state
   useEffect(() => {
     if (preferences) {
-      setSessionCount(preferences.sessionCount);
       setToolType(preferences.toolType);
       setClaudeConfig(prev => ({
         ...prev,
@@ -825,8 +826,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     onChange={(e) => {
                       const count = parseInt(e.target.value) || 1;
                       setSessionCount(count);
-                      setFormData({ ...formData, count });
-                      savePreferences({ sessionCount: count });
+                      setFormData(prev => ({ ...prev, count }));
                     }}
                     className="w-full"
                   />
