@@ -197,8 +197,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
     // Listen for the appropriate event based on the agent type
     if (outputEventName.includes('codex')) {
+      // Only register Electron IPC listener for Codex - not both IPC and window
       window.electron?.on(outputEventName, handleOutput);
-      window.addEventListener(outputEventName, handleOutput as any);
     } else {
       window.electron?.on('session:output', handleOutput);
     }
@@ -206,7 +206,6 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     return () => {
       if (outputEventName.includes('codex')) {
         window.electron?.off(outputEventName, handleOutput);
-        window.removeEventListener(outputEventName, handleOutput as any);
       } else {
         window.electron?.off('session:output', handleOutput);
       }

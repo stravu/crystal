@@ -88,7 +88,8 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           setIsProcessing(false);
         }
 
-        window.dispatchEvent(new CustomEvent('codexPanel:output', { detail: data }));
+        // Don't re-dispatch the event - components already listen to IPC events directly
+        // This was causing duplicate event handling
       }
     };
 
@@ -209,28 +210,16 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       console.log(`[codex-debug] Added ${attachmentPaths.length} attachment paths to message`);
     }
     
-    // Immediately display the user's message in the output
-    const userOutputEvent = {
-      panelId,
-      sessionId: activeSession.id,
-      type: 'json',
-      data: {
-        type: 'user_input',
-        content: finalMessage
-      },
-      timestamp: new Date().toISOString()
-    };
-    
     // Add user message to conversation history
     conversationHistoryRef.current.push({
       type: 'user_input',
       content: finalMessage,
-      timestamp: userOutputEvent.timestamp
+      timestamp: new Date().toISOString()
     });
     
-    // Emit the event directly to the output view
-    window.dispatchEvent(new CustomEvent('codexPanel:output', { detail: userOutputEvent }));
-    console.log(`[codex-debug] Dispatched user input to output view`);
+    // Don't dispatch custom event - let the backend handle sending output events
+    // This prevents duplicate events and maintains consistency
+    console.log(`[codex-debug] Added user input to conversation history`);
     
     setIsProcessing(true);
     

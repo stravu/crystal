@@ -136,6 +136,10 @@ async function createWindow() {
     } : {})
   });
 
+  // Increase max listeners to prevent warning when many panels are active
+  // Each panel can register multiple event listeners
+  mainWindow.webContents.setMaxListeners(100);
+
   if (isDevelopment) {
     await mainWindow.loadURL('http://localhost:4521');
     mainWindow.webContents.openDevTools();

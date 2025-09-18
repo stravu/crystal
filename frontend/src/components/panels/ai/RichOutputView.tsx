@@ -167,8 +167,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     
     // Listen for the appropriate event based on the panel type
     if (outputEventName.includes('codex')) {
+      // Only register Electron IPC listener for Codex
       window.electron?.on(outputEventName, handleOutputAvailable);
-      window.addEventListener(outputEventName, handleOutputAvailable as any);
+      // Don't also add a window event listener - this causes duplicate handling
     } else {
       window.addEventListener('session-output-available', handleOutputAvailable as any);
     }
@@ -177,12 +178,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       clearTimeout(debounceTimer);
       if (outputEventName.includes('codex')) {
         window.electron?.off(outputEventName, handleOutputAvailable);
-        window.removeEventListener(outputEventName, handleOutputAvailable as any);
       } else {
         window.removeEventListener('session-output-available', handleOutputAvailable as any);
       }
     };
-  }, [panelId, outputEventName, messageTransformer]); // Include dependencies
+  }, [panelId, outputEventName]); // Remove messageTransformer from dependencies to avoid re-registering
 
   // Initial load
   useEffect(() => {
