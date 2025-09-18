@@ -337,7 +337,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   const infoText = sessionInfo.initial_prompt ? 
-                    `User Prompt:\n${sessionInfo.initial_prompt}\n\nCommand:\n${sessionInfo.claude_command || sessionInfo.codex_command || ''}\n\nWorktree Path:\n${sessionInfo.worktree_path}\n\nModel: ${sessionInfo.model}` :
+                    `You:\n${sessionInfo.initial_prompt}\n\nCommand:\n${sessionInfo.claude_command || sessionInfo.codex_command || ''}\n\nWorktree Path:\n${sessionInfo.worktree_path}\n\nModel: ${sessionInfo.model}` :
                     `Model: ${sessionInfo.model || 'Unknown'}`;
                   copyToClipboard(infoText, -1);
                 }}
@@ -365,7 +365,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     <div>
                       <div className="flex items-center gap-2 text-text-secondary mb-1">
                         <FileText className="w-3.5 h-3.5" />
-                        <span className="text-xs font-semibold uppercase tracking-wider">User Prompt</span>
+                        <span className="text-xs font-semibold tracking-wider">You</span>
                       </div>
                       <div className="bg-surface-primary rounded p-3 text-text-primary whitespace-pre-wrap break-words">
                         {sessionInfo.initial_prompt}

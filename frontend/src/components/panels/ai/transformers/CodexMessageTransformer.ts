@@ -3,6 +3,18 @@ import { MessageTransformer, UnifiedMessage, ToolCall } from './MessageTransform
 export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
 
+  private normalizeTimestamp(timestamp?: string | Date): string {
+    if (!timestamp) {
+      return new Date().toISOString();
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString();
+    }
+
+    return timestamp;
+  }
+
   transform(rawOutputs: any[]): UnifiedMessage[] {
     const messages: UnifiedMessage[] = [];
     
@@ -51,7 +63,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: output.timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(output.timestamp),
           segments: [{
             type: 'text',
             content: parsedData
@@ -74,7 +86,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return null;
   }
 
-  private parseJsonMessage(message: any, timestamp?: string): UnifiedMessage | null {
+  private parseJsonMessage(message: any, timestamp?: string | Date): UnifiedMessage | null {
     
     // Handle Codex protocol operations (user input)
     if (message.op) {
@@ -88,7 +100,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'user',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
             content: content || JSON.stringify(op)
@@ -100,6 +112,38 @@ export class CodexMessageTransformer implements MessageTransformer {
       }
     }
     
+    // Handle session info blocks that provide initial context
+    if (message.type === 'session_info') {
+      const sessionInfo = {
+        type: 'session_info',
+        initialPrompt: message.initial_prompt,
+        codexCommand: message.codex_command,
+        claudeCommand: message.claude_command,
+        worktreePath: message.worktree_path,
+        model: message.model,
+        modelProvider: message.model_provider,
+        approvalPolicy: message.approval_policy ?? message.approval,
+        sandboxMode: message.sandbox_mode ?? message.sandbox,
+        permissionMode: message.permission_mode,
+        timestamp: this.normalizeTimestamp(timestamp)
+      };
+
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'system_info',
+          info: sessionInfo
+        }],
+        metadata: {
+          agent: 'codex',
+          systemSubtype: 'session_info',
+          sessionInfo
+        }
+      };
+    }
+
     // Handle Codex protocol messages (responses)
     if (message.msg) {
       const msg = message.msg;
@@ -114,7 +158,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -134,7 +178,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'user',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
             content: msg.content || msg.text || JSON.stringify(msg)
@@ -153,7 +197,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'thinking',
             content: content
@@ -174,7 +218,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
             content: content
@@ -182,6 +226,28 @@ export class CodexMessageTransformer implements MessageTransformer {
           metadata: {
             agent: 'codex',
             model: msg.model || 'gpt-4o'
+          }
+        };
+      }
+
+      if (msg.type === 'error') {
+        const errorMessage = msg.message || msg.error || 'Error';
+        const errorDetails = msg.details || msg.detail || msg.stack;
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'system',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'error',
+            error: {
+              message: errorMessage,
+              details: typeof errorDetails === 'string' ? errorDetails : errorDetails ? JSON.stringify(errorDetails, null, 2) : undefined
+            }
+          }],
+          metadata: {
+            agent: 'codex',
+            systemSubtype: 'error'
           }
         };
       }
@@ -198,7 +264,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
             tool: toolCall
@@ -214,7 +280,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_result',
             result: {
@@ -234,7 +300,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -252,7 +318,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -280,7 +346,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
             tool: {
@@ -312,7 +378,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_result',
             result: {
@@ -345,7 +411,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
             tool: {
@@ -373,7 +439,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_result',
             result: {
@@ -393,7 +459,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'diff',
             diff: msg.unified_diff || ''
@@ -412,7 +478,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -442,7 +508,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'user',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
           content: message.content || message.text || JSON.stringify(message)
@@ -457,7 +523,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'assistant',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
           content: message.content || message.text || JSON.stringify(message)
@@ -468,7 +534,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         }
       };
     }
-    
+
     if (message.type === 'tool_call') {
       const toolCall: ToolCall = {
         id: `tool_${++this.messageIdCounter}`,
@@ -480,7 +546,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'assistant',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'tool_call',
           tool: toolCall
@@ -495,7 +561,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'system',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
           content: message.message || JSON.stringify(message)
@@ -505,7 +571,53 @@ export class CodexMessageTransformer implements MessageTransformer {
         }
       };
     }
-    
+
+    // Handle Codex runtime configuration summaries that don't include a type field
+    if (!message.type && (message.provider || message.model_provider) && message.model) {
+      const runtimeInfo = {
+        type: 'session_runtime',
+        provider: message.provider || message.model_provider,
+        model: message.model,
+        sandboxMode: message.sandbox_mode ?? message.sandbox,
+        approvalPolicy: message.approval_policy ?? message.approval,
+        reasoningEffort: message['reasoning effort'] ?? message.reasoning_effort ?? message.reasoningEffort,
+        reasoningSummaries: message['reasoning summaries'] ?? message.reasoning_summaries ?? message.reasoningSummaries,
+        workdir: message.workdir || message.cwd,
+        raw: message
+      };
+
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'system_info',
+          info: runtimeInfo
+        }],
+        metadata: {
+          agent: 'codex',
+          systemSubtype: 'session_runtime'
+        }
+      };
+    }
+
+    // Handle plain prompt objects to show as user messages
+    if (typeof message.prompt === 'string' && message.prompt.trim()) {
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'user',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'text',
+          content: message.prompt
+        }],
+        metadata: {
+          agent: 'codex',
+          source: 'prompt'
+        }
+      };
+    }
+
     // Handle session messages (e.g., errors, status updates)
     if (message.type === 'session' && message.data) {
       const data = message.data;
@@ -520,7 +632,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'error',
             error: {
@@ -539,7 +651,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'system',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'system_info',
           info: {
@@ -560,7 +672,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return {
       id: `msg_${++this.messageIdCounter}`,
       role: 'system',
-      timestamp: timestamp || new Date().toISOString(),
+      timestamp: this.normalizeTimestamp(timestamp),
       segments: [{
         type: 'text',
         content: `\`\`\`json\n${JSON.stringify(message, null, 2)}\n\`\`\``
