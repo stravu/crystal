@@ -2290,6 +2290,15 @@ export class DatabaseService {
     state?: any;
     metadata?: any;
   }): void {
+    // Add debug logging to track panel state changes
+    if (updates.state !== undefined) {
+      console.log(`[DB-DEBUG] updatePanel called for ${panelId} with state:`, JSON.stringify(updates.state));
+      const existingPanel = this.getPanel(panelId);
+      if (existingPanel) {
+        console.log(`[DB-DEBUG] Existing panel state before update:`, JSON.stringify(existingPanel.state));
+      }
+    }
+    
     this.transaction(() => {
       const setClauses: string[] = [];
       const values: any[] = [];
@@ -2313,11 +2322,18 @@ export class DatabaseService {
         setClauses.push('updated_at = CURRENT_TIMESTAMP');
         values.push(panelId);
         
-        this.db.prepare(`
+        const result = this.db.prepare(`
           UPDATE tool_panels
           SET ${setClauses.join(', ')}
           WHERE id = ?
         `).run(...values);
+        
+        console.log(`[DB-DEBUG] Update result for panel ${panelId}: ${result.changes} rows affected`);
+        
+        if (updates.state !== undefined && result.changes > 0) {
+          const afterPanel = this.getPanel(panelId);
+          console.log(`[DB-DEBUG] Panel state after update:`, JSON.stringify(afterPanel?.state));
+        }
       }
     });
   }

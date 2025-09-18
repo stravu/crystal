@@ -67,10 +67,23 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
       );
       
       // Update panel state with the model and other settings
+      // IMPORTANT: Get panel BEFORE startPanel to preserve any existing codexSessionId
+      const panelBefore = panelManager.getPanel(panelId);
+      let existingCodexSessionId: string | undefined;
+      if (panelBefore) {
+        const customStateBefore = panelBefore.state.customState as CodexPanelState;
+        existingCodexSessionId = customStateBefore?.codexSessionId;
+        if (existingCodexSessionId) {
+          logger?.info(`[codex-debug] Existing codexSessionId found before start: ${existingCodexSessionId}`);
+        }
+      }
+      
+      // After startPanel, update the state
       const panel = panelManager.getPanel(panelId);
       if (panel) {
+        const currentCustomState = panel.state.customState as CodexPanelState;
         const updatedState: CodexPanelState = {
-          ...panel.state.customState as CodexPanelState,
+          ...currentCustomState,
           isInitialized: true,
           lastPrompt: prompt,
           model: options?.model || DEFAULT_CODEX_MODEL,
@@ -79,6 +92,15 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
           sandboxMode: options?.sandboxMode || 'workspace-write',
           lastActivityTime: new Date().toISOString()
         };
+        
+        // Preserve any existing or new codexSessionId
+        if (existingCodexSessionId) {
+          updatedState.codexSessionId = existingCodexSessionId;
+          logger?.info(`[codex-debug] Preserving existing codexSessionId in start: ${existingCodexSessionId}`);
+        } else if (currentCustomState?.codexSessionId) {
+          updatedState.codexSessionId = currentCustomState.codexSessionId;
+          logger?.info(`[codex-debug] Preserving new codexSessionId from start: ${currentCustomState.codexSessionId}`);
+        }
         
         await panelManager.updatePanel(panelId, {
           state: {
@@ -103,6 +125,15 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     try {
       logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}`);
       
+      // Get the panel state BEFORE calling continuePanel to preserve codexSessionId
+      const panelBefore = panelManager.getPanel(panelId);
+      let savedCodexSessionId: string | undefined;
+      if (panelBefore) {
+        const customStateBefore = panelBefore.state.customState as CodexPanelState;
+        savedCodexSessionId = customStateBefore?.codexSessionId;
+        logger?.info(`[codex-debug] Saved codexSessionId before continuePanel: ${savedCodexSessionId || 'none'}`);
+      }
+      
       await codexPanelManager.continuePanel(
         panelId,
         worktreePath,
@@ -112,16 +143,32 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         options?.modelProvider
       );
       
-      // Update panel state with the model if provided
+      // Update panel state with the new prompt
+      // IMPORTANT: Get fresh panel state but preserve the saved codexSessionId
       const panel = panelManager.getPanel(panelId);
-      if (panel && options?.model) {
+      if (panel) {
+        const currentCustomState = panel.state.customState as CodexPanelState;
         const updatedState: CodexPanelState = {
-          ...panel.state.customState as CodexPanelState,
+          ...currentCustomState,
           lastPrompt: prompt,
-          model: options.model,
-          modelProvider: options?.modelProvider || (panel.state.customState as CodexPanelState)?.modelProvider || 'openai',
           lastActivityTime: new Date().toISOString()
         };
+        
+        // Only update model if provided
+        if (options?.model) {
+          updatedState.model = options.model;
+          updatedState.modelProvider = options.modelProvider || currentCustomState?.modelProvider || 'openai';
+        }
+        
+        // CRITICAL: Restore the saved codexSessionId
+        if (savedCodexSessionId) {
+          updatedState.codexSessionId = savedCodexSessionId;
+          logger?.info(`[codex-debug] Restoring codexSessionId: ${savedCodexSessionId}`);
+        } else if (currentCustomState?.codexSessionId) {
+          // Fallback: if there's a codexSessionId in current state, preserve it
+          updatedState.codexSessionId = currentCustomState.codexSessionId;
+          logger?.info(`[codex-debug] Preserving existing codexSessionId: ${currentCustomState.codexSessionId}`);
+        }
         
         await panelManager.updatePanel(panelId, {
           state: {
@@ -129,6 +176,7 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
             customState: updatedState
           }
         });
+        logger?.info(`[codex-debug] Panel state updated after continue`);
       }
       
       return { success: true };

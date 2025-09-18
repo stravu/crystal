@@ -1081,10 +1081,10 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
             console.log('[IPC] panels:continue resuming Codex conversation via continuePanel');
             await codexPanelManager.continuePanel(
               panelId,
+              panel.sessionId,  // Add the missing sessionId parameter
               session.worktreePath,
               input || '',
-              conversationHistory,
-              model
+              conversationHistory
             );
             return { success: true };
           } catch (err) {

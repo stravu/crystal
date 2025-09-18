@@ -65,7 +65,8 @@ export interface ClaudePanelState {
 export interface CodexPanelState {
   // Basic state
   isInitialized?: boolean;       // Whether Codex process has been started
-  codexResumeId?: string;        // Codex's internal resume ID for session continuation
+  codexResumeId?: string;        // Codex's internal resume ID for session continuation (deprecated)
+  codexSessionId?: string;       // Codex's session ID for resuming conversations
   
   // Enhanced persistence
   lastPrompt?: string;           // Last user prompt

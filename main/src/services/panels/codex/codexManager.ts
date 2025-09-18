@@ -8,6 +8,7 @@ import { findExecutableInPath } from '../../../utils/shellPath';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
+import { panelManager } from '../../panelManager';
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -42,6 +43,8 @@ interface CodexProcess {
  */
 export class CodexManager extends AbstractCliManager {
   private sessionIdSearchAttempts: number = 0;
+  private hasTriggeredSessionIdSearch: Set<string> = new Set();
+  private messageCount: Map<string, number> = new Map();
   
   constructor(
     sessionManager: any,
@@ -248,6 +251,41 @@ export class CodexManager extends AbstractCliManager {
         const jsonMessage = JSON.parse(line.trim());
         this.logger?.verbose(`[codex] JSON message from panel ${panelId}: ${JSON.stringify(jsonMessage).substring(0, 500)}`);
         
+        // Track message count for this panel
+        const currentCount = this.messageCount.get(panelId) || 0;
+        this.messageCount.set(panelId, currentCount + 1);
+        
+        // Trigger session ID search after receiving the third message
+        // (skip session info and prompt messages)
+        // BUT ONLY if we don't already have a session ID stored
+        if (currentCount === 2 && !this.hasTriggeredSessionIdSearch.has(panelId)) {
+          this.hasTriggeredSessionIdSearch.add(panelId);
+          
+          // Check if we already have a session ID stored
+          let existingSessionId: string | undefined;
+          if (this.sessionManager) {
+            const db = (this.sessionManager as any).db;
+            if (db) {
+              const panel = db.getPanel(panelId);
+              existingSessionId = panel?.state?.customState?.codexSessionId;
+            }
+          }
+          
+          if (existingSessionId) {
+            this.logger?.info(`[session-id-debug] Panel ${panelId} already has session ID: ${existingSessionId}, skipping search`);
+          } else {
+            this.logger?.info(`[session-id-debug] Triggering session ID search after third message for panel ${panelId}`);
+            
+            // Get the worktree path from the process
+            const process = this.processes.get(panelId);
+            if (process) {
+              this.findAndStoreCodexSessionId(panelId, process.worktreePath).catch(error => {
+                this.logger?.error(`[session-id-debug] Failed to find session ID: ${error}`);
+              });
+            }
+          }
+        }
+        
         // Check if this is a session ID message from Codex
         // We're looking for a specific session_id field, NOT generic id fields
         // Session IDs should be UUIDs, not numbers like 0
@@ -283,8 +321,12 @@ export class CodexManager extends AbstractCliManager {
                     ...currentState,
                     customState: { ...customState, codexSessionId }
                   };
-                  db.updatePanel(panelId, { state: updatedState });
-                  this.logger?.info(`[session-id-debug] Stored valid Codex session_id for panel ${panelId}: ${codexSessionId}`);
+                  // Use panelManager to update so cache is properly updated
+                  // Schedule the update asynchronously since parseCliOutput is not async
+                  setImmediate(async () => {
+                    await panelManager.updatePanel(panelId, { state: updatedState });
+                    this.logger?.info(`[session-id-debug] Stored valid Codex session_id for panel ${panelId}: ${codexSessionId}`);
+                  });
                 }
               } else {
                 this.logger?.warn(`[session-id-debug] Could not find panel ${panelId} to store session ID`);
@@ -503,6 +545,10 @@ export class CodexManager extends AbstractCliManager {
     
     this.logger?.info(`[codex] Starting panel ${panelId} with interactive mode`);
     
+    // Reset tracking for this panel (in case it's being restarted)
+    this.hasTriggeredSessionIdSearch.delete(panelId);
+    this.messageCount.set(panelId, 0);
+    
     // Emit initial session info message (similar to Claude)
     const sessionInfoMessage = {
       type: 'session_info',
@@ -524,11 +570,8 @@ export class CodexManager extends AbstractCliManager {
     
     await this.spawnCliProcess(options);
     
-    // Search for session ID asynchronously to avoid blocking UI
-    // Use cross-platform Node.js approach instead of shell commands
-    this.findAndStoreCodexSessionId(panelId, worktreePath).catch(error => {
-      this.logger?.error(`[session-id-debug] Failed to find session ID: ${error}`);
-    });
+    // Session ID search will be triggered after receiving the third message
+    // This ensures the session file has been created by Codex
   }
 
   /**
@@ -537,8 +580,8 @@ export class CodexManager extends AbstractCliManager {
    * Cross-platform implementation that mimics the original shell command behavior.
    */
   private async findAndStoreCodexSessionId(panelId: string, worktreePath: string): Promise<void> {
-    // Wait briefly for Codex to create/update session files
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Small delay to ensure file is written
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const fsPromises = require('fs').promises as typeof import('fs').promises;
     const fsSync = require('fs') as typeof import('fs');
@@ -685,7 +728,7 @@ export class CodexManager extends AbstractCliManager {
             // Found it!
             this.logger?.info(`[session-id-debug] Found valid session ID: ${sessionId} (from ${pathMod.basename(file)})`);
             
-            // Store in the panel state
+            // Store in the panel state (but check if we're overwriting)
             if (this.sessionManager) {
               const db = (this.sessionManager as any).db;
               if (db) {
@@ -693,14 +736,39 @@ export class CodexManager extends AbstractCliManager {
                 if (panel) {
                   const currentState = panel.state || {};
                   const customState = currentState.customState || {};
+                  const existingSessionId = customState.codexSessionId;
+                  
+                  if (existingSessionId && existingSessionId !== sessionId) {
+                    this.logger?.warn(`[session-id-debug] WARNING: Overwriting existing session ID ${existingSessionId} with ${sessionId}`);
+                  }
+                  
                   const updatedState = { 
                     ...currentState, 
                     customState: { ...customState, codexSessionId: sessionId } 
                   };
-                  db.updatePanel(panelId, { state: updatedState });
-                  this.logger?.info(`[session-id-debug] Stored session ID in panel state`);
+                  
+                  this.logger?.info(`[session-id-debug] About to update panel state with: ${JSON.stringify(updatedState)}`);
+                  // Use panelManager to update so cache is properly updated
+                  await panelManager.updatePanel(panelId, { state: updatedState });
+                  
+                  // Verify it was saved
+                  const verifyPanel = panelManager.getPanel(panelId);
+                  const verifyCustomState = verifyPanel?.state?.customState as any;
+                  const savedSessionId = verifyCustomState?.codexSessionId;
+                  if (savedSessionId === sessionId) {
+                    this.logger?.info(`[session-id-debug] ✅ Verified session ID was stored correctly: ${savedSessionId}`);
+                  } else {
+                    this.logger?.error(`[session-id-debug] ❌ Failed to store session ID! Expected ${sessionId}, got ${savedSessionId}`);
+                    this.logger?.error(`[session-id-debug] Panel state after save: ${JSON.stringify(verifyPanel?.state)}`);
+                  }
+                } else {
+                  this.logger?.error(`[session-id-debug] Panel ${panelId} not found in database!`);
                 }
+              } else {
+                this.logger?.error(`[session-id-debug] Database not available!`);
               }
+            } else {
+              this.logger?.error(`[session-id-debug] Session manager not available!`);
             }
             return; // Done - found and stored the session ID
             
@@ -745,8 +813,22 @@ export class CodexManager extends AbstractCliManager {
                     ...currentState, 
                     customState: { ...customState, codexSessionId: sessionId } 
                   };
-                  db.updatePanel(panelId, { state: updatedState });
-                  this.logger?.info(`[session-id-debug] Stored fallback session ID in panel state`);
+                  
+                  this.logger?.info(`[session-id-debug] FALLBACK: About to update panel state with: ${JSON.stringify(updatedState)}`);
+                  // Use panelManager to update so cache is properly updated
+                  await panelManager.updatePanel(panelId, { state: updatedState });
+                  
+                  // Verify it was saved
+                  const verifyPanel = panelManager.getPanel(panelId);
+                  const verifyCustomState = verifyPanel?.state?.customState as any;
+                  const savedSessionId = verifyCustomState?.codexSessionId;
+                  if (savedSessionId === sessionId) {
+                    this.logger?.info(`[session-id-debug] ✅ FALLBACK: Verified session ID was stored correctly: ${savedSessionId}`);
+                  } else {
+                    this.logger?.error(`[session-id-debug] ❌ FALLBACK: Failed to store session ID! Expected ${sessionId}, got ${savedSessionId}`);
+                  }
+                } else {
+                  this.logger?.error(`[session-id-debug] FALLBACK: Panel ${panelId} not found!`);
                 }
               }
             }
@@ -796,16 +878,21 @@ export class CodexManager extends AbstractCliManager {
       this.logger?.warn(`[session-id-debug] Session manager not available`);
     }
     
-    // Also try the getPanelCodexSessionId method if it exists
+    // Also try the getPanelCodexSessionId method - THIS IS THE PREFERRED METHOD
     const methodSessionId = this.sessionManager?.getPanelCodexSessionId?.(panelId);
     this.logger?.info(`[session-id-debug] getPanelCodexSessionId returned: ${methodSessionId || 'null'}`);
     
-    // Use whichever session ID we found
-    codexSessionId = codexSessionId || methodSessionId;
+    // Prefer the method over direct access as it's more reliable
+    codexSessionId = methodSessionId || codexSessionId;
     
     if (codexSessionId) {
       this.logger?.info(`[session-id-debug] ✅ Found Codex session ID: ${codexSessionId}`);
       this.logger?.info(`[session-id-debug] Will use: codex exec --json resume ${codexSessionId} "${prompt}"`);
+      
+      // Mark that we already have a session ID so we don't search for it again
+      this.hasTriggeredSessionIdSearch.add(panelId);
+      // Reset message counter for the new conversation turn
+      this.messageCount.set(panelId, 0);
       
       // Use Codex's resume command to continue the conversation
       const options: CodexSpawnOptions = {
@@ -827,6 +914,10 @@ export class CodexManager extends AbstractCliManager {
   }
 
   async stopPanel(panelId: string): Promise<void> {
+    // Clean up tracking data
+    this.hasTriggeredSessionIdSearch.delete(panelId);
+    this.messageCount.delete(panelId);
+    
     await this.killProcess(panelId);
   }
 
