@@ -53,6 +53,14 @@ interface AttachedText {
   size: number;
 }
 
+const attachmentListsEqual = <T extends { id: string }>(a: T[] = [], b: T[] = []) => {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return a.every((item, index) => item.id === b[index]?.id);
+};
+
 interface CreateSessionDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -68,7 +76,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     prompt: '',
     model: 'auto',
     permissionMode: 'ignore',
-    ultrathink: false
+    ultrathink: false,
+    attachedImages: [],
+    attachedTexts: []
   });
   const [codexConfig, setCodexConfig] = useState<CodexConfig>({
     prompt: '',
@@ -77,7 +87,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     approvalPolicy: 'auto',
     sandboxMode: 'workspace-write',
     webSearch: false,
-    thinkingLevel: 'medium'
+    thinkingLevel: 'medium',
+    attachedImages: [],
+    attachedTexts: []
   });
   const [formData, setFormData] = useState<CreateSessionRequest>({
     prompt: '',
@@ -105,37 +117,77 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const { showError } = useErrorStore();
   const { preferences, loadPreferences, updatePreferences } = useSessionPreferencesStore();
 
-  const addImageAttachment = useCallback((image: AttachedImage) => {
-    setAttachedImages(prev => [...prev, image]);
+  const syncPromptAcrossConfigs = useCallback((newPrompt: string, source: 'claude' | 'codex' | 'none') => {
+    setFormData(prev => (prev.prompt === newPrompt ? prev : { ...prev, prompt: newPrompt }));
 
-    if (toolType === 'claude') {
-      setClaudeConfig(prev => ({
-        ...prev,
-        attachedImages: [...(prev.attachedImages || []), image]
-      }));
-    } else if (toolType === 'codex') {
-      setCodexConfig(prev => ({
-        ...prev,
-        attachedImages: [...(prev.attachedImages || []), image]
-      }));
+    if (source !== 'claude') {
+      setClaudeConfig(prev => (prev.prompt === newPrompt ? prev : { ...prev, prompt: newPrompt }));
     }
-  }, [toolType]);
+
+    if (source !== 'codex') {
+      setCodexConfig(prev => (prev.prompt === newPrompt ? prev : { ...prev, prompt: newPrompt }));
+    }
+  }, []);
+
+  const syncImageAttachments = useCallback((updater: (prev: AttachedImage[]) => AttachedImage[]) => {
+    setAttachedImages(prevImages => {
+      const updatedImages = updater(prevImages);
+
+      if (attachmentListsEqual(prevImages, updatedImages)) {
+        return prevImages;
+      }
+
+      setClaudeConfig(prev => {
+        const current = prev.attachedImages || [];
+        return attachmentListsEqual(current, updatedImages)
+          ? prev
+          : { ...prev, attachedImages: updatedImages };
+      });
+
+      setCodexConfig(prev => {
+        const current = prev.attachedImages || [];
+        return attachmentListsEqual(current, updatedImages)
+          ? prev
+          : { ...prev, attachedImages: updatedImages };
+      });
+
+      return updatedImages;
+    });
+  }, []);
+
+  const syncTextAttachments = useCallback((updater: (prev: AttachedText[]) => AttachedText[]) => {
+    setAttachedTexts(prevTexts => {
+      const updatedTexts = updater(prevTexts);
+
+      if (attachmentListsEqual(prevTexts, updatedTexts)) {
+        return prevTexts;
+      }
+
+      setClaudeConfig(prev => {
+        const current = prev.attachedTexts || [];
+        return attachmentListsEqual(current, updatedTexts)
+          ? prev
+          : { ...prev, attachedTexts: updatedTexts };
+      });
+
+      setCodexConfig(prev => {
+        const current = prev.attachedTexts || [];
+        return attachmentListsEqual(current, updatedTexts)
+          ? prev
+          : { ...prev, attachedTexts: updatedTexts };
+      });
+
+      return updatedTexts;
+    });
+  }, []);
+
+  const addImageAttachment = useCallback((image: AttachedImage) => {
+    syncImageAttachments(prev => [...prev, image]);
+  }, [syncImageAttachments]);
 
   const addTextAttachment = useCallback((text: AttachedText) => {
-    setAttachedTexts(prev => [...prev, text]);
-
-    if (toolType === 'claude') {
-      setClaudeConfig(prev => ({
-        ...prev,
-        attachedTexts: [...(prev.attachedTexts || []), text]
-      }));
-    } else if (toolType === 'codex') {
-      setCodexConfig(prev => ({
-        ...prev,
-        attachedTexts: [...(prev.attachedTexts || []), text]
-      }));
-    }
-  }, [toolType]);
+    syncTextAttachments(prev => [...prev, text]);
+  }, [syncTextAttachments]);
   
   // Load session creation preferences when dialog opens and clear session name/prompt
   useEffect(() => {
@@ -143,12 +195,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       loadPreferences();
       // Always clear session name and prompts when dialog opens
       setSessionName('');
-      setClaudeConfig(prev => ({ ...prev, prompt: '', attachedImages: [], attachedTexts: [] }));
-      setCodexConfig(prev => ({ ...prev, prompt: '', attachedImages: [], attachedTexts: [] }));
-      setAttachedImages([]);
-      setAttachedTexts([]);
+      syncPromptAcrossConfigs('', 'none');
+      syncImageAttachments(() => []);
+      syncTextAttachments(() => []);
     }
-  }, [isOpen, loadPreferences]);
+  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -457,36 +508,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   }, [addImageAttachment, addTextAttachment, processFile, generateTextId]);
 
   const removeImage = useCallback((id: string) => {
-    // Remove from active tool's config
-    if (toolType === 'claude') {
-      setClaudeConfig(prev => ({
-        ...prev,
-        attachedImages: (prev.attachedImages || []).filter(img => img.id !== id)
-      }));
-    } else if (toolType === 'codex') {
-      setCodexConfig(prev => ({
-        ...prev,
-        attachedImages: (prev.attachedImages || []).filter(img => img.id !== id)
-      }));
-    }
-    setAttachedImages(prev => prev.filter(img => img.id !== id));
-  }, [toolType]);
+    syncImageAttachments(prev => prev.filter(img => img.id !== id));
+  }, [syncImageAttachments]);
 
   const removeText = useCallback((id: string) => {
-    // Remove from active tool's config
-    if (toolType === 'claude') {
-      setClaudeConfig(prev => ({
-        ...prev,
-        attachedTexts: (prev.attachedTexts || []).filter(txt => txt.id !== id)
-      }));
-    } else if (toolType === 'codex') {
-      setCodexConfig(prev => ({
-        ...prev,
-        attachedTexts: (prev.attachedTexts || []).filter(txt => txt.id !== id)
-      }));
-    }
-    setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
-  }, [toolType]);
+    syncTextAttachments(prev => prev.filter(txt => txt.id !== id));
+  }, [syncTextAttachments]);
   
   if (!isOpen) return null;
   
@@ -921,6 +948,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       config={claudeConfig}
                       onChange={(newConfig) => {
                         setClaudeConfig(newConfig);
+                        syncPromptAcrossConfigs(newConfig.prompt ?? '', 'claude');
+                        syncImageAttachments(() => [...(newConfig.attachedImages || [])]);
+                        syncTextAttachments(() => [...(newConfig.attachedTexts || [])]);
                         // Save claude config preferences (excluding prompt and attachments)
                         const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
                         savePreferences({ claudeConfig: {
@@ -961,6 +991,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       config={codexConfig}
                       onChange={(newConfig) => {
                         setCodexConfig(newConfig);
+                        syncPromptAcrossConfigs(newConfig.prompt ?? '', 'codex');
+                        syncImageAttachments(() => [...(newConfig.attachedImages || [])]);
+                        syncTextAttachments(() => [...(newConfig.attachedTexts || [])]);
                         // Save codex config preferences (excluding prompt and attachments)
                         const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
                         savePreferences({ codexConfig: {
@@ -1036,7 +1069,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <div className="relative">
                   <FilePathAutocomplete
                     value={formData.prompt}
-                    onChange={(value) => setFormData({ ...formData, prompt: value })}
+                    onChange={(value) => syncPromptAcrossConfigs(value, 'none')}
                     projectId={projectId?.toString()}
                     placeholder="Describe your task... (use @ to reference files)"
                     className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
