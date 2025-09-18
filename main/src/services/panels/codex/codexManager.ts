@@ -315,8 +315,8 @@ export class CodexManager extends AbstractCliManager {
                 const currentState = panel.state || {};
                 const customState = currentState.customState || {};
                 
-                // Only update if we don't have one or if this is different
-                if (!customState.codexSessionId || customState.codexSessionId !== codexSessionId) {
+                // Only update if we don't have one - never overwrite existing session IDs
+                if (!customState.codexSessionId) {
                   const updatedState = {
                     ...currentState,
                     customState: { ...customState, codexSessionId }
@@ -738,8 +738,9 @@ export class CodexManager extends AbstractCliManager {
                   const customState = currentState.customState || {};
                   const existingSessionId = customState.codexSessionId;
                   
-                  if (existingSessionId && existingSessionId !== sessionId) {
-                    this.logger?.warn(`[session-id-debug] WARNING: Overwriting existing session ID ${existingSessionId} with ${sessionId}`);
+                  if (existingSessionId) {
+                    this.logger?.warn(`[session-id-debug] WARNING: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
+                    return; // Don't overwrite existing session ID
                   }
                   
                   const updatedState = { 
@@ -809,6 +810,14 @@ export class CodexManager extends AbstractCliManager {
                 if (panel) {
                   const currentState = panel.state || {};
                   const customState = currentState.customState || {};
+                  
+                  // Check if session ID already exists
+                  const existingSessionId = customState.codexSessionId;
+                  if (existingSessionId) {
+                    this.logger?.warn(`[session-id-debug] FALLBACK: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
+                    return; // Don't overwrite existing session ID
+                  }
+                  
                   const updatedState = { 
                     ...currentState, 
                     customState: { ...customState, codexSessionId: sessionId } 
