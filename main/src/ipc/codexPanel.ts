@@ -150,16 +150,13 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     }
   });
 
-  // Send input to Codex panel
+  // Send input to Codex panel - DEPRECATED in interactive mode
+  // In interactive mode, each prompt spawns a new process via start or continue
+  // Keeping this handler for backward compatibility but it should not be used
   ipcMain.handle('codexPanel:sendInput', async (_, panelId: string, input: string) => {
-    try {
-      logger?.info(`[codex-debug] IPC sendInput: Panel ${panelId}, Input: "${input}"`);
-      codexPanelManager.sendInputToPanel(panelId, input);
-      return { success: true };
-    } catch (error) {
-      logger?.error(`[codex-debug] Failed to send input to panel ${panelId}:`, error as Error);
-      throw error;
-    }
+    const error = new Error('sendInput is not supported in interactive mode. Use codexPanel:continue instead.');
+    logger?.error(`[codex-debug] sendInput called but not supported in interactive mode for panel ${panelId}`);
+    throw error;
   });
 
   // Send approval decision

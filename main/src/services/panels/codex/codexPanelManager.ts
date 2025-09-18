@@ -92,6 +92,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
 
   /**
    * Send approval decision to Codex
+   * Note: In interactive mode, approvals are handled differently than in proto mode
    */
   async sendApproval(panelId: string, callId: string, decision: 'approved' | 'denied', type: 'exec' | 'patch'): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
@@ -99,12 +100,15 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex-debug] Sending approval:\n  Panel ID: ${panelId}\n  Call ID: ${callId}\n  Decision: ${decision}\n  Type: ${type}`);
-    return this.codexManager.sendApproval(panelId, callId, decision, type);
+    this.logger?.info(`[codex] Approval handling in interactive mode - may need configuration:\n  Panel ID: ${panelId}\n  Call ID: ${callId}\n  Decision: ${decision}\n  Type: ${type}`);
+    // In interactive mode, approval may be handled through stdin or configuration
+    // For now, log a warning as this functionality may need to be adapted
+    this.logger?.warn(`[codex] Approval handling in interactive mode is not yet fully implemented`);
   }
 
   /**
    * Send interrupt signal to Codex
+   * Note: In interactive mode, interrupts are handled through the PTY process
    */
   async sendInterrupt(panelId: string): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
@@ -112,21 +116,27 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex-debug] Sending interrupt to panel ${panelId}`);
-    return this.codexManager.sendInterrupt(panelId);
+    // Check if process is running before trying to send interrupt
+    if (!this.codexManager.isPanelRunning(panelId)) {
+      this.logger?.warn(`[codex] Cannot send interrupt - no running process for panel ${panelId}`);
+      // No need to throw here as the process isn't running anyway
+      return;
+    }
+
+    this.logger?.info(`[codex] Sending interrupt signal (Ctrl+C) to panel ${panelId}`);
+    // In interactive mode, send Ctrl+C through the PTY
+    this.codexManager.sendInput(panelId, '\x03'); // Ctrl+C
   }
 
   /**
-   * Send user input to Codex (override to use Codex-specific method)
+   * Send user input to Codex - DEPRECATED in interactive mode
+   * In interactive mode, each prompt spawns a new process via startPanel or continuePanel
+   * @deprecated Use continuePanel instead for subsequent prompts
    */
   async sendInputToPanel(panelId: string, input: string): Promise<void> {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      throw new Error(`Panel ${panelId} not registered`);
-    }
-
-    this.logger?.info(`[codex-debug] Sending user input to panel ${panelId}: "${input}"`);
-    await this.codexManager.sendUserInput(panelId, input);
+    // This method is no longer used in interactive mode
+    // Each user prompt should spawn a new process using continuePanel
+    throw new Error('sendInputToPanel is not supported in interactive mode. Use continuePanel instead.');
   }
 
   /**

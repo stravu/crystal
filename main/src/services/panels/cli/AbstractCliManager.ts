@@ -159,6 +159,12 @@ export abstract class AbstractCliManager extends EventEmitter {
 
       // Get CLI executable path
       const cliCommand = await this.getCliExecutablePath();
+      
+      // Log the exact command being executed
+      const fullCommand = `${cliCommand} ${args.join(' ')}`;
+      this.logger?.info(`[${this.getCliToolName()}-command] COMMAND: ${fullCommand}`);
+      this.logger?.info(`[${this.getCliToolName()}-command] Working directory: ${worktreePath}`);
+      this.logger?.info(`[${this.getCliToolName()}-command] Environment vars: ${Object.keys(cliEnv).join(', ')}`);
 
       // Spawn the process
       const ptyProcess = await this.spawnPtyProcess(cliCommand, args, worktreePath, env);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Terminal, Clock, Hash, Cpu, Network, AlertCircle, CheckCircle } from 'lucide-react';
+import { RefreshCw, Terminal, Clock, Hash, Cpu, Network, AlertCircle, CheckCircle, FileJson, Command } from 'lucide-react';
 
 interface CodexDebugStateViewProps {
   sessionId: string;
@@ -16,23 +16,16 @@ interface CodexDebugState {
   panelId: string;
   worktreePath?: string;
   
-  // Timing information
-  startTime?: string;
-  lastMessageTime?: string;
-  timeSinceLastMessage?: number;
+  // Interactive mode information (new)
+  codexSessionId?: string;  // Codex's internal session ID for resume
+  executionMode: 'interactive' | 'unknown';
   
-  // Message statistics
+  // Message statistics (simplified for interactive mode)
   totalMessagesReceived: number;
-  totalMessagesSent: number;
-  messageBufferSize: number;
   
   // Process state
   processState: 'not_started' | 'initializing' | 'running' | 'stopped' | 'error';
   lastError?: string;
-  
-  // Protocol information
-  protocolHandshakeComplete: boolean;
-  pendingPrompt?: string;
   
   // Model information
   model?: string;
@@ -52,7 +45,12 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
       const state = await window.electron?.invoke('codexPanel:getDebugState', { panelId });
       
       if (state) {
-        setDebugState(state);
+        // Transform the backend state to our frontend format
+        setDebugState({
+          ...state,
+          executionMode: 'interactive', // We're always in interactive mode now
+          codexSessionId: state.codexSessionId || undefined
+        });
       } else {
         // No state returned, set default
         setDebugState({
@@ -61,9 +59,7 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
           panelId,
           processState: 'not_started',
           totalMessagesReceived: 0,
-          totalMessagesSent: 0,
-          messageBufferSize: 0,
-          protocolHandshakeComplete: false
+          executionMode: 'interactive'
         });
       }
       setLastRefreshTime(new Date());
@@ -76,9 +72,7 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
         processState: 'error',
         lastError: String(error),
         totalMessagesReceived: 0,
-        totalMessagesSent: 0,
-        messageBufferSize: 0,
-        protocolHandshakeComplete: false
+        executionMode: 'interactive'
       });
     } finally {
       setLoading(false);
@@ -90,28 +84,6 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
     loadDebugState();
   }, [sessionId, panelId]);
 
-  const formatTimeDifference = (ms?: number): string => {
-    if (ms === undefined || ms === null) return 'N/A';
-    
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ago`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s ago`;
-    } else {
-      return `${seconds}s ago`;
-    }
-  };
-
-  const formatTimestamp = (timestamp?: string): string => {
-    if (!timestamp) return 'N/A';
-    
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
-  };
 
   const getStatusIcon = (state: string) => {
     switch (state) {
@@ -197,9 +169,10 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
                   </div>
                 </div>
                 <div>
-                  <span className="text-text-secondary">Protocol Handshake:</span>
-                  <div className="text-text-primary font-medium mt-1">
-                    {debugState.protocolHandshakeComplete ? '✅ Complete' : '⏳ Pending'}
+                  <span className="text-text-secondary">Execution Mode:</span>
+                  <div className="text-text-primary font-medium mt-1 flex items-center gap-2">
+                    <Command className="w-4 h-4 text-blue-400" />
+                    Interactive (--json)
                   </div>
                 </div>
               </div>
@@ -214,20 +187,33 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-text-secondary">Crystal Session ID:</span>
-                  <div className="text-text-primary font-mono mt-1 break-all">
+                  <div className="text-text-primary font-mono mt-1 text-xs break-all">
                     {debugState.sessionId}
                   </div>
                 </div>
                 <div>
                   <span className="text-text-secondary">Panel ID:</span>
-                  <div className="text-text-primary font-mono mt-1 break-all">
+                  <div className="text-text-primary font-mono mt-1 text-xs break-all">
                     {debugState.panelId}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-text-secondary">Codex Session ID (for resume):</span>
+                  <div className="text-text-primary font-mono mt-1 text-xs break-all">
+                    {debugState.codexSessionId ? (
+                      <>
+                        {debugState.codexSessionId}
+                        <span className="text-green-400 ml-2 text-xs">✓ Can resume</span>
+                      </>
+                    ) : (
+                      <span className="text-yellow-400">Not yet captured - will be set after first response</span>
+                    )}
                   </div>
                 </div>
                 {debugState.worktreePath && (
                   <div className="col-span-2">
                     <span className="text-text-secondary">Worktree Path:</span>
-                    <div className="text-text-primary font-mono mt-1 break-all">
+                    <div className="text-text-primary font-mono mt-1 text-xs break-all">
                       {debugState.worktreePath}
                     </div>
                   </div>
@@ -235,57 +221,65 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
               </div>
             </div>
 
-            {/* Timing Information */}
+            {/* Interactive Mode Information */}
             <div className="bg-surface-secondary rounded-lg p-4">
               <h4 className="text-sm font-medium text-text-primary mb-3 flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Timing Information
+                <FileJson className="w-4 h-4" />
+                Interactive Mode Status
               </h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-text-secondary">Start Time:</span>
-                  <div className="text-text-primary mt-1">
-                    {formatTimestamp(debugState.startTime)}
+                  <span className="text-text-secondary">Command Mode:</span>
+                  <div className="text-text-primary font-medium mt-1">
+                    codex exec --json
                   </div>
                 </div>
                 <div>
-                  <span className="text-text-secondary">Last Message Time:</span>
-                  <div className="text-text-primary mt-1">
-                    {formatTimestamp(debugState.lastMessageTime)}
+                  <span className="text-text-secondary">Resume Support:</span>
+                  <div className="text-text-primary font-medium mt-1">
+                    {debugState.codexSessionId ? '✅ Available' : '⚠️ Not available (no session ID)'}
                   </div>
                 </div>
-                <div className="col-span-2">
-                  <span className="text-text-secondary">Time Since Last Message:</span>
-                  <div className="text-text-primary font-medium mt-1">
-                    {formatTimeDifference(debugState.timeSinceLastMessage)}
+                <div>
+                  <span className="text-text-secondary">Input Method:</span>
+                  <div className="text-text-primary mt-1">
+                    PTY stdin (direct)
+                  </div>
+                </div>
+                <div>
+                  <span className="text-text-secondary">Output Format:</span>
+                  <div className="text-text-primary mt-1">
+                    JSON Lines (JSONL)
                   </div>
                 </div>
               </div>
+              {debugState.codexSessionId && (
+                <div className="mt-4 p-3 bg-green-900/20 border border-green-600/30 rounded-md">
+                  <div className="text-xs text-green-400 font-medium mb-1">Resume Command:</div>
+                  <code className="text-xs text-green-300 font-mono">
+                    codex exec resume {debugState.codexSessionId} --json
+                  </code>
+                </div>
+              )}
             </div>
 
-            {/* Message Statistics */}
+            {/* Message Statistics (Simplified) */}
             <div className="bg-surface-secondary rounded-lg p-4">
               <h4 className="text-sm font-medium text-text-primary mb-3 flex items-center gap-2">
                 <Terminal className="w-4 h-4" />
-                Message Statistics
+                Communication Statistics
               </h4>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-text-secondary">Messages Received:</span>
+                  <span className="text-text-secondary">JSON Messages Received:</span>
                   <div className="text-text-primary font-semibold text-lg mt-1">
                     {debugState.totalMessagesReceived}
                   </div>
                 </div>
                 <div>
-                  <span className="text-text-secondary">Messages Sent:</span>
-                  <div className="text-text-primary font-semibold text-lg mt-1">
-                    {debugState.totalMessagesSent}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-text-secondary">Buffer Size:</span>
-                  <div className="text-text-primary font-semibold text-lg mt-1">
-                    {debugState.messageBufferSize} bytes
+                  <span className="text-text-secondary">Communication Type:</span>
+                  <div className="text-text-primary font-medium mt-1">
+                    Bidirectional PTY
                   </div>
                 </div>
               </div>
@@ -299,7 +293,7 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
                   <div>
                     <span className="text-text-secondary">Model:</span>
                     <div className="text-text-primary font-medium mt-1">
-                      {debugState.model || 'Default'}
+                      {debugState.model || 'Auto (GPT-5)'}
                     </div>
                   </div>
                   <div>
@@ -325,15 +319,16 @@ export const CodexDebugStateView: React.FC<CodexDebugStateViewProps> = ({ sessio
               </div>
             )}
 
-            {/* Pending Prompt */}
-            {debugState.pendingPrompt && (
-              <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-yellow-400 mb-2">Pending Prompt</h4>
-                <div className="text-sm text-yellow-300 font-mono whitespace-pre-wrap">
-                  {debugState.pendingPrompt}
-                </div>
-              </div>
-            )}
+            {/* Tips for Interactive Mode */}
+            <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-blue-400 mb-2">Interactive Mode Tips</h4>
+              <ul className="text-sm text-blue-300 space-y-1">
+                <li>• Input is sent directly through PTY stdin</li>
+                <li>• Use Ctrl+C (sent as \x03) to interrupt execution</li>
+                <li>• Session IDs are captured from JSON output for resume capability</li>
+                <li>• All output is streamed as JSON Lines (one JSON object per line)</li>
+              </ul>
+            </div>
           </div>
         )}
       </div>

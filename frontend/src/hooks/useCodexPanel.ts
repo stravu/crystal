@@ -19,6 +19,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const initializingRef = useRef(false);
+  const conversationHistoryRef = useRef<any[]>([]);
 
   // Get session from panel
   const panel = usePanelStore(state => {
@@ -59,6 +60,16 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       if (data.panelId === panelId) {
         // Handle output events - could update local state if needed
         console.log(`[codex-debug] Output event received for panel ${panelId}:`, JSON.stringify(data).substring(0, 500));
+        
+        // Track conversation messages for history
+        if (data.type === 'json' && data.data) {
+          // Store relevant messages in conversation history
+          conversationHistoryRef.current.push({
+            type: data.data.type || 'unknown',
+            content: data.data,
+            timestamp: data.timestamp || new Date().toISOString()
+          });
+        }
         
         // Check if this is a task_complete message to reset processing state
         if (data.type === 'json' && data.data?.msg?.type === 'task_complete') {
@@ -206,6 +217,13 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       timestamp: new Date().toISOString()
     };
     
+    // Add user message to conversation history
+    conversationHistoryRef.current.push({
+      type: 'user_input',
+      content: finalMessage,
+      timestamp: userOutputEvent.timestamp
+    });
+    
     // Emit the event directly to the output view
     window.dispatchEvent(new CustomEvent('codexPanel:output', { detail: userOutputEvent }));
     console.log(`[codex-debug] Dispatched user input to output view`);
@@ -232,9 +250,24 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
         setIsInitialized(true);
         console.log(`[codex-debug] Codex started for panel ${panelId}`);
       } else {
-        // Send input to existing Codex process
-        console.log(`[codex-debug] Sending input to existing Codex process for panel ${panelId}`);
-        await window.electron?.invoke('codexPanel:sendInput', panelId, finalMessage);
+        // In interactive mode, each new prompt requires spawning a new process with 'continue'
+        console.log(`[codex-debug] Continuing Codex session for panel ${panelId} with new prompt`);
+        
+        // Get conversation history for context
+        const conversationHistory = conversationHistoryRef.current || [];
+        console.log(`[codex-debug] Using ${conversationHistory.length} conversation history items`);
+        
+        await window.electron?.invoke('codexPanel:continue', 
+          panelId,
+          activeSession.worktreePath,
+          finalMessage,
+          conversationHistory,
+          {
+            model: options?.model || DEFAULT_CODEX_MODEL,
+            modelProvider: options?.modelProvider || 'openai'
+          }
+        );
+        console.log(`[codex-debug] Codex continue invoked for panel ${panelId}`);
       }
     } catch (error) {
       console.error(`[codex-debug] Failed to send message for panel ${panelId}:`, error);
