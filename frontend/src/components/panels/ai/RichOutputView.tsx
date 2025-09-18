@@ -567,6 +567,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       const approvalPolicy = sessionInfo.approvalPolicy || sessionInfo.approval_policy;
       const sandboxMode = sessionInfo.sandboxMode || sessionInfo.sandbox_mode;
       const permissionMode = sessionInfo.permissionMode || sessionInfo.permission_mode;
+      const rawResumeSessionId = sessionInfo.resumeSessionId ?? sessionInfo.resume_session_id;
+      const resumeSessionId = typeof rawResumeSessionId === 'string' && rawResumeSessionId.trim().length > 0
+        ? rawResumeSessionId
+        : null;
 
       return (
         <div
@@ -582,8 +586,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               <Settings2 className="w-5 h-5" />
             </div>
             <div className="flex-1 space-y-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-text-primary">Codex Session Ready</span>
+                <span className="text-[11px] font-mono text-text-secondary bg-surface-secondary/70 border border-border-secondary px-2 py-0.5 rounded">
+                  Resume ID: {resumeSessionId ?? 'none'}
+                </span>
                 <span className="text-sm text-text-tertiary">
                   {formatDistanceToNow(parseTimestamp(message.timestamp))}
                 </span>
@@ -654,6 +661,14 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                     <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Permission Mode</span>
                     <div className="text-text-secondary mt-1 capitalize">
                       {permissionMode}
+                    </div>
+                  </div>
+                )}
+                {resumeSessionId && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Resume Session ID</span>
+                    <div className="text-text-secondary mt-1 font-mono truncate" title={resumeSessionId}>
+                      {resumeSessionId}
                     </div>
                   </div>
                 )}

@@ -216,6 +216,74 @@ export class CodexManager extends AbstractCliManager {
     return args;
   }
 
+  private emitSessionInfoMessage(params: {
+    panelId: string;
+    sessionId: string;
+    worktreePath: string;
+    prompt: string;
+    command: string;
+    model?: string;
+    modelProvider?: string;
+    approvalPolicy?: string;
+    sandboxMode?: string;
+    permissionMode?: string;
+    resumeSessionId?: string;
+    isResume?: boolean;
+  }): void {
+    const {
+      panelId,
+      sessionId,
+      worktreePath,
+      prompt,
+      command,
+      model,
+      modelProvider,
+      approvalPolicy,
+      sandboxMode,
+      permissionMode,
+      resumeSessionId,
+      isResume
+    } = params;
+
+    const sessionInfoMessage: Record<string, any> = {
+      type: 'session_info',
+      initial_prompt: prompt,
+      codex_command: command,
+      worktree_path: worktreePath,
+      model: model || DEFAULT_CODEX_MODEL,
+      model_provider: modelProvider || 'openai',
+      timestamp: new Date().toISOString()
+    };
+
+    if (approvalPolicy) {
+      sessionInfoMessage.approval_policy = approvalPolicy;
+    }
+
+    if (sandboxMode) {
+      sessionInfoMessage.sandbox_mode = sandboxMode;
+    }
+
+    if (permissionMode) {
+      sessionInfoMessage.permission_mode = permissionMode;
+    }
+
+    if (resumeSessionId) {
+      sessionInfoMessage.resume_session_id = resumeSessionId;
+    }
+
+    if (typeof isResume === 'boolean') {
+      sessionInfoMessage.is_resume = isResume;
+    }
+
+    this.emit('output', {
+      panelId,
+      sessionId,
+      type: 'json',
+      data: sessionInfoMessage,
+      timestamp: new Date()
+    });
+  }
+
   protected async getCliExecutablePath(): Promise<string> {
     // Check for custom path in config
     const config = this.configManager?.getConfig() as any;
@@ -561,22 +629,14 @@ export class CodexManager extends AbstractCliManager {
     this.messageCount.set(panelId, 0);
     
     // Emit initial session info message (similar to Claude)
-    const sessionInfoMessage = {
-      type: 'session_info',
-      initial_prompt: options.prompt,
-      codex_command: `cd ${worktreePath} && codex exec --json ${prompt}`,
-      worktree_path: options.worktreePath,
-      model: options.model || DEFAULT_CODEX_MODEL,
-      model_provider: options.modelProvider || 'openai',
-      timestamp: new Date().toISOString()
-    };
-
-    this.emit('output', {
+    this.emitSessionInfoMessage({
       panelId,
       sessionId,
-      type: 'json',
-      data: sessionInfoMessage,
-      timestamp: new Date()
+      worktreePath,
+      prompt: options.prompt,
+      command: `cd ${worktreePath} && codex exec --json ${prompt}`,
+      model: options.model,
+      modelProvider: options.modelProvider
     });
     
     await this.spawnCliProcess(options);
@@ -927,7 +987,20 @@ export class CodexManager extends AbstractCliManager {
         isResume: true,
         resumeSessionId: codexSessionId
       };
-      
+
+      const promptSuffix = prompt && prompt.trim() ? ` ${prompt}` : '';
+      const resumeCommand = `cd ${worktreePath} && codex exec --json resume ${codexSessionId}${promptSuffix}`;
+
+      this.emitSessionInfoMessage({
+        panelId,
+        sessionId,
+        worktreePath,
+        prompt,
+        command: resumeCommand,
+        resumeSessionId: codexSessionId,
+        isResume: true
+      });
+
       await this.spawnCliProcess(options);
     } else {
       // No session ID to resume from, start a new session

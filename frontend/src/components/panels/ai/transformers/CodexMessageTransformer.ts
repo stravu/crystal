@@ -125,6 +125,8 @@ export class CodexMessageTransformer implements MessageTransformer {
         approvalPolicy: message.approval_policy ?? message.approval,
         sandboxMode: message.sandbox_mode ?? message.sandbox,
         permissionMode: message.permission_mode,
+        resumeSessionId: message.resume_session_id ?? message.resumeSessionId,
+        isResume: message.is_resume ?? message.isResume,
         timestamp: this.normalizeTimestamp(timestamp)
       };
 
