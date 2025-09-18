@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Settings } from 'lucide-react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { AIViewMode, RichOutputSettings } from '../ai/AbstractAIPanel';
-import { RichOutputView } from '../ai/RichOutputView';
+import { RichOutputWithSidebar } from '../claude/RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
 import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransformer';
 import { CodexStatsView } from './CodexStatsView';
@@ -168,15 +168,12 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
       <div className="flex-1 relative min-h-0 overflow-hidden">
         {viewMode === 'richOutput' && (
           <div className="h-full block w-full">
-            <RichOutputView 
+            <RichOutputWithSidebar
               panelId={panel.id}
               sessionStatus={activeSession.status}
               settings={richOutputSettings}
               onSettingsChange={handleRichOutputSettingsChange}
-              showSettings={showRichOutputSettings}
-              messageTransformer={messageTransformer}
-              outputEventName="codexPanel:output"
-              getOutputsHandler="codexPanel:getOutputs"
+              transformer={messageTransformer}
             />
           </div>
         )}

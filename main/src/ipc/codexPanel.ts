@@ -55,6 +55,10 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     try {
       logger?.info(`[codex-debug] IPC start:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Approval: ${options?.approvalPolicy || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch || false}`);
       
+      // Save the user prompt as a conversation message with panel_id
+      // This triggers panel-prompt-added event for the prompts sidebar
+      sessionManager.addPanelConversationMessage(panelId, 'user', prompt);
+      
       await codexPanelManager.startPanel(
         panelId,
         worktreePath,
@@ -124,6 +128,10 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
   }) => {
     try {
       logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}`);
+      
+      // Save the new user prompt as a conversation message
+      // This triggers panel-prompt-added event for the prompts sidebar
+      sessionManager.addPanelConversationMessage(panelId, 'user', prompt);
       
       // Get the panel state BEFORE calling continuePanel to preserve codexSessionId
       const panelBefore = panelManager.getPanel(panelId);

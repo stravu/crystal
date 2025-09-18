@@ -680,6 +680,24 @@ export class SessionManager extends EventEmitter {
       }
     }
     
+    // Handle Codex session completion message to stop prompt timing
+    if (output.type === 'json' && output.data.type === 'session' && output.data.data?.status === 'completed') {
+      console.log('[SessionManager] Detected Codex session completion for panel:', panelId);
+      // Add a completion message to trigger panel-response-added event which stops the timer
+      const completionMessage = output.data.data.message || 'Session completed';
+      this.addPanelConversationMessage(panelId, 'assistant', completionMessage);
+    }
+    
+    // Handle Codex agent messages (similar to Claude's assistant messages)
+    if (output.type === 'json' && (output.data.type === 'agent_message' || output.data.type === 'agent_message_delta')) {
+      const agentText = output.data.message || output.data.delta || '';
+      if (agentText && output.data.type === 'agent_message') {
+        console.log('[SessionManager] Adding Codex agent message to panel:', panelId, 'text length:', agentText.length);
+        // Only add complete messages, not deltas
+        this.addPanelConversationMessage(panelId, 'assistant', agentText);
+      }
+    }
+    
     // Handle user conversation message extraction for Claude panels (same logic as sessions)
     if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
       // Extract text content from user messages
