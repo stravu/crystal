@@ -34,9 +34,19 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
 }) => {
   // Initialize model
   const getInitialModel = (): OpenAICodexModel => {
+    // First, check if the panel has stored codexConfig with model
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.model) {
+      const storedModel = customState.codexConfig.model;
+      if (storedModel in CODEX_MODELS) {
+        return storedModel as OpenAICodexModel;
+      }
+    }
+    // Then check if initialModel prop is provided
     if (initialModel && initialModel in CODEX_MODELS) {
       return initialModel as OpenAICodexModel;
     }
+    // Otherwise fall back to localStorage
     const saved = localStorage.getItem(LAST_CODEX_MODEL_KEY);
     if (saved && saved in CODEX_MODELS) {
       return saved as OpenAICodexModel;
@@ -45,8 +55,25 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   };
 
   const [selectedModel, setSelectedModel] = useState<OpenAICodexModel>(getInitialModel());
-  const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>('workspace-write');
-  const [webSearch, setWebSearch] = useState(false);
+  const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>(() => {
+    // Check if the panel has stored codexConfig with sandboxMode
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.sandboxMode) {
+      const storedMode = customState.codexConfig.sandboxMode;
+      if (storedMode === 'read-only' || storedMode === 'workspace-write' || storedMode === 'danger-full-access') {
+        return storedMode;
+      }
+    }
+    return 'workspace-write';
+  });
+  const [webSearch, setWebSearch] = useState(() => {
+    // Check if the panel has stored codexConfig with webSearch
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.webSearch !== undefined) {
+      return customState.codexConfig.webSearch;
+    }
+    return false;
+  });
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
     // First, check if the panel has stored codexConfig with thinkingLevel
     const customState = panel?.state?.customState as any;
@@ -104,6 +131,7 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   // Save model selection to localStorage
   useEffect(() => {
     localStorage.setItem(LAST_CODEX_MODEL_KEY, selectedModel);
+    // Note: The model will be saved to panel state when sending a message
   }, [selectedModel]);
 
   // Save thinking level to localStorage
@@ -111,14 +139,37 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
     localStorage.setItem(LAST_CODEX_THINKING_LEVEL_KEY, thinkingLevel);
   }, [thinkingLevel]);
   
-  // Update thinking level when panel changes (e.g., when switching sessions)
+  // Update model and thinking level when panel changes (e.g., when switching sessions)
   useEffect(() => {
     const customState = panel?.state?.customState as any;
+    
+    // Update model
+    if (customState?.codexConfig?.model) {
+      const storedModel = customState.codexConfig.model;
+      if (storedModel in CODEX_MODELS) {
+        setSelectedModel(storedModel as OpenAICodexModel);
+      }
+    }
+    
+    // Update thinking level
     if (customState?.codexConfig?.thinkingLevel) {
       const storedLevel = customState.codexConfig.thinkingLevel;
       if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
         setThinkingLevel(storedLevel);
       }
+    }
+    
+    // Update sandbox mode
+    if (customState?.codexConfig?.sandboxMode) {
+      const storedMode = customState.codexConfig.sandboxMode;
+      if (storedMode === 'read-only' || storedMode === 'workspace-write' || storedMode === 'danger-full-access') {
+        setSandboxMode(storedMode);
+      }
+    }
+    
+    // Update web search
+    if (customState?.codexConfig?.webSearch !== undefined) {
+      setWebSearch(customState.codexConfig.webSearch);
     }
   }, [panel?.state?.customState]);
 

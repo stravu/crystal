@@ -181,16 +181,27 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
         console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
         try {
+          // Prepare initial custom state for the panel
+          let customState: any = undefined;
+          if (panelType === 'codex') {
+            const codexConfig = (session as any).codexConfig || {};
+            customState = {
+              codexConfig: {
+                model: codexConfig.model || 'auto',
+                modelProvider: codexConfig.modelProvider || 'openai',
+                thinkingLevel: codexConfig.thinkingLevel || 'medium',
+                sandboxMode: codexConfig.sandboxMode || 'workspace-write',
+                webSearch: codexConfig.webSearch || false
+              }
+            };
+            console.log(`[Events] Creating Codex panel with customState:`, customState);
+          }
+          
           const panel = await panelManager.createPanel({
             sessionId: session.id,
             type: panelType as any,
             title: panelTitle,
-            initialState: panelType === 'codex' ? { 
-              model: session.model,
-              // Store the codexConfig in the panel metadata for retrieval by the frontend
-              // Note: This will be passed through from the session creation request
-              codexConfig: (session as any).codexConfig 
-            } : undefined
+            initialState: customState
           });
           console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
 
