@@ -7,7 +7,7 @@ import { useAIInputPanel } from '../../../hooks/useAIInputPanel';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
 import { Pill } from '../../ui/Pill';
-import { SwitchSimple as Switch } from '../../ui/SwitchSimple';
+import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 const LAST_CODEX_THINKING_LEVEL_KEY = 'codex.lastSelectedThinkingLevel';
@@ -251,6 +251,10 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
     ? "Enter your response..." 
     : "Ask Codex anything...";
 
+  // Calculate auto-commit enabled state
+  const effectiveMode = session.commitMode || (session.autoCommit === false ? 'disabled' : 'checkpoint');
+  const isAutoCommitEnabled = effectiveMode !== 'disabled';
+
   return (
     <div className="border-t-2 border-border-primary flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
       <div className="bg-surface-secondary">
@@ -431,22 +435,43 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
                 setThinkingLevel={setThinkingLevel}
               />
 
-              {/* Options Pills */}
-              <div className="flex items-center gap-2">
-                {/* Sandbox Mode */}
-                <SandboxSelector
-                  sandboxMode={sandboxMode}
-                  setSandboxMode={setSandboxMode}
-                />
+              {/* Auto-Commit Mode Pill - always visible */}
+              <CommitModePill
+                sessionId={session.id}
+                currentMode={session.commitMode}
+                currentSettings={session.commitModeSettings}
+                autoCommit={session.autoCommit}
+                projectId={session.projectId}
+                isAutoCommitEnabled={isAutoCommitEnabled}
+              />
 
-                {/* Web Search Toggle */}
-                <div title="Allow AI to search the web for up-to-date information">
-                  <Switch
-                    checked={webSearch}
-                    onCheckedChange={setWebSearch}
-                    label="Web Search"
-                    size="sm"
+              {/* Toggle Group - subtle visual grouping */}
+              <div className="flex items-center gap-2 ml-1 pl-2 border-l border-border-primary/20">
+                {/* Auto-Commit Toggle - Hidden: Now handled by CommitMode system */}
+                {/* <AutoCommitSwitch
+                  sessionId={session.id}
+                  currentMode={session.commitMode}
+                  currentSettings={session.commitModeSettings}
+                  autoCommit={session.autoCommit}
+                /> */}
+
+                {/* Options Pills */}
+                <div className="flex items-center gap-2">
+                  {/* Sandbox Mode */}
+                  <SandboxSelector
+                    sandboxMode={sandboxMode}
+                    setSandboxMode={setSandboxMode}
                   />
+
+                  {/* Web Search Toggle - Hidden for Codex as it doesn't work */}
+                  {/* <div title="Allow AI to search the web for up-to-date information">
+                    <Switch
+                      checked={webSearch}
+                      onCheckedChange={setWebSearch}
+                      label="Web Search"
+                      size="sm"
+                    />
+                  </div> */}
                 </div>
               </div>
             </div>

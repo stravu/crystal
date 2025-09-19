@@ -2,6 +2,7 @@ import React from 'react';
 import { AbstractInputPanel, AbstractInputPanelState, InputOptions } from '../ai/AbstractInputPanel';
 import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
 import type { Session } from '../../../types/session';
+import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 
@@ -111,6 +112,11 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
 
   renderOptionsPanel(): React.ReactNode {
     const { options } = this.state;
+    const { session } = this.props;
+    
+    // Calculate auto-commit enabled state
+    const effectiveMode = session.commitMode || (session.autoCommit === false ? 'disabled' : 'checkpoint');
+    const isAutoCommitEnabled = effectiveMode !== 'disabled';
     
     return (
       <div className="flex flex-wrap gap-4 text-xs">
@@ -147,7 +153,30 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Commit Mode Controls */}
+        <div className="flex items-center gap-3">
+          {/* Auto-Commit Toggle - Hidden: Now handled by CommitMode system */}
+          {/* <label className="text-text-secondary">Auto-Commit:</label>
+          <div className="flex items-center gap-2">
+            <AutoCommitSwitch
+              sessionId={session.id}
+              currentMode={session.commitMode}
+              currentSettings={session.commitModeSettings}
+              autoCommit={session.autoCommit}
+            />
+            <CommitModePill */}
+          <CommitModePill
+            sessionId={session.id}
+            currentMode={session.commitMode}
+            currentSettings={session.commitModeSettings}
+            autoCommit={session.autoCommit}
+            projectId={session.projectId}
+            isAutoCommitEnabled={isAutoCommitEnabled}
+          />
+        </div>
+
+        {/* Web Search toggle hidden for Codex as it doesn't work */}
+        {/* <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-text-secondary cursor-pointer">
             <input
               type="checkbox"
@@ -159,7 +188,7 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
             />
             Web Search
           </label>
-        </div>
+        </div> */}
       </div>
     );
   }

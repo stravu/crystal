@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
 import { Card } from '../ui/Card';
-import { Checkbox } from '../ui/Input';
 import { Shield, ShieldOff, Cpu, Paperclip, X, FileText, Brain, Gauge, Zap } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { CODEX_MODELS, type OpenAICodexModel } from '../../../../shared/types/models';
@@ -280,14 +279,14 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
 
       {/* Additional Options */}
       <div className="space-y-3">
-        {/* Web Search */}
-        <Checkbox
+        {/* Web Search - Hidden for Codex as it doesn't work */}
+        {/* <Checkbox
           id="codex-websearch"
           label="Enable web search"
           checked={config.webSearch || false}
           onChange={(e) => onChange({ ...config, webSearch: e.target.checked })}
           disabled={disabled}
-        />
+        /> */}
         
         {/* Approval Policy */}
         <div>

@@ -218,6 +218,25 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
 };
 
 // Auto-Commit Switch Component
+// 
+// NOTE: This component is currently HIDDEN from the UI (commented out in input panels).
+// 
+// REASON: The autoCommit boolean field is a legacy system that has been superseded 
+// by the more sophisticated CommitMode system (structured/checkpoint/disabled).
+// 
+// BACKWARDS COMPATIBILITY: The legacy autoCommit field still works through the 
+// executionTracker.ts conversion logic, but this UI component actually calls the 
+// modern commit-mode system rather than updating the legacy autoCommit field.
+// 
+// CURRENT STATE: 
+// - UI shows AutoCommitSwitch (when enabled) -> calls commit-mode:update-session-settings
+// - Legacy autoCommit field may become stale 
+// - executionTracker.ts converts legacy autoCommit to commitMode for backwards compatibility
+// 
+// DECISION: Hide the toggle to avoid confusion. Users should use the CommitModePill
+// to select between structured/checkpoint/disabled modes instead of a simple on/off toggle.
+//
+// FUTURE: The autoCommit database column will be dropped as part of the database cleanup.
 export const AutoCommitSwitch: React.FC<AutoCommitSwitchProps> = ({
   sessionId,
   currentMode,

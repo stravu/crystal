@@ -4,10 +4,12 @@ export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
   private toolCalls = new Map<string, ToolCall>();
   private toolCallIdCounter = 0;
+  private originalPrompt: string | null = null; // Track original prompt from session info
 
   private resetToolCallState() {
     this.toolCalls.clear();
     this.toolCallIdCounter = 0;
+    this.originalPrompt = null; // Reset original prompt tracking
   }
 
   private createToolCallId(): string {
@@ -82,6 +84,34 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     return timestamp;
+  }
+
+  /**
+   * Check if a prompt has been enhanced with structured commit instructions
+   */
+  private isEnhancedPrompt(content: string): boolean {
+    if (!content || !this.originalPrompt) {
+      return false;
+    }
+    
+    // If the content starts with the original prompt and has additional content, it's likely enhanced
+    if (content.startsWith(this.originalPrompt) && content.length > this.originalPrompt.length) {
+      const additionalContent = content.substring(this.originalPrompt.length).trim();
+      // Check for specific structured commit template indicators from DEFAULT_STRUCTURED_PROMPT_TEMPLATE
+      return additionalContent.includes('After completing the requested changes') ||
+             additionalContent.includes('please create a git commit with an appropriate message') ||
+             additionalContent.includes('Conventional Commits format') ||
+             additionalContent.includes('feat:, fix:, docs:, style:, refactor:, test:, chore:') ||
+             additionalContent.includes('Only commit files that are directly related to this task') ||
+             // Also check for generic structured commit indicators
+             additionalContent.includes('Your commit message should') ||
+             additionalContent.includes('structured commit format') ||
+             additionalContent.includes('commit message template') ||
+             additionalContent.includes('COMMIT MESSAGE STRUCTURE') ||
+             additionalContent.includes('**Structured Commit Guidelines**');
+    }
+    
+    return false;
   }
 
   transform(rawOutputs: any[]): UnifiedMessage[] {
@@ -167,13 +197,18 @@ export class CodexMessageTransformer implements MessageTransformer {
         const textItems = op.items.filter((item: any) => item.type === 'text');
         const content = textItems.map((item: any) => item.text).join('\n');
         
+        // Use original prompt if available (for structured commit mode), otherwise use content as-is
+        const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
+          ? this.originalPrompt 
+          : (content || JSON.stringify(op));
+        
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'user',
           timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
-            content: content || JSON.stringify(op)
+            content: displayContent
           }],
           metadata: {
             agent: 'codex'
@@ -184,6 +219,11 @@ export class CodexMessageTransformer implements MessageTransformer {
     
     // Handle session info blocks that provide initial context
     if (message.type === 'session_info') {
+      // Capture the original prompt for later use in user input messages
+      if (message.original_prompt || message.initial_prompt) {
+        this.originalPrompt = message.original_prompt || message.initial_prompt;
+      }
+      
       const sessionInfo = {
         type: 'session_info',
         initialPrompt: message.initial_prompt,
@@ -247,13 +287,20 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // User input
       if (msg.type === 'user_input') {
+        const content = msg.content || msg.text || JSON.stringify(msg);
+        
+        // Use original prompt if available (for structured commit mode), otherwise use content as-is
+        const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
+          ? this.originalPrompt 
+          : content;
+        
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'user',
           timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
-            content: msg.content || msg.text || JSON.stringify(msg)
+            content: displayContent
           }],
           metadata: {
             agent: 'codex'
@@ -599,13 +646,20 @@ export class CodexMessageTransformer implements MessageTransformer {
     
     // Handle frontend-generated messages or direct protocol messages
     if (message.type === 'user_input' || message.type === 'user') {
+      const content = message.content || message.text || JSON.stringify(message);
+      
+      // Use original prompt if available (for structured commit mode), otherwise use content as-is
+      const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
+        ? this.originalPrompt 
+        : content;
+      
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'user',
         timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
-          content: message.content || message.text || JSON.stringify(message)
+          content: displayContent
         }],
         metadata: {
           agent: 'codex'
@@ -692,13 +746,18 @@ export class CodexMessageTransformer implements MessageTransformer {
 
     // Handle plain prompt objects to show as user messages
     if (typeof message.prompt === 'string' && message.prompt.trim()) {
+      // Use original prompt if available (for structured commit mode), otherwise use prompt as-is
+      const displayContent = this.originalPrompt && this.isEnhancedPrompt(message.prompt) 
+        ? this.originalPrompt 
+        : message.prompt;
+      
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'user',
         timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
-          content: message.prompt
+          content: displayContent
         }],
         metadata: {
           agent: 'codex',

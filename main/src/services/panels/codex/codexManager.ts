@@ -10,6 +10,7 @@ import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/
 import type { CodexPanelState } from '../../../../../shared/types/panels';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { panelManager } from '../../panelManager';
+import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -47,6 +48,7 @@ export class CodexManager extends AbstractCliManager {
   private sessionIdSearchAttempts: number = 0;
   private hasTriggeredSessionIdSearch: Set<string> = new Set();
   private messageCount: Map<string, number> = new Map();
+  private originalPrompts: Map<string, string> = new Map(); // Track original prompts per panel
   
   constructor(
     sessionManager: any,
@@ -169,6 +171,15 @@ export class CodexManager extends AbstractCliManager {
     this.logger?.info(`[codex-command-build]   webSearch: ${webSearch || false}`);
     this.logger?.info(`[codex-command-build]   thinkingLevel: ${thinkingLevel || 'not specified'}`);
     this.logger?.info(`[codex-command-build]   prompt: "${prompt || ''}"`);
+    
+    // Store the original prompt for display purposes
+    this.originalPrompts.set(options.panelId, prompt);
+    
+    // Get session data for structured commit enhancement
+    const dbSession = this.sessionManager.getDbSession(options.sessionId);
+    
+    // Enhance prompt for structured commit mode if needed
+    const finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
 
     const args: string[] = ['exec', '--json'];
 
@@ -201,8 +212,8 @@ export class CodexManager extends AbstractCliManager {
       }
     }
 
-    if (prompt && prompt.trim()) {
-      args.push(prompt);
+    if (finalPrompt && finalPrompt.trim()) {
+      args.push(finalPrompt);
     }
 
     const commandSummary = `codex ${args.join(' ')}`;
@@ -246,6 +257,7 @@ export class CodexManager extends AbstractCliManager {
     const sessionInfoMessage: Record<string, any> = {
       type: 'session_info',
       initial_prompt: prompt,
+      original_prompt: prompt, // Store original prompt separately for transformer use
       codex_command: command,
       worktree_path: worktreePath,
       model: model || DEFAULT_CODEX_MODEL,
@@ -1066,6 +1078,7 @@ export class CodexManager extends AbstractCliManager {
     // Clean up tracking data
     this.hasTriggeredSessionIdSearch.delete(panelId);
     this.messageCount.delete(panelId);
+    this.originalPrompts.delete(panelId);
     
     await this.killProcess(panelId);
   }
@@ -1142,6 +1155,42 @@ export class CodexManager extends AbstractCliManager {
     
     // Default fallback
     return 'x86_64-unknown-linux-musl';
+  }
+
+  /**
+   * Enhance prompt for structured commit mode (similar to Claude implementation)
+   */
+  private enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
+    // Check if session has structured commit mode
+    if (dbSession?.commit_mode === 'structured') {
+      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
+
+      let commitModeSettings;
+      if (dbSession.commit_mode_settings) {
+        try {
+          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
+        } catch (e) {
+          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
+        }
+      }
+
+      // Get structured prompt template from settings or use default
+      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
+
+      // Add structured commit instructions to the prompt
+      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
+      this.logger?.verbose(`Added structured commit instructions to prompt`);
+      return enhancedPrompt;
+    }
+
+    return prompt;
+  }
+
+  /**
+   * Get the original prompt for a panel (before structured commit enhancement)
+   */
+  getOriginalPrompt(panelId: string): string | undefined {
+    return this.originalPrompts.get(panelId);
   }
 
   /**

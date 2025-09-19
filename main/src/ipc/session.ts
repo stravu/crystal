@@ -440,9 +440,52 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
       // Handle based on tool type
       if (sessionToolType === 'codex') {
-        // For Codex sessions, sendInput is not supported
-        console.log(`[IPC] Session ${sessionId} is a Codex session - sendInput not supported`);
-        return { success: false, error: 'Direct input not supported for Codex sessions. Use the Codex panel interface.' };
+        // For Codex sessions, route through the Codex panel manager
+        console.log(`[IPC] Session ${sessionId} is a Codex session - routing to Codex panel`);
+        
+        // Get Codex panels for this session after potential creation
+        const postCreateCodexPanels = panelManager.getPanelsForSession(sessionId).filter(p => p.type === 'codex');
+        
+        if (postCreateCodexPanels.length === 0) {
+          console.error(`[IPC] No Codex panels found for session ${sessionId} after creation attempt`);
+          return { success: false, error: 'No Codex panels found for session' };
+        }
+        
+        // Use the first Codex panel
+        const codexPanel = postCreateCodexPanels[0];
+        console.log(`[IPC] Using Codex panel ${codexPanel.id} for input to session ${sessionId}`);
+        
+        // Get Codex manager instance
+        const { cliManagerFactory } = require('../services/cliManagerFactory');
+        const codexManager = cliManagerFactory.getCodexManager();
+        
+        if (!codexManager) {
+          console.error(`[IPC] Codex manager not available`);
+          return { success: false, error: 'Codex manager not available' };
+        }
+        
+        // Check if Codex is running for this panel
+        const isCodexRunning = codexManager.isPanelRunning(codexPanel.id);
+        
+        if (!isCodexRunning) {
+          console.log(`[IPC] Codex not running for panel ${codexPanel.id}, starting it now...`);
+          
+          // Start Codex via the panel with the input as the initial prompt (finalInput already includes structured commit enhancement)
+          await codexManager.startPanel(codexPanel.id, sessionId, session.worktreePath, finalInput);
+          
+          // Update session status to running
+          await sessionManager.updateSession(sessionId, { status: 'running' });
+        } else {
+          console.log(`[IPC] Codex already running for panel ${codexPanel.id}, continuing conversation...`);
+          
+          // Continue the Codex conversation with the new input (finalInput already includes structured commit enhancement)
+          await codexManager.continuePanel(codexPanel.id, sessionId, session.worktreePath, finalInput, []);
+          
+          // Update session status to running
+          await sessionManager.updateSession(sessionId, { status: 'running' });
+        }
+        
+        return { success: true };
       }
       
       if (sessionToolType === 'none') {

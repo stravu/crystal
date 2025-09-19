@@ -4,7 +4,7 @@ import { Session, GitCommands } from '../../../types/session';
 import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square, FileText } from 'lucide-react';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { API } from '../../../utils/api';
-import { CommitModePill, AutoCommitSwitch } from '../../CommitModeToggle';
+import { CommitModePill } from '../../CommitModeToggle';
 import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
 import { Pill } from '../../ui/Pill';
 import { SwitchSimple as Switch } from '../../ui/SwitchSimple';
@@ -595,13 +595,13 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
                 {/* Toggle Group - subtle visual grouping */}
                 <div className="flex items-center gap-2 ml-1 pl-2 border-l border-border-primary/20">
-                  {/* Auto-Commit Toggle */}
-                  <AutoCommitSwitch
+                  {/* Auto-Commit Toggle - Hidden: Now handled by CommitMode system */}
+                  {/* <AutoCommitSwitch
                     sessionId={activeSession.id}
                     currentMode={activeSession.commitMode}
                     currentSettings={activeSession.commitModeSettings}
                     autoCommit={activeSession.autoCommit}
-                  />
+                  /> */}
                   
                   {/* Extended Thinking Toggle */}
                   <Switch
