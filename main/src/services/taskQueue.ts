@@ -160,6 +160,7 @@ export class TaskQueue {
         }
 
         let worktreeName = worktreeTemplate;
+        let sessionName: string;
         
         // Generate a name if template is empty - but skip if we're in multi-session creation with index
         if (!worktreeName || worktreeName.trim() === '') {
@@ -167,18 +168,38 @@ export class TaskQueue {
           if (index !== undefined && index >= 0) {
             console.log(`[TaskQueue] Multi-session creation detected (index ${index}), using fallback name`);
             worktreeName = 'session';
+            sessionName = 'Session';
           } else {
             console.log(`[TaskQueue] No worktree template provided, generating name from prompt...`);
-            // Use the AI-powered name generator or smart fallback
-            worktreeName = await this.options.worktreeNameGenerator.generateWorktreeName(prompt);
-            console.log(`[TaskQueue] Generated base name: ${worktreeName}`);
+            // Use the AI-powered name generator to generate a session name with spaces
+            sessionName = await this.options.worktreeNameGenerator.generateSessionName(prompt);
+            // Convert the session name to a worktree name (spaces to hyphens)
+            worktreeName = sessionName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            console.log(`[TaskQueue] Generated session name: ${sessionName}`);
+            console.log(`[TaskQueue] Generated worktree name: ${worktreeName}`);
+          }
+        } else {
+          // If we have a worktree template, use it as the session name as-is
+          sessionName = worktreeName;
+          
+          // For the worktree name, replace spaces with hyphens and make it lowercase
+          // but keep hyphens that are already there
+          if (worktreeName.includes(' ')) {
+            worktreeName = worktreeName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          } else {
+            // Already a valid worktree name format (no spaces), just clean it up
+            worktreeName = worktreeName.toLowerCase().replace(/[^a-z0-9-]/g, '');
           }
         }
         
-        // Ensure uniqueness among all sessions (including archived)
-        worktreeName = await this.ensureUniqueSessionName(worktreeName, index);
+        // Ensure uniqueness for both names
+        const { sessionName: uniqueSessionName, worktreeName: uniqueWorktreeName } = 
+          await this.ensureUniqueNames(sessionName, worktreeName, targetProject, index);
+        sessionName = uniqueSessionName;
+        worktreeName = uniqueWorktreeName;
         
         console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
+        console.log(`[TaskQueue] Session display name: ${sessionName}`);
         console.log(`[TaskQueue] Target project:`, JSON.stringify({
           id: targetProject.id,
           name: targetProject.name,
@@ -189,8 +210,6 @@ export class TaskQueue {
         const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
         console.log(`[TaskQueue] Base commit: ${baseCommit}, Base branch: ${actualBaseBranch}`);
-        
-        const sessionName = worktreeName;
         console.log(`[TaskQueue] Creating session in database`);
         
         const session = await sessionManager.createSession(
@@ -582,6 +601,75 @@ export class TaskQueue {
     }
     
     return uniqueName;
+  }
+
+  private async ensureUniqueNames(baseSessionName: string, baseWorktreeName: string, project: any, index?: number): Promise<{ sessionName: string; worktreeName: string }> {
+    const { sessionManager, worktreeManager } = this.options;
+    const db = (sessionManager as any).db;
+    
+    let candidateSessionName = baseSessionName;
+    let candidateWorktreeName = baseWorktreeName;
+    
+    // Add index suffix if provided (for multiple sessions)
+    if (index !== undefined) {
+      candidateSessionName = `${baseSessionName} ${index + 1}`;
+      candidateWorktreeName = `${baseWorktreeName}-${index + 1}`;
+    }
+    
+    // Check for existing sessions with these names (including archived)
+    let counter = 1;
+    let uniqueSessionName = candidateSessionName;
+    let uniqueWorktreeName = candidateWorktreeName;
+    
+    while (true) {
+      // Check session name and worktree name separately
+      // This is important because different session names could map to the same worktree name
+      // e.g., "Fix Auth Bug" and "Fix-Auth-Bug" both become "fix-auth-bug"
+      const sessionNameExists = db.db.prepare(`
+        SELECT id FROM sessions 
+        WHERE name = ?
+        LIMIT 1
+      `).get(uniqueSessionName);
+      
+      const worktreeNameExists = db.db.prepare(`
+        SELECT id FROM sessions 
+        WHERE worktree_name = ?
+        LIMIT 1
+      `).get(uniqueWorktreeName);
+      
+      // Check if worktree directory exists on filesystem
+      // This handles cases where a worktree was created outside of Crystal
+      let worktreePathExists = false;
+      try {
+        if (project) {
+          const path = require('path');
+          const fs = require('fs');
+          const worktreeFolder = project.worktree_folder || 'worktrees';
+          const worktreePath = path.join(project.path, worktreeFolder, uniqueWorktreeName);
+          worktreePathExists = fs.existsSync(worktreePath);
+        }
+      } catch (e) {
+        // Ignore filesystem check errors
+        console.log('[TaskQueue] Could not check filesystem for worktree:', e);
+      }
+      
+      // All must be unique (session name, worktree name in DB, and no filesystem conflict)
+      if (!sessionNameExists && !worktreeNameExists && !worktreePathExists) {
+        break;
+      }
+      
+      // If any is taken, increment both to keep them in sync
+      if (index !== undefined) {
+        uniqueSessionName = `${baseSessionName} ${index + 1} ${counter}`;
+        uniqueWorktreeName = `${baseWorktreeName}-${index + 1}-${counter}`;
+      } else {
+        uniqueSessionName = `${baseSessionName} ${counter}`;
+        uniqueWorktreeName = `${baseWorktreeName}-${counter}`;
+      }
+      counter++;
+    }
+    
+    return { sessionName: uniqueSessionName, worktreeName: uniqueWorktreeName };
   }
 
   async close() {

@@ -521,12 +521,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const validateWorktreeName = (name: string): string | null => {
     if (!name) return null; // Empty is allowed
     
-    // Check for spaces
-    if (name.includes(' ')) {
-      return 'Session name cannot contain spaces';
-    }
+    // Spaces are now allowed in session names
+    // They will be converted to hyphens for the actual worktree name
     
-    // Check for invalid git characters
+    // Check for invalid git characters (excluding spaces which are now allowed)
     const invalidChars = /[~^:?*\[\]\\]/;
     if (invalidChars.test(name)) {
       return 'Session name contains invalid characters (~^:?*[]\\)';
