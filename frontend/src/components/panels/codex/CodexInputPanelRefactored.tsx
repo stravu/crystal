@@ -16,7 +16,6 @@ interface CodexInputPanelProps {
 interface CodexInputOptions extends InputOptions {
   model: OpenAICodexModel;
   modelProvider: 'openai';
-  approvalPolicy: 'manual' | 'auto';
   sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
   webSearch: boolean;
 }
@@ -40,7 +39,6 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
       return {
         model: initialModel as OpenAICodexModel,
         modelProvider: 'openai',
-        approvalPolicy: 'manual',
         sandboxMode: 'workspace-write',
         webSearch: false,
       };
@@ -52,7 +50,6 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
       return {
         model: saved as OpenAICodexModel,
         modelProvider: 'openai',
-        approvalPolicy: 'manual',
         sandboxMode: 'workspace-write',
         webSearch: false,
       };
@@ -62,7 +59,6 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
     return {
       model: DEFAULT_CODEX_MODEL,
       modelProvider: 'openai',
-      approvalPolicy: 'manual',
       sandboxMode: 'workspace-write',
       webSearch: false,
     };
@@ -133,20 +129,6 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
                 {model.label}
               </option>
             ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-text-secondary">Approval:</label>
-          <select
-            value={options.approvalPolicy}
-            onChange={(e) => this.setState({ 
-              options: { ...options, approvalPolicy: e.target.value as 'manual' | 'auto' }
-            })}
-            className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary"
-          >
-            <option value="manual">Manual</option>
-            <option value="auto">Auto</option>
           </select>
         </div>
 

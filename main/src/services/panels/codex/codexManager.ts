@@ -7,6 +7,7 @@ import type { ConfigManager } from '../../configManager';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
+import type { CodexPanelState } from '../../../../../shared/types/panels';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { panelManager } from '../../panelManager';
 
@@ -150,69 +151,64 @@ export class CodexManager extends AbstractCliManager {
   }
 
   protected buildCommandArgs(options: CodexSpawnOptions): string[] {
-    const { prompt, isResume, resumeSessionId, model, modelProvider, sandboxMode, webSearch, thinkingLevel } = options;
-    
-    this.logger?.info(`[codex-command-build] Building command with options:`);
+    const {
+      prompt,
+      isResume,
+      resumeSessionId,
+      model,
+      sandboxMode,
+      webSearch,
+      thinkingLevel
+    } = options;
+
+    this.logger?.info('[codex-command-build] Building command with options:');
     this.logger?.info(`[codex-command-build]   isResume: ${isResume}`);
     this.logger?.info(`[codex-command-build]   resumeSessionId: ${resumeSessionId || 'none'}`);
     this.logger?.info(`[codex-command-build]   model: ${model || 'not specified'}`);
+    this.logger?.info(`[codex-command-build]   sandboxMode: ${sandboxMode || 'workspace-write'}`);
+    this.logger?.info(`[codex-command-build]   webSearch: ${webSearch || false}`);
     this.logger?.info(`[codex-command-build]   thinkingLevel: ${thinkingLevel || 'not specified'}`);
     this.logger?.info(`[codex-command-build]   prompt: "${prompt || ''}"`);
-    
-    // If resuming a session, use the resume command
-    if (isResume && resumeSessionId) {
-      // --json must come before resume subcommand
-      const args: string[] = ['exec', '--json', 'resume', resumeSessionId];
-      
-      // Add the prompt if provided
-      if (prompt && prompt.trim()) {
-        args.push(prompt);
-      }
-      
-      this.logger?.info(`[codex-command-build] ✅ Built RESUME command: codex ${args.join(' ')}`);
-      return args;
-    }
-    
-    // Otherwise use exec for new interactive sessions
-    const args: string[] = ['exec'];
-    
-    // Add --json flag for interactive mode with JSON output (similar to Claude's stream-json)
-    args.push('--json');
-    
-    // Model configuration - 'auto' means don't pass a model parameter
+
+    const args: string[] = ['exec', '--json'];
+
     if (model && model !== 'auto') {
       args.push('-m', model);
+      this.logger?.info(`[codex] Setting model to: ${model}`);
     }
-    
-    // Don't use -C flag since we're already spawning the process in the worktree directory
-    // This ensures Codex runs FROM the directory, not just operates ON it
-    // args.push('-C', options.worktreePath); // REMOVED - running from cwd instead
-    
-    // Sandbox mode (default to workspace-write for safety)
+
     const sandbox = sandboxMode || 'workspace-write';
-    args.push('-s', sandbox);
-    
-    // Thinking level (reasoning effort)
+    args.push('-c', `sandbox_mode="${sandbox}"`);
+    this.logger?.info(`[codex] Setting sandbox mode to: ${sandbox}`);
+
     if (thinkingLevel) {
-      // Use -c config override for model_reasoning_effort
       args.push('-c', `model_reasoning_effort="${thinkingLevel}"`);
       this.logger?.info(`[codex] Setting model_reasoning_effort to: ${thinkingLevel}`);
     }
-    
-    // Web search
+
     if (webSearch) {
-      // Codex doesn't have a direct web search flag in exec mode
-      // This may need to be configured via config file
-      this.logger?.info('[codex] Web search requested but may need config file setup');
+      args.push('-c', 'web_search=true');
+      this.logger?.info('[codex] Enabling web_search via config override');
+    } else {
+      this.logger?.info('[codex] Web search disabled for this command');
     }
-    
-    // Add the prompt
+
+    if (isResume) {
+      if (resumeSessionId) {
+        args.push('resume', resumeSessionId);
+      } else {
+        this.logger?.warn('[codex] Resume requested without a resumeSessionId. Falling back to a new session command.');
+      }
+    }
+
     if (prompt && prompt.trim()) {
       args.push(prompt);
     }
-    
-    this.logger?.info(`[codex-command-build] ✅ Built NEW SESSION command: codex ${args.join(' ')}`);
-    
+
+    const commandSummary = `codex ${args.join(' ')}`;
+    const commandType = isResume && resumeSessionId ? 'RESUME' : 'NEW SESSION';
+    this.logger?.info(`[codex-command-build] ✅ Built ${commandType} command: ${commandSummary}`);
+
     return args;
   }
 
@@ -229,6 +225,7 @@ export class CodexManager extends AbstractCliManager {
     permissionMode?: string;
     resumeSessionId?: string;
     isResume?: boolean;
+    webSearch?: boolean;
   }): void {
     const {
       panelId,
@@ -242,7 +239,8 @@ export class CodexManager extends AbstractCliManager {
       sandboxMode,
       permissionMode,
       resumeSessionId,
-      isResume
+      isResume,
+      webSearch
     } = params;
 
     const sessionInfoMessage: Record<string, any> = {
@@ -257,6 +255,10 @@ export class CodexManager extends AbstractCliManager {
 
     if (approvalPolicy) {
       sessionInfoMessage.approval_policy = approvalPolicy;
+    }
+
+    if (typeof webSearch === 'boolean') {
+      sessionInfoMessage.web_search = webSearch;
     }
 
     if (sandboxMode) {
@@ -610,7 +612,10 @@ export class CodexManager extends AbstractCliManager {
     prompt: string,
     model?: string,
     modelProvider?: string,
-    thinkingLevel?: 'low' | 'medium' | 'high'
+    thinkingLevel?: 'low' | 'medium' | 'high',
+    approvalPolicy?: 'auto' | 'manual',
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
+    webSearch?: boolean
   ): Promise<void> {
     const options: CodexSpawnOptions = {
       panelId,
@@ -619,7 +624,10 @@ export class CodexManager extends AbstractCliManager {
       prompt,
       model: model || DEFAULT_CODEX_MODEL,
       modelProvider: modelProvider || 'openai',
-      thinkingLevel
+      thinkingLevel,
+      approvalPolicy,
+      sandboxMode,
+      webSearch
     };
     
     this.logger?.info(`[codex] Starting panel ${panelId} with interactive mode`);
@@ -628,15 +636,21 @@ export class CodexManager extends AbstractCliManager {
     this.hasTriggeredSessionIdSearch.delete(panelId);
     this.messageCount.set(panelId, 0);
     
+    const finalArgs = this.buildCommandArgs(options);
+    const commandPreview = `codex ${finalArgs.join(' ')}`;
+
     // Emit initial session info message (similar to Claude)
     this.emitSessionInfoMessage({
       panelId,
       sessionId,
       worktreePath,
       prompt: options.prompt,
-      command: `cd ${worktreePath} && codex exec --json ${prompt}`,
+      command: commandPreview,
       model: options.model,
-      modelProvider: options.modelProvider
+      modelProvider: options.modelProvider,
+      approvalPolicy: options.approvalPolicy,
+      sandboxMode: options.sandboxMode,
+      webSearch: options.webSearch
     });
     
     await this.spawnCliProcess(options);
@@ -930,7 +944,10 @@ export class CodexManager extends AbstractCliManager {
     prompt: string,
     conversationHistory: any[],
     model?: string,
-    thinkingLevel?: 'low' | 'medium' | 'high'
+    modelProvider?: string,
+    thinkingLevel?: 'low' | 'medium' | 'high',
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
+    webSearch?: boolean
   ): Promise<void> {
     // Check if we have a stored Codex session ID to resume from
     this.logger?.info(`[session-id-debug] === CONTINUE PANEL CALLED ===`);
@@ -939,7 +956,10 @@ export class CodexManager extends AbstractCliManager {
     this.logger?.info(`[session-id-debug] Worktree: ${worktreePath}`);
     this.logger?.info(`[session-id-debug] New prompt: "${prompt}"`);
     this.logger?.info(`[session-id-debug] History items: ${conversationHistory.length}`);
+    this.logger?.info(`[session-id-debug] Passed sandboxMode: ${sandboxMode || 'undefined'}`);
+    this.logger?.info(`[session-id-debug] Passed webSearch: ${webSearch !== undefined ? webSearch : 'undefined'}`);
     
+    let panelState: CodexPanelState | undefined;
     // Try to get the session ID from the panel's custom state
     let codexSessionId = null;
     if (this.sessionManager) {
@@ -947,7 +967,8 @@ export class CodexManager extends AbstractCliManager {
       if (db) {
         const panel = db.getPanel(panelId);
         if (panel) {
-          codexSessionId = panel.state?.customState?.codexSessionId;
+          panelState = panel.state?.customState as CodexPanelState | undefined;
+          codexSessionId = panelState?.codexSessionId;
           this.logger?.info(`[session-id-debug] Retrieved from panel state: ${codexSessionId || 'null'}`);
           this.logger?.info(`[session-id-debug] Full panel state: ${JSON.stringify(panel.state)}`);
         } else {
@@ -969,34 +990,53 @@ export class CodexManager extends AbstractCliManager {
     
     if (codexSessionId) {
       this.logger?.info(`[session-id-debug] ✅ Found Codex session ID: ${codexSessionId}`);
-      this.logger?.info(`[session-id-debug] Will use: codex exec --json resume ${codexSessionId} "${prompt}"`);
+      this.logger?.info(`[session-id-debug] Panel state for resume: ${JSON.stringify(panelState || {})}`);
       
       // Mark that we already have a session ID so we don't search for it again
       this.hasTriggeredSessionIdSearch.add(panelId);
       // Reset message counter for the new conversation turn
       this.messageCount.set(panelId, 0);
       
+      // Prefer the passed parameters over the saved panel state
+      const resolvedModel = model || panelState?.model || DEFAULT_CODEX_MODEL;
+      const resolvedModelProvider = modelProvider || panelState?.modelProvider || 'openai';
+      const resolvedApprovalPolicy = panelState?.approvalPolicy;
+      const resolvedSandboxMode = sandboxMode !== undefined ? sandboxMode : (panelState?.sandboxMode || 'workspace-write');
+      const resolvedWebSearch = webSearch !== undefined ? webSearch : (panelState?.webSearch || false);
+      
+      this.logger?.info(`[session-id-debug] Resolved sandboxMode: ${resolvedSandboxMode}`);
+      this.logger?.info(`[session-id-debug] Resolved webSearch: ${resolvedWebSearch}`);
+
       // Use Codex's resume command to continue the conversation
       const options: CodexSpawnOptions = {
         panelId,
         sessionId,
         worktreePath,
         prompt,
-        model,
+        model: resolvedModel,
+        modelProvider: resolvedModelProvider,
         thinkingLevel,
         isResume: true,
-        resumeSessionId: codexSessionId
+        resumeSessionId: codexSessionId,
+        approvalPolicy: resolvedApprovalPolicy,
+        sandboxMode: resolvedSandboxMode,
+        webSearch: resolvedWebSearch
       };
-
-      const promptSuffix = prompt && prompt.trim() ? ` ${prompt}` : '';
-      const resumeCommand = `cd ${worktreePath} && codex exec --json resume ${codexSessionId}${promptSuffix}`;
+      const finalArgs = this.buildCommandArgs(options);
+      const commandPreview = `codex ${finalArgs.join(' ')}`;
+      this.logger?.info(`[session-id-debug] Will use resume command: ${commandPreview}`);
 
       this.emitSessionInfoMessage({
         panelId,
         sessionId,
         worktreePath,
         prompt,
-        command: resumeCommand,
+        command: commandPreview,
+        model: options.model,
+        modelProvider: options.modelProvider,
+        approvalPolicy: options.approvalPolicy,
+        sandboxMode: options.sandboxMode,
+        webSearch: options.webSearch,
         resumeSessionId: codexSessionId,
         isResume: true
       });
@@ -1006,7 +1046,19 @@ export class CodexManager extends AbstractCliManager {
       // No session ID to resume from, start a new session
       this.logger?.warn(`[session-id-debug] ❌ No Codex session ID found for panel ${panelId}`);
       this.logger?.warn(`[session-id-debug] Starting NEW session instead of resuming`);
-      await this.startPanel(panelId, sessionId, worktreePath, prompt, model, undefined, thinkingLevel);
+      // Use passed parameters with panel state as fallback
+      await this.startPanel(
+        panelId,
+        sessionId,
+        worktreePath,
+        prompt,
+        model || panelState?.model,
+        modelProvider || panelState?.modelProvider,
+        thinkingLevel,
+        panelState?.approvalPolicy,
+        sandboxMode !== undefined ? sandboxMode : panelState?.sandboxMode,
+        webSearch !== undefined ? webSearch : panelState?.webSearch
+      );
     }
   }
 

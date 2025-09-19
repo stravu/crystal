@@ -265,7 +265,6 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           {
             model: options?.model || DEFAULT_CODEX_MODEL,
             modelProvider: options?.modelProvider || 'openai',
-            approvalPolicy: options?.approvalPolicy || 'manual',
             sandboxMode: options?.sandboxMode || 'workspace-write',
             webSearch: options?.webSearch || false,
             thinkingLevel: options?.thinkingLevel || 'medium'
@@ -289,7 +288,9 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           {
             model: options?.model || DEFAULT_CODEX_MODEL,
             modelProvider: options?.modelProvider || 'openai',
-            thinkingLevel: options?.thinkingLevel || 'medium'
+            thinkingLevel: options?.thinkingLevel || 'medium',
+            sandboxMode: options?.sandboxMode || 'workspace-write',
+            webSearch: options?.webSearch || false
           }
         );
         console.log(`[codex-debug] Codex continue invoked for panel ${panelId}`);

@@ -40,7 +40,6 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
   const [options, setOptions] = useState({
     model: getInitialModel(),
     modelProvider: 'openai',
-    approvalPolicy: 'manual' as 'manual' | 'auto',
     sandboxMode: 'workspace-write' as 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch: false
   });
@@ -131,18 +130,6 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
                     {model.label}
                   </option>
                 ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="text-text-secondary">Approval:</label>
-              <select
-                value={options.approvalPolicy}
-                onChange={(e) => setOptions({ ...options, approvalPolicy: e.target.value as 'manual' | 'auto' })}
-                className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary"
-              >
-                <option value="manual">Manual</option>
-                <option value="auto">Auto</option>
               </select>
             </div>
 

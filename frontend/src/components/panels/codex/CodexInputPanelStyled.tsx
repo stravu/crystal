@@ -45,7 +45,6 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   };
 
   const [selectedModel, setSelectedModel] = useState<OpenAICodexModel>(getInitialModel());
-  const [approvalPolicy, setApprovalPolicy] = useState<'manual' | 'auto'>('manual');
   const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>('workspace-write');
   const [webSearch, setWebSearch] = useState(false);
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
@@ -90,7 +89,6 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
       const options = {
         model: selectedModel,
         modelProvider: 'openai',
-        approvalPolicy,
         sandboxMode,
         webSearch,
         thinkingLevel,
@@ -139,7 +137,6 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
     await hookHandleSubmit({
       model: selectedModel,
       modelProvider: 'openai',
-      approvalPolicy,
       sandboxMode,
       webSearch,
       thinkingLevel
@@ -385,17 +382,6 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
 
               {/* Options Pills */}
               <div className="flex items-center gap-2">
-                {/* Approval Policy Pill */}
-                <Pill
-                  onClick={() => setApprovalPolicy(approvalPolicy === 'manual' ? 'auto' : 'manual')}
-                  icon={approvalPolicy === 'auto' ? <CheckCircle className="w-3.5 h-3.5" /> : <Target className="w-3.5 h-3.5" />}
-                  title={approvalPolicy === 'auto' 
-                    ? 'Auto mode: AI can execute commands without approval' 
-                    : 'Manual mode: You must approve each command before execution'}
-                >
-                  {approvalPolicy === 'auto' ? 'Auto' : 'Manual'}
-                </Pill>
-
                 {/* Sandbox Mode */}
                 <SandboxSelector
                   sandboxMode={sandboxMode}

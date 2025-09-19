@@ -255,7 +255,7 @@ export class CodexManager extends AbstractCliManager {
     
     // Add other configuration
     args.push('--model', 'gpt-5');
-    args.push('--sandbox-mode', 'workspace-write');
+    args.push('-c', 'sandbox_mode="workspace-write"');
     
     const spawnOptions = {
       panelId,
@@ -284,9 +284,8 @@ export class CodexManager extends AbstractCliManager {
       args.push('--model', options.model);
     }
     
-    // Sandbox and approval settings
-    args.push('--sandbox-mode', options.sandboxMode || 'workspace-write');
-    args.push('--approval-policy', options.approvalPolicy || 'on-request');
+    // Sandbox settings
+    args.push('-c', `sandbox_mode="${options.sandboxMode || 'workspace-write'}"`);
     
     // Initial prompt for new sessions
     if (!options.isResume && options.prompt) {

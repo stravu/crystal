@@ -203,7 +203,10 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       prompt,
       model,
       modelProvider,
-      thinkingLevel
+      thinkingLevel,
+      approvalPolicy,
+      sandboxMode,
+      webSearch
     );
   }
 
@@ -289,14 +292,17 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     conversationHistory: any[],
     model?: string,
     modelProvider?: string,
-    thinkingLevel?: 'low' | 'medium' | 'high'
+    thinkingLevel?: 'low' | 'medium' | 'high',
+    approvalPolicy?: 'auto' | 'manual',
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
+    webSearch?: boolean
   ): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
     if (!mapping) {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex-debug] Continuing panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  History items: ${conversationHistory.length}\n  Model: ${model || DEFAULT_CODEX_MODEL}\n  Provider: ${modelProvider || 'openai'}\n  Thinking Level: ${thinkingLevel || 'medium'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"`);
+    this.logger?.info(`[codex-debug] Continuing panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  History items: ${conversationHistory.length}\n  Model: ${model || DEFAULT_CODEX_MODEL}\n  Provider: ${modelProvider || 'openai'}\n  Thinking Level: ${thinkingLevel || 'medium'}\n  Sandbox: ${sandboxMode || 'not specified'}\n  Web Search: ${webSearch ?? 'not specified'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"`);
     
     // Codex doesn't fully support history replay yet, but GPT-5 has improved context handling
     // For now, we'll start a new session with the prompt
@@ -307,7 +313,10 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       prompt,
       conversationHistory,
       model,
-      thinkingLevel
+      modelProvider,
+      thinkingLevel,
+      sandboxMode,
+      webSearch
     );
   }
 

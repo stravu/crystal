@@ -106,6 +106,7 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
           modelProvider: options?.modelProvider || 'openai',
           approvalPolicy: options?.approvalPolicy || 'manual',
           sandboxMode: options?.sandboxMode || 'workspace-write',
+          webSearch: options?.webSearch ?? currentCustomState?.webSearch ?? false,
           lastActivityTime: new Date().toISOString()
         };
         
@@ -138,9 +139,11 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     model?: string;
     modelProvider?: string;
     thinkingLevel?: 'low' | 'medium' | 'high';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
   }) => {
     try {
-      logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Thinking Level: ${options?.thinkingLevel || 'default'}`);
+      logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Thinking Level: ${options?.thinkingLevel || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch ?? 'default'}`);
       
       // Save the new user prompt as a conversation message
       // This triggers panel-prompt-added event for the prompts sidebar
@@ -162,7 +165,10 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         conversationHistory,
         options?.model,
         options?.modelProvider,
-        options?.thinkingLevel
+        options?.thinkingLevel,
+        undefined, // approvalPolicy - not used for now
+        options?.sandboxMode,
+        options?.webSearch
       );
       
       // Update panel state with the new prompt
@@ -176,10 +182,20 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
           lastActivityTime: new Date().toISOString()
         };
         
-        // Only update model if provided
+        // Update options if provided
         if (options?.model) {
           updatedState.model = options.model;
           updatedState.modelProvider = options.modelProvider || currentCustomState?.modelProvider || 'openai';
+        }
+        
+        // Update sandbox mode if provided
+        if (options?.sandboxMode) {
+          updatedState.sandboxMode = options.sandboxMode;
+        }
+        
+        // Update web search if provided
+        if (options?.webSearch !== undefined) {
+          updatedState.webSearch = options.webSearch;
         }
         
         // CRITICAL: Restore the saved codexSessionId
