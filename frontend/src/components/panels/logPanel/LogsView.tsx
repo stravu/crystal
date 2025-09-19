@@ -363,7 +363,9 @@ export const LogsView: React.FC<LogsViewProps> = ({ sessionId, isVisible }) => {
         className="flex-1 min-h-0 overflow-y-auto overflow-x-auto font-mono text-sm p-4 bg-bg-primary text-text-primary whitespace-pre-wrap break-all"
         onScroll={(e) => {
           const target = e.target as HTMLDivElement;
-          const isAtBottom = target.scrollHeight - target.scrollTop === target.clientHeight;
+          // Consider "at bottom" only if within 50px of the bottom
+          const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+          const isAtBottom = distanceFromBottom < 50;
           if (isAtBottom !== autoScroll) {
             setAutoScroll(isAtBottom);
           }

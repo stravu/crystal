@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { API } from '../../../utils/api';
 import type { LucideIcon } from 'lucide-react';
 import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Copy, Check, FileText, Terminal, Info, Loader2, Clock } from 'lucide-react';
@@ -119,6 +119,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const wasAtBottomRef = useRef(true); // Start as true to scroll to bottom on first load
   const loadMessagesRef = useRef<(() => Promise<void>) | null>(null);
   const isFirstLoadRef = useRef(true); // Track if this is the first load
+  const previousMessageCountRef = useRef(0); // Track previous message count
 
   // Save local settings to localStorage when they change
   useEffect(() => {
@@ -148,6 +149,14 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     // Prevent concurrent loads using ref
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
+    
+    // Capture scroll position before loading
+    const container = scrollContainerRef.current;
+    if (container) {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      const wasAtBottom = distanceFromBottom < 50;
+      wasAtBottomRef.current = wasAtBottom;
+    }
     
     try {
       setError(null);
@@ -252,51 +261,59 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     };
   }, [panelId, outputEventName]); // Remove messageTransformer from dependencies to avoid re-registering
 
-  // Initial load
+  // Initial load - only when panelId actually changes
   useEffect(() => {
     if (!panelId) return;
     // Reset first load flag when session changes
     isFirstLoadRef.current = true;
     wasAtBottomRef.current = true; // Also reset to true for new sessions
     loadMessages();
-  }, [panelId, loadMessages]);
-
-  // Track if user is at bottom - set up once when container is available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelId]); // Only depend on panelId, not loadMessages - we want this to run only on panel change
+  
+  // Call loadMessages when it changes (but don't reset scroll position)
   useEffect(() => {
-    let cleanup: (() => void) | undefined;
-    
-    // Use a small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
+    if (!isFirstLoadRef.current && panelId) {
+      loadMessages();
+    }
+  }, [loadMessages, panelId]);
 
-      const checkIfAtBottom = () => {
-        // Consider "at bottom" if within 30% of viewport height or 300px (whichever is larger)
-        const threshold = Math.max(container.clientHeight * 0.3, 300);
-        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-        const isAtBottom = distanceFromBottom < threshold;
-        wasAtBottomRef.current = isAtBottom;
-      };
+  // Track if user is at bottom - set up as soon as possible
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-      // Check initial position
-      checkIfAtBottom();
-
-      container.addEventListener('scroll', checkIfAtBottom);
+    const checkIfAtBottom = () => {
+      // Consider "at bottom" only if within 50px of the bottom
+      // This ensures we don't auto-scroll if the user has intentionally scrolled up
+      const threshold = 50;
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      const isAtBottom = distanceFromBottom < threshold;
       
-      // Store cleanup function
-      cleanup = () => container.removeEventListener('scroll', checkIfAtBottom);
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      if (cleanup) cleanup();
+      
+      wasAtBottomRef.current = isAtBottom;
     };
-  }, []); // Empty array - set up only once
+
+    // Check initial position immediately
+    checkIfAtBottom();
+
+    // Add scroll listener
+    container.addEventListener('scroll', checkIfAtBottom, { passive: true });
+    
+    return () => {
+      container.removeEventListener('scroll', checkIfAtBottom);
+    };
+  }); // Run on every render to ensure we catch container availability
 
   // Auto-scroll to bottom when messages change or view loads
   useEffect(() => {
-    if (messagesEndRef.current && !loading) {
-      // Always scroll to bottom on first load, or if we were at the bottom before the update
+    // Only proceed if we have new messages (not just a re-render)
+    const hasNewMessages = messages.length > previousMessageCountRef.current;
+    previousMessageCountRef.current = messages.length;
+    
+    if (messagesEndRef.current && !loading && (hasNewMessages || isFirstLoadRef.current)) {
+      // Use the wasAtBottomRef value that was captured BEFORE the messages updated
+      // Don't double-check after DOM update as the scroll position will have changed
       if (isFirstLoadRef.current || wasAtBottomRef.current) {
         // Use requestAnimationFrame to ensure DOM has updated
         requestAnimationFrame(() => {
@@ -307,7 +324,6 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           if (isFirstLoadRef.current) {
             isFirstLoadRef.current = false;
           }
-          // Don't set wasAtBottomRef here - let the scroll event handler determine actual position
         });
       }
     }

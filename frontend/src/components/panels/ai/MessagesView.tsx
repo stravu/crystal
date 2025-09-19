@@ -219,7 +219,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      // Consider "at bottom" only if within 50px of the bottom
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
       autoScrollRef.current = isAtBottom;
     };
 
