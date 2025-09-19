@@ -18,4 +18,26 @@ export interface AppConfig {
     notifyOnComplete: boolean;
   };
   devMode?: boolean;
+  sessionCreationPreferences?: {
+    sessionCount?: number;
+    toolType?: 'claude' | 'codex' | 'none';
+    claudeConfig?: {
+      model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
+      permissionMode?: 'ignore' | 'approve';
+      ultrathink?: boolean;
+    };
+    codexConfig?: {
+      model?: string;
+      modelProvider?: string;
+      approvalPolicy?: 'auto' | 'manual';
+      sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+      webSearch?: boolean;
+    };
+    showAdvanced?: boolean;
+    baseBranch?: string;
+    commitModeSettings?: {
+      mode?: 'checkpoint' | 'incremental' | 'single';
+      checkpointPrefix?: string;
+    };
+  };
 }

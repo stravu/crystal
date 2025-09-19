@@ -1,18 +1,21 @@
 import React, { useState, KeyboardEvent, useEffect, useCallback, memo } from 'react';
-import { Send, X, Paperclip, FileText, Square, ChevronRight, Zap, Target, Brain, CheckCircle } from 'lucide-react';
+import { Send, X, Paperclip, FileText, Square, ChevronRight, Zap, Target, Brain, CheckCircle, Gauge } from 'lucide-react';
 import type { Session, GitCommands } from '../../../types/session';
+import type { ToolPanel } from '../../../../../shared/types/panels';
 import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
 import { useAIInputPanel } from '../../../hooks/useAIInputPanel';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
 import { Pill } from '../../ui/Pill';
-import { SwitchSimple as Switch } from '../../ui/SwitchSimple';
+import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
+const LAST_CODEX_THINKING_LEVEL_KEY = 'codex.lastSelectedThinkingLevel';
 
 interface CodexInputPanelStyledProps {
   session: Session;
   panelId: string;
+  panel?: ToolPanel;
   onSendMessage: (message: string, options?: any) => Promise<void>;
   disabled?: boolean;
   initialModel?: string;
@@ -26,13 +29,24 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   disabled = false,
   initialModel,
   onCancel,
-  gitCommands
+  gitCommands,
+  panel
 }) => {
   // Initialize model
   const getInitialModel = (): OpenAICodexModel => {
+    // First, check if the panel has stored codexConfig with model
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.model) {
+      const storedModel = customState.codexConfig.model;
+      if (storedModel in CODEX_MODELS) {
+        return storedModel as OpenAICodexModel;
+      }
+    }
+    // Then check if initialModel prop is provided
     if (initialModel && initialModel in CODEX_MODELS) {
       return initialModel as OpenAICodexModel;
     }
+    // Otherwise fall back to localStorage
     const saved = localStorage.getItem(LAST_CODEX_MODEL_KEY);
     if (saved && saved in CODEX_MODELS) {
       return saved as OpenAICodexModel;
@@ -41,9 +55,38 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   };
 
   const [selectedModel, setSelectedModel] = useState<OpenAICodexModel>(getInitialModel());
-  const [approvalPolicy, setApprovalPolicy] = useState<'manual' | 'auto'>('manual');
-  const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>('workspace-write');
-  const [webSearch, setWebSearch] = useState(false);
+  const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>(() => {
+    // Check if the panel has stored codexConfig with sandboxMode
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.sandboxMode) {
+      const storedMode = customState.codexConfig.sandboxMode;
+      if (storedMode === 'read-only' || storedMode === 'workspace-write' || storedMode === 'danger-full-access') {
+        return storedMode;
+      }
+    }
+    return 'workspace-write';
+  });
+  const [webSearch, setWebSearch] = useState(() => {
+    // Check if the panel has stored codexConfig with webSearch
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.webSearch !== undefined) {
+      return customState.codexConfig.webSearch;
+    }
+    return false;
+  });
+  const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
+    // First, check if the panel has stored codexConfig with thinkingLevel
+    const customState = panel?.state?.customState as any;
+    if (customState?.codexConfig?.thinkingLevel) {
+      const storedLevel = customState.codexConfig.thinkingLevel;
+      if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
+        return storedLevel;
+      }
+    }
+    // Otherwise fall back to localStorage
+    const saved = localStorage.getItem(LAST_CODEX_THINKING_LEVEL_KEY);
+    return (saved === 'low' || saved === 'medium' || saved === 'high') ? saved : 'medium';
+  });
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
@@ -73,9 +116,9 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
       const options = {
         model: selectedModel,
         modelProvider: 'openai',
-        approvalPolicy,
         sandboxMode,
         webSearch,
+        thinkingLevel,
         attachedImages: images,
         attachedTexts: texts
       };
@@ -88,7 +131,47 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   // Save model selection to localStorage
   useEffect(() => {
     localStorage.setItem(LAST_CODEX_MODEL_KEY, selectedModel);
+    // Note: The model will be saved to panel state when sending a message
   }, [selectedModel]);
+
+  // Save thinking level to localStorage
+  useEffect(() => {
+    localStorage.setItem(LAST_CODEX_THINKING_LEVEL_KEY, thinkingLevel);
+  }, [thinkingLevel]);
+  
+  // Update model and thinking level when panel changes (e.g., when switching sessions)
+  useEffect(() => {
+    const customState = panel?.state?.customState as any;
+    
+    // Update model
+    if (customState?.codexConfig?.model) {
+      const storedModel = customState.codexConfig.model;
+      if (storedModel in CODEX_MODELS) {
+        setSelectedModel(storedModel as OpenAICodexModel);
+      }
+    }
+    
+    // Update thinking level
+    if (customState?.codexConfig?.thinkingLevel) {
+      const storedLevel = customState.codexConfig.thinkingLevel;
+      if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
+        setThinkingLevel(storedLevel);
+      }
+    }
+    
+    // Update sandbox mode
+    if (customState?.codexConfig?.sandboxMode) {
+      const storedMode = customState.codexConfig.sandboxMode;
+      if (storedMode === 'read-only' || storedMode === 'workspace-write' || storedMode === 'danger-full-access') {
+        setSandboxMode(storedMode);
+      }
+    }
+    
+    // Update web search
+    if (customState?.codexConfig?.webSearch !== undefined) {
+      setWebSearch(customState.codexConfig.webSearch);
+    }
+  }, [panel?.state?.customState]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -105,9 +188,9 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
     await hookHandleSubmit({
       model: selectedModel,
       modelProvider: 'openai',
-      approvalPolicy,
       sandboxMode,
-      webSearch
+      webSearch,
+      thinkingLevel
     });
   };
 
@@ -167,6 +250,10 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   const placeholder = session.status === 'waiting' 
     ? "Enter your response..." 
     : "Ask Codex anything...";
+
+  // Calculate auto-commit enabled state
+  const effectiveMode = session.commitMode || (session.autoCommit === false ? 'disabled' : 'checkpoint');
+  const isAutoCommitEnabled = effectiveMode !== 'disabled';
 
   return (
     <div className="border-t-2 border-border-primary flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
@@ -342,33 +429,49 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
                 setSelectedModel={setSelectedModel}
               />
 
-              {/* Options Pills */}
-              <div className="flex items-center gap-2">
-                {/* Approval Policy Pill */}
-                <Pill
-                  onClick={() => setApprovalPolicy(approvalPolicy === 'manual' ? 'auto' : 'manual')}
-                  icon={approvalPolicy === 'auto' ? <CheckCircle className="w-3.5 h-3.5" /> : <Target className="w-3.5 h-3.5" />}
-                  title={approvalPolicy === 'auto' 
-                    ? 'Auto mode: AI can execute commands without approval' 
-                    : 'Manual mode: You must approve each command before execution'}
-                >
-                  {approvalPolicy === 'auto' ? 'Auto' : 'Manual'}
-                </Pill>
+              {/* Thinking Level Selector */}
+              <ThinkingLevelSelector
+                thinkingLevel={thinkingLevel}
+                setThinkingLevel={setThinkingLevel}
+              />
 
-                {/* Sandbox Mode */}
-                <SandboxSelector
-                  sandboxMode={sandboxMode}
-                  setSandboxMode={setSandboxMode}
-                />
+              {/* Auto-Commit Mode Pill - always visible */}
+              <CommitModePill
+                sessionId={session.id}
+                currentMode={session.commitMode}
+                currentSettings={session.commitModeSettings}
+                autoCommit={session.autoCommit}
+                projectId={session.projectId}
+                isAutoCommitEnabled={isAutoCommitEnabled}
+              />
 
-                {/* Web Search Toggle */}
-                <div title="Allow AI to search the web for up-to-date information">
-                  <Switch
-                    checked={webSearch}
-                    onCheckedChange={setWebSearch}
-                    label="Web Search"
-                    size="sm"
+              {/* Toggle Group - subtle visual grouping */}
+              <div className="flex items-center gap-2 ml-1 pl-2 border-l border-border-primary/20">
+                {/* Auto-Commit Toggle - Hidden: Now handled by CommitMode system */}
+                {/* <AutoCommitSwitch
+                  sessionId={session.id}
+                  currentMode={session.commitMode}
+                  currentSettings={session.commitModeSettings}
+                  autoCommit={session.autoCommit}
+                /> */}
+
+                {/* Options Pills */}
+                <div className="flex items-center gap-2">
+                  {/* Sandbox Mode */}
+                  <SandboxSelector
+                    sandboxMode={sandboxMode}
+                    setSandboxMode={setSandboxMode}
                   />
+
+                  {/* Web Search Toggle - Hidden for Codex as it doesn't work */}
+                  {/* <div title="Allow AI to search the web for up-to-date information">
+                    <Switch
+                      checked={webSearch}
+                      onCheckedChange={setWebSearch}
+                      label="Web Search"
+                      size="sm"
+                    />
+                  </div> */}
                 </div>
               </div>
             </div>
@@ -578,6 +681,74 @@ const SandboxSelector: React.FC<SandboxSelectorProps> = ({
       trigger={triggerButton}
       items={dropdownItems}
       selectedId={sandboxMode}
+      position="auto"
+      width="sm"
+      onOpenChange={() => {}}
+    />
+  );
+};
+
+// Thinking Level Selector Component
+interface ThinkingLevelSelectorProps {
+  thinkingLevel: 'low' | 'medium' | 'high';
+  setThinkingLevel: (level: 'low' | 'medium' | 'high') => void;
+}
+
+const ThinkingLevelSelector: React.FC<ThinkingLevelSelectorProps> = ({
+  thinkingLevel,
+  setThinkingLevel,
+}) => {
+  const levelConfigs = {
+    'low': {
+      label: 'Low',
+      icon: Gauge,
+      iconColor: 'text-interactive',
+      description: 'Faster responses with less reasoning'
+    },
+    'medium': {
+      label: 'Medium',
+      icon: Brain,
+      iconColor: 'text-interactive',
+      description: 'Balanced speed and reasoning'
+    },
+    'high': {
+      label: 'High',
+      icon: Zap,
+      iconColor: 'text-status-success',
+      description: 'Slower but more thorough reasoning'
+    }
+  };
+
+  const currentConfig = levelConfigs[thinkingLevel];
+  const Icon = currentConfig.icon;
+
+  const dropdownItems: DropdownItem[] = Object.entries(levelConfigs).map(([level, config]) => ({
+    id: level,
+    label: config.label,
+    description: config.description,
+    icon: config.icon,
+    iconColor: config.iconColor,
+    onClick: () => setThinkingLevel(level as 'low' | 'medium' | 'high'),
+  }));
+
+  const triggerButton = (
+    <Pill
+      icon={<Icon className={`w-3.5 h-3.5 ${currentConfig.iconColor}`} />}
+      title={`Thinking Level: ${currentConfig.description}. Click to change.`}
+    >
+      {currentConfig.label}
+      <svg className="w-3.5 h-3.5 text-text-tertiary" 
+        fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </Pill>
+  );
+
+  return (
+    <Dropdown
+      trigger={triggerButton}
+      items={dropdownItems}
+      selectedId={thinkingLevel}
       position="auto"
       width="sm"
       onOpenChange={() => {}}

@@ -2,13 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Settings } from 'lucide-react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { AIViewMode, RichOutputSettings } from '../ai/AbstractAIPanel';
-import { RichOutputView } from '../ai/RichOutputView';
+import { RichOutputWithSidebar } from '../claude/RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
 import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransformer';
 import { CodexStatsView } from './CodexStatsView';
+import { CodexDebugStateView } from './CodexDebugStateView';
 import { CodexInputPanelStyled } from './CodexInputPanelStyled';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
+import { useConfigStore } from '../../../stores/configStore';
 
 interface CodexPanelProps {
   panel: ToolPanel;
@@ -37,7 +39,9 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
   // Get the model from panel state
   const codexState = panel.state?.customState as any;
   const model = codexState?.model || DEFAULT_CODEX_MODEL;
-  
+  const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
+  const showDebugTabs = devModeEnabled;
+
   const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('codexRichOutputSettings', JSON.stringify(newSettings));
@@ -48,6 +52,12 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
 
   // Use the Codex-specific hook
   const hook = useCodexPanel(panel.id, isActive);
+
+  useEffect(() => {
+    if (!devModeEnabled && viewMode !== 'richOutput') {
+      setViewMode('richOutput');
+    }
+  }, [devModeEnabled, viewMode]);
   
   useEffect(() => {
     console.log(`[codex-debug] CodexPanel mounted/updated: Panel ${panel.id}, ViewMode: ${viewMode}, Session: ${hook.activeSession?.id || 'none'}`);
@@ -77,12 +87,13 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-bg-primary">
       {/* Panel Header with Segmented Control */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border-primary bg-surface-primary">
-        {/* Segmented Control for View Mode */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">View</span>
-          <div className="inline-flex rounded-lg bg-surface-secondary p-0.5">
-            <button
+      {showDebugTabs && (
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border-primary bg-surface-primary">
+          {/* Segmented Control for View Mode */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">View</span>
+            <div className="inline-flex rounded-lg bg-surface-secondary p-0.5">
+              <button
               onClick={() => {
                 console.log(`[codex-debug] View mode changed to richOutput for panel ${panel.id}`);
                 setViewMode('richOutput');
@@ -95,79 +106,113 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
             >
               Output
             </button>
-            <button
-              onClick={() => {
-                console.log(`[codex-debug] View mode changed to messages for panel ${panel.id}`);
-                setViewMode('messages');
-              }}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                viewMode === 'messages'
-                  ? 'bg-bg-primary text-text-primary shadow-sm'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              Messages
-            </button>
-            <button
-              onClick={() => {
-                console.log(`[codex-debug] View mode changed to stats for panel ${panel.id}`);
-                setViewMode('stats');
-              }}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                viewMode === 'stats'
-                  ? 'bg-bg-primary text-text-primary shadow-sm'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              Stats
-            </button>
+            {devModeEnabled && (
+              <>
+                <button
+                  onClick={() => {
+                    console.log(`[codex-debug] View mode changed to messages for panel ${panel.id}`);
+                    setViewMode('messages');
+                  }}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    viewMode === 'messages'
+                      ? 'bg-bg-primary text-text-primary shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Messages
+                </button>
+                <button
+                  onClick={() => {
+                    console.log(`[codex-debug] View mode changed to stats for panel ${panel.id}`);
+                    setViewMode('stats');
+                  }}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    viewMode === 'stats'
+                      ? 'bg-bg-primary text-text-primary shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Stats
+                </button>
+                <button
+                  onClick={() => {
+                    console.log(`[codex-debug] View mode changed to debugState for panel ${panel.id}`);
+                    setViewMode('debugState');
+                  }}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    viewMode === 'debugState'
+                      ? 'bg-bg-primary text-text-primary shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Debug State
+                </button>
+              </>
+            )}
+            </div>
+          </div>
+
+          {/* Model indicator and settings button */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-tertiary">
+              Model: <span className="text-text-secondary font-medium">{model}</span>
+            </span>
+            
+            {viewMode === 'richOutput' && (
+              <button
+                onClick={() => {
+                  console.log(`[codex-debug] Settings toggled for panel ${panel.id}: ${!showRichOutputSettings}`);
+                  setShowRichOutputSettings(!showRichOutputSettings);
+                }}
+                className={`px-2 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 ${
+                  showRichOutputSettings
+                    ? 'bg-surface-hover text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                }`}
+                title="Configure display settings"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Settings</span>
+              </button>
+            )}
           </div>
         </div>
+      )}
 
-        {/* Model indicator and settings button */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-tertiary">
-            Model: <span className="text-text-secondary font-medium">{model}</span>
-          </span>
-          
-          {viewMode === 'richOutput' && (
+      {/* Main Content Area */}
+      <div className="flex-1 relative min-h-0 overflow-hidden">
+        {!showDebugTabs && (
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-3 rounded border border-border-primary bg-surface-secondary px-3 py-1.5 shadow-sm">
+            <span className="text-xs text-text-tertiary">
+              Model: <span className="text-text-secondary font-medium">{model}</span>
+            </span>
             <button
               onClick={() => {
                 console.log(`[codex-debug] Settings toggled for panel ${panel.id}: ${!showRichOutputSettings}`);
                 setShowRichOutputSettings(!showRichOutputSettings);
               }}
-              className={`px-2 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 ${
-                showRichOutputSettings
-                  ? 'bg-surface-hover text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
-              }`}
+              className="p-1.5 rounded hover:bg-surface-hover transition-colors"
               title="Configure display settings"
+              aria-label="Open Codex display settings"
             >
-              <Settings className="w-3.5 h-3.5" />
-              <span>Settings</span>
+              <Settings className="w-4 h-4 text-text-secondary" />
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 relative min-h-0 overflow-hidden">
+          </div>
+        )}
         {viewMode === 'richOutput' && (
           <div className="h-full block w-full">
-            <RichOutputView 
+            <RichOutputWithSidebar
               panelId={panel.id}
               sessionStatus={activeSession.status}
               settings={richOutputSettings}
               onSettingsChange={handleRichOutputSettingsChange}
-              showSettings={showRichOutputSettings}
-              messageTransformer={messageTransformer}
-              outputEventName="codexPanel:output"
-              getOutputsHandler="codexPanel:getOutputs"
+              transformer={messageTransformer}
+              showSystemMessages={showDebugTabs}
             />
           </div>
         )}
         
-        {viewMode === 'messages' && (
+        {devModeEnabled && viewMode === 'messages' && (
           <div className="h-full flex flex-col overflow-hidden w-full">
             <MessagesView 
               panelId={panel.id} 
@@ -177,10 +222,16 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
             />
           </div>
         )}
-        
-        {viewMode === 'stats' && (
+
+        {devModeEnabled && viewMode === 'stats' && (
           <div className="h-full flex flex-col overflow-hidden w-full">
             <CodexStatsView sessionId={activeSession.id} />
+          </div>
+        )}
+
+        {devModeEnabled && viewMode === 'debugState' && (
+          <div className="h-full flex flex-col overflow-hidden w-full">
+            <CodexDebugStateView sessionId={activeSession.id} panelId={panel.id} />
           </div>
         )}
       </div>
@@ -190,6 +241,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
         <CodexInputPanelStyled
           session={activeSession}
           panelId={panel.id}
+          panel={panel}
           onSendMessage={hook.handleSendMessage}
           disabled={hook.isProcessing}
           initialModel={model}

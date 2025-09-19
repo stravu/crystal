@@ -1,11 +1,123 @@
-import { MessageTransformer, UnifiedMessage, ToolCall } from './MessageTransformer';
+import { MessageTransformer, UnifiedMessage, ToolCall, ToolResult } from './MessageTransformer';
 
 export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
+  private toolCalls = new Map<string, ToolCall>();
+  private toolCallIdCounter = 0;
+  private originalPrompt: string | null = null; // Track original prompt from session info
+
+  private resetToolCallState() {
+    this.toolCalls.clear();
+    this.toolCallIdCounter = 0;
+    this.originalPrompt = null; // Reset original prompt tracking
+  }
+
+  private createToolCallId(): string {
+    this.toolCallIdCounter += 1;
+    return `tool_${this.toolCallIdCounter}`;
+  }
+
+  private registerToolCall(providedId: string | undefined, name: string, input: any): ToolCall {
+    const id = providedId || this.createToolCallId();
+    let toolCall = this.toolCalls.get(id);
+
+    if (toolCall) {
+      toolCall.name = name;
+      toolCall.input = input;
+      toolCall.status = 'pending';
+      toolCall.result = undefined;
+    } else {
+      toolCall = {
+        id,
+        name,
+        input,
+        status: 'pending'
+      };
+      this.toolCalls.set(id, toolCall);
+    }
+
+    return toolCall;
+  }
+
+  private getMostRecentPendingToolCall(): ToolCall | undefined {
+    const values = Array.from(this.toolCalls.values());
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (values[i].status === 'pending') {
+        return values[i];
+      }
+    }
+    return undefined;
+  }
+
+  private applyResultToToolCall(providedId: string | undefined, result: ToolResult, isError: boolean): string {
+    let id = providedId;
+    let toolCall = id ? this.toolCalls.get(id) : undefined;
+
+    if (!toolCall && !id) {
+      toolCall = this.getMostRecentPendingToolCall();
+      id = toolCall?.id;
+    }
+
+    if (!toolCall) {
+      id = id || this.createToolCallId();
+      toolCall = {
+        id,
+        name: 'unknown',
+        status: 'pending'
+      };
+      this.toolCalls.set(id, toolCall);
+    }
+
+    toolCall.status = isError ? 'error' : 'success';
+    toolCall.result = result;
+
+    return toolCall.id;
+  }
+
+  private normalizeTimestamp(timestamp?: string | Date): string {
+    if (!timestamp) {
+      return new Date().toISOString();
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString();
+    }
+
+    return timestamp;
+  }
+
+  /**
+   * Check if a prompt has been enhanced with structured commit instructions
+   */
+  private isEnhancedPrompt(content: string): boolean {
+    if (!content || !this.originalPrompt) {
+      return false;
+    }
+    
+    // If the content starts with the original prompt and has additional content, it's likely enhanced
+    if (content.startsWith(this.originalPrompt) && content.length > this.originalPrompt.length) {
+      const additionalContent = content.substring(this.originalPrompt.length).trim();
+      // Check for specific structured commit template indicators from DEFAULT_STRUCTURED_PROMPT_TEMPLATE
+      return additionalContent.includes('After completing the requested changes') ||
+             additionalContent.includes('please create a git commit with an appropriate message') ||
+             additionalContent.includes('Conventional Commits format') ||
+             additionalContent.includes('feat:, fix:, docs:, style:, refactor:, test:, chore:') ||
+             additionalContent.includes('Only commit files that are directly related to this task') ||
+             // Also check for generic structured commit indicators
+             additionalContent.includes('Your commit message should') ||
+             additionalContent.includes('structured commit format') ||
+             additionalContent.includes('commit message template') ||
+             additionalContent.includes('COMMIT MESSAGE STRUCTURE') ||
+             additionalContent.includes('**Structured Commit Guidelines**');
+    }
+    
+    return false;
+  }
 
   transform(rawOutputs: any[]): UnifiedMessage[] {
     const messages: UnifiedMessage[] = [];
-    
+    this.resetToolCallState();
+
     for (const output of rawOutputs) {
       const message = this.parseOutput(output);
       if (message) {
@@ -51,7 +163,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: output.timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(output.timestamp),
           segments: [{
             type: 'text',
             content: parsedData
@@ -74,7 +186,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return null;
   }
 
-  private parseJsonMessage(message: any, timestamp?: string): UnifiedMessage | null {
+  private parseJsonMessage(message: any, timestamp?: string | Date): UnifiedMessage | null {
     
     // Handle Codex protocol operations (user input)
     if (message.op) {
@@ -85,13 +197,18 @@ export class CodexMessageTransformer implements MessageTransformer {
         const textItems = op.items.filter((item: any) => item.type === 'text');
         const content = textItems.map((item: any) => item.text).join('\n');
         
+        // Use original prompt if available (for structured commit mode), otherwise use content as-is
+        const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
+          ? this.originalPrompt 
+          : (content || JSON.stringify(op));
+        
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'user',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
-            content: content || JSON.stringify(op)
+            content: displayContent
           }],
           metadata: {
             agent: 'codex'
@@ -100,6 +217,45 @@ export class CodexMessageTransformer implements MessageTransformer {
       }
     }
     
+    // Handle session info blocks that provide initial context
+    if (message.type === 'session_info') {
+      // Capture the original prompt for later use in user input messages
+      if (message.original_prompt || message.initial_prompt) {
+        this.originalPrompt = message.original_prompt || message.initial_prompt;
+      }
+      
+      const sessionInfo = {
+        type: 'session_info',
+        initialPrompt: message.initial_prompt,
+        codexCommand: message.codex_command,
+        claudeCommand: message.claude_command,
+        worktreePath: message.worktree_path,
+        model: message.model,
+        modelProvider: message.model_provider,
+        approvalPolicy: message.approval_policy ?? message.approval,
+        sandboxMode: message.sandbox_mode ?? message.sandbox,
+        permissionMode: message.permission_mode,
+        resumeSessionId: message.resume_session_id ?? message.resumeSessionId,
+        isResume: message.is_resume ?? message.isResume,
+        timestamp: this.normalizeTimestamp(timestamp)
+      };
+
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'system_info',
+          info: sessionInfo
+        }],
+        metadata: {
+          agent: 'codex',
+          systemSubtype: 'session_info',
+          sessionInfo
+        }
+      };
+    }
+
     // Handle Codex protocol messages (responses)
     if (message.msg) {
       const msg = message.msg;
@@ -114,7 +270,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -131,13 +287,20 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // User input
       if (msg.type === 'user_input') {
+        const content = msg.content || msg.text || JSON.stringify(msg);
+        
+        // Use original prompt if available (for structured commit mode), otherwise use content as-is
+        const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
+          ? this.originalPrompt 
+          : content;
+        
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'user',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
-            content: msg.content || msg.text || JSON.stringify(msg)
+            content: displayContent
           }],
           metadata: {
             agent: 'codex'
@@ -153,7 +316,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'thinking',
             content: content
@@ -174,7 +337,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'text',
             content: content
@@ -185,20 +348,65 @@ export class CodexMessageTransformer implements MessageTransformer {
           }
         };
       }
-      
-      // Tool call
-      if (msg.type === 'tool_call') {
-        const toolCall: ToolCall = {
-          id: `tool_${++this.messageIdCounter}`,
-          name: msg.tool || 'unknown',
-          input: msg.args || msg,
-          status: 'pending'
+
+      if (msg.type === 'error') {
+        const errorMessage = msg.message || msg.error || 'Error';
+        const errorDetails = msg.details || msg.detail || msg.stack;
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'system',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'error',
+            error: {
+              message: errorMessage,
+              details: typeof errorDetails === 'string' ? errorDetails : errorDetails ? JSON.stringify(errorDetails, null, 2) : undefined
+            }
+          }],
+          metadata: {
+            agent: 'codex',
+            systemSubtype: 'error'
+          }
         };
+      }
+
+      // Handle stream errors (e.g., authentication, retry errors)
+      if (msg.type === 'stream_error') {
+        const errorMessage = msg.message || 'Stream error';
+        let errorDetails = errorMessage;
+        
+        // Check if this is a 401 Unauthorized error
+        if (errorMessage.includes('401 Unauthorized')) {
+          errorDetails = `${errorMessage}\n\nYou may need to authenticate with Codex. Try running 'codex auth login' in a terminal to login with your Codex account.`;
+        }
         
         return {
           id: `msg_${++this.messageIdCounter}`,
+          role: 'system',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'error',
+            error: {
+              message: 'Stream Error',
+              details: errorDetails
+            }
+          }],
+          metadata: {
+            agent: 'codex',
+            systemSubtype: 'stream_error'
+          }
+        };
+      }
+      
+      // Tool call
+      if (msg.type === 'tool_call') {
+        const toolCall = this.registerToolCall(msg.call_id || msg.tool_call_id || msg.id, msg.tool || 'unknown', msg.args || msg);
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
             tool: toolCall
@@ -211,16 +419,30 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // Tool result
       if (msg.type === 'tool_result') {
+        const content = typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result);
+        const isError = Boolean(msg.is_error || msg.success === false || msg.status === 'error');
+        const result: ToolResult = {
+          content,
+          isError
+        };
+
+        if (msg.metadata) {
+          result.metadata = msg.metadata;
+        }
+
+        const toolCallId = this.applyResultToToolCall(msg.tool_call_id, result, isError);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_result',
             result: {
-              toolCallId: msg.tool_call_id || `tool_${this.messageIdCounter}`,
-              content: typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result),
-              isError: false
+              toolCallId,
+              content: result.content,
+              isError: result.isError,
+              metadata: result.metadata
             }
           }],
           metadata: {
@@ -234,7 +456,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -252,7 +474,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'system_info',
             info: {
@@ -276,23 +498,20 @@ export class CodexMessageTransformer implements MessageTransformer {
         const command = Array.isArray(msg.command) 
           ? msg.command.join(' ') 
           : msg.command;
-        
+
+        const toolCall = this.registerToolCall(msg.call_id, 'exec_command', {
+          command,
+          cwd: msg.cwd,
+          parsed_cmd: msg.parsed_cmd
+        });
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
-            tool: {
-              id: msg.call_id || `tool_${++this.messageIdCounter}`,
-              name: 'exec_command',
-              input: {
-                command,
-                cwd: msg.cwd,
-                parsed_cmd: msg.parsed_cmd
-              },
-              status: 'pending'
-            }
+            tool: toolCall
           }],
           metadata: {
             agent: 'codex'
@@ -308,21 +527,28 @@ export class CodexMessageTransformer implements MessageTransformer {
       if (msg.type === 'exec_command_end') {
         const output = msg.formatted_output || msg.aggregated_output || 
                       `${msg.stdout || ''}${msg.stderr || ''}`;
-        
+        const result: ToolResult = {
+          content: (output || '').trim() || 'Command completed',
+          isError: msg.exit_code !== 0,
+          metadata: {
+            exitCode: msg.exit_code,
+            duration: msg.duration
+          }
+        };
+
+        const toolCallId = this.applyResultToToolCall(msg.call_id, result, result.isError ?? false);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_result',
             result: {
-              toolCallId: msg.call_id || `tool_${this.messageIdCounter}`,
-              content: output.trim() || 'Command completed',
-              isError: msg.exit_code !== 0,
-              metadata: {
-                exitCode: msg.exit_code,
-                duration: msg.duration
-              }
+              toolCallId,
+              content: result.content,
+              isError: result.isError,
+              metadata: result.metadata
             }
           }],
           metadata: {
@@ -342,22 +568,19 @@ export class CodexMessageTransformer implements MessageTransformer {
           return path;
         }).join('\n');
         
+        const toolCall = this.registerToolCall(msg.call_id, 'patch_apply', {
+          files: fileList,
+          changes,
+          auto_approved: msg.auto_approved
+        });
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'assistant',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_call',
-            tool: {
-              id: msg.call_id || `tool_${++this.messageIdCounter}`,
-              name: 'patch_apply',
-              input: {
-                files: fileList,
-                changes,
-                auto_approved: msg.auto_approved
-              },
-              status: 'pending'
-            }
+            tool: toolCall
           }],
           metadata: {
             agent: 'codex'
@@ -369,17 +592,23 @@ export class CodexMessageTransformer implements MessageTransformer {
         const result = msg.success 
           ? (msg.stdout || 'Patch applied successfully')
           : (msg.stderr || msg.stdout || 'Patch failed');
-        
+        const toolResult: ToolResult = {
+          content: result,
+          isError: !msg.success
+        };
+
+        const toolCallId = this.applyResultToToolCall(msg.call_id, toolResult, toolResult.isError ?? false);
+
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'tool_result',
             result: {
-              toolCallId: msg.call_id || `tool_${this.messageIdCounter}`,
-              content: result,
-              isError: !msg.success
+              toolCallId,
+              content: toolResult.content,
+              isError: toolResult.isError
             }
           }],
           metadata: {
@@ -393,7 +622,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'diff',
             diff: msg.unified_diff || ''
@@ -406,29 +635,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       // Token count information
       if (msg.type === 'token_count') {
-        const info = msg.info || {};
-        const usage = info.last_token_usage || info.total_token_usage || {};
-        
-        return {
-          id: `msg_${++this.messageIdCounter}`,
-          role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
-          segments: [{
-            type: 'system_info',
-            info: {
-              type: 'token_usage',
-              input_tokens: usage.input_tokens,
-              output_tokens: usage.output_tokens,
-              reasoning_tokens: usage.reasoning_output_tokens,
-              total_tokens: usage.total_tokens,
-              cached_tokens: usage.cached_input_tokens,
-              context_window: info.model_context_window
-            }
-          }],
-          metadata: {
-            agent: 'codex'
-          }
-        };
+        return null; // Skip showing token usage telemetry in the output view
       }
     }
     
@@ -439,13 +646,20 @@ export class CodexMessageTransformer implements MessageTransformer {
     
     // Handle frontend-generated messages or direct protocol messages
     if (message.type === 'user_input' || message.type === 'user') {
+      const content = message.content || message.text || JSON.stringify(message);
+      
+      // Use original prompt if available (for structured commit mode), otherwise use content as-is
+      const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
+        ? this.originalPrompt 
+        : content;
+      
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'user',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
-          content: message.content || message.text || JSON.stringify(message)
+          content: displayContent
         }],
         metadata: {
           agent: 'codex'
@@ -457,7 +671,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'assistant',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
           content: message.content || message.text || JSON.stringify(message)
@@ -468,19 +682,14 @@ export class CodexMessageTransformer implements MessageTransformer {
         }
       };
     }
-    
+
     if (message.type === 'tool_call') {
-      const toolCall: ToolCall = {
-        id: `tool_${++this.messageIdCounter}`,
-        name: message.name || 'unknown',
-        input: message.arguments || message,
-        status: 'pending'
-      };
-      
+      const toolCall = this.registerToolCall(message.call_id || message.id, message.name || 'unknown', message.arguments || message);
+
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'assistant',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'tool_call',
           tool: toolCall
@@ -495,7 +704,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'system',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
           content: message.message || JSON.stringify(message)
@@ -505,7 +714,58 @@ export class CodexMessageTransformer implements MessageTransformer {
         }
       };
     }
-    
+
+    // Handle Codex runtime configuration summaries that don't include a type field
+    if (!message.type && (message.provider || message.model_provider) && message.model) {
+      const runtimeInfo = {
+        type: 'session_runtime',
+        provider: message.provider || message.model_provider,
+        model: message.model,
+        sandboxMode: message.sandbox_mode ?? message.sandbox,
+        approvalPolicy: message.approval_policy ?? message.approval,
+        reasoningEffort: message['reasoning effort'] ?? message.reasoning_effort ?? message.reasoningEffort,
+        reasoningSummaries: message['reasoning summaries'] ?? message.reasoning_summaries ?? message.reasoningSummaries,
+        workdir: message.workdir || message.cwd,
+        raw: message
+      };
+
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'system_info',
+          info: runtimeInfo
+        }],
+        metadata: {
+          agent: 'codex',
+          systemSubtype: 'session_runtime'
+        }
+      };
+    }
+
+    // Handle plain prompt objects to show as user messages
+    if (typeof message.prompt === 'string' && message.prompt.trim()) {
+      // Use original prompt if available (for structured commit mode), otherwise use prompt as-is
+      const displayContent = this.originalPrompt && this.isEnhancedPrompt(message.prompt) 
+        ? this.originalPrompt 
+        : message.prompt;
+      
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'user',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'text',
+          content: displayContent
+        }],
+        metadata: {
+          agent: 'codex',
+          source: 'prompt'
+        }
+      };
+    }
+
     // Handle session messages (e.g., errors, status updates)
     if (message.type === 'session' && message.data) {
       const data = message.data;
@@ -520,7 +780,7 @@ export class CodexMessageTransformer implements MessageTransformer {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: this.normalizeTimestamp(timestamp),
           segments: [{
             type: 'error',
             error: {
@@ -539,7 +799,7 @@ export class CodexMessageTransformer implements MessageTransformer {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'system',
-        timestamp: timestamp || new Date().toISOString(),
+        timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'system_info',
           info: {
@@ -560,7 +820,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return {
       id: `msg_${++this.messageIdCounter}`,
       role: 'system',
-      timestamp: timestamp || new Date().toISOString(),
+      timestamp: this.normalizeTimestamp(timestamp),
       segments: [{
         type: 'text',
         content: `\`\`\`json\n${JSON.stringify(message, null, 2)}\n\`\`\``

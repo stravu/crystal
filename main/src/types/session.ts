@@ -64,6 +64,14 @@ export interface CreateSessionRequest {
   toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
+  codexConfig?: {
+    model?: string;
+    modelProvider?: string;
+    approvalPolicy?: 'auto' | 'manual';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+  };
 }
 
 export interface SessionUpdate {

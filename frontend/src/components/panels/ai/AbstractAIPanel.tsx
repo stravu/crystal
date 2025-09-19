@@ -6,7 +6,7 @@ import { Session } from '../../../types/session';
 /**
  * Common view modes for AI agent panels
  */
-export type AIViewMode = 'richOutput' | 'messages' | 'stats';
+export type AIViewMode = 'richOutput' | 'messages' | 'stats' | 'debugState';
 
 /**
  * Common settings for rich output display

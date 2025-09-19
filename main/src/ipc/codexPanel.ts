@@ -7,7 +7,7 @@ import type { CodexPanelState } from '../../../shared/types/panels';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
 // Singleton instances will be created in the register function
-let codexManager: CodexManager;
+export let codexManager: CodexManager;
 export let codexPanelManager: CodexPanelManager;
 
 export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServices) {
@@ -25,19 +25,29 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     try {
       logger?.info(`[codex-debug] IPC initialize: Panel ${panelId}, Session ${sessionId}, Worktree: ${worktreePath}, Prompt: "${prompt?.substring(0, 100) || 'none'}"`);
       
-      // Register the panel with the manager
-      logger?.info(`[codex-debug] Registering panel ${panelId} with session ${sessionId}`);
-      codexPanelManager.registerPanel(panelId, sessionId);
+      // Check if the panel already has a codexSessionId (from a previous session)
+      const existingCodexSessionId = sessionManager.getPanelCodexSessionId(panelId);
       
-      // If a prompt is provided, start the Codex process
-      if (prompt) {
-        logger?.info(`[codex-debug] Starting Codex process with initial prompt`);
-        await codexPanelManager.startPanel(panelId, worktreePath, prompt);
+      if (existingCodexSessionId) {
+        logger?.info(`[codex-debug] Panel ${panelId} has existing codexSessionId: ${existingCodexSessionId}`);
+        // Just register the panel - the frontend will handle resuming when the user sends a message
+        logger?.info(`[codex-debug] Registering panel ${panelId} with session ${sessionId} for potential resume`);
+        codexPanelManager.registerPanel(panelId, sessionId);
       } else {
-        logger?.info(`[codex-debug] No initial prompt provided, panel registered but not started`);
+        // Register the panel with the manager
+        logger?.info(`[codex-debug] Registering new panel ${panelId} with session ${sessionId}`);
+        codexPanelManager.registerPanel(panelId, sessionId);
+        
+        // If a prompt is provided, start the Codex process
+        if (prompt) {
+          logger?.info(`[codex-debug] Starting Codex process with initial prompt`);
+          await codexPanelManager.startPanel(panelId, worktreePath, prompt);
+        } else {
+          logger?.info(`[codex-debug] No initial prompt provided, panel registered but not started`);
+        }
       }
       
-      return { success: true };
+      return { success: true, hasExistingSession: !!existingCodexSessionId };
     } catch (error) {
       logger?.error(`[codex-debug] Failed to initialize panel ${panelId}:`, error as Error);
       throw error;
@@ -51,9 +61,14 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     approvalPolicy?: 'auto' | 'manual';
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
     webSearch?: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
   }) => {
     try {
-      logger?.info(`[codex-debug] IPC start:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Approval: ${options?.approvalPolicy || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch || false}`);
+      logger?.info(`[codex-debug] IPC start:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Approval: ${options?.approvalPolicy || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch || false}\n  Thinking Level: ${options?.thinkingLevel || 'default'}`);
+      
+      // Save the user prompt as a conversation message with panel_id
+      // This triggers panel-prompt-added event for the prompts sidebar
+      sessionManager.addPanelConversationMessage(panelId, 'user', prompt);
       
       await codexPanelManager.startPanel(
         panelId,
@@ -63,22 +78,46 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         options?.modelProvider,
         options?.approvalPolicy,
         options?.sandboxMode,
-        options?.webSearch
+        options?.webSearch,
+        options?.thinkingLevel
       );
       
       // Update panel state with the model and other settings
+      // IMPORTANT: Get panel BEFORE startPanel to preserve any existing codexSessionId
+      const panelBefore = panelManager.getPanel(panelId);
+      let existingCodexSessionId: string | undefined;
+      if (panelBefore) {
+        const customStateBefore = panelBefore.state.customState as CodexPanelState;
+        existingCodexSessionId = customStateBefore?.codexSessionId;
+        if (existingCodexSessionId) {
+          logger?.info(`[codex-debug] Existing codexSessionId found before start: ${existingCodexSessionId}`);
+        }
+      }
+      
+      // After startPanel, update the state
       const panel = panelManager.getPanel(panelId);
       if (panel) {
+        const currentCustomState = panel.state.customState as CodexPanelState;
         const updatedState: CodexPanelState = {
-          ...panel.state.customState as CodexPanelState,
+          ...currentCustomState,
           isInitialized: true,
           lastPrompt: prompt,
           model: options?.model || DEFAULT_CODEX_MODEL,
           modelProvider: options?.modelProvider || 'openai',
           approvalPolicy: options?.approvalPolicy || 'manual',
           sandboxMode: options?.sandboxMode || 'workspace-write',
+          webSearch: options?.webSearch ?? currentCustomState?.webSearch ?? false,
           lastActivityTime: new Date().toISOString()
         };
+        
+        // Preserve any existing or new codexSessionId
+        if (existingCodexSessionId) {
+          updatedState.codexSessionId = existingCodexSessionId;
+          logger?.info(`[codex-debug] Preserving existing codexSessionId in start: ${existingCodexSessionId}`);
+        } else if (currentCustomState?.codexSessionId) {
+          updatedState.codexSessionId = currentCustomState.codexSessionId;
+          logger?.info(`[codex-debug] Preserving new codexSessionId from start: ${currentCustomState.codexSessionId}`);
+        }
         
         await panelManager.updatePanel(panelId, {
           state: {
@@ -99,9 +138,25 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
   ipcMain.handle('codexPanel:continue', async (_, panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], options?: {
     model?: string;
     modelProvider?: string;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
   }) => {
     try {
-      logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}`);
+      logger?.info(`[codex-debug] IPC continue:\n  Panel: ${panelId}\n  Worktree: ${worktreePath}\n  History items: ${conversationHistory.length}\n  Prompt: "${prompt}"\n  Model: ${options?.model || 'default'}\n  Provider: ${options?.modelProvider || 'default'}\n  Thinking Level: ${options?.thinkingLevel || 'default'}\n  Sandbox: ${options?.sandboxMode || 'default'}\n  Web Search: ${options?.webSearch ?? 'default'}`);
+      
+      // Save the new user prompt as a conversation message
+      // This triggers panel-prompt-added event for the prompts sidebar
+      sessionManager.addPanelConversationMessage(panelId, 'user', prompt);
+      
+      // Get the panel state BEFORE calling continuePanel to preserve codexSessionId
+      const panelBefore = panelManager.getPanel(panelId);
+      let savedCodexSessionId: string | undefined;
+      if (panelBefore) {
+        const customStateBefore = panelBefore.state.customState as CodexPanelState;
+        savedCodexSessionId = customStateBefore?.codexSessionId;
+        logger?.info(`[codex-debug] Saved codexSessionId before continuePanel: ${savedCodexSessionId || 'none'}`);
+      }
       
       await codexPanelManager.continuePanel(
         panelId,
@@ -109,19 +164,49 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         prompt,
         conversationHistory,
         options?.model,
-        options?.modelProvider
+        options?.modelProvider,
+        options?.thinkingLevel,
+        undefined, // approvalPolicy - not used for now
+        options?.sandboxMode,
+        options?.webSearch
       );
       
-      // Update panel state with the model if provided
+      // Update panel state with the new prompt
+      // IMPORTANT: Get fresh panel state but preserve the saved codexSessionId
       const panel = panelManager.getPanel(panelId);
-      if (panel && options?.model) {
+      if (panel) {
+        const currentCustomState = panel.state.customState as CodexPanelState;
         const updatedState: CodexPanelState = {
-          ...panel.state.customState as CodexPanelState,
+          ...currentCustomState,
           lastPrompt: prompt,
-          model: options.model,
-          modelProvider: options?.modelProvider || (panel.state.customState as CodexPanelState)?.modelProvider || 'openai',
           lastActivityTime: new Date().toISOString()
         };
+        
+        // Update options if provided
+        if (options?.model) {
+          updatedState.model = options.model;
+          updatedState.modelProvider = options.modelProvider || currentCustomState?.modelProvider || 'openai';
+        }
+        
+        // Update sandbox mode if provided
+        if (options?.sandboxMode) {
+          updatedState.sandboxMode = options.sandboxMode;
+        }
+        
+        // Update web search if provided
+        if (options?.webSearch !== undefined) {
+          updatedState.webSearch = options.webSearch;
+        }
+        
+        // CRITICAL: Restore the saved codexSessionId
+        if (savedCodexSessionId) {
+          updatedState.codexSessionId = savedCodexSessionId;
+          logger?.info(`[codex-debug] Restoring codexSessionId: ${savedCodexSessionId}`);
+        } else if (currentCustomState?.codexSessionId) {
+          // Fallback: if there's a codexSessionId in current state, preserve it
+          updatedState.codexSessionId = currentCustomState.codexSessionId;
+          logger?.info(`[codex-debug] Preserving existing codexSessionId: ${currentCustomState.codexSessionId}`);
+        }
         
         await panelManager.updatePanel(panelId, {
           state: {
@@ -129,6 +214,7 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
             customState: updatedState
           }
         });
+        logger?.info(`[codex-debug] Panel state updated after continue`);
       }
       
       return { success: true };
@@ -150,16 +236,13 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     }
   });
 
-  // Send input to Codex panel
+  // Send input to Codex panel - DEPRECATED in interactive mode
+  // In interactive mode, each prompt spawns a new process via start or continue
+  // Keeping this handler for backward compatibility but it should not be used
   ipcMain.handle('codexPanel:sendInput', async (_, panelId: string, input: string) => {
-    try {
-      logger?.info(`[codex-debug] IPC sendInput: Panel ${panelId}, Input: "${input}"`);
-      codexPanelManager.sendInputToPanel(panelId, input);
-      return { success: true };
-    } catch (error) {
-      logger?.error(`[codex-debug] Failed to send input to panel ${panelId}:`, error as Error);
-      throw error;
-    }
+    const error = new Error('sendInput is not supported in interactive mode. Use codexPanel:continue instead.');
+    logger?.error(`[codex-debug] sendInput called but not supported in interactive mode for panel ${panelId}`);
+    throw error;
   });
 
   // Send approval decision
@@ -179,6 +262,58 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
     try {
       logger?.info(`[codex-debug] IPC sendInterrupt: Panel ${panelId}`);
       await codexPanelManager.sendInterrupt(panelId);
+
+      // Record a system message when the user cancels Codex execution
+      const panel = panelManager.getPanel(panelId);
+      const sessionId = panel?.sessionId;
+      const timestamp = new Date();
+      const cancellationMessage = {
+        type: 'session',
+        data: {
+          status: 'cancelled',
+          message: 'Cancelled by user',
+          source: 'user'
+        }
+      };
+
+      try {
+        if (sessionManager?.addPanelOutput) {
+          sessionManager.addPanelOutput(panelId, {
+            type: 'json',
+            data: cancellationMessage,
+            timestamp
+          });
+        } else if (sessionId) {
+          sessionManager.addSessionOutput(sessionId, {
+            type: 'json',
+            data: cancellationMessage,
+            timestamp
+          });
+        }
+
+        const payload = {
+          panelId,
+          sessionId,
+          type: 'json' as const,
+          data: cancellationMessage,
+          timestamp
+        };
+
+        if (sessionId) {
+          sessionManager.emit('session-output', payload);
+          sessionManager.emit('session-output-available', { sessionId, panelId });
+        }
+
+        // Notify Codex-specific listeners so the UI updates immediately
+        codexManager.emit('panel-output', payload);
+
+        // Ensure session status reflects the stop request
+        if (sessionId) {
+          sessionManager.stopSession(sessionId);
+        }
+      } catch (loggingError) {
+        logger?.warn(`[codex-debug] Failed to record cancellation message for panel ${panelId}:`, loggingError as Error);
+      }
       return { success: true };
     } catch (error) {
       logger?.error(`[codex-debug] Failed to send interrupt to panel ${panelId}:`, error as Error);
@@ -211,14 +346,27 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
   });
 
   // Get existing outputs for a panel
-  ipcMain.handle('codexPanel:getOutputs', async (_, panelId: string, limit: number = 1000) => {
+  ipcMain.handle('codexPanel:getOutputs', async (_, panelId: string) => {
     try {
-      logger?.info(`[codex-debug] IPC getOutputs: Panel ${panelId}, Limit: ${limit}`);
-      const outputs = sessionManager.getSessionOutputsForPanel(panelId, limit);
+      logger?.info(`[codex-debug] IPC getOutputs: Panel ${panelId}`);
+      const outputs = sessionManager.getSessionOutputsForPanel(panelId);
       logger?.info(`[codex-debug] Found ${outputs.length} outputs for panel ${panelId}`);
       return outputs;
     } catch (error) {
       logger?.error(`[codex-debug] Failed to get outputs for panel ${panelId}:`, error as Error);
+      throw error;
+    }
+  });
+
+  // Get debug state for a panel
+  ipcMain.handle('codexPanel:getDebugState', async (_, { panelId }: { panelId: string }) => {
+    try {
+      logger?.info(`[codex-debug] IPC getDebugState: Panel ${panelId}`);
+      const debugState = await codexManager.getDebugState(panelId);
+      logger?.info(`[codex-debug] Debug state retrieved for panel ${panelId}`);
+      return debugState;
+    } catch (error) {
+      logger?.error(`[codex-debug] Failed to get debug state for panel ${panelId}:`, error as Error);
       throw error;
     }
   });

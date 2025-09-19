@@ -30,10 +30,17 @@ interface CreateSessionJob {
   folderId?: string;
   baseBranch?: string;
   autoCommit?: boolean;
-  model?: string;
   toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
+  codexConfig?: {
+    model?: string;
+    modelProvider?: string;
+    approvalPolicy?: 'auto' | 'manual';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+  };
 }
 
 interface ContinueSessionJob {
@@ -129,7 +136,7 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model, toolType } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
       console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
@@ -152,6 +159,7 @@ export class TaskQueue {
         }
 
         let worktreeName = worktreeTemplate;
+        let sessionName: string;
         
         // Generate a name if template is empty - but skip if we're in multi-session creation with index
         if (!worktreeName || worktreeName.trim() === '') {
@@ -159,18 +167,38 @@ export class TaskQueue {
           if (index !== undefined && index >= 0) {
             console.log(`[TaskQueue] Multi-session creation detected (index ${index}), using fallback name`);
             worktreeName = 'session';
+            sessionName = 'Session';
           } else {
             console.log(`[TaskQueue] No worktree template provided, generating name from prompt...`);
-            // Use the AI-powered name generator or smart fallback
-            worktreeName = await this.options.worktreeNameGenerator.generateWorktreeName(prompt);
-            console.log(`[TaskQueue] Generated base name: ${worktreeName}`);
+            // Use the AI-powered name generator to generate a session name with spaces
+            sessionName = await this.options.worktreeNameGenerator.generateSessionName(prompt);
+            // Convert the session name to a worktree name (spaces to hyphens)
+            worktreeName = sessionName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            console.log(`[TaskQueue] Generated session name: ${sessionName}`);
+            console.log(`[TaskQueue] Generated worktree name: ${worktreeName}`);
+          }
+        } else {
+          // If we have a worktree template, use it as the session name as-is
+          sessionName = worktreeName;
+          
+          // For the worktree name, replace spaces with hyphens and make it lowercase
+          // but keep hyphens that are already there
+          if (worktreeName.includes(' ')) {
+            worktreeName = worktreeName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          } else {
+            // Already a valid worktree name format (no spaces), just clean it up
+            worktreeName = worktreeName.toLowerCase().replace(/[^a-z0-9-]/g, '');
           }
         }
         
-        // Ensure uniqueness among all sessions (including archived)
-        worktreeName = await this.ensureUniqueSessionName(worktreeName, index);
+        // Ensure uniqueness for both names
+        const { sessionName: uniqueSessionName, worktreeName: uniqueWorktreeName } = 
+          await this.ensureUniqueNames(sessionName, worktreeName, targetProject, index);
+        sessionName = uniqueSessionName;
+        worktreeName = uniqueWorktreeName;
         
         console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
+        console.log(`[TaskQueue] Session display name: ${sessionName}`);
         console.log(`[TaskQueue] Target project:`, JSON.stringify({
           id: targetProject.id,
           name: targetProject.name,
@@ -181,8 +209,6 @@ export class TaskQueue {
         const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
         console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
         console.log(`[TaskQueue] Base commit: ${baseCommit}, Base branch: ${actualBaseBranch}`);
-        
-        const sessionName = worktreeName;
         console.log(`[TaskQueue] Creating session in database`);
         
         const session = await sessionManager.createSession(
@@ -195,7 +221,6 @@ export class TaskQueue {
           false, // isMainRepo = false for regular sessions
           autoCommit,
           job.data.folderId,
-          model,
           toolType,
           baseCommit,
           actualBaseBranch,
@@ -203,6 +228,11 @@ export class TaskQueue {
           job.data.commitModeSettings
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
+        
+        // Attach codexConfig to the session object for the panel creation in events.ts
+        if (codexConfig) {
+          (session as any).codexConfig = codexConfig;
+        }
 
         // Only add prompt-related data if there's actually a prompt
         if (prompt && prompt.trim().length > 0) {
@@ -255,12 +285,10 @@ export class TaskQueue {
 
         // Only start an AI panel if there's a prompt
         if (prompt && prompt.trim().length > 0) {
-          const resolvedToolType: 'claude' | 'codex' | 'none' = toolType
-            ? toolType
-            : (model && getCodexModelConfig(model)) ? 'codex' : 'claude';
+          const resolvedToolType: 'claude' | 'codex' | 'none' = toolType || 'claude';
 
           if (resolvedToolType === 'codex') {
-            console.log(`[TaskQueue] Starting Codex for session ${session.id} with model: ${model}`);
+            console.log(`[TaskQueue] Starting Codex for session ${session.id}`);
 
             // Wait for the Codex panel to be created by the session-created event handler in events.ts
             let codexPanel = null;
@@ -288,7 +316,17 @@ export class TaskQueue {
                   }
 
                   console.log(`[TaskQueue] Starting Codex with prompt length: ${prompt.length} characters`);
-                  await codexPanelManager.startPanel(codexPanel.id, session.worktreePath, prompt, model);
+                  await codexPanelManager.startPanel(
+                    codexPanel.id, 
+                    session.worktreePath, 
+                    prompt, 
+                    codexConfig?.model,
+                    codexConfig?.modelProvider,
+                    codexConfig?.approvalPolicy,
+                    codexConfig?.sandboxMode,
+                    codexConfig?.webSearch,
+                    codexConfig?.thinkingLevel
+                  );
                   console.log(`[TaskQueue] Codex started successfully via panel manager for panel ${codexPanel.id} (session ${session.id})`);
                 } catch (error) {
                   console.error('[TaskQueue] Failed to start Codex via panel manager:', error);
@@ -304,7 +342,7 @@ export class TaskQueue {
               throw new Error('No Codex panel found - cannot start Codex without a real panel ID');
             }
           } else if (resolvedToolType === 'claude') {
-            console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
+            console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
             
             // Wait for the Claude panel to be created by the session-created event handler in events.ts
             let claudePanel = null;
@@ -341,8 +379,10 @@ export class TaskQueue {
                   }
                   
                   // Use the claude panel manager directly instead of calling IPC handlers
-                  await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, model);
-                  console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            } catch (error) {
+                  // Model is now managed at panel level
+                  await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode);
+                  console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            
+                } catch (error) {
                   console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
                   throw new Error(`Failed to start Claude panel: ${error}`);
                 }
@@ -440,10 +480,17 @@ export class TaskQueue {
     projectId?: number,
     baseBranch?: string,
     autoCommit?: boolean,
-    model?: string,
     toolType?: 'claude' | 'codex' | 'none',
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
-    commitModeSettings?: string
+    commitModeSettings?: string,
+    codexConfig?: {
+      model?: string;
+      modelProvider?: string;
+      approvalPolicy?: 'auto' | 'manual';
+      sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+      webSearch?: boolean;
+      thinkingLevel?: 'low' | 'medium' | 'high';
+    }
   ): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
@@ -501,7 +548,7 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model, toolType, commitMode, commitModeSettings }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, toolType, commitMode, commitModeSettings, codexConfig }));
     }
     return Promise.all(jobs);
   }
@@ -551,6 +598,75 @@ export class TaskQueue {
     }
     
     return uniqueName;
+  }
+
+  private async ensureUniqueNames(baseSessionName: string, baseWorktreeName: string, project: any, index?: number): Promise<{ sessionName: string; worktreeName: string }> {
+    const { sessionManager, worktreeManager } = this.options;
+    const db = (sessionManager as any).db;
+    
+    let candidateSessionName = baseSessionName;
+    let candidateWorktreeName = baseWorktreeName;
+    
+    // Add index suffix if provided (for multiple sessions)
+    if (index !== undefined) {
+      candidateSessionName = `${baseSessionName} ${index + 1}`;
+      candidateWorktreeName = `${baseWorktreeName}-${index + 1}`;
+    }
+    
+    // Check for existing sessions with these names (including archived)
+    let counter = 1;
+    let uniqueSessionName = candidateSessionName;
+    let uniqueWorktreeName = candidateWorktreeName;
+    
+    while (true) {
+      // Check session name and worktree name separately
+      // This is important because different session names could map to the same worktree name
+      // e.g., "Fix Auth Bug" and "Fix-Auth-Bug" both become "fix-auth-bug"
+      const sessionNameExists = db.db.prepare(`
+        SELECT id FROM sessions 
+        WHERE name = ?
+        LIMIT 1
+      `).get(uniqueSessionName);
+      
+      const worktreeNameExists = db.db.prepare(`
+        SELECT id FROM sessions 
+        WHERE worktree_name = ?
+        LIMIT 1
+      `).get(uniqueWorktreeName);
+      
+      // Check if worktree directory exists on filesystem
+      // This handles cases where a worktree was created outside of Crystal
+      let worktreePathExists = false;
+      try {
+        if (project) {
+          const path = require('path');
+          const fs = require('fs');
+          const worktreeFolder = project.worktree_folder || 'worktrees';
+          const worktreePath = path.join(project.path, worktreeFolder, uniqueWorktreeName);
+          worktreePathExists = fs.existsSync(worktreePath);
+        }
+      } catch (e) {
+        // Ignore filesystem check errors
+        console.log('[TaskQueue] Could not check filesystem for worktree:', e);
+      }
+      
+      // All must be unique (session name, worktree name in DB, and no filesystem conflict)
+      if (!sessionNameExists && !worktreeNameExists && !worktreePathExists) {
+        break;
+      }
+      
+      // If any is taken, increment both to keep them in sync
+      if (index !== undefined) {
+        uniqueSessionName = `${baseSessionName} ${index + 1} ${counter}`;
+        uniqueWorktreeName = `${baseWorktreeName}-${index + 1}-${counter}`;
+      } else {
+        uniqueSessionName = `${baseSessionName} ${counter}`;
+        uniqueWorktreeName = `${baseWorktreeName}-${counter}`;
+      }
+      counter++;
+    }
+    
+    return { sessionName: uniqueSessionName, worktreeName: uniqueWorktreeName };
   }
 
   async close() {

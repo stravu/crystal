@@ -2,7 +2,7 @@ import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Send, Settings2, StopCircle } from 'lucide-react';
 import type { Session } from '../../../types/session';
 import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
-import { CommitModePill } from '../../CommitModeToggle';
+import { CommitModePill, AutoCommitSwitch } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 
@@ -129,8 +129,7 @@ export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
 
             {/* Commit Mode Controls */}
             <div className="flex items-center gap-3">
-              {/* Auto-Commit Toggle - Hidden: Now handled by CommitMode system */}
-              {/* <label className="text-text-secondary">Auto-Commit:</label>
+              <label className="text-text-secondary">Auto-Commit:</label>
               <div className="flex items-center gap-2">
                 <AutoCommitSwitch
                   sessionId={session.id}
@@ -138,18 +137,29 @@ export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
                   currentSettings={session.commitModeSettings}
                   autoCommit={session.autoCommit}
                 />
-                <CommitModePill */}
-              <CommitModePill
-                sessionId={session.id}
-                currentMode={session.commitMode}
-                currentSettings={session.commitModeSettings}
-                autoCommit={session.autoCommit}
-                projectId={session.projectId}
-                isAutoCommitEnabled={isAutoCommitEnabled}
-              />
+                <CommitModePill
+                  sessionId={session.id}
+                  currentMode={session.commitMode}
+                  currentSettings={session.commitModeSettings}
+                  autoCommit={session.autoCommit}
+                  projectId={session.projectId}
+                  isAutoCommitEnabled={isAutoCommitEnabled}
+                />
+              </div>
             </div>
 
             {/* Web Search toggle hidden for Codex as it doesn't work */}
+            {/* <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-text-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={options.webSearch}
+                  onChange={(e) => setOptions({ ...options, webSearch: e.target.checked })}
+                  className="rounded border-border-primary"
+                />
+                Web Search
+              </label>
+            </div> */
           </div>
         </div>
       )}

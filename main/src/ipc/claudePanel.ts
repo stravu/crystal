@@ -81,15 +81,22 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
       // Save the user prompt as a conversation message with panel_id
       sessionManager.addPanelConversationMessage(panelId, 'user', prompt);
 
+      // Get model from panel settings if not provided
+      let modelToUse = model;
+      if (!modelToUse) {
+        const settings = databaseService.getClaudePanelSettings(panelId);
+        modelToUse = settings?.model || 'claude-3-opus-20240229';
+      }
+
       // Start Claude via the panel manager
-      await claudePanelManager.startPanel(panelId, session.worktreePath, prompt, permissionMode, model);
+      await claudePanelManager.startPanel(panelId, session.worktreePath, prompt, permissionMode, modelToUse);
       
       // Update panel state
       const updatedState: ClaudePanelState = {
         ...panel.state.customState as ClaudePanelState,
         isInitialized: true,
         lastPrompt: prompt,
-        model,
+        model: modelToUse,
         permissionMode,
         lastActivityTime: new Date().toISOString()
       };
@@ -135,16 +142,23 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
         sessionManager.getPanelConversationMessages(panelId) :
         sessionManager.getConversationMessages(panel.sessionId);
 
+      // Get model from panel settings if not provided
+      let modelToUse = model;
+      if (!modelToUse) {
+        const settings = databaseService.getClaudePanelSettings(panelId);
+        modelToUse = settings?.model || 'claude-3-opus-20240229';
+      }
+
       // Continue Claude via the panel manager
       const continuePrompt = prompt || '';
-      await claudePanelManager.continuePanel(panelId, session.worktreePath, continuePrompt, conversationHistory, model);
+      await claudePanelManager.continuePanel(panelId, session.worktreePath, continuePrompt, conversationHistory, modelToUse);
       
       // Update panel state
       const updatedState: ClaudePanelState = {
         ...panel.state.customState as ClaudePanelState,
         isInitialized: true,
         lastPrompt: prompt,
-        model: model || (panel.state.customState as ClaudePanelState)?.model,
+        model: modelToUse,
         lastActivityTime: new Date().toISOString()
       };
 
@@ -303,6 +317,49 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
     } catch (error) {
       console.error('Failed to list Claude panels:', error);
       return { success: false, error: 'Failed to list Claude panels' };
+    }
+  });
+
+  // Get Claude panel model settings
+  ipcMain.handle('claude-panels:get-model', async (_event, panelId: string) => {
+    try {
+      console.log('[IPC] claude-panels:get-model called for panelId:', panelId);
+
+      // Get panel settings from database
+      const settings = databaseService.getClaudePanelSettings(panelId);
+      if (!settings) {
+        // Return default from config if settings don't exist yet
+        const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
+        return { success: true, data: defaultModel };
+      }
+
+      return { success: true, data: settings.model };
+    } catch (error) {
+      console.error('Failed to get Claude panel model:', error);
+      return { success: false, error: 'Failed to get Claude panel model' };
+    }
+  });
+
+  // Set Claude panel model settings
+  ipcMain.handle('claude-panels:set-model', async (_event, panelId: string, model: string) => {
+    try {
+      console.log('[IPC] claude-panels:set-model called for panelId:', panelId, 'model:', model);
+
+      // Check if settings exist
+      const existingSettings = databaseService.getClaudePanelSettings(panelId);
+      
+      if (!existingSettings) {
+        // Create new settings
+        databaseService.createClaudePanelSettings(panelId, { model });
+      } else {
+        // Update existing settings
+        databaseService.updateClaudePanelSettings(panelId, { model });
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set Claude panel model:', error);
+      return { success: false, error: 'Failed to set Claude panel model' };
     }
   });
 

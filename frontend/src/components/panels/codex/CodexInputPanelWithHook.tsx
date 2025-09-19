@@ -3,6 +3,7 @@ import { Send, Settings2, StopCircle, X, Paperclip, FileText } from 'lucide-reac
 import type { Session } from '../../../types/session';
 import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
 import { useAIInputPanel } from '../../../hooks/useAIInputPanel';
+import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 
@@ -40,7 +41,6 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
   const [options, setOptions] = useState({
     model: getInitialModel(),
     modelProvider: 'openai',
-    approvalPolicy: 'manual' as 'manual' | 'auto',
     sandboxMode: 'workspace-write' as 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch: false
   });
@@ -73,6 +73,10 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
     onCancel,
     disabled
   });
+
+  // Calculate auto-commit enabled state  
+  const effectiveMode = session.commitMode || (session.autoCommit === false ? 'disabled' : 'checkpoint');
+  const isAutoCommitEnabled = effectiveMode !== 'disabled';
 
   // Save model selection to localStorage whenever it changes
   useEffect(() => {
@@ -135,18 +139,6 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-text-secondary">Approval:</label>
-              <select
-                value={options.approvalPolicy}
-                onChange={(e) => setOptions({ ...options, approvalPolicy: e.target.value as 'manual' | 'auto' })}
-                className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary"
-              >
-                <option value="manual">Manual</option>
-                <option value="auto">Auto</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
               <label className="text-text-secondary">Sandbox:</label>
               <select
                 value={options.sandboxMode}
@@ -159,7 +151,30 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Commit Mode Controls */}
+            <div className="flex items-center gap-3">
+              {/* Auto-Commit Toggle - Hidden: Now handled by CommitMode system */}
+              {/* <label className="text-text-secondary">Auto-Commit:</label>
+              <div className="flex items-center gap-2">
+                <AutoCommitSwitch
+                  sessionId={session.id}
+                  currentMode={session.commitMode}
+                  currentSettings={session.commitModeSettings}
+                  autoCommit={session.autoCommit}
+                />
+                <CommitModePill */}
+              <CommitModePill
+                sessionId={session.id}
+                currentMode={session.commitMode}
+                currentSettings={session.commitModeSettings}
+                autoCommit={session.autoCommit}
+                projectId={session.projectId}
+                isAutoCommitEnabled={isAutoCommitEnabled}
+              />
+            </div>
+
+            {/* Web Search toggle hidden for Codex as it doesn't work */}
+            {/* <div className="flex items-center gap-2">
               <label className="flex items-center gap-1 text-text-secondary cursor-pointer">
                 <input
                   type="checkbox"
@@ -169,7 +184,7 @@ export const CodexInputPanelWithHook: React.FC<CodexInputPanelProps> = ({
                 />
                 Web Search
               </label>
-            </div>
+            </div> */}
           </div>
         </div>
       )}

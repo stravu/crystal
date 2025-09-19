@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AIPanelProps } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
@@ -8,6 +8,7 @@ import { useClaudePanel } from '../../../hooks/useClaudePanel';
 import { ClaudeSettingsPanel } from './ClaudeSettingsPanel';
 import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
 import { Settings } from 'lucide-react';
+import { useConfigStore } from '../../../stores/configStore';
 
 export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
   const hook = useClaudePanel(panel.id, isActive);
@@ -26,6 +27,8 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
 
   const transformer = new ClaudeMessageTransformer();
   const activeSession = hook.activeSession;
+  const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
+  const showDebugTabs = devModeEnabled;
 
   const handleRichOutputSettingsChange = (newSettings: any) => {
     setRichOutputSettings(newSettings);
@@ -35,6 +38,12 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
   const toggleSettings = () => {
     setShowSettings(!showSettings);
   };
+
+  useEffect(() => {
+    if (!devModeEnabled && activeView !== 'richOutput') {
+      setActiveView('richOutput');
+    }
+  }, [devModeEnabled, activeView]);
 
   if (!activeSession) {
     return (
@@ -51,69 +60,88 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
   return (
     <div className="flex-1 flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="border-b border-border-primary bg-surface-primary shadow-sm">
-        <div className="flex items-center justify-between px-4 h-12">
-          <div className="flex items-center gap-2">
-            <div className="flex">
-              <button
-                onClick={() => setActiveView('richOutput')}
-                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                  activeView === 'richOutput'
-                    ? 'text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                Output
-                {activeView === 'richOutput' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+      {showDebugTabs && (
+        <div className="border-b border-border-primary bg-surface-primary shadow-sm">
+          <div className="flex items-center justify-between px-4 h-12">
+            <div className="flex items-center gap-2">
+              <div className="flex">
+                <button
+                  onClick={() => setActiveView('richOutput')}
+                  className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                    activeView === 'richOutput'
+                      ? 'text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Output
+                  {activeView === 'richOutput' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+                  )}
+                </button>
+                {devModeEnabled && (
+                  <>
+                    <button
+                      onClick={() => setActiveView('messages')}
+                      className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                        activeView === 'messages'
+                          ? 'text-text-primary'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      Messages
+                      {activeView === 'messages' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setActiveView('stats')}
+                      className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                        activeView === 'stats'
+                          ? 'text-text-primary'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      Stats
+                      {activeView === 'stats' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
+                      )}
+                    </button>
+                  </>
                 )}
-              </button>
-              <button
-                onClick={() => setActiveView('messages')}
-                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                  activeView === 'messages'
-                    ? 'text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                Messages
-                {activeView === 'messages' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
-                )}
-              </button>
-              <button
-                onClick={() => setActiveView('stats')}
-                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                  activeView === 'stats'
-                    ? 'text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                Stats
-                {activeView === 'stats' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-interactive" />
-                )}
-              </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-secondary">Claude</span>
+              {activeView === 'richOutput' && (
+                <button
+                  onClick={toggleSettings}
+                  className="p-1.5 rounded hover:bg-surface-hover transition-colors"
+                  title="Display settings"
+                >
+                  <Settings className="w-4 h-4 text-text-secondary" />
+                </button>
+              )}
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-secondary">Claude</span>
-            {activeView === 'richOutput' && (
-              <button
-                onClick={toggleSettings}
-                className="p-1.5 rounded hover:bg-surface-hover transition-colors"
-                title="Display settings"
-              >
-                <Settings className="w-4 h-4 text-text-secondary" />
-              </button>
-            )}
-          </div>
         </div>
-      </div>
+      )}
 
       {/* Main content area */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
+        {!showDebugTabs && (
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-2 rounded border border-border-primary bg-surface-secondary px-3 py-1 shadow-sm">
+            <span className="text-xs text-text-secondary">Claude</span>
+            <button
+              onClick={toggleSettings}
+              className="p-1.5 rounded hover:bg-surface-hover transition-colors"
+              title="Display settings"
+              aria-label="Open Claude settings"
+            >
+              <Settings className="w-4 h-4 text-text-secondary" />
+            </button>
+          </div>
+        )}
         {activeView === 'richOutput' && (
           <RichOutputWithSidebar 
             panelId={panel.id}
@@ -123,14 +151,14 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
             transformer={transformer}
           />
         )}
-        {activeView === 'messages' && (
+        {devModeEnabled && activeView === 'messages' && (
           <MessagesView 
             panelId={panel.id}
             agentType="claude"
             outputEventName="session:output"
           />
         )}
-        {activeView === 'stats' && (
+        {devModeEnabled && activeView === 'stats' && (
           <SessionStats sessionId={activeSession.id} />
         )}
       </div>
@@ -164,6 +192,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
           hasConversationHistory={hook.hasConversationHistory}
           contextCompacted={hook.contextCompacted}
           handleCancelRequest={hook.handleStopSession}
+          panelId={panel.id}
         />
       )}
 

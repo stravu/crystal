@@ -1,6 +1,29 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.3.0] - 2025-09-18
+
+### Major Changes
+- **OpenAI Codex support** - Run OpenAI Codex as well as Claude Code
+- **Panel-based workspace** - You may now create multiple agent and terminal panels inside a single session
+
+### Added
+- **Session attachments & shortcuts** - Add text attachment support alongside images when starting sessions and Cmd+Click to spin up a new session.
+- **Clipboard actions** - Copy-to-clipboard icons for session messages and run-script logs.
+
+### Changed
+- **New session dialog** - Remembers preferences, allows promptless sessions, stabilizes prompts when switching models, and improves model selection.
+- **Environment reliability** - Centralized PATH handling and refreshed git actions after commits for more accurate status updates.
+- **Session naming** - Session names can now have spaces for better flexibility.
+
+### Fixed
+- **Session UX issues** - Fixed session rename regressions, prompt box glitches, duplicate key errors, and ensured git actions only appear on the right session.
+- **Attachments & prompts** - Corrected handling for image/text attachments, wrong prompts in dialogs, and Codex conversation continuation.
+- **Performance improvements** - Improved scroll behavior on diff viewer commits and better worktree deletion queuing.
+
+### Security
+- **Race condition hardening** - Added session validation, mutex locks, and database transactions to prevent cross-session data leaks.
+
 ## [0.2.3] - 2025-08-25
 
 ### Fixed

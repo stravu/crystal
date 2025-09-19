@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import { Card } from '../ui/Card';
-import { Checkbox } from '../ui/Input';
-import { Shield, ShieldOff, Cpu, Paperclip } from 'lucide-react';
+import { Shield, ShieldOff, Cpu, Paperclip, X, FileText, Brain, Gauge, Zap } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { CODEX_MODELS, type OpenAICodexModel } from '../../../../shared/types/models';
 
@@ -12,6 +11,7 @@ export interface CodexConfig {
   approvalPolicy?: 'auto' | 'manual';
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   webSearch?: boolean;
+  thinkingLevel?: 'low' | 'medium' | 'high';
   attachedImages?: any[];
   attachedTexts?: any[];
 }
@@ -22,6 +22,8 @@ interface CodexConfigProps {
   projectId?: string;
   disabled?: boolean;
   onPaste?: (e: React.ClipboardEvent) => void;
+  onRemoveImage?: (id: string) => void;
+  onRemoveText?: (id: string) => void;
 }
 
 export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
@@ -29,7 +31,9 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
   onChange,
   projectId,
   disabled = false,
-  onPaste
+  onPaste,
+  onRemoveImage,
+  onRemoveText
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -73,6 +77,66 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
         <label htmlFor="codex-prompt" className="block text-sm font-medium text-text-secondary mb-2">
           Initial Prompt
         </label>
+        {(config.attachedImages?.length ?? 0) > 0 || (config.attachedTexts?.length ?? 0) > 0 ? (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {config.attachedTexts?.map(text => (
+              <div key={text.id} className="relative group">
+                <div className="h-12 px-3 flex items-center gap-2 bg-surface-secondary rounded border border-border-primary">
+                  <FileText className="w-4 h-4 text-text-secondary" />
+                  <span className="text-xs text-text-secondary max-w-[150px] truncate">
+                    {text.name}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return;
+                    if (onRemoveText) {
+                      onRemoveText(text.id);
+                    } else {
+                      onChange({
+                        ...config,
+                        attachedTexts: (config.attachedTexts || []).filter(item => item.id !== text.id)
+                      });
+                    }
+                  }}
+                  className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  aria-label={`Remove ${text.name}`}
+                >
+                  <X className="w-2.5 h-2.5 text-text-secondary" />
+                </button>
+              </div>
+            ))}
+
+            {config.attachedImages?.map(image => (
+              <div key={image.id} className="relative group">
+                <img
+                  src={image.dataUrl}
+                  alt={image.name}
+                  className="h-12 w-12 object-cover rounded border border-border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return;
+                    if (onRemoveImage) {
+                      onRemoveImage(image.id);
+                    } else {
+                      onChange({
+                        ...config,
+                        attachedImages: (config.attachedImages || []).filter(item => item.id !== image.id)
+                      });
+                    }
+                  }}
+                  className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  aria-label={`Remove ${image.name}`}
+                >
+                  <X className="w-2.5 h-2.5 text-text-secondary" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="relative">
           <FilePathAutocomplete
             value={config.prompt || ''}
@@ -150,16 +214,79 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
         </div>
       </div>
 
+      {/* Thinking Level */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-2">
+          Thinking Level
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          <Card
+            variant={(config.thinkingLevel || 'medium') === 'low' ? 'interactive' : 'bordered'}
+            padding="sm"
+            className={`relative cursor-pointer transition-all ${
+              (config.thinkingLevel || 'medium') === 'low' ? 'border-interactive bg-interactive/10' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onChange({ ...config, thinkingLevel: 'low' })}
+            title="Low thinking - Faster responses with less reasoning"
+          >
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Gauge className={`w-5 h-5 ${(config.thinkingLevel || 'medium') === 'low' ? 'text-interactive' : ''}`} />
+              <span className={`text-sm font-medium ${(config.thinkingLevel || 'medium') === 'low' ? 'text-interactive' : ''}`}>Low</span>
+              <span className="text-xs opacity-75">Fast</span>
+            </div>
+            {(config.thinkingLevel || 'medium') === 'low' && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+            )}
+          </Card>
+          <Card
+            variant={(config.thinkingLevel || 'medium') === 'medium' ? 'interactive' : 'bordered'}
+            padding="sm"
+            className={`relative cursor-pointer transition-all ${
+              (config.thinkingLevel || 'medium') === 'medium' ? 'border-interactive bg-interactive/10' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onChange({ ...config, thinkingLevel: 'medium' })}
+            title="Medium thinking - Balanced speed and reasoning (default)"
+          >
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Brain className={`w-5 h-5 ${(config.thinkingLevel || 'medium') === 'medium' ? 'text-interactive' : ''}`} />
+              <span className={`text-sm font-medium ${(config.thinkingLevel || 'medium') === 'medium' ? 'text-interactive' : ''}`}>Medium</span>
+              <span className="text-xs opacity-75">Balanced</span>
+            </div>
+            {(config.thinkingLevel || 'medium') === 'medium' && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+            )}
+          </Card>
+          <Card
+            variant={(config.thinkingLevel || 'medium') === 'high' ? 'interactive' : 'bordered'}
+            padding="sm"
+            className={`relative cursor-pointer transition-all ${
+              (config.thinkingLevel || 'medium') === 'high' ? 'border-interactive bg-interactive/10' : ''
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onChange({ ...config, thinkingLevel: 'high' })}
+            title="High thinking - Slower but more thorough reasoning"
+          >
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Zap className={`w-5 h-5 ${(config.thinkingLevel || 'medium') === 'high' ? 'text-interactive' : ''}`} />
+              <span className={`text-sm font-medium ${(config.thinkingLevel || 'medium') === 'high' ? 'text-interactive' : ''}`}>High</span>
+              <span className="text-xs opacity-75">Thorough</span>
+            </div>
+            {(config.thinkingLevel || 'medium') === 'high' && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+            )}
+          </Card>
+        </div>
+      </div>
+
       {/* Additional Options */}
       <div className="space-y-3">
-        {/* Web Search */}
-        <Checkbox
+        {/* Web Search - Hidden for Codex as it doesn't work */}
+        {/* <Checkbox
           id="codex-websearch"
           label="Enable web search"
           checked={config.webSearch || false}
           onChange={(e) => onChange({ ...config, webSearch: e.target.checked })}
           disabled={disabled}
-        />
+        /> */}
         
         {/* Approval Policy */}
         <div>

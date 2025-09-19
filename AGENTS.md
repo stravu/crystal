@@ -38,3 +38,5 @@
 - Keep changes minimal and scoped; prefer small patches.
 - Update docs alongside code; do not alter build targets without discussion.
 - Use repository scripts (pnpm) and keep formatting consistent with existing files.
+- Always review the root `CLAUDE.md` before beginning any work. 
+- Scan the repository for every `CLAUDE.md`, and when working in a folder or any of its subfolders that has one, read and follow that file too.

@@ -33,4 +33,24 @@ export function registerConfigHandlers(ipcMain: IpcMain, { configManager, claude
       return { success: false, error: 'Failed to update config' };
     }
   });
+
+  ipcMain.handle('config:get-session-preferences', async () => {
+    try {
+      const preferences = configManager.getSessionCreationPreferences();
+      return { success: true, data: preferences };
+    } catch (error) {
+      console.error('Failed to get session creation preferences:', error);
+      return { success: false, error: 'Failed to get session creation preferences' };
+    }
+  });
+
+  ipcMain.handle('config:update-session-preferences', async (_event, preferences: any) => {
+    try {
+      await configManager.updateConfig({ sessionCreationPreferences: preferences });
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to update session creation preferences:', error);
+      return { success: false, error: 'Failed to update session creation preferences' };
+    }
+  });
 } 

@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn';
 import { RichOutputSettings } from '../ai/AbstractAIPanel';
 import { MessageTransformer } from '../ai/transformers/MessageTransformer';
 import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
+import { CodexMessageTransformer } from '../ai/transformers/CodexMessageTransformer';
 
 interface RichOutputWithSidebarProps {
   panelId?: string;
@@ -17,6 +18,7 @@ interface RichOutputWithSidebarProps {
   showSettings?: boolean;
   onSettingsClick?: () => void;
   transformer?: MessageTransformer;
+  showSystemMessages?: boolean;
 }
 
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
@@ -25,6 +27,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionStatus,
   settings,
   transformer,
+  showSystemMessages = true,
 }) => {
   // Use panelId if available, otherwise fall back to sessionId for backward compatibility
   const id = panelId || sessionId;
@@ -57,6 +60,11 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
     }
   }, []);
 
+  // Determine event names and handlers based on transformer type
+  const isCodex = transformer instanceof CodexMessageTransformer;
+  const outputEventName = isCodex ? "codexPanel:output" : "session-output-available";
+  const getOutputsHandler = isCodex ? "codexPanel:getOutputs" : "panels:getJsonMessages";
+
   return (
     <div className="flex h-full relative">
       {/* Main Content */}
@@ -67,8 +75,9 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           sessionStatus={sessionStatus}
           settings={settings}
           messageTransformer={transformer || new ClaudeMessageTransformer()}
-          outputEventName="session-output-available"
-          getOutputsHandler="panels:getJsonMessages"
+          outputEventName={outputEventName}
+          getOutputsHandler={getOutputsHandler}
+          showSystemMessages={showSystemMessages}
         />
       </div>
 

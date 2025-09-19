@@ -11,6 +11,7 @@ import {
   validatePanelEventContext,
   logValidationFailure 
 } from './utils/sessionValidation';
+import type { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
 
 export function setupEventListeners(services: AppServices, getMainWindow: () => BrowserWindow | null): void {
   const {
@@ -21,8 +22,137 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     gitDiffManager,
     gitStatusManager,
     worktreeManager,
-    archiveProgressManager
+    archiveProgressManager,
+    logger
   } = services;
+
+  let codexCliManager: AbstractCliManager | undefined;
+  try {
+    const { codexManager: resolvedCodexManager } = require('./ipc/codexPanel');
+    codexCliManager = resolvedCodexManager;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    (logger || console).warn?.(`[Main] Unable to load Codex manager for lifecycle events: ${message}`);
+  }
+
+  const attachProcessLifecycleHandlers = (
+    manager: AbstractCliManager | undefined,
+    tool: 'claude' | 'codex'
+  ) => {
+    if (!manager) {
+      if (tool === 'codex') {
+        (logger || console).warn?.('[Main] Codex manager not available; skipping lifecycle handlers');
+      }
+      return;
+    }
+
+    const toolLabel = tool === 'claude' ? 'Claude Code' : 'Codex';
+
+    manager.on('spawned', async ({ panelId, sessionId }: { panelId?: string; sessionId: string }) => {
+      const validation = panelId
+        ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
+        : validateEventContext({ sessionId }, sessionId);
+
+      if (!validation.valid) {
+        logValidationFailure(`${toolLabel} spawned event`, validation);
+        return;
+      }
+
+      if (panelId) {
+        console.log(`[Main] ${toolLabel} spawned for panel ${panelId} (session ${sessionId}), updating status to 'running'`);
+      } else {
+        console.log(`[Main] ${toolLabel} spawned for session ${sessionId}, updating status to 'running'`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      await sessionManager.updateSession(sessionId, {
+        status: 'running',
+        run_started_at: 'CURRENT_TIMESTAMP'
+      });
+
+      const updatedSession = await sessionManager.getSession(sessionId);
+      console.log(`[Main] Session ${sessionId} status after update: ${updatedSession?.status}`);
+
+      try {
+        const session = await sessionManager.getSession(sessionId);
+        if (session && session.worktreePath) {
+          const panels = panelManager.getPanelsForSession(sessionId);
+          const targetPanels = panels.filter((p: any) => p.type === tool);
+
+          let promptMarkers;
+          if (targetPanels.length > 0 && typeof sessionManager.getPanelPromptMarkers === 'function') {
+            promptMarkers = sessionManager.getPanelPromptMarkers(targetPanels[0].id);
+          } else {
+            promptMarkers = sessionManager.getPromptMarkers(sessionId);
+          }
+
+          const latestPrompt = promptMarkers.length > 0
+            ? promptMarkers[promptMarkers.length - 1].prompt_text
+            : session.prompt;
+
+          await executionTracker.startExecution(sessionId, session.worktreePath, undefined, latestPrompt);
+          // NOTE: Run commands are not started automatically; user must trigger them explicitly.
+        }
+      } catch (error) {
+        console.error(`Failed to start execution tracking for session ${sessionId}:`, error);
+      }
+    });
+
+    manager.on('exit', async ({ panelId, sessionId, exitCode, signal }: { panelId?: string; sessionId: string; exitCode: number | null; signal: number | null | string }) => {
+      const validation = panelId
+        ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
+        : validateEventContext({ sessionId }, sessionId);
+
+      if (!validation.valid) {
+        logValidationFailure(`${toolLabel} exit event`, validation);
+        return;
+      }
+
+      const signalText = signal === null || signal === undefined ? 'null' : String(signal);
+      if (panelId) {
+        console.log(`[Main] ${toolLabel} exited for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signalText}`);
+      } else {
+        console.log(`[Main] ${toolLabel} exited for session ${sessionId} with code ${exitCode}, signal ${signalText}`);
+      }
+
+      if (exitCode !== null && exitCode !== undefined) {
+        await sessionManager.setSessionExitCode(sessionId, exitCode);
+      }
+
+      const session = sessionManager.getSession(sessionId);
+      if (session) {
+        const dbSession = sessionManager.getDbSession(sessionId);
+        if (dbSession && dbSession.status !== 'completed') {
+          console.log(`[Main] Updating session ${sessionId} status to 'stopped'`);
+          await sessionManager.updateSession(sessionId, { status: 'stopped' });
+        } else {
+          console.log(`[Main] Session ${sessionId} already marked as completed, preserving status`);
+          const updatedSession = sessionManager.getSession(sessionId);
+          if (updatedSession) {
+            console.log(`[Main] Session ${sessionId} final status: ${updatedSession.status}`);
+          }
+        }
+      }
+
+      try {
+        await runCommandManager.stopRunCommands(sessionId);
+      } catch (error) {
+        console.error(`Failed to stop run commands for session ${sessionId}:`, error);
+      }
+
+      try {
+        if (executionTracker.isTracking(sessionId)) {
+          await executionTracker.endExecution(sessionId);
+        }
+      } catch (error) {
+        console.error(`Failed to end execution tracking for session ${sessionId}:`, error);
+      }
+    });
+  };
+
+  attachProcessLifecycleHandlers(claudeCodeManager, 'claude');
+  attachProcessLifecycleHandlers(codexCliManager, 'codex');
 
   // Listen to sessionManager events and broadcast to renderer
   sessionManager.on('session-created', async (session) => {
@@ -51,11 +181,27 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
         console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
         try {
+          // Prepare initial custom state for the panel
+          let customState: any = undefined;
+          if (panelType === 'codex') {
+            const codexConfig = (session as any).codexConfig || {};
+            customState = {
+              codexConfig: {
+                model: codexConfig.model || 'auto',
+                modelProvider: codexConfig.modelProvider || 'openai',
+                thinkingLevel: codexConfig.thinkingLevel || 'medium',
+                sandboxMode: codexConfig.sandboxMode || 'workspace-write',
+                webSearch: codexConfig.webSearch || false
+              }
+            };
+            console.log(`[Events] Creating Codex panel with customState:`, customState);
+          }
+          
           const panel = await panelManager.createPanel({
             sessionId: session.id,
             type: panelType as any,
             title: panelTitle,
-            initialState: panelType === 'codex' ? { model: session.model } : undefined
+            initialState: customState
           });
           console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
 
@@ -311,55 +457,19 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   claudeCodeManager.on('exit', async ({ panelId, sessionId, exitCode, signal }: { panelId?: string; sessionId: string; exitCode: number; signal: string }) => {
-    // Validate the event context
-    const validation = panelId 
+    const validation = panelId
       ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
       : validateEventContext({ sessionId }, sessionId);
 
     if (!validation.valid) {
       logValidationFailure('claudeCodeManager exit event', validation);
-      return; // Don't process invalid events
+      return;
     }
 
     if (panelId) {
-      console.log(`[Main] Claude Code exited for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signal}`);
+      console.log(`[Main] Claude Code exit summary triggered for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signal}`);
     } else {
-      console.log(`[Main] Claude Code exited for session ${sessionId} with code ${exitCode}, signal ${signal}`);
-    }
-    await sessionManager.setSessionExitCode(sessionId, exitCode);
-    
-    // Get the current session to check its current status
-    const session = sessionManager.getSession(sessionId);
-    if (session) {
-      // Only update to 'stopped' if the session hasn't already been marked as completed
-      const dbSession = sessionManager.getDbSession(sessionId);
-      if (dbSession && dbSession.status !== 'completed') {
-        console.log(`[Main] Updating session ${sessionId} status to 'stopped'`);
-        await sessionManager.updateSession(sessionId, { status: 'stopped' });
-      } else {
-        console.log(`[Main] Session ${sessionId} already marked as completed, preserving status`);
-        // Trigger a re-conversion to ensure the UI gets the correct status
-        const updatedSession = sessionManager.getSession(sessionId);
-        if (updatedSession) {
-          console.log(`[Main] Session ${sessionId} final status: ${updatedSession.status}`);
-        }
-      }
-    }
-
-    // Stop run commands
-    try {
-      await runCommandManager.stopRunCommands(sessionId);
-    } catch (error) {
-      console.error(`Failed to stop run commands for session ${sessionId}:`, error);
-    }
-
-    // End execution tracking
-    try {
-      if (executionTracker.isTracking(sessionId)) {
-        await executionTracker.endExecution(sessionId);
-      }
-    } catch (error) {
-      console.error(`Failed to end execution tracking for session ${sessionId}:`, error);
+      console.log(`[Main] Claude Code exit summary triggered for session ${sessionId} with code ${exitCode}, signal ${signal}`);
     }
 
     // Add commit information when session ends

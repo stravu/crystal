@@ -178,13 +178,23 @@ export const SessionView = memo(() => {
     async (type: ToolPanelType) => {
       if (!activeSession) return;
       
-      // For Codex panels, include the last selected model in initial state
+      // For Codex panels, include the last selected model and thinking level in initial state
       let initialState: any = undefined;
       if (type === 'codex') {
         const savedModel = localStorage.getItem('codex.lastSelectedModel');
-        if (savedModel) {
-          initialState = { model: savedModel };
-        }
+        const savedThinkingLevel = localStorage.getItem('codex.lastSelectedThinkingLevel');
+        
+        initialState = {
+          customState: {
+            codexConfig: {
+              model: savedModel || 'auto',
+              modelProvider: 'openai',
+              thinkingLevel: savedThinkingLevel || 'medium',
+              sandboxMode: 'workspace-write',
+              webSearch: false
+            }
+          }
+        };
       }
       
       await panelApi.createPanel({

@@ -12,7 +12,31 @@ import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/ClaudeCodeConfig';
 import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
-import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
+import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
+import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
+
+const LARGE_TEXT_THRESHOLD = 5000;
+const TEXT_FILE_EXTENSIONS = /\.(?:txt|md|markdown|log|json|js|jsx|ts|tsx|py|rb|go|java|cs|c|cpp|h|hpp|rs|yml|yaml|sh|bash|zsh|html|css|scss|less|xml|csv)$/i;
+
+const isLikelyTextFile = (file: File) => {
+  if (file.type && file.type.startsWith('text/')) {
+    return true;
+  }
+
+  const knownTypes = new Set([
+    'application/json',
+    'application/javascript',
+    'application/xml',
+    'application/x-python-code',
+    'application/x-sh',
+  ]);
+
+  if (knownTypes.has(file.type)) {
+    return true;
+  }
+
+  return TEXT_FILE_EXTENSIONS.test(file.name.toLowerCase());
+};
 
 interface AttachedImage {
   id: string;
@@ -29,6 +53,14 @@ interface AttachedText {
   size: number;
 }
 
+const attachmentListsEqual = <T extends { id: string }>(a: T[] = [], b: T[] = []) => {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return a.every((item, index) => item.id === b[index]?.id);
+};
+
 interface CreateSessionDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,7 +76,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     prompt: '',
     model: 'auto',
     permissionMode: 'ignore',
-    ultrathink: false
+    ultrathink: false,
+    attachedImages: [],
+    attachedTexts: []
   });
   const [codexConfig, setCodexConfig] = useState<CodexConfig>({
     prompt: '',
@@ -52,14 +86,17 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     modelProvider: 'openai',
     approvalPolicy: 'auto',
     sandboxMode: 'workspace-write',
-    webSearch: false
+    webSearch: false,
+    thinkingLevel: 'medium',
+    attachedImages: [],
+    attachedTexts: []
   });
   const [formData, setFormData] = useState<CreateSessionRequest>({
     prompt: '',
     worktreeTemplate: '',
     count: 1,
-    permissionMode: 'ignore',
-    model: 'auto' // Default to auto (Claude Code's default selection)
+    permissionMode: 'ignore'
+    // Model is now managed at panel level, not session level
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
@@ -74,27 +111,141 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
   const { showError } = useErrorStore();
-  
-  // Fetch project details to get last used model
-  useEffect(() => {
-    if (isOpen && projectId) {
-      API.projects.getAll().then(response => {
-        if (response.success && response.data) {
-          const project = response.data.find((p: any) => p.id === projectId);
-          if (project && project.lastUsedModel) {
-            setFormData(prev => ({
-              ...prev,
-              model: project.lastUsedModel
-            }));
-          }
-        }
-      }).catch((err: any) => {
-        console.error('Failed to fetch projects:', err);
-      });
+  const { preferences, loadPreferences, updatePreferences } = useSessionPreferencesStore();
+
+  const syncPromptAcrossConfigs = useCallback((newPrompt: string, source: 'claude' | 'codex' | 'none') => {
+    setFormData(prev => (prev.prompt === newPrompt ? prev : { ...prev, prompt: newPrompt }));
+
+    if (source !== 'claude') {
+      setClaudeConfig(prev => (prev.prompt === newPrompt ? prev : { ...prev, prompt: newPrompt }));
     }
-  }, [isOpen, projectId]);
+
+    if (source !== 'codex') {
+      setCodexConfig(prev => (prev.prompt === newPrompt ? prev : { ...prev, prompt: newPrompt }));
+    }
+  }, []);
+
+  const syncImageAttachments = useCallback((updater: (prev: AttachedImage[]) => AttachedImage[]) => {
+    setAttachedImages(prevImages => {
+      const updatedImages = updater(prevImages);
+
+      if (attachmentListsEqual(prevImages, updatedImages)) {
+        return prevImages;
+      }
+
+      setClaudeConfig(prev => {
+        const current = prev.attachedImages || [];
+        return attachmentListsEqual(current, updatedImages)
+          ? prev
+          : { ...prev, attachedImages: updatedImages };
+      });
+
+      setCodexConfig(prev => {
+        const current = prev.attachedImages || [];
+        return attachmentListsEqual(current, updatedImages)
+          ? prev
+          : { ...prev, attachedImages: updatedImages };
+      });
+
+      return updatedImages;
+    });
+  }, []);
+
+  const syncTextAttachments = useCallback((updater: (prev: AttachedText[]) => AttachedText[]) => {
+    setAttachedTexts(prevTexts => {
+      const updatedTexts = updater(prevTexts);
+
+      if (attachmentListsEqual(prevTexts, updatedTexts)) {
+        return prevTexts;
+      }
+
+      setClaudeConfig(prev => {
+        const current = prev.attachedTexts || [];
+        return attachmentListsEqual(current, updatedTexts)
+          ? prev
+          : { ...prev, attachedTexts: updatedTexts };
+      });
+
+      setCodexConfig(prev => {
+        const current = prev.attachedTexts || [];
+        return attachmentListsEqual(current, updatedTexts)
+          ? prev
+          : { ...prev, attachedTexts: updatedTexts };
+      });
+
+      return updatedTexts;
+    });
+  }, []);
+
+  const addImageAttachment = useCallback((image: AttachedImage) => {
+    syncImageAttachments(prev => [...prev, image]);
+  }, [syncImageAttachments]);
+
+  const addTextAttachment = useCallback((text: AttachedText) => {
+    syncTextAttachments(prev => [...prev, text]);
+  }, [syncTextAttachments]);
+  
+  // Load session creation preferences when dialog opens and clear session name/prompt
+  useEffect(() => {
+    if (isOpen) {
+      loadPreferences();
+      // Always clear session name and prompts when dialog opens
+      setSessionName('');
+      setSessionCount(1);
+      setFormData(prev => ({ ...prev, count: 1 }));
+      syncPromptAcrossConfigs('', 'none');
+      syncImageAttachments(() => []);
+      syncTextAttachments(() => []);
+    }
+  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+  }, [toolType]);
+
+  // Apply loaded preferences to state
+  useEffect(() => {
+    if (preferences) {
+      setToolType(preferences.toolType);
+      setClaudeConfig(prev => ({
+        ...prev,
+        model: preferences.claudeConfig.model,
+        permissionMode: preferences.claudeConfig.permissionMode,
+        ultrathink: preferences.claudeConfig.ultrathink
+      }));
+      setCodexConfig(prev => ({
+        ...prev,
+        model: preferences.codexConfig.model as OpenAICodexModel,
+        modelProvider: preferences.codexConfig.modelProvider,
+        approvalPolicy: preferences.codexConfig.approvalPolicy,
+        sandboxMode: preferences.codexConfig.sandboxMode,
+        webSearch: preferences.codexConfig.webSearch,
+        thinkingLevel: preferences.codexConfig.thinkingLevel || 'medium'
+      }));
+      setShowAdvanced(preferences.showAdvanced);
+      setCommitModeSettings(preferences.commitModeSettings);
+      // Note: we don't apply baseBranch as it should be project-specific
+    }
+  }, [preferences]);
+
+  // Save preferences when certain settings change
+  const savePreferences = async (updates: Partial<typeof preferences>) => {
+    await updatePreferences(updates);
+  };
+  
+  // Note: Model preferences are now stored in panel settings, not at project level
   
   useEffect(() => {
     if (isOpen) {
@@ -209,13 +360,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     });
   }, []);
 
+  const generateTextId = useCallback(() => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, []);
+
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
     // Check for text content first
     const textData = e.clipboardData.getData('text/plain');
-    const LARGE_TEXT_THRESHOLD = 5000;
     
     if (textData && textData.length > LARGE_TEXT_THRESHOLD) {
       // Large text pasted - convert to attachment
@@ -228,19 +380,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         size: textData.length,
       };
       
-      // Add to the active tool's config
-      if (toolType === 'claude') {
-        setClaudeConfig(prev => ({
-          ...prev,
-          attachedTexts: [...(prev.attachedTexts || []), textAttachment]
-        }));
-      } else if (toolType === 'codex') {
-        setCodexConfig(prev => ({
-          ...prev,
-          attachedTexts: [...(prev.attachedTexts || []), textAttachment]
-        }));
-      }
-      setAttachedTexts(prev => [...prev, textAttachment]);
+      addTextAttachment(textAttachment);
       console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
       return;
     }
@@ -262,67 +402,112 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       if (file) {
         const image = await processFile(file);
         if (image) {
-          // Add to the active tool's config
-          if (toolType === 'claude') {
-            setClaudeConfig(prev => ({
-              ...prev,
-              attachedImages: [...(prev.attachedImages || []), image]
-            }));
-          } else if (toolType === 'codex') {
-            setCodexConfig(prev => ({
-              ...prev,
-              attachedImages: [...(prev.attachedImages || []), image]
-            }));
-          }
-          setAttachedImages(prev => [...prev, image]);
+          addImageAttachment(image);
         }
       }
     }
-  }, [processFile, toolType]);
+  }, [processFile, addImageAttachment, addTextAttachment, generateTextId]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current += 1;
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files || []);
+
+    if (files.length === 0) {
+      const textData = e.dataTransfer.getData('text/plain');
+      if (textData && textData.length > LARGE_TEXT_THRESHOLD) {
+        const textAttachment: AttachedText = {
+          id: generateTextId(),
+          name: `Dropped Text (${textData.length.toLocaleString()} chars)`,
+          content: textData,
+          size: textData.length,
+        };
+        addTextAttachment(textAttachment);
+        console.log(`[Drop Text] Automatically attached ${textData.length} characters from drop`);
+      }
+      return;
+    }
+
+    for (const file of files) {
+      if (file.type && file.type.startsWith('image/')) {
+        const image = await processFile(file);
+        if (image) {
+          addImageAttachment(image);
+        }
+        continue;
+      }
+
+      if (isLikelyTextFile(file)) {
+        try {
+          const content = await file.text();
+          if (!content) {
+            continue;
+          }
+
+          const textAttachment: AttachedText = {
+            id: generateTextId(),
+            name: `${file.name} (${content.length.toLocaleString()} chars)`,
+            content,
+            size: content.length,
+          };
+          addTextAttachment(textAttachment);
+          console.log(`[Drop Text File] Attached ${file.name} (${content.length} chars)`);
+        } catch (error) {
+          console.error('Failed to read dropped text file:', error);
+        }
+      } else {
+        console.warn('Unsupported file type for drop:', file.name);
+      }
+    }
+  }, [addImageAttachment, addTextAttachment, processFile, generateTextId]);
 
   const removeImage = useCallback((id: string) => {
-    // Remove from active tool's config
-    if (toolType === 'claude') {
-      setClaudeConfig(prev => ({
-        ...prev,
-        attachedImages: (prev.attachedImages || []).filter(img => img.id !== id)
-      }));
-    } else if (toolType === 'codex') {
-      setCodexConfig(prev => ({
-        ...prev,
-        attachedImages: (prev.attachedImages || []).filter(img => img.id !== id)
-      }));
-    }
-    setAttachedImages(prev => prev.filter(img => img.id !== id));
-  }, [toolType]);
+    syncImageAttachments(prev => prev.filter(img => img.id !== id));
+  }, [syncImageAttachments]);
 
   const removeText = useCallback((id: string) => {
-    // Remove from active tool's config
-    if (toolType === 'claude') {
-      setClaudeConfig(prev => ({
-        ...prev,
-        attachedTexts: (prev.attachedTexts || []).filter(txt => txt.id !== id)
-      }));
-    } else if (toolType === 'codex') {
-      setCodexConfig(prev => ({
-        ...prev,
-        attachedTexts: (prev.attachedTexts || []).filter(txt => txt.id !== id)
-      }));
-    }
-    setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
-  }, [toolType]);
+    syncTextAttachments(prev => prev.filter(txt => txt.id !== id));
+  }, [syncTextAttachments]);
   
   if (!isOpen) return null;
   
   const validateWorktreeName = (name: string): string | null => {
     if (!name) return null; // Empty is allowed
     
-    // Check for spaces
-    if (name.includes(' ')) {
-      return 'Session name cannot contain spaces';
-    }
+    // Spaces are now allowed in session names
+    // They will be converted to hyphens for the actual worktree name
     
-    // Check for invalid git characters
+    // Check for invalid git characters (excluding spaces which are now allowed)
     const invalidChars = /[~^:?*\[\]\\]/;
     if (invalidChars.test(name)) {
       return 'Session name contains invalid characters (~^:?*[]\\)';
@@ -345,8 +530,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     
     return null;
   };
-
-  const generateTextId = () => `txt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -375,7 +558,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     try {
       // Prepare the prompt and configuration based on selected tool
       let finalPrompt = '';
-      let finalModel = 'auto';
+      // Model is now managed at panel level, not session level
       let finalPermissionMode: 'ignore' | 'approve' = 'ignore';
       
       // Get attachments from the active config
@@ -389,12 +572,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         if (claudeConfig.ultrathink && finalPrompt) {
           finalPrompt += '\nultrathink';
         }
-        finalModel = claudeConfig.model;
+        // Model is stored at panel level for Claude panels
         finalPermissionMode = claudeConfig.permissionMode;
       } else if (toolType === 'codex') {
         // Use Codex config directly
         finalPrompt = codexConfig.prompt || '';
-        finalModel = (codexConfig.model || DEFAULT_CODEX_MODEL) as string;
+        // Model is stored at panel level for Codex panels
         // Keep session permission mode independent of Codex approval policy; default to ignore unless explicitly set
         finalPermissionMode = formData.permissionMode || 'ignore';
       }
@@ -460,13 +643,21 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         prompt: finalPrompt || undefined,
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
-        model: finalModel,
+        // Model is now managed at panel level, not session level
         toolType,
         permissionMode: finalPermissionMode,
         projectId,
         commitMode: commitModeSettings.mode,
         commitModeSettings: JSON.stringify(commitModeSettings),
-        baseBranch: formData.baseBranch
+        baseBranch: formData.baseBranch,
+        codexConfig: toolType === 'codex' ? {
+          model: codexConfig.model,
+          modelProvider: codexConfig.modelProvider,
+          approvalPolicy: codexConfig.approvalPolicy,
+          sandboxMode: codexConfig.sandboxMode,
+          webSearch: codexConfig.webSearch,
+          thinkingLevel: codexConfig.thinkingLevel
+        } : undefined
       });
       
       if (!response.success) {
@@ -479,48 +670,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         return;
       }
       
-      // Save the model as last used for this project
-      if (projectId && finalModel) {
-        API.projects.update(projectId.toString(), { lastUsedModel: finalModel }).catch(err => {
-          console.error('Failed to save last used model:', err);
-        });
-      }
+      // Note: Model preferences are now stored in panel settings during panel creation
       
       onClose();
-      // Reset form but fetch the default permission mode again
-      const configResponse = await API.config.get();
-      const defaultPermissionMode = configResponse.success && configResponse.data?.defaultPermissionMode 
-        ? configResponse.data.defaultPermissionMode 
-        : 'ignore';
-      // Reset form
-      setSessionName('');
-      setSessionCount(1);
-      setToolType('none');
-      setClaudeConfig({
-        prompt: '',
-        model: claudeConfig.model, // Keep the same model for next time
-        permissionMode: defaultPermissionMode as 'ignore' | 'approve',
-        ultrathink: false
-      });
-      setCodexConfig({
-        prompt: '',
-        model: DEFAULT_CODEX_MODEL,
-        modelProvider: 'openai',
-        approvalPolicy: 'auto',
-        sandboxMode: 'workspace-write',
-        webSearch: false
-      });
-      setFormData({ 
-        prompt: '', 
-        worktreeTemplate: '', 
-        count: 1, 
-        permissionMode: defaultPermissionMode as 'ignore' | 'approve', 
-        model: finalModel // Keep the same model for next time
-      });
-      setWorktreeError(null);
-      setShowAdvanced(false); // Close advanced options
-      setAttachedImages([]); // Clear attachments
-      setAttachedTexts([]); // Clear attachments
+      // Reset form - name and prompt are cleared, but other settings are preserved from preferences
+      // This will be handled by the useEffect when the dialog opens again
     } catch (error: any) {
       console.error('Error creating session:', error);
       showError({
@@ -648,7 +802,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     onChange={(e) => {
                       const count = parseInt(e.target.value) || 1;
                       setSessionCount(count);
-                      setFormData({ ...formData, count });
+                      setFormData(prev => ({ ...prev, count }));
                     }}
                     className="w-full"
                   />
@@ -683,7 +837,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setToolType('none')}
+                    onClick={() => {
+                      setToolType('none');
+                      savePreferences({ toolType: 'none' });
+                    }}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <X className={`w-5 h-5 ${toolType === 'none' ? 'text-interactive' : 'text-text-tertiary'}`} />
@@ -703,7 +860,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setToolType('claude')}
+                    onClick={() => {
+                      setToolType('claude');
+                      savePreferences({ toolType: 'claude' });
+                    }}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Brain className={`w-5 h-5 ${toolType === 'claude' ? 'text-interactive' : ''}`} />
@@ -723,7 +883,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         ? 'border-interactive bg-interactive/10'
                         : ''
                     }`}
-                    onClick={() => setToolType('codex')}
+                    onClick={() => {
+                      setToolType('codex');
+                      savePreferences({ toolType: 'codex' });
+                    }}
                   >
                     <div className="flex flex-col items-center gap-1 py-2">
                       <Code2 className={`w-5 h-5 ${toolType === 'codex' ? 'text-interactive' : ''}`} />
@@ -739,110 +902,91 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               
               {/* Tool-specific configuration */}
               {toolType === 'claude' && (
-                <Card variant="bordered" className="p-4">
-                  <ClaudeCodeConfigComponent
-                    config={claudeConfig}
-                    onChange={setClaudeConfig}
-                    projectId={projectId?.toString()}
-                    onPaste={handlePaste}
-                  />
-                  
-                  {/* Attached items for Claude */}
-                  {((claudeConfig.attachedImages?.length ?? 0) > 0 || (claudeConfig.attachedTexts?.length ?? 0) > 0) && (
-                    <div className="mt-4 pt-4 border-t border-border-primary">
-                      <p className="text-xs text-text-secondary mb-2">Attached Files:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {claudeConfig.attachedTexts?.map(text => (
-                          <div key={text.id} className="relative group">
-                            <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
-                              <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                              <span className="text-xs text-text-secondary max-w-[120px] truncate">
-                                {text.name}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeText(text.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                        
-                        {claudeConfig.attachedImages?.map(image => (
-                          <div key={image.id} className="relative group">
-                            <img
-                              src={image.dataUrl}
-                              alt={image.name}
-                              className="h-10 w-10 object-cover rounded border border-border-primary"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                <Card
+                  variant="bordered"
+                  className={`relative p-4 transition-colors ${
+                    isDragging ? 'border-interactive border-dashed bg-interactive/10' : ''
+                  }`}
+                  onDrop={handleDrop}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                >
+                  {isDragging && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-card border-2 border-dashed border-interactive bg-interactive/10 text-interactive">
+                      <Paperclip className="w-5 h-5 mb-1" />
+                      <span className="text-xs font-medium">Drop files to attach</span>
                     </div>
                   )}
+
+                  <div className={isDragging ? 'opacity-60' : ''}>
+                    <ClaudeCodeConfigComponent
+                      config={claudeConfig}
+                      onChange={(newConfig) => {
+                        setClaudeConfig(newConfig);
+                        syncPromptAcrossConfigs(newConfig.prompt ?? '', 'claude');
+                        syncImageAttachments(() => [...(newConfig.attachedImages || [])]);
+                        syncTextAttachments(() => [...(newConfig.attachedTexts || [])]);
+                        // Save claude config preferences (excluding prompt and attachments)
+                        const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
+                        savePreferences({ claudeConfig: {
+                          model: configToSave.model,
+                          permissionMode: configToSave.permissionMode,
+                          ultrathink: configToSave.ultrathink ?? false
+                        } });
+                      }}
+                      projectId={projectId?.toString()}
+                      onPaste={handlePaste}
+                      onRemoveImage={removeImage}
+                      onRemoveText={removeText}
+                    />
+                  </div>
                 </Card>
               )}
               
               {toolType === 'codex' && (
-                <Card variant="bordered" className="p-4">
-                  <CodexConfigComponent
-                    config={codexConfig}
-                    onChange={setCodexConfig}
-                    projectId={projectId?.toString()}
-                    onPaste={handlePaste}
-                  />
-                  
-                  {/* Attached items for Codex */}
-                  {((codexConfig.attachedImages?.length ?? 0) > 0 || (codexConfig.attachedTexts?.length ?? 0) > 0) && (
-                    <div className="mt-4 pt-4 border-t border-border-primary">
-                      <p className="text-xs text-text-secondary mb-2">Attached Files:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {codexConfig.attachedTexts?.map(text => (
-                          <div key={text.id} className="relative group">
-                            <div className="h-10 px-2.5 flex items-center gap-1.5 bg-surface-secondary rounded border border-border-primary">
-                              <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                              <span className="text-xs text-text-secondary max-w-[120px] truncate">
-                                {text.name}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeText(text.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                        
-                        {codexConfig.attachedImages?.map(image => (
-                          <div key={image.id} className="relative group">
-                            <img
-                              src={image.dataUrl}
-                              alt={image.name}
-                              className="h-10 w-10 object-cover rounded border border-border-primary"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="absolute -top-1 -right-1 bg-surface-primary border border-border-primary rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                            >
-                              <X className="w-2.5 h-2.5 text-text-secondary" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                <Card
+                  variant="bordered"
+                  className={`relative p-4 transition-colors ${
+                    isDragging ? 'border-interactive border-dashed bg-interactive/10' : ''
+                  }`}
+                  onDrop={handleDrop}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                >
+                  {isDragging && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-card border-2 border-dashed border-interactive bg-interactive/10 text-interactive">
+                      <Paperclip className="w-5 h-5 mb-1" />
+                      <span className="text-xs font-medium">Drop files to attach</span>
                     </div>
                   )}
+
+                  <div className={isDragging ? 'opacity-60' : ''}>
+                    <CodexConfigComponent
+                      config={codexConfig}
+                      onChange={(newConfig) => {
+                        setCodexConfig(newConfig);
+                        syncPromptAcrossConfigs(newConfig.prompt ?? '', 'codex');
+                        syncImageAttachments(() => [...(newConfig.attachedImages || [])]);
+                        syncTextAttachments(() => [...(newConfig.attachedTexts || [])]);
+                        // Save codex config preferences (excluding prompt and attachments)
+                        const { prompt, attachedImages, attachedTexts, ...configToSave } = newConfig;
+                        savePreferences({ codexConfig: {
+                          model: (configToSave.model ?? DEFAULT_CODEX_MODEL) as string,
+                          modelProvider: configToSave.modelProvider ?? 'openai',
+                          approvalPolicy: configToSave.approvalPolicy ?? 'auto',
+                          sandboxMode: configToSave.sandboxMode ?? 'workspace-write',
+                          webSearch: configToSave.webSearch ?? false,
+                          thinkingLevel: configToSave.thinkingLevel ?? 'medium'
+                        } });
+                      }}
+                      projectId={projectId?.toString()}
+                      onPaste={handlePaste}
+                      onRemoveImage={removeImage}
+                      onRemoveText={removeText}
+                    />
+                  </div>
                 </Card>
               )}
               
@@ -901,7 +1045,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <div className="relative">
                   <FilePathAutocomplete
                     value={formData.prompt}
-                    onChange={(value) => setFormData({ ...formData, prompt: value })}
+                    onChange={(value) => syncPromptAcrossConfigs(value, 'none')}
                     projectId={projectId?.toString()}
                     placeholder="Describe your task... (use @ to reference files)"
                     className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
@@ -931,7 +1075,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                     for (const file of files) {
                       const image = await processFile(file);
                       if (image) {
-                        setAttachedImages(prev => [...prev, image]);
+                        addImageAttachment(image);
                       }
                     }
                     e.target.value = ''; // Reset input
@@ -944,7 +1088,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             <div className="px-6 pb-4">
               <Button
                 type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
+                onClick={() => {
+                  const newShowAdvanced = !showAdvanced;
+                  setShowAdvanced(newShowAdvanced);
+                  savePreferences({ showAdvanced: newShowAdvanced });
+                }}
                 variant="ghost"
                 size="sm"
                 className="text-text-secondary hover:text-text-primary"
@@ -972,6 +1120,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       onChange={(e) => {
                         const selectedBranch = e.target.value;
                         setFormData({ ...formData, baseBranch: selectedBranch });
+                        savePreferences({ baseBranch: selectedBranch });
                       }}
                       className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary"
                       disabled={isLoadingBranches}
@@ -1009,6 +1158,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   settings={commitModeSettings}
                   onChange={(_mode, settings) => {
                     setCommitModeSettings(settings);
+                    savePreferences({ commitModeSettings: settings });
                   }}
                 />
               </div>

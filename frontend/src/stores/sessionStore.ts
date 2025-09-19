@@ -101,7 +101,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         output: state.activeMainRepoSession.output,
         jsonMessages: state.activeMainRepoSession.jsonMessages
       };
-      console.log(`[SessionStore] Updated active main repo session ${updatedSession.id} model:`, newActiveSession.model);
+      console.log(`[SessionStore] Updated active main repo session ${updatedSession.id}`);
       return {
         ...state,
         activeMainRepoSession: newActiveSession
@@ -120,7 +120,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           output: state.sessions[i].output,
           jsonMessages: state.sessions[i].jsonMessages
         };
-        console.log(`[SessionStore] Updated session ${updatedSession.id} model: ${state.sessions[i].model} -> ${updatedSessionWithOutput.model}`);
+        console.log(`[SessionStore] Updated session ${updatedSession.id}`);
         newSessions[i] = updatedSessionWithOutput;
         break;
       }

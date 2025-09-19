@@ -30,6 +30,13 @@ export class PanelEventBus extends EventEmitter {
     
     // Set up event listeners for each event type
     eventTypes.forEach(eventType => {
+      // Check if we already have a listener for this event type
+      if (panelListeners.has(eventType)) {
+        // Remove the old listener before adding new one
+        const oldListener = panelListeners.get(eventType)!;
+        this.removeListener(eventType, oldListener);
+      }
+      
       const listener = (event: PanelEvent) => {
         // Don't send events back to the source panel
         if (event.source.panelId !== panelId) {

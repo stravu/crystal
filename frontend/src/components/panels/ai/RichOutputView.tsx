@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { API } from '../../../utils/api';
-import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Copy, Check, FileText, Terminal, Info, Loader2, Clock } from 'lucide-react';
 import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 import { MessageSegment } from './components/MessageSegment';
 import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransformer';
 import { RichOutputSettings } from './AbstractAIPanel';
+import { CodexMessageTransformer } from './transformers/CodexMessageTransformer';
 
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
@@ -13,6 +15,69 @@ const defaultSettings: RichOutputSettings = {
   collapseTools: false,
   showThinking: true,
   showSessionInit: false, // Hide by default - it's developer info
+};
+
+const formatStatusLabel = (value: string): string =>
+  value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char: string) => char.toUpperCase());
+
+const sessionStatusStyles: Record<string, {
+  icon: LucideIcon;
+  container: string;
+  iconWrapper: string;
+  title?: string;
+  titleClass: string;
+}> = {
+  completed: {
+    icon: CheckCircle,
+    container: 'bg-status-success/10 border-status-success/30',
+    iconWrapper: 'bg-status-success/20 text-status-success',
+    title: 'Session Completed',
+    titleClass: 'text-status-success'
+  },
+  running: {
+    icon: Loader2,
+    container: 'bg-interactive/10 border-interactive/30',
+    iconWrapper: 'bg-interactive/20 text-interactive-on-dark',
+    title: 'Session Running',
+    titleClass: 'text-interactive-on-dark'
+  },
+  initializing: {
+    icon: Loader2,
+    container: 'bg-interactive/10 border-interactive/30',
+    iconWrapper: 'bg-interactive/20 text-interactive-on-dark',
+    title: 'Session Initializing',
+    titleClass: 'text-interactive-on-dark'
+  },
+  waiting: {
+    icon: Clock,
+    container: 'bg-status-warning/10 border-status-warning/30',
+    iconWrapper: 'bg-status-warning/20 text-status-warning',
+    title: 'Waiting for Input',
+    titleClass: 'text-status-warning'
+  },
+  paused: {
+    icon: Clock,
+    container: 'bg-status-warning/10 border-status-warning/30',
+    iconWrapper: 'bg-status-warning/20 text-status-warning',
+    title: 'Session Paused',
+    titleClass: 'text-status-warning'
+  },
+  error: {
+    icon: XCircle,
+    container: 'bg-status-error/10 border-status-error/30',
+    iconWrapper: 'bg-status-error/20 text-status-error',
+    title: 'Session Error',
+    titleClass: 'text-status-error'
+  },
+  default: {
+    icon: Info,
+    container: 'bg-surface-tertiary/50 border-border-primary',
+    iconWrapper: 'bg-surface-secondary text-text-secondary',
+    title: 'Session Update',
+    titleClass: 'text-text-secondary'
+  }
 };
 
 interface RichOutputViewProps {
@@ -24,24 +89,28 @@ interface RichOutputViewProps {
   messageTransformer: MessageTransformer;
   outputEventName: string;
   getOutputsHandler: string;
+  showSystemMessages?: boolean;
 }
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
-  ({ panelId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings, messageTransformer, outputEventName, getOutputsHandler }, ref) => {
+  ({ panelId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings, messageTransformer, outputEventName, getOutputsHandler, showSystemMessages: showSystemMessagesProp }, ref) => {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsedMessages, setCollapsedMessages] = useState<Set<string>>(new Set());
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [showScrollButton, setShowScrollButton] = useState(false);
-  
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const showSystemMessages = showSystemMessagesProp ?? true;
+
   // Use parent-controlled settings if provided, otherwise use default
   const localSettings = useMemo<RichOutputSettings>(() => {
     const saved = localStorage.getItem('richOutputSettings');
     return saved ? JSON.parse(saved) : defaultSettings;
   }, []);
-  
+
   const settings = propsSettings || localSettings;
+  const isCodexTransformer = useMemo(() => messageTransformer instanceof CodexMessageTransformer, [messageTransformer]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -50,6 +119,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const wasAtBottomRef = useRef(true); // Start as true to scroll to bottom on first load
   const loadMessagesRef = useRef<(() => Promise<void>) | null>(null);
   const isFirstLoadRef = useRef(true); // Track if this is the first load
+  const previousMessageCountRef = useRef(0); // Track previous message count
 
   // Save local settings to localStorage when they change
   useEffect(() => {
@@ -79,6 +149,14 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     // Prevent concurrent loads using ref
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
+    
+    // Capture scroll position before loading
+    const container = scrollContainerRef.current;
+    if (container) {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      const wasAtBottom = distanceFromBottom < 50;
+      wasAtBottomRef.current = wasAtBottom;
+    }
     
     try {
       setError(null);
@@ -166,8 +244,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     
     // Listen for the appropriate event based on the panel type
     if (outputEventName.includes('codex')) {
+      // Only register Electron IPC listener for Codex
       window.electron?.on(outputEventName, handleOutputAvailable);
-      window.addEventListener(outputEventName, handleOutputAvailable as any);
+      // Don't also add a window event listener - this causes duplicate handling
     } else {
       window.addEventListener('session-output-available', handleOutputAvailable as any);
     }
@@ -176,58 +255,65 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       clearTimeout(debounceTimer);
       if (outputEventName.includes('codex')) {
         window.electron?.off(outputEventName, handleOutputAvailable);
-        window.removeEventListener(outputEventName, handleOutputAvailable as any);
       } else {
         window.removeEventListener('session-output-available', handleOutputAvailable as any);
       }
     };
-  }, [panelId, outputEventName, messageTransformer]); // Include dependencies
+  }, [panelId, outputEventName]); // Remove messageTransformer from dependencies to avoid re-registering
 
-  // Initial load
+  // Initial load - only when panelId actually changes
   useEffect(() => {
     if (!panelId) return;
     // Reset first load flag when session changes
     isFirstLoadRef.current = true;
     wasAtBottomRef.current = true; // Also reset to true for new sessions
     loadMessages();
-  }, [panelId, loadMessages]);
-
-  // Track if user is at bottom - set up once when container is available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelId]); // Only depend on panelId, not loadMessages - we want this to run only on panel change
+  
+  // Call loadMessages when it changes (but don't reset scroll position)
   useEffect(() => {
-    let cleanup: (() => void) | undefined;
-    
-    // Use a small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
+    if (!isFirstLoadRef.current && panelId) {
+      loadMessages();
+    }
+  }, [loadMessages, panelId]);
 
-      const checkIfAtBottom = () => {
-        // Consider "at bottom" if within 30% of viewport height or 300px (whichever is larger)
-        const threshold = Math.max(container.clientHeight * 0.3, 300);
-        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-        const isAtBottom = distanceFromBottom < threshold;
-        wasAtBottomRef.current = isAtBottom;
-      };
+  // Track if user is at bottom - set up as soon as possible
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-      // Check initial position
-      checkIfAtBottom();
-
-      container.addEventListener('scroll', checkIfAtBottom);
+    const checkIfAtBottom = () => {
+      // Consider "at bottom" only if within 50px of the bottom
+      // This ensures we don't auto-scroll if the user has intentionally scrolled up
+      const threshold = 50;
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      const isAtBottom = distanceFromBottom < threshold;
       
-      // Store cleanup function
-      cleanup = () => container.removeEventListener('scroll', checkIfAtBottom);
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      if (cleanup) cleanup();
+      
+      wasAtBottomRef.current = isAtBottom;
     };
-  }, []); // Empty array - set up only once
+
+    // Check initial position immediately
+    checkIfAtBottom();
+
+    // Add scroll listener
+    container.addEventListener('scroll', checkIfAtBottom, { passive: true });
+    
+    return () => {
+      container.removeEventListener('scroll', checkIfAtBottom);
+    };
+  }); // Run on every render to ensure we catch container availability
 
   // Auto-scroll to bottom when messages change or view loads
   useEffect(() => {
-    if (messagesEndRef.current && !loading) {
-      // Always scroll to bottom on first load, or if we were at the bottom before the update
+    // Only proceed if we have new messages (not just a re-render)
+    const hasNewMessages = messages.length > previousMessageCountRef.current;
+    previousMessageCountRef.current = messages.length;
+    
+    if (messagesEndRef.current && !loading && (hasNewMessages || isFirstLoadRef.current)) {
+      // Use the wasAtBottomRef value that was captured BEFORE the messages updated
+      // Don't double-check after DOM update as the scroll position will have changed
       if (isFirstLoadRef.current || wasAtBottomRef.current) {
         // Use requestAnimationFrame to ensure DOM has updated
         requestAnimationFrame(() => {
@@ -238,7 +324,6 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           if (isFirstLoadRef.current) {
             isFirstLoadRef.current = false;
           }
-          // Don't set wasAtBottomRef here - let the scroll event handler determine actual position
         });
       }
     }
@@ -289,6 +374,38 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       return next;
     });
+  };
+
+  const copyMessageContent = async (message: UnifiedMessage) => {
+    // Extract all text content from the message segments
+    const contentParts: string[] = [];
+    
+    message.segments.forEach(seg => {
+      if (seg.type === 'text' && seg.content) {
+        contentParts.push(seg.content);
+      } else if (seg.type === 'thinking' && seg.content) {
+        contentParts.push(`*Thinking:*\n${seg.content}`);
+      } else if (seg.type === 'tool_call' && seg.tool) {
+        contentParts.push(`**Tool: ${seg.tool.name}**\n\`\`\`json\n${JSON.stringify(seg.tool.input, null, 2)}\n\`\`\``);
+        if (seg.tool.result) {
+          contentParts.push(`**Result:**\n${seg.tool.result.content}`);
+        }
+      } else if (seg.type === 'diff' && seg.diff) {
+        contentParts.push(`\`\`\`diff\n${seg.diff}\n\`\`\``);
+      }
+    });
+    
+    const fullContent = contentParts.join('\n\n');
+    
+    try {
+      await navigator.clipboard.writeText(fullContent);
+      setCopiedMessageId(message.id);
+      setTimeout(() => {
+        setCopiedMessageId(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
   };
 
   // Render a complete message
@@ -362,7 +479,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           if (el) userMessageRefs.current.set(userMessageIndex, el);
         } : undefined}
         className={`
-          rounded-lg transition-all
+          rounded-lg transition-all relative group
           ${isUser ? 'bg-surface-secondary' : hasThinking ? 'bg-surface-primary/50' : 'bg-surface-primary'}
           ${hasToolCalls ? 'bg-surface-tertiary/30' : ''}
           ${settings.compactMode ? 'p-3' : 'p-4'}
@@ -390,14 +507,33 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
               </span>
             )}
           </div>
-          {hasTextContent && textContent.length > 200 && (
-            <button
-              onClick={() => toggleMessageCollapse(message.id)}
-              className="text-text-tertiary hover:text-text-secondary transition-colors"
-            >
-              {isCollapsed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            </button>
-          )}
+          {/* Action buttons */}
+          <div className="flex items-center gap-1">
+            {/* Copy button - only for assistant messages */}
+            {!isUser && (
+              <button
+                onClick={() => copyMessageContent(message)}
+                className="p-1.5 rounded-lg bg-surface-secondary/80 hover:bg-surface-secondary transition-all opacity-0 group-hover:opacity-100 border border-border-primary"
+                title="Copy message content as markdown"
+              >
+                {copiedMessageId === message.id ? (
+                  <Check className="w-3.5 h-3.5 text-status-success" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-text-tertiary hover:text-text-secondary" />
+                )}
+              </button>
+            )}
+            {/* Hide/Show button for long messages */}
+            {hasTextContent && textContent.length > 200 && (
+              <button
+                onClick={() => toggleMessageCollapse(message.id)}
+                className="p-1.5 rounded-lg hover:bg-surface-secondary/50 transition-colors text-text-tertiary hover:text-text-secondary"
+                title={isCollapsed ? "Show full message" : "Collapse message"}
+              >
+                {isCollapsed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Message Content */}
@@ -503,6 +639,249 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       .filter(seg => seg.type === 'text')
       .map(seg => seg.type === 'text' ? seg.content : '')
       .join('\n\n');
+
+    if (message.metadata?.systemSubtype === 'session_info') {
+      if (!showSystemMessages && isCodexTransformer) {
+        return null;
+      }
+      const infoSegment = message.segments.find(seg => seg.type === 'system_info');
+      const sessionInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
+      const initialPrompt = sessionInfo.initialPrompt || sessionInfo.initial_prompt;
+      const command = sessionInfo.codexCommand || sessionInfo.claudeCommand || sessionInfo.codex_command;
+      const worktreePath = sessionInfo.worktreePath || sessionInfo.worktree_path;
+      const model = sessionInfo.model;
+      const provider = sessionInfo.modelProvider || sessionInfo.model_provider;
+      const approvalPolicy = sessionInfo.approvalPolicy || sessionInfo.approval_policy;
+      const sandboxMode = sessionInfo.sandboxMode || sessionInfo.sandbox_mode;
+      const permissionMode = sessionInfo.permissionMode || sessionInfo.permission_mode;
+      const rawResumeSessionId = sessionInfo.resumeSessionId ?? sessionInfo.resume_session_id;
+      const resumeSessionId = typeof rawResumeSessionId === 'string' && rawResumeSessionId.trim().length > 0
+        ? rawResumeSessionId
+        : null;
+
+      return (
+        <div
+          key={message.id}
+          className={`
+            rounded-lg transition-all bg-surface-tertiary border border-border-primary
+            ${settings.compactMode ? 'p-3' : 'p-4'}
+            ${needsExtraSpacing ? 'mt-4' : ''}
+          `}
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-full p-2 bg-interactive/15 text-interactive-on-dark">
+              <Settings2 className="w-5 h-5" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-text-primary">Codex Session Ready</span>
+                <span className="text-[11px] font-mono text-text-secondary bg-surface-secondary/70 border border-border-secondary px-2 py-0.5 rounded">
+                  Resume ID: {resumeSessionId ?? 'none'}
+                </span>
+                <span className="text-sm text-text-tertiary">
+                  {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                </span>
+              </div>
+
+              {initialPrompt && (
+                <div>
+                  <div className="flex items-center gap-2 text-text-secondary mb-1">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="text-xs font-semibold tracking-wider">You</span>
+                  </div>
+                  <div className="bg-surface-secondary rounded p-3 text-sm text-text-primary whitespace-pre-wrap break-words">
+                    {initialPrompt}
+                  </div>
+                </div>
+              )}
+
+              {command && (
+                <div>
+                  <div className="flex items-center gap-2 text-text-secondary mb-1">
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">Codex Command</span>
+                  </div>
+                  <div className="bg-surface-secondary rounded p-3 text-xs text-text-primary font-mono overflow-x-auto">
+                    {command}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {model && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Model</span>
+                    <div className="text-text-secondary mt-1 font-medium">
+                      {model}
+                      {provider && (
+                        <span className="block text-text-tertiary text-[11px] font-normal">Provider: {provider}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {worktreePath && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Worktree</span>
+                    <div className="text-text-secondary mt-1 font-mono truncate" title={worktreePath}>
+                      {worktreePath}
+                    </div>
+                  </div>
+                )}
+                {approvalPolicy && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Approval Policy</span>
+                    <div className="text-text-secondary mt-1">
+                      {approvalPolicy}
+                    </div>
+                  </div>
+                )}
+                {sandboxMode && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Sandbox</span>
+                    <div className="text-text-secondary mt-1">
+                      {sandboxMode}
+                    </div>
+                  </div>
+                )}
+                {permissionMode && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Permission Mode</span>
+                    <div className="text-text-secondary mt-1 capitalize">
+                      {permissionMode}
+                    </div>
+                  </div>
+                )}
+                {resumeSessionId && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Resume Session ID</span>
+                    <div className="text-text-secondary mt-1 font-mono truncate" title={resumeSessionId}>
+                      {resumeSessionId}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (message.metadata?.systemSubtype === 'session_runtime') {
+      if (!showSystemMessages && isCodexTransformer) {
+        return null;
+      }
+      const infoSegment = message.segments.find(seg => seg.type === 'system_info');
+      const runtimeInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
+      const provider = runtimeInfo.provider;
+      const sandboxMode = runtimeInfo.sandboxMode;
+      const approvalPolicy = runtimeInfo.approvalPolicy;
+      const reasoningEffort = runtimeInfo.reasoningEffort;
+      const reasoningSummaries = runtimeInfo.reasoningSummaries;
+      const workdir = runtimeInfo.workdir;
+
+      return (
+        <div
+          key={message.id}
+          className={`
+            rounded-lg transition-all bg-surface-secondary/60 border border-border-primary
+            ${settings.compactMode ? 'p-3' : 'p-4'}
+            ${needsExtraSpacing ? 'mt-4' : ''}
+          `}
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-full p-2 bg-surface-secondary text-text-secondary">
+              <Settings2 className="w-5 h-5" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-text-primary">Runtime Configuration</span>
+                <span className="text-sm text-text-tertiary">
+                  {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {provider && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Provider</span>
+                    <div className="text-text-secondary mt-1">{provider}</div>
+                  </div>
+                )}
+                {sandboxMode && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Sandbox</span>
+                    <div className="text-text-secondary mt-1">{sandboxMode}</div>
+                  </div>
+                )}
+                {approvalPolicy && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Approval Policy</span>
+                    <div className="text-text-secondary mt-1">{approvalPolicy}</div>
+                  </div>
+                )}
+                {reasoningEffort && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Reasoning Effort</span>
+                    <div className="text-text-secondary mt-1">{reasoningEffort}</div>
+                  </div>
+                )}
+                {reasoningSummaries && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Reasoning Summaries</span>
+                    <div className="text-text-secondary mt-1">{reasoningSummaries}</div>
+                  </div>
+                )}
+                {workdir && (
+                  <div>
+                    <span className="text-text-quaternary uppercase tracking-wide text-[10px]">Workdir</span>
+                    <div className="text-text-secondary mt-1 font-mono truncate" title={workdir}>
+                      {workdir}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const errorSegment = message.segments.find(seg => seg.type === 'error');
+    if (errorSegment?.type === 'error' && errorSegment.error) {
+      const { message: errorMessage, details } = errorSegment.error;
+
+      return (
+        <div
+          key={message.id}
+          className={`
+            rounded-lg transition-all bg-status-error/10 border border-status-error/30
+            ${settings.compactMode ? 'p-3' : 'p-4'}
+            ${needsExtraSpacing ? 'mt-4' : ''}
+          `}
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-full p-2 bg-status-error/20 text-status-error">
+              <XCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-status-error">
+                  {errorMessage || 'Session Error'}
+                </span>
+                <span className="text-sm text-text-tertiary">
+                  {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                </span>
+              </div>
+              {details && (
+                <pre className="bg-status-error/10 border border-status-error/30 rounded p-3 text-xs text-status-error/90 whitespace-pre-wrap font-mono overflow-x-auto">
+                  {typeof details === 'string' ? details : JSON.stringify(details, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     
     if (message.metadata?.systemSubtype === 'init') {
       const info = message.segments.find(seg => seg.type === 'system_info');
@@ -737,7 +1116,68 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       const info = systemInfo.info;
       
       // Handle specific system_info types
+      if (info.type === 'session_status') {
+        const rawStatus = typeof info.status === 'string' ? info.status : 'unknown';
+        const statusKey = rawStatus.toLowerCase();
+        const config = sessionStatusStyles[statusKey] || sessionStatusStyles.default;
+        const StatusIcon = config.icon;
+        const title = config.title ?? formatStatusLabel(rawStatus);
+
+        if (!showSystemMessages && isCodexTransformer && statusKey === 'completed') {
+          return null;
+        }
+
+        const statusMessage = typeof info.message === 'string' && info.message.trim().length > 0
+          ? info.message
+          : `Session status updated to ${formatStatusLabel(rawStatus)}`;
+
+        const detailsContent = info.details && typeof info.details === 'string'
+          ? info.details
+          : info.details && typeof info.details === 'object'
+            ? JSON.stringify(info.details, null, 2)
+            : null;
+
+        return (
+          <div
+            key={message.id}
+            className={`
+              rounded-lg transition-all border
+              ${config.container}
+              ${settings.compactMode ? 'p-3' : 'p-4'}
+              ${needsExtraSpacing ? 'mt-4' : ''}
+            `}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`rounded-full p-2 ${config.iconWrapper}`}>
+                <StatusIcon className={`w-5 h-5 ${statusKey === 'running' || statusKey === 'initializing' ? 'animate-spin' : ''}`} />
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold ${config.titleClass}`}>
+                    {title}
+                  </span>
+                  <span className="text-sm text-text-tertiary">
+                    {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                  </span>
+                </div>
+                <div className="text-sm text-text-secondary whitespace-pre-wrap">
+                  {statusMessage}
+                </div>
+                {detailsContent && (
+                  <pre className="bg-surface-secondary/70 border border-border-primary rounded p-3 text-xs text-text-secondary whitespace-pre-wrap font-mono overflow-x-auto">
+                    {detailsContent}
+                  </pre>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       if (info.type === 'task_started') {
+        if (!showSystemMessages && isCodexTransformer) {
+          return null;
+        }
         return (
           <div
             key={message.id}

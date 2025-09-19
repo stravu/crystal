@@ -31,6 +31,27 @@ export class ConfigManager extends EventEmitter {
         notifyOnStatusChange: true,
         notifyOnWaiting: true,
         notifyOnComplete: true
+      },
+      sessionCreationPreferences: {
+        sessionCount: 1,
+        toolType: 'none',
+        claudeConfig: {
+          model: 'auto',
+          permissionMode: 'ignore',
+          ultrathink: false
+        },
+        codexConfig: {
+          model: 'gpt-5',
+          modelProvider: 'openai',
+          approvalPolicy: 'auto',
+          sandboxMode: 'workspace-write',
+          webSearch: false
+        },
+        showAdvanced: false,
+        commitModeSettings: {
+          mode: 'checkpoint',
+          checkpointPrefix: 'checkpoint: '
+        }
       }
     };
   }
@@ -43,13 +64,29 @@ export class ConfigManager extends EventEmitter {
       const data = await fs.readFile(this.configPath, 'utf-8');
       const loadedConfig = JSON.parse(data);
       
-      // Merge loaded config with defaults, ensuring notification settings exist
+      // Merge loaded config with defaults, ensuring nested settings exist
       this.config = {
         ...this.config,
         ...loadedConfig,
         notifications: {
           ...this.config.notifications,
           ...loadedConfig.notifications
+        },
+        sessionCreationPreferences: {
+          ...this.config.sessionCreationPreferences,
+          ...loadedConfig.sessionCreationPreferences,
+          claudeConfig: {
+            ...this.config.sessionCreationPreferences?.claudeConfig,
+            ...loadedConfig.sessionCreationPreferences?.claudeConfig
+          },
+          codexConfig: {
+            ...this.config.sessionCreationPreferences?.codexConfig,
+            ...loadedConfig.sessionCreationPreferences?.codexConfig
+          },
+          commitModeSettings: {
+            ...this.config.sessionCreationPreferences?.commitModeSettings,
+            ...loadedConfig.sessionCreationPreferences?.commitModeSettings
+          }
         }
       };
     } catch (error) {
@@ -118,5 +155,29 @@ export class ConfigManager extends EventEmitter {
 
   getDefaultModel(): string {
     return this.config.defaultModel || 'sonnet';
+  }
+
+  getSessionCreationPreferences() {
+    return this.config.sessionCreationPreferences || {
+      sessionCount: 1,
+      toolType: 'none',
+      claudeConfig: {
+        model: 'auto',
+        permissionMode: 'ignore',
+        ultrathink: false
+      },
+      codexConfig: {
+        model: 'gpt-5',
+        modelProvider: 'openai',
+        approvalPolicy: 'auto',
+        sandboxMode: 'workspace-write',
+        webSearch: false
+      },
+      showAdvanced: false,
+      commitModeSettings: {
+        mode: 'checkpoint',
+        checkpointPrefix: 'checkpoint: '
+      }
+    };
   }
 }

@@ -31,18 +31,17 @@ export const SessionInput: React.FC<SessionInputProps> = ({
   setUltrathink,
   handleToggleAutoCommit,
 }) => {
-  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'auto');
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Update selected model when switching to a different session
+    // Model is now managed at panel level, not session level
     console.log('[SessionInput] Session changed:', {
       id: activeSession.id,
-      model: activeSession.model,
       name: activeSession.name
     });
-    setSelectedModel(activeSession.model || 'auto');
-  }, [activeSession.id]); // Only reset when session ID changes, not when model updates
+    setSelectedModel('auto');
+  }, [activeSession.id]); // Only reset when session ID changes
 
   const onKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const shouldSend = e.key === 'Enter' && (e.metaKey || e.ctrlKey);

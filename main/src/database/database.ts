@@ -666,13 +666,14 @@ export class DatabaseService {
       console.log('[Database] Created app_opens table');
     }
 
-    // Add model column to sessions table if it doesn't exist
+    // Remove model column from sessions table if it exists (moved to panel level)
     const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all();
     const hasModelColumn = sessionTableInfoModel.some((col: any) => col.name === 'model');
     
-    if (!hasModelColumn) {
-      this.db.prepare("ALTER TABLE sessions ADD COLUMN model TEXT DEFAULT 'sonnet'").run();
-      console.log('[Database] Added model column to sessions table');
+    if (hasModelColumn) {
+      // Note: SQLite doesn't support DROP COLUMN in older versions
+      // We'll leave the column but stop using it
+      console.log('[Database] Model column exists in sessions table but will be ignored (moved to panel level)');
     }
 
     // Add tool_type column to sessions table if it doesn't exist
@@ -683,13 +684,9 @@ export class DatabaseService {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN tool_type TEXT DEFAULT 'claude'").run();
       console.log('[Database] Added tool_type column to sessions table');
 
-      // Best effort: mark known Codex sessions based on model values
+      // Best effort: mark known Codex sessions (removed model-based detection)
       try {
-        this.db.prepare(`
-          UPDATE sessions
-          SET tool_type = 'codex'
-          WHERE model IN ('gpt-5', 'gpt-5-codex')
-        `).run();
+        // No longer detecting based on model since it's panel-level now
       } catch (error) {
         console.error('[Database] Failed to backfill tool_type for Codex sessions:', error);
       }
@@ -925,14 +922,14 @@ export class DatabaseService {
 
         // Step 4: Data migration - Create Claude panels for existing sessions and migrate data
         const sessionsWithClaude = this.db.prepare(`
-          SELECT id, claude_session_id, model FROM sessions 
+          SELECT id, claude_session_id FROM sessions 
           WHERE claude_session_id IS NOT NULL 
           AND NOT EXISTS (
             SELECT 1 FROM tool_panels 
             WHERE session_id = sessions.id 
             AND type = 'claude'
           )
-        `).all() as Array<{id: string, claude_session_id: string, model?: string}>;
+        `).all() as Array<{id: string, claude_session_id: string}>;
 
         console.log(`[Database] Found ${sessionsWithClaude.length} sessions with Claude data to migrate`);
 
@@ -950,11 +947,13 @@ export class DatabaseService {
             JSON.stringify({ claudeResumeId: session.claude_session_id })
           );
 
-          // Create Claude panel settings
+          // Create Claude panel settings with default model from config
+          const { configManager } = require('../services/configManager');
+          const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
           this.db.prepare(`
             INSERT INTO claude_panel_settings (panel_id, model)
             VALUES (?, ?)
-          `).run(panelId, session.model || 'claude-3-opus-20240229');
+          `).run(panelId, defaultModel);
 
           // Update all Claude data tables to link to the new panel
           this.db.prepare(`
@@ -1458,8 +1457,8 @@ export class DatabaseService {
       const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
       
       this.db.prepare(`
-        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, model, base_commit, base_branch, commit_mode, commit_mode_settings)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, base_commit, base_branch, commit_mode, commit_mode_settings)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.id,
         data.name,
@@ -1473,7 +1472,6 @@ export class DatabaseService {
         displayOrder,
         data.auto_commit !== undefined ? (data.auto_commit ? 1 : 0) : 1,
         data.tool_type || 'claude',
-        data.model || 'sonnet',
         data.base_commit || null,
         data.base_branch || null,
         data.commit_mode || null,
@@ -1573,10 +1571,6 @@ export class DatabaseService {
       updates.push('auto_commit = ?');
       values.push(data.auto_commit ? 1 : 0);
     }
-    if (data.model !== undefined) {
-      updates.push('model = ?');
-      values.push(data.model);
-    }
     if (data.skip_continue_next !== undefined) {
       updates.push('skip_continue_next = ?');
       const boolValue = data.skip_continue_next ? 1 : 0;
@@ -1596,9 +1590,9 @@ export class DatabaseService {
       return this.getSession(id);
     }
 
-    // Only update the updated_at timestamp if we're changing something other than is_favorite, auto_commit, model, skip_continue_next, commit_mode, or commit_mode_settings
+    // Only update the updated_at timestamp if we're changing something other than is_favorite, auto_commit, skip_continue_next, commit_mode, or commit_mode_settings
     // This prevents the session from showing as "unviewed" when just toggling these settings
-    const isOnlyToggleUpdate = updates.length === 1 && (updates[0] === 'is_favorite = ?' || updates[0] === 'auto_commit = ?' || updates[0] === 'model = ?' || updates[0] === 'skip_continue_next = ?' || updates[0] === 'commit_mode = ?' || updates[0] === 'commit_mode_settings = ?');
+    const isOnlyToggleUpdate = updates.length === 1 && (updates[0] === 'is_favorite = ?' || updates[0] === 'auto_commit = ?' || updates[0] === 'skip_continue_next = ?' || updates[0] === 'commit_mode = ?' || updates[0] === 'commit_mode_settings = ?');
     if (!isOnlyToggleUpdate) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
     }
@@ -1648,22 +1642,40 @@ export class DatabaseService {
   }
 
   getSessionOutputs(sessionId: string, limit?: number): SessionOutput[] {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const effectiveLimit = typeof limit === 'number' ? limit : Number(limit);
+    if (Number.isFinite(effectiveLimit) && effectiveLimit > 0) {
+      const rows = this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE session_id = ? 
+        ORDER BY timestamp DESC, id DESC
+        LIMIT ?
+      `).all(sessionId, effectiveLimit) as SessionOutput[];
+      return rows.reverse();
+    }
+
     return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE session_id = ? 
-      ORDER BY timestamp ASC 
-      ${limitClause}
+      ORDER BY timestamp ASC, id ASC
     `).all(sessionId) as SessionOutput[];
   }
 
   getSessionOutputsForPanel(panelId: string, limit?: number): SessionOutput[] {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const effectiveLimit = typeof limit === 'number' ? limit : Number(limit);
+    if (Number.isFinite(effectiveLimit) && effectiveLimit > 0) {
+      const rows = this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE panel_id = ? 
+        ORDER BY timestamp DESC, id DESC
+        LIMIT ?
+      `).all(panelId, effectiveLimit) as SessionOutput[];
+      return rows.reverse();
+    }
+
     return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE panel_id = ? 
-      ORDER BY timestamp ASC 
-      ${limitClause}
+      ORDER BY timestamp ASC, id ASC
     `).all(panelId) as SessionOutput[];
   }
 
@@ -1698,12 +1710,21 @@ export class DatabaseService {
   }
 
   getPanelOutputs(panelId: string, limit?: number): SessionOutput[] {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const effectiveLimit = typeof limit === 'number' ? limit : Number(limit);
+    if (Number.isFinite(effectiveLimit) && effectiveLimit > 0) {
+      const rows = this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE panel_id = ? 
+        ORDER BY timestamp DESC, id DESC
+        LIMIT ?
+      `).all(panelId, effectiveLimit) as SessionOutput[];
+      return rows.reverse();
+    }
+
     return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE panel_id = ? 
-      ORDER BY timestamp ASC 
-      ${limitClause}
+      ORDER BY timestamp ASC, id ASC
     `).all(panelId) as SessionOutput[];
   }
 
@@ -2290,6 +2311,15 @@ export class DatabaseService {
     state?: any;
     metadata?: any;
   }): void {
+    // Add debug logging to track panel state changes
+    if (updates.state !== undefined) {
+      console.log(`[DB-DEBUG] updatePanel called for ${panelId} with state:`, JSON.stringify(updates.state));
+      const existingPanel = this.getPanel(panelId);
+      if (existingPanel) {
+        console.log(`[DB-DEBUG] Existing panel state before update:`, JSON.stringify(existingPanel.state));
+      }
+    }
+    
     this.transaction(() => {
       const setClauses: string[] = [];
       const values: any[] = [];
@@ -2313,11 +2343,18 @@ export class DatabaseService {
         setClauses.push('updated_at = CURRENT_TIMESTAMP');
         values.push(panelId);
         
-        this.db.prepare(`
+        const result = this.db.prepare(`
           UPDATE tool_panels
           SET ${setClauses.join(', ')}
           WHERE id = ?
         `).run(...values);
+        
+        console.log(`[DB-DEBUG] Update result for panel ${panelId}: ${result.changes} rows affected`);
+        
+        if (updates.state !== undefined && result.changes > 0) {
+          const afterPanel = this.getPanel(panelId);
+          console.log(`[DB-DEBUG] Panel state after update:`, JSON.stringify(afterPanel?.state));
+        }
       }
     });
   }
@@ -2448,12 +2485,16 @@ export class DatabaseService {
     max_tokens?: number;
     temperature?: number;
   }): void {
+    // Get the default model from config if not provided
+    const { configManager } = require('../services/configManager');
+    const defaultModel = settings.model || configManager.getDefaultModel() || 'claude-3-opus-20240229';
+    
     this.db.prepare(`
       INSERT INTO claude_panel_settings (panel_id, model, commit_mode, system_prompt, max_tokens, temperature)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       panelId,
-      settings.model || 'claude-3-opus-20240229',
+      defaultModel,
       settings.commit_mode ? 1 : 0,
       settings.system_prompt || null,
       settings.max_tokens || 4096,

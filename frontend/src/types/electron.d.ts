@@ -40,7 +40,7 @@ interface ElectronAPI {
     create: (request: any) => Promise<IPCResponse>;
     delete: (sessionId: string) => Promise<IPCResponse>;
     sendInput: (sessionId: string, input: string) => Promise<IPCResponse>;
-    continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
+    continue: (sessionId: string, prompt?: string) => Promise<IPCResponse>;
     getOutput: (sessionId: string, limit?: number) => Promise<IPCResponse>;
     getJsonMessages: (sessionId: string) => Promise<IPCResponse>;
     getStatistics: (sessionId: string) => Promise<IPCResponse>;
@@ -147,6 +147,8 @@ interface ElectronAPI {
   config: {
     get: () => Promise<IPCResponse>;
     update: (updates: any) => Promise<IPCResponse>;
+    getSessionPreferences: () => Promise<IPCResponse>;
+    updateSessionPreferences: (preferences: any) => Promise<IPCResponse>;
   };
 
   // Prompts
@@ -259,10 +261,16 @@ interface ElectronAPI {
     getConversationMessages: (panelId: string) => Promise<IPCResponse>;
     getJsonMessages: (panelId: string) => Promise<IPCResponse>;
     getPrompts: (panelId: string) => Promise<IPCResponse>;
-    continue: (panelId: string, input: string, model?: string) => Promise<IPCResponse>;
+    continue: (panelId: string, input: string) => Promise<IPCResponse>;
     stop: (panelId: string) => Promise<IPCResponse>;
     resizeTerminal: (panelId: string, cols: number, rows: number) => Promise<IPCResponse>;
     sendTerminalInput: (panelId: string, data: string) => Promise<IPCResponse>;
+  };
+
+  // Claude Panels - specific API for Claude panels
+  claudePanels: {
+    getModel: (panelId: string) => Promise<IPCResponse>;
+    setModel: (panelId: string, model: string) => Promise<IPCResponse>;
   };
 
   // Logs panel operations

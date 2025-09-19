@@ -31,14 +31,14 @@ export class WorktreeNameGenerator {
     }
   }
 
-  async generateWorktreeName(prompt: string): Promise<string> {
+  async generateSessionName(prompt: string): Promise<string> {
     if (!this.anthropic) {
       console.log('[WorktreeNameGenerator] No Anthropic client available, using fallback name generation');
       // Fallback to basic name generation if no API key
-      return this.generateFallbackName(prompt);
+      return this.generateFallbackSessionName(prompt);
     }
 
-    console.log('[WorktreeNameGenerator] Attempting AI-powered name generation for prompt:', prompt.substring(0, 50) + '...');
+    console.log('[WorktreeNameGenerator] Attempting AI-powered session name generation for prompt:', prompt.substring(0, 50) + '...');
     try {
       const response = await this.anthropic.messages.create({
         model: 'claude-3-haiku-20240307', // Using Haiku for fast, cost-effective naming
@@ -47,25 +47,25 @@ export class WorktreeNameGenerator {
         messages: [
           {
             role: 'user',
-            content: `You are a developer assistant that generates concise, descriptive git worktree names. 
+            content: `You are a developer assistant that generates concise, descriptive session names. 
             
 Rules:
 - Generate a short, descriptive name (2-4 words max)
-- Use kebab-case (lowercase with hyphens)
+- Use normal spacing between words
 - Make it relevant to the coding task described
 - Keep it under 30 characters
 - Don't include numbers (those will be added for uniqueness)
 - Focus on the main feature/task being described
 
 Examples:
-- "Fix user authentication bug" → "fix-auth-bug"
-- "Add dark mode toggle" → "dark-mode-toggle"
-- "Refactor payment system" → "refactor-payments"
-- "Update API documentation" → "update-api-docs"
+- "Fix user authentication bug" → "Fix Auth Bug"
+- "Add dark mode toggle" → "Dark Mode Toggle"
+- "Refactor payment system" → "Refactor Payments"
+- "Update API documentation" → "Update API Docs"
 
-Generate a worktree name for this coding task: "${prompt}"
+Generate a session name for this coding task: "${prompt}"
 
-Respond with ONLY the worktree name, nothing else.`
+Respond with ONLY the session name, nothing else.`
           }
         ]
       });
@@ -74,17 +74,36 @@ Respond with ONLY the worktree name, nothing else.`
       if (content.type === 'text' && content.text) {
         const generatedName = content.text.trim();
         if (generatedName) {
-          const sanitized = this.sanitizeName(generatedName);
-          console.log('[WorktreeNameGenerator] AI generated name:', sanitized);
+          const sanitized = this.sanitizeSessionName(generatedName);
+          console.log('[WorktreeNameGenerator] AI generated session name:', sanitized);
           return sanitized;
         }
       }
     } catch (error) {
-      console.error('Error generating worktree name with Anthropic:', error);
+      console.error('Error generating session name with Anthropic:', error);
     }
 
     // Fallback if Anthropic fails
-    return this.generateFallbackName(prompt);
+    return this.generateFallbackSessionName(prompt);
+  }
+
+  async generateWorktreeName(prompt: string): Promise<string> {
+    // Generate a session name first, then convert to worktree name
+    const sessionName = await this.generateSessionName(prompt);
+    return this.convertSessionNameToWorktreeName(sessionName);
+  }
+
+  private generateFallbackSessionName(prompt: string): string {
+    // Simple fallback: take first few words and capitalize properly
+    const words = prompt
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 2)
+      .slice(0, 3)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1));
+    
+    return words.join(' ') || 'New Task';
   }
 
   private generateFallbackName(prompt: string): string {
@@ -99,8 +118,28 @@ Respond with ONLY the worktree name, nothing else.`
     return words.join('-') || 'new-task';
   }
 
+  private sanitizeSessionName(name: string): string {
+    // Allow spaces in session names but remove other special characters
+    return name
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, ' ')  // Normalize multiple spaces to single space
+      .trim()
+      .substring(0, 30);
+  }
+
   private sanitizeName(name: string): string {
     return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 30);
+  }
+
+  private convertSessionNameToWorktreeName(sessionName: string): string {
+    // Convert session name (with spaces) to worktree name (with hyphens)
+    return sessionName
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
