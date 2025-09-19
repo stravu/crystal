@@ -323,6 +323,34 @@ export class CodexMessageTransformer implements MessageTransformer {
           }
         };
       }
+
+      // Handle stream errors (e.g., authentication, retry errors)
+      if (msg.type === 'stream_error') {
+        let errorMessage = msg.message || 'Stream error';
+        let errorDetails = errorMessage;
+        
+        // Check if this is a 401 Unauthorized error
+        if (errorMessage.includes('401 Unauthorized')) {
+          errorDetails = `${errorMessage}\n\nYou may need to authenticate with Codex. Try running 'codex auth login' in a terminal to login with your Codex account.`;
+        }
+        
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'system',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'error',
+            error: {
+              message: 'Stream Error',
+              details: errorDetails
+            }
+          }],
+          metadata: {
+            agent: 'codex',
+            systemSubtype: 'stream_error'
+          }
+        };
+      }
       
       // Tool call
       if (msg.type === 'tool_call') {
