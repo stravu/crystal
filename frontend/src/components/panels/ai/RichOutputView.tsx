@@ -7,6 +7,7 @@ import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/Think
 import { MessageSegment } from './components/MessageSegment';
 import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransformer';
 import { RichOutputSettings } from './AbstractAIPanel';
+import { CodexMessageTransformer } from './transformers/CodexMessageTransformer';
 
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
@@ -88,10 +89,11 @@ interface RichOutputViewProps {
   messageTransformer: MessageTransformer;
   outputEventName: string;
   getOutputsHandler: string;
+  showSystemMessages?: boolean;
 }
 
 export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: number) => void }, RichOutputViewProps>(
-  ({ panelId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings, messageTransformer, outputEventName, getOutputsHandler }, ref) => {
+  ({ panelId, sessionStatus, settings: propsSettings, onSettingsChange, showSettings, messageTransformer, outputEventName, getOutputsHandler, showSystemMessages: showSystemMessagesProp }, ref) => {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,14 +101,16 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  
+  const showSystemMessages = showSystemMessagesProp ?? true;
+
   // Use parent-controlled settings if provided, otherwise use default
   const localSettings = useMemo<RichOutputSettings>(() => {
     const saved = localStorage.getItem('richOutputSettings');
     return saved ? JSON.parse(saved) : defaultSettings;
   }, []);
-  
+
   const settings = propsSettings || localSettings;
+  const isCodexTransformer = useMemo(() => messageTransformer instanceof CodexMessageTransformer, [messageTransformer]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -621,6 +625,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       .join('\n\n');
 
     if (message.metadata?.systemSubtype === 'session_info') {
+      if (!showSystemMessages && isCodexTransformer) {
+        return null;
+      }
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
       const sessionInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
       const initialPrompt = sessionInfo.initialPrompt || sessionInfo.initial_prompt;
@@ -744,6 +751,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     }
 
     if (message.metadata?.systemSubtype === 'session_runtime') {
+      if (!showSystemMessages && isCodexTransformer) {
+        return null;
+      }
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
       const runtimeInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
       const provider = runtimeInfo.provider;
@@ -1097,6 +1107,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         const StatusIcon = config.icon;
         const title = config.title ?? formatStatusLabel(rawStatus);
 
+        if (!showSystemMessages && isCodexTransformer && statusKey === 'completed') {
+          return null;
+        }
+
         const statusMessage = typeof info.message === 'string' && info.message.trim().length > 0
           ? info.message
           : `Session status updated to ${formatStatusLabel(rawStatus)}`;
@@ -1145,6 +1159,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
 
       if (info.type === 'task_started') {
+        if (!showSystemMessages && isCodexTransformer) {
+          return null;
+        }
         return (
           <div
             key={message.id}

@@ -18,6 +18,7 @@ interface RichOutputWithSidebarProps {
   showSettings?: boolean;
   onSettingsClick?: () => void;
   transformer?: MessageTransformer;
+  showSystemMessages?: boolean;
 }
 
 export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
@@ -26,6 +27,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   sessionStatus,
   settings,
   transformer,
+  showSystemMessages = true,
 }) => {
   // Use panelId if available, otherwise fall back to sessionId for backward compatibility
   const id = panelId || sessionId;
@@ -75,6 +77,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
           messageTransformer={transformer || new ClaudeMessageTransformer()}
           outputEventName={outputEventName}
           getOutputsHandler={getOutputsHandler}
+          showSystemMessages={showSystemMessages}
         />
       </div>
 
