@@ -452,25 +452,15 @@ export abstract class AbstractCliManager extends EventEmitter {
   }
 
   /**
-   * Get enhanced system environment with PATH
-   * Uses centralized shellPath utility for consistent PATH management
+   * Get enhanced system environment with PATH and complete shell environment
+   * Uses centralized shellPath utility and loads complete user environment
    */
   protected async getSystemEnvironment(): Promise<{ [key: string]: string }> {
-    // Get the enhanced PATH from centralized utility (includes Linux-specific paths)
-    const shellPath = getShellPath();
+    // Import the new shell environment utility
+    const { getMergedEnvironment } = await import('../../../utils/shellEnvironment');
 
-    // Find Node.js and ensure it's in the PATH
-    const nodePath = await findNodeExecutable();
-    const nodeDir = path.dirname(nodePath);
-    const pathSeparator = process.platform === 'win32' ? ';' : ':';
-    
-    // Combine Node.js directory with enhanced PATH
-    const pathWithNode = nodeDir + pathSeparator + shellPath;
-
-    return {
-      ...process.env,
-      PATH: pathWithNode
-    } as { [key: string]: string };
+    // Get the complete merged environment (shell environment + Crystal enhancements)
+    return getMergedEnvironment();
   }
 
   /**

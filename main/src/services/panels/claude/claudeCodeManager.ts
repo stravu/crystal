@@ -186,12 +186,13 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
   protected async initializeCliEnvironment(options: ClaudeSpawnOptions): Promise<{ [key: string]: string }> {
     const { sessionId, permissionMode } = options;
-    
-    // Get basic system environment
+
+    // Get complete system environment (now includes user's shell environment)
     const systemEnv = await this.getSystemEnvironment();
-    
-    // Initialize environment with MCP-specific variables
+
+    // Initialize environment with system environment and MCP-specific variables
     const env: { [key: string]: string } = {
+      ...systemEnv,
       // Ensure MCP-related environment variables are preserved
       MCP_SOCKET_PATH: this.permissionIpcPath || '',
       // Add debug mode for MCP if verbose logging is enabled

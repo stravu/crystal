@@ -109,6 +109,17 @@ All core features have been successfully implemented with significant enhancemen
   - Run scripts for testing/building
   - Main branch customization
 
+### Environment Variable Handling
+- **Shell environment loading**: Automatically sources user shell configuration files (.zprofile, .bashrc, .profile, etc.)
+- **Third-party LLM provider support**: Seamlessly integrates with providers like z.ai and other Anthropic-compatible services
+- **Environment variable inheritance**: Claude Code processes receive complete user environment including:
+  - `ANTHROPIC_BASE_URL`: Custom API endpoint for third-party providers
+  - `ANTHROPIC_AUTH_TOKEN`: Authentication tokens for third-party providers
+  - All other user environment variables from shell configuration
+- **Cross-platform compatibility**: Works on macOS, Linux, and Windows with platform-specific shell detection
+- **Robust fallback mechanisms**: Gracefully handles shell configuration errors and missing files
+- **Packaged app support**: Special handling for Electron packaged apps to ensure environment loading works correctly
+
 ### Data Persistence
 - **SQLite Database**:
   - `projects`: Project configurations and paths
@@ -153,6 +164,8 @@ All core features have been successfully implemented with significant enhancemen
 - **Claude Integration**: @anthropic-ai/claude-code SDK
 - **Process Management**: node-pty for PTY processes
 - **Git Integration**: Command-line git worktree management
+- **Shell Environment Integration**: Complete shell environment loading with cross-platform support
+- **Environment Variable Management**: Automatic loading and merging of user environment variables for third-party LLM providers
 
 ### Communication
 - **Electron IPC**: Secure inter-process communication for all operations
@@ -749,6 +762,26 @@ crystal/
 5. Archive completed sessions to keep the list manageable
 6. Set up project-specific prompts for consistency
 
+### Third-Party LLM Provider Setup
+Crystal automatically loads environment variables from your shell configuration files, enabling seamless integration with third-party LLM providers.
+
+**For z.ai users:**
+1. Add the following to your shell configuration file (`~/.zprofile`, `~/.bashrc`, or `~/.profile`):
+```bash
+export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+export ANTHROPIC_AUTH_TOKEN="your-z.ai-token-here"
+```
+
+
+**How it works:**
+- Crystal automatically detects your default shell (zsh, bash, etc.)
+- Sources your shell configuration files in the correct order
+- Passes all environment variables to Claude Code processes
+- Works on macOS, Linux, and Windows with platform-specific handling
+
+**Verification:**
+After setting up your environment variables, create a new session and check that your third-party provider works as expected. Crystal will automatically load and use the credentials from your shell environment.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -756,6 +789,15 @@ crystal/
 2. **Git operations fail**: Ensure no uncommitted changes conflict
 3. **Terminal not responding**: Check if Claude Code is installed correctly
 4. **Notifications not working**: Grant permission when prompted
+5. **Third-party LLM provider not working**:
+   - Verify environment variables are set in your shell configuration file
+   - Ensure variables are exported (not just set) in your shell profile
+   - Test variables work in terminal: `echo $ANTHROPIC_BASE_URL`
+   - Restart Crystal after making changes to shell configuration
+6. **Environment variables not loading**:
+   - Check that shell configuration files exist and are readable
+   - Verify syntax in shell configuration files (run `source ~/.zprofile` to test)
+   - Ensure Crystal has permission to access your shell configuration files
 
 ### Debug Mode
 Enable verbose logging in Settings to see detailed logs for troubleshooting.
