@@ -326,7 +326,7 @@ export class CodexMessageTransformer implements MessageTransformer {
 
       // Handle stream errors (e.g., authentication, retry errors)
       if (msg.type === 'stream_error') {
-        let errorMessage = msg.message || 'Stream error';
+        const errorMessage = msg.message || 'Stream error';
         let errorDetails = errorMessage;
         
         // Check if this is a 401 Unauthorized error
