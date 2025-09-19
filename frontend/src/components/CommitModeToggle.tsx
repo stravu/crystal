@@ -24,7 +24,7 @@ interface CommitModePillProps {
   autoCommit?: boolean;
   projectId?: number;
   onModeChange?: (mode: CommitMode, settings: CommitModeSettings) => void;
-  isAutoCommitEnabled: boolean;
+  isAutoCommitEnabled?: boolean; // Made optional since it's no longer used
 }
 
 interface AutoCommitSwitchProps {
@@ -43,7 +43,6 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
   autoCommit,
   projectId,
   onModeChange,
-  isAutoCommitEnabled,
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -59,12 +58,10 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
   // Determine effective mode (backwards compatibility)
   const effectiveMode = currentMode || (autoCommit === false ? 'disabled' : 'checkpoint');
   
-  // Get the active commit mode (defaults to checkpoint if enabled)
-  const activeCommitMode: 'structured' | 'checkpoint' = isAutoCommitEnabled 
-    ? (effectiveMode === 'structured' ? 'structured' : 'checkpoint')
-    : 'checkpoint'; // Default for when auto-commit gets enabled
+  // Get the active commit mode
+  const activeCommitMode: CommitMode = effectiveMode;
 
-  const getModeConfig = (mode: 'structured' | 'checkpoint') => {
+  const getModeConfig = (mode: CommitMode) => {
     switch (mode) {
       case 'structured':
         return {
@@ -76,10 +73,15 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
           icon: RotateCcw,
           label: 'Checkpoint',
         };
+      case 'disabled':
+        return {
+          icon: GitCommit,
+          label: 'Disabled',
+        };
     }
   };
 
-  const handleCommitModeChange = async (newMode: 'structured' | 'checkpoint') => {
+  const handleCommitModeChange = async (newMode: CommitMode) => {
     const newSettings: CommitModeSettings = {
       ...parsedSettings,
       mode: newMode,
@@ -132,6 +134,15 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
       onClick: () => handleCommitModeChange('checkpoint'),
       variant: 'success',
     },
+    {
+      id: 'disabled',
+      label: 'Disabled',
+      description: 'No automatic commits',
+      icon: GitCommit,
+      iconColor: 'text-text-secondary',
+      onClick: () => handleCommitModeChange('disabled'),
+      variant: 'default',
+    },
   ];
 
   const config = getModeConfig(activeCommitMode);
@@ -140,22 +151,18 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
   const modeSelectorPill = (
     <Pill
       variant="default"
-      isActive={isAutoCommitEnabled} // Show active styling when enabled
+      isActive={activeCommitMode !== 'disabled'} // Show active styling when commits are enabled
       icon={<Icon className={cn(
         'w-3.5 h-3.5',
-        isAutoCommitEnabled ? 'text-text-on-interactive' : 'text-text-secondary'
+        activeCommitMode !== 'disabled' ? 'text-text-on-interactive' : 'text-text-secondary'
       )} />}
-      className={cn(
-        'transition-all duration-200 shadow-sm',
-        !isAutoCommitEnabled && 'opacity-50 cursor-default'
-      )}
-      disabled={!isAutoCommitEnabled}
+      className="transition-all duration-200 shadow-sm"
     >
       {config.label}
       <ChevronDown className={cn(
         'w-3 h-3 transition-transform',
         showDropdown ? 'rotate-180' : '',
-        isAutoCommitEnabled ? 'text-text-on-interactive' : 'text-text-secondary'
+        activeCommitMode !== 'disabled' ? 'text-text-on-interactive' : 'text-text-secondary'
       )} />
     </Pill>
   );
@@ -174,18 +181,14 @@ export const CommitModePill: React.FC<CommitModePillProps> = ({
 
   return (
     <>
-      {isAutoCommitEnabled ? (
-        <Dropdown
-          trigger={modeSelectorPill}
-          items={dropdownItems}
-          selectedId={activeCommitMode}
-          footer={dropdownFooter}
-          position="auto"
-          onOpenChange={setShowDropdown}
-        />
-      ) : (
-        modeSelectorPill
-      )}
+      <Dropdown
+        trigger={modeSelectorPill}
+        items={dropdownItems}
+        selectedId={activeCommitMode}
+        footer={dropdownFooter}
+        position="auto"
+        onOpenChange={setShowDropdown}
+      />
 
       {/* Settings Dialog */}
       {showSettings && (
