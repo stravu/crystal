@@ -1642,22 +1642,40 @@ export class DatabaseService {
   }
 
   getSessionOutputs(sessionId: string, limit?: number): SessionOutput[] {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const effectiveLimit = typeof limit === 'number' ? limit : Number(limit);
+    if (Number.isFinite(effectiveLimit) && effectiveLimit > 0) {
+      const rows = this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE session_id = ? 
+        ORDER BY timestamp DESC, id DESC
+        LIMIT ?
+      `).all(sessionId, effectiveLimit) as SessionOutput[];
+      return rows.reverse();
+    }
+
     return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE session_id = ? 
-      ORDER BY timestamp ASC 
-      ${limitClause}
+      ORDER BY timestamp ASC, id ASC
     `).all(sessionId) as SessionOutput[];
   }
 
   getSessionOutputsForPanel(panelId: string, limit?: number): SessionOutput[] {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const effectiveLimit = typeof limit === 'number' ? limit : Number(limit);
+    if (Number.isFinite(effectiveLimit) && effectiveLimit > 0) {
+      const rows = this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE panel_id = ? 
+        ORDER BY timestamp DESC, id DESC
+        LIMIT ?
+      `).all(panelId, effectiveLimit) as SessionOutput[];
+      return rows.reverse();
+    }
+
     return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE panel_id = ? 
-      ORDER BY timestamp ASC 
-      ${limitClause}
+      ORDER BY timestamp ASC, id ASC
     `).all(panelId) as SessionOutput[];
   }
 
@@ -1692,12 +1710,21 @@ export class DatabaseService {
   }
 
   getPanelOutputs(panelId: string, limit?: number): SessionOutput[] {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const effectiveLimit = typeof limit === 'number' ? limit : Number(limit);
+    if (Number.isFinite(effectiveLimit) && effectiveLimit > 0) {
+      const rows = this.db.prepare(`
+        SELECT * FROM session_outputs 
+        WHERE panel_id = ? 
+        ORDER BY timestamp DESC, id DESC
+        LIMIT ?
+      `).all(panelId, effectiveLimit) as SessionOutput[];
+      return rows.reverse();
+    }
+
     return this.db.prepare(`
       SELECT * FROM session_outputs 
       WHERE panel_id = ? 
-      ORDER BY timestamp ASC 
-      ${limitClause}
+      ORDER BY timestamp ASC, id ASC
     `).all(panelId) as SessionOutput[];
   }
 

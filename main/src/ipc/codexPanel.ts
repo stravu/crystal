@@ -346,10 +346,10 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
   });
 
   // Get existing outputs for a panel
-  ipcMain.handle('codexPanel:getOutputs', async (_, panelId: string, limit: number = 1000) => {
+  ipcMain.handle('codexPanel:getOutputs', async (_, panelId: string) => {
     try {
-      logger?.info(`[codex-debug] IPC getOutputs: Panel ${panelId}, Limit: ${limit}`);
-      const outputs = sessionManager.getSessionOutputsForPanel(panelId, limit);
+      logger?.info(`[codex-debug] IPC getOutputs: Panel ${panelId}`);
+      const outputs = sessionManager.getSessionOutputsForPanel(panelId);
       logger?.info(`[codex-debug] Found ${outputs.length} outputs for panel ${panelId}`);
       return outputs;
     } catch (error) {

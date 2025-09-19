@@ -52,7 +52,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         // Use appropriate method based on agent type
         if (getMessagesHandler && window.electron) {
           // For Codex and other IPC-based panels
-          const outputs = await window.electron.invoke(getMessagesHandler, panelId, 1000);
+          const outputs = await window.electron.invoke(getMessagesHandler, panelId);
           const jsonMessages = outputs
             .filter((output: any) => output.type === 'json')
             .map((output: any) => ({

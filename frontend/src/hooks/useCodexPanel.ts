@@ -151,7 +151,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
         // Load existing conversation history for this panel
         try {
           console.log(`[codex-debug] Loading conversation history for panel ${panelId}`);
-          const outputs = await window.electron?.invoke('codexPanel:getOutputs', panelId, 1000);
+          const outputs = await window.electron?.invoke('codexPanel:getOutputs', panelId);
           if (outputs && outputs.length > 0) {
             console.log(`[codex-debug] Loaded ${outputs.length} outputs for panel ${panelId}`);
             // Rebuild conversation history from outputs

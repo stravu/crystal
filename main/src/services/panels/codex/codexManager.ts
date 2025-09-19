@@ -1211,7 +1211,7 @@ export class CodexManager extends AbstractCliManager {
     this.logger?.info(`[session-id-debug] Debug state final session ID: ${codexSessionId || 'null'}`);
     
     // Get message statistics
-    const outputs = this.sessionManager.getSessionOutputsForPanel(panelId, 1000);
+    const outputs = this.sessionManager.getSessionOutputsForPanel(panelId);
     const messageStats = {
       totalMessagesReceived: outputs.filter((o: any) => o.type === 'json').length,
       totalMessagesSent: 0, // Interactive mode doesn't track sent messages the same way
