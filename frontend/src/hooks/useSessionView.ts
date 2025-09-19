@@ -1178,7 +1178,7 @@ export const useSessionView = (
     }
   };
 
-  const handleContinueConversation = async (attachedImages?: any[], attachedTexts?: any[], model?: string) => {
+  const handleContinueConversation = async (attachedImages?: any[], attachedTexts?: any[]) => {
     if (!input.trim() || !activeSession) return;
     
     // Mark that we're continuing a conversation to prevent output reload
@@ -1245,7 +1245,7 @@ export const useSessionView = (
       finalInput = `${finalInput}${attachmentsMessage}`;
     }
     
-    const response = await API.sessions.continue(activeSession.id, finalInput, model);
+    const response = await API.sessions.continue(activeSession.id, finalInput);
     if (response.success) {
       setInput('');
       setUltrathink(false);

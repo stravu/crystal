@@ -32,7 +32,7 @@ interface SessionInputWithImagesProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleTerminalCommand: () => void;
   handleSendInput: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
-  handleContinueConversation: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[], model?: string) => void;
+  handleContinueConversation: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
   isStravuConnected: boolean;
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
@@ -44,6 +44,7 @@ interface SessionInputWithImagesProps {
   hasConversationHistory?: boolean;
   contextCompacted?: boolean;
   handleCancelRequest?: () => void;
+  panelId?: string; // Add optional panel ID for panel-specific model settings
 }
 
 export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = memo(({
@@ -66,13 +67,14 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   hasConversationHistory,
   contextCompacted = false,
   handleCancelRequest,
+  panelId,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(activeSession.model || 'auto');
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,10 +83,23 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const effectiveMode = activeSession.commitMode || (activeSession.autoCommit === false ? 'disabled' : 'checkpoint');
   const isAutoCommitEnabled = effectiveMode !== 'disabled';
 
+  // Load model from panel settings if panelId is provided
   useEffect(() => {
-    // Update selected model when switching to a different session
-    setSelectedModel(activeSession.model || 'auto');
-  }, [activeSession.id]); // Only reset when session ID changes, not when model updates
+    if (panelId) {
+      // Fetch model from Claude panel settings
+      API.claudePanels.getModel(panelId).then((response) => {
+        if (response.success && response.data) {
+          setSelectedModel(response.data);
+        }
+      }).catch((error) => {
+        console.error('Failed to fetch panel model:', error);
+        setSelectedModel('auto'); // Default fallback
+      });
+    } else {
+      // Fallback for non-panel usage (if any)
+      setSelectedModel('auto');
+    }
+  }, [panelId]); // Reload when panel ID changes
 
   const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -226,7 +241,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
           setAttachedImages([]);
           setAttachedTexts([]);
         } else {
-          await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
+          await handleContinueConversation(attachedImages, attachedTexts);
           setAttachedImages([]);
           setAttachedTexts([]);
         }
@@ -254,7 +269,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         setAttachedImages([]);
         setAttachedTexts([]);
       } else {
-        await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
+        await handleContinueConversation(attachedImages, attachedTexts);
         setAttachedImages([]);
         setAttachedTexts([]);
       }
@@ -565,6 +580,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   selectedModel={selectedModel}
                   setSelectedModel={setSelectedModel}
                   setShowDropdown={() => {}}
+                  panelId={panelId}
                 />
 
                 {/* Auto-Commit Mode Pill - always visible */}
@@ -713,20 +729,32 @@ interface ModelSelectorProps {
   selectedModel: string;
   setSelectedModel: (model: string) => void;
   setShowDropdown: (show: boolean) => void;
+  panelId?: string;
 }
 
 const ModelSelector: React.FC<ModelSelectorProps> = ({
   selectedModel,
   setSelectedModel,
   setShowDropdown,
+  panelId,
 }) => {
   const handleModelChange = async (modelId: string) => {
     setSelectedModel(modelId);
     
+    // Save model to panel settings if panelId is provided
+    if (panelId) {
+      try {
+        await API.claudePanels.setModel(panelId, modelId);
+      } catch (err) {
+        console.error('Failed to save panel model:', err);
+      }
+    }
+    
+    // Also save as the default model preference for new panels
     try {
       await API.config.update({ defaultModel: modelId });
     } catch (err) {
-      console.error('Failed to save default model:', err);
+      console.error('Failed to save default model preference:', err);
     }
   };
 

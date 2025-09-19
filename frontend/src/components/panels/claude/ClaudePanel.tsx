@@ -192,6 +192,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
           hasConversationHistory={hook.hasConversationHistory}
           contextCompacted={hook.contextCompacted}
           handleCancelRequest={hook.handleStopSession}
+          panelId={panel.id}
         />
       )}
 

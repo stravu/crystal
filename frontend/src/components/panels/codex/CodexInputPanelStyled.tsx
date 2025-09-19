@@ -120,7 +120,7 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
         setThinkingLevel(storedLevel);
       }
     }
-  }, [(panel?.state?.customState as any)?.codexConfig?.thinkingLevel]);
+  }, [panel?.state?.customState]);
 
   // Auto-resize textarea
   useEffect(() => {

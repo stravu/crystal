@@ -95,8 +95,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     prompt: '',
     worktreeTemplate: '',
     count: 1,
-    permissionMode: 'ignore',
-    model: 'auto' // Default to auto (Claude Code's default selection)
+    permissionMode: 'ignore'
+    // Model is now managed at panel level, not session level
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
@@ -245,24 +245,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     await updatePreferences(updates);
   };
   
-  // Fetch project details to get last used model
-  useEffect(() => {
-    if (isOpen && projectId) {
-      API.projects.getAll().then(response => {
-        if (response.success && response.data) {
-          const project = response.data.find((p: any) => p.id === projectId);
-          if (project && project.lastUsedModel) {
-            setFormData(prev => ({
-              ...prev,
-              model: project.lastUsedModel
-            }));
-          }
-        }
-      }).catch((err: any) => {
-        console.error('Failed to fetch projects:', err);
-      });
-    }
-  }, [isOpen, projectId]);
+  // Note: Model preferences are now stored in panel settings, not at project level
   
   useEffect(() => {
     if (isOpen) {
@@ -575,7 +558,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     try {
       // Prepare the prompt and configuration based on selected tool
       let finalPrompt = '';
-      let finalModel = 'auto';
+      // Model is now managed at panel level, not session level
       let finalPermissionMode: 'ignore' | 'approve' = 'ignore';
       
       // Get attachments from the active config
@@ -589,12 +572,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         if (claudeConfig.ultrathink && finalPrompt) {
           finalPrompt += '\nultrathink';
         }
-        finalModel = claudeConfig.model;
+        // Model is stored at panel level for Claude panels
         finalPermissionMode = claudeConfig.permissionMode;
       } else if (toolType === 'codex') {
         // Use Codex config directly
         finalPrompt = codexConfig.prompt || '';
-        finalModel = (codexConfig.model || DEFAULT_CODEX_MODEL) as string;
+        // Model is stored at panel level for Codex panels
         // Keep session permission mode independent of Codex approval policy; default to ignore unless explicitly set
         finalPermissionMode = formData.permissionMode || 'ignore';
       }
@@ -660,7 +643,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         prompt: finalPrompt || undefined,
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
-        model: finalModel,
+        // Model is now managed at panel level, not session level
         toolType,
         permissionMode: finalPermissionMode,
         projectId,
@@ -687,12 +670,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         return;
       }
       
-      // Save the model as last used for this project
-      if (projectId && finalModel) {
-        API.projects.update(projectId.toString(), { lastUsedModel: finalModel }).catch(err => {
-          console.error('Failed to save last used model:', err);
-        });
-      }
+      // Note: Model preferences are now stored in panel settings during panel creation
       
       onClose();
       // Reset form - name and prompt are cleared, but other settings are preserved from preferences

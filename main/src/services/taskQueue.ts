@@ -30,7 +30,6 @@ interface CreateSessionJob {
   folderId?: string;
   baseBranch?: string;
   autoCommit?: boolean;
-  model?: string;
   toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
@@ -137,7 +136,7 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, model, toolType, codexConfig } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
       console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
@@ -222,7 +221,6 @@ export class TaskQueue {
           false, // isMainRepo = false for regular sessions
           autoCommit,
           job.data.folderId,
-          model,
           toolType,
           baseCommit,
           actualBaseBranch,
@@ -287,12 +285,10 @@ export class TaskQueue {
 
         // Only start an AI panel if there's a prompt
         if (prompt && prompt.trim().length > 0) {
-          const resolvedToolType: 'claude' | 'codex' | 'none' = toolType
-            ? toolType
-            : (model && getCodexModelConfig(model)) ? 'codex' : 'claude';
+          const resolvedToolType: 'claude' | 'codex' | 'none' = toolType || 'claude';
 
           if (resolvedToolType === 'codex') {
-            console.log(`[TaskQueue] Starting Codex for session ${session.id} with model: ${model}`);
+            console.log(`[TaskQueue] Starting Codex for session ${session.id}`);
 
             // Wait for the Codex panel to be created by the session-created event handler in events.ts
             let codexPanel = null;
@@ -324,7 +320,7 @@ export class TaskQueue {
                     codexPanel.id, 
                     session.worktreePath, 
                     prompt, 
-                    codexConfig?.model || model,
+                    codexConfig?.model,
                     codexConfig?.modelProvider,
                     codexConfig?.approvalPolicy,
                     codexConfig?.sandboxMode,
@@ -346,7 +342,7 @@ export class TaskQueue {
               throw new Error('No Codex panel found - cannot start Codex without a real panel ID');
             }
           } else if (resolvedToolType === 'claude') {
-            console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode} and model: ${model}`);
+            console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
             
             // Wait for the Claude panel to be created by the session-created event handler in events.ts
             let claudePanel = null;
@@ -383,8 +379,10 @@ export class TaskQueue {
                   }
                   
                   // Use the claude panel manager directly instead of calling IPC handlers
-                  await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, model);
-                  console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            } catch (error) {
+                  // Model is now managed at panel level
+                  await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode);
+                  console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            
+                } catch (error) {
                   console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
                   throw new Error(`Failed to start Claude panel: ${error}`);
                 }
@@ -482,7 +480,6 @@ export class TaskQueue {
     projectId?: number,
     baseBranch?: string,
     autoCommit?: boolean,
-    model?: string,
     toolType?: 'claude' | 'codex' | 'none',
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
     commitModeSettings?: string,
@@ -551,7 +548,7 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, model, toolType, commitMode, commitModeSettings, codexConfig }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, toolType, commitMode, commitModeSettings, codexConfig }));
     }
     return Promise.all(jobs);
   }

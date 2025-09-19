@@ -115,7 +115,6 @@ export function useIPCEvents() {
     const unsubscribeSessionUpdated = window.electronAPI.events.onSessionUpdated((session: Session) => {
       console.log('[useIPCEvents] Session updated event received:', {
         id: session.id,
-        model: session.model,
         status: session.status,
         commitMode: session.commitMode,
         commitModeSettings: session.commitModeSettings

@@ -163,7 +163,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           targetProject.id,
           request.baseBranch,
           request.autoCommit,
-          request.model,
           request.toolType,
           request.commitMode,
           request.commitModeSettings,
@@ -171,10 +170,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         );
         console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
         
-        // Update project's lastUsedModel
-        if (request.model) {
-          await databaseService.updateProject(targetProject.id, { lastUsedModel: request.model });
-        }
+        // Note: Model is now stored at panel level, not session level
         
         return { success: true, data: { jobIds: jobs.map(job => job.id) } };
       } else {
@@ -186,7 +182,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           projectId: targetProject.id,
           baseBranch: request.baseBranch,
           autoCommit: request.autoCommit,
-          model: request.model,
           toolType: request.toolType,
           commitMode: request.commitMode,
           commitModeSettings: request.commitModeSettings,
@@ -194,10 +189,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         });
         console.log('[IPC] Created job with ID:', job.id);
         
-        // Update project's lastUsedModel
-        if (request.model) {
-          await databaseService.updateProject(targetProject.id, { lastUsedModel: request.model });
-        }
+        // Note: Model is now stored at panel level, not session level
         
         return { success: true, data: { jobId: job.id } };
       }
@@ -523,7 +515,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string, model?: string) => {
+  ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string) => {
     try {
       // Validate session exists and is active
       const sessionValidation = validateSessionIsActive(sessionId);
@@ -607,19 +599,10 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const isMainRepoFirstStart = dbSession?.is_main_repo && conversationHistory.length === 0 && continuePrompt;
 
       // Update session status to initializing and clear run_started_at
-      // Also update the model if provided
-      const updateData: any = {
+      sessionManager.updateSession(sessionId, {
         status: 'initializing',
         run_started_at: null // Clear previous run time
-      };
-      
-      // If a model was provided and it's different, update it now
-      if (model && model !== dbSession?.model) {
-        updateData.model = model;
-        console.log(`[IPC] Updating session ${sessionId} model from ${dbSession?.model} to ${model}`);
-      }
-      
-      sessionManager.updateSession(sessionId, updateData);
+      });
 
       if (isMainRepoFirstStart && continuePrompt) {
         // First message in main repo session - start Claude Code without --resume
@@ -666,13 +649,13 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           // Start Claude Code via the first Claude panel
           const claudePanel = mainRepoClaudePanels[0];
           console.log(`[IPC] Starting Claude via panel ${claudePanel.id} for main repo session ${sessionId}`);
-          const modelToUse = model || dbSession?.model || 'sonnet';
-          await claudeCodeManager.startPanel(claudePanel.id, sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode, modelToUse);
+          // Model is now managed at panel level
+          await claudeCodeManager.startPanel(claudePanel.id, sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode);
         } else {
           // Fallback to session-based start
           console.log(`[IPC] No Claude panels found, falling back to session-based start for ${sessionId}`);
-          const modelToUse = model || dbSession?.model || 'sonnet';
-          await claudeCodeManager.startSession(sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode, modelToUse);
+          // Model is now managed at panel level  
+          await claudeCodeManager.startSession(sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode);
         }
       } else {
         // Normal continue for existing sessions
@@ -687,14 +670,14 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         if (normalContinueClaudePanels.length > 0) {
           // Continue Claude conversation via the first Claude panel
           const claudePanel = normalContinueClaudePanels[0];
-          const modelToUse = model || dbSession?.model || 'sonnet';
-          console.log(`[IPC] Continuing Claude via panel ${claudePanel.id} for session ${sessionId} - provided model: ${model}, current model: ${dbSession?.model}, modelToUse: ${modelToUse}`);
-          await claudeCodeManager.continuePanel(claudePanel.id, sessionId, session.worktreePath, continuePrompt, conversationHistory, modelToUse);
+          // Model is now managed at panel level
+          console.log(`[IPC] Continuing Claude via panel ${claudePanel.id} for session ${sessionId}`);
+          await claudeCodeManager.continuePanel(claudePanel.id, sessionId, session.worktreePath, continuePrompt, conversationHistory);
         } else {
           // Fallback to session-based continue
-          const modelToUse = model || dbSession?.model || 'sonnet';
-          console.log(`[IPC] No Claude panels found, continuing session ${sessionId} - provided model: ${model}, current model: ${dbSession?.model}, modelToUse: ${modelToUse}`);
-          await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory, modelToUse);
+          // Model is now managed at panel level
+          console.log(`[IPC] No Claude panels found, continuing session ${sessionId}`);
+          await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory);
         }
       }
 
@@ -1023,7 +1006,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('panels:continue', async (_event, panelId: string, input: string, model?: string) => {
+  ipcMain.handle('panels:continue', async (_event, panelId: string, input: string) => {
     try {
       console.log(`[IPC] panels:continue called for panel: ${panelId}`);
 
@@ -1076,7 +1059,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
             if (!isRunning && !hasCodexSessionId) {
               // No running process and no session ID, start fresh
               console.log('[IPC] panels:continue starting fresh Codex session (no running process, no codex_session_id)');
-              await codexPanelManager.startPanel(panelId, panel.sessionId, session.worktreePath, input || '', model);
+              // Model is stored in panel state for Codex panels
+              await codexPanelManager.startPanel(panelId, panel.sessionId, session.worktreePath, input || '');
               return { success: true };
             }
 
@@ -1125,7 +1109,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
             if (!isRunning && !hasClaudeSessionId) {
               console.log('[IPC] panels:continue starting fresh via startPanel (no running process, no claude_session_id)');
               const dbSession = sessionManager.getDbSession(panel.sessionId);
-              await claudePanelManager.startPanel(panelId, session.worktreePath, input || '', dbSession?.permission_mode, model);
+              // Model is now managed at panel level in Claude panel settings
+              await claudePanelManager.startPanel(panelId, session.worktreePath, input || '', dbSession?.permission_mode);
               return { success: true };
             }
 
@@ -1134,7 +1119,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               ? await sessionManager.getPanelConversationMessages(panelId)
               : await sessionManager.getConversationMessages(panel.sessionId);
 
-            await claudePanelManager.continuePanel(panelId, session.worktreePath, input || '', conversationHistory, model);
+            // Model is now managed at panel level in Claude panel settings
+            await claudePanelManager.continuePanel(panelId, session.worktreePath, input || '', conversationHistory);
             return { success: true };
           } catch (err) {
             console.error('Failed to continue Claude panel:', err);
@@ -1746,7 +1732,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           id: session.id,
           name: session.name,
           status: session.status,
-          model: session.model || 'claude-sonnet-4',
+          // Model is now managed at panel level, not session level
           createdAt: session.createdAt,
           updatedAt: session.lastActivity || session.createdAt,
           duration: duration,

@@ -334,7 +334,7 @@ export const useClaudePanel = (
     }
   };
 
-  const handleContinueConversation = async (attachedImages?: any[], attachedTexts?: any[], model?: string) => {
+  const handleContinueConversation = async (attachedImages?: any[], attachedTexts?: any[]) => {
     if (!input.trim() || !activeSession) return;
     
     // Mark that we're continuing a conversation to prevent output reload
@@ -401,7 +401,7 @@ export const useClaudePanel = (
       finalInput = `${finalInput}${attachmentsMessage}`;
     }
     
-    const response = await API.panels.continue(panelId, finalInput, model);
+    const response = await API.panels.continue(panelId, finalInput);
     if (response.success) {
       setInput('');
       setUltrathink(false);

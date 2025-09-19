@@ -147,7 +147,7 @@ export class SessionManager extends EventEmitter {
       folderId: dbSession.folder_id,
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
-      model: dbSession.model,
+      // Model is now managed at panel level
       toolType: normalizedToolType,
       archived: dbSession.archived || false,
       baseCommit: dbSession.base_commit,
@@ -213,7 +213,6 @@ export class SessionManager extends EventEmitter {
     isMainRepo?: boolean,
     autoCommit?: boolean,
     folderId?: string,
-    model?: string,
     toolType?: 'claude' | 'codex' | 'none',
     baseCommit?: string,
     baseBranch?: string,
@@ -232,7 +231,6 @@ export class SessionManager extends EventEmitter {
         isMainRepo,
         autoCommit,
         folderId,
-        model,
         toolType,
         baseCommit,
         baseBranch,
@@ -253,7 +251,6 @@ export class SessionManager extends EventEmitter {
     isMainRepo?: boolean,
     autoCommit?: boolean,
     folderId?: string,
-    model?: string,
     toolType?: 'claude' | 'codex' | 'none',
     baseCommit?: string,
     baseBranch?: string,
@@ -298,7 +295,7 @@ export class SessionManager extends EventEmitter {
       permission_mode: permissionMode,
       is_main_repo: isMainRepo,
       auto_commit: autoCommit,
-      model: model,
+      // Model is now managed at panel level
       base_commit: baseCommit,
       base_branch: baseBranch,
       tool_type: toolType,
@@ -359,10 +356,9 @@ export class SessionManager extends EventEmitter {
         true, // isMainRepo = true
         true, // autoCommit = true (default for main repo sessions)
         undefined, // folderId
-        'sonnet', // default model for main repo sessions
-        'claude',
-        undefined,
-        undefined,
+        'claude', // tool_type
+        undefined, // baseCommit
+        undefined, // baseBranch
         project.commit_mode, // Use project's commit mode
         undefined // commit_mode_settings - let it use project defaults
       );
@@ -395,10 +391,7 @@ export class SessionManager extends EventEmitter {
       console.log(`[SessionManager] Mapping status ${update.status} to DB status ${dbUpdate.status}`);
     }
     
-    if (update.model !== undefined) {
-      dbUpdate.model = update.model;
-      console.log(`[SessionManager] Updating model to ${update.model}`);
-    }
+    // Model is now managed at panel level, not session level
     
     if (update.skip_continue_next !== undefined) {
       dbUpdate.skip_continue_next = update.skip_continue_next;
