@@ -66,6 +66,24 @@ export interface Session {
   commit_mode?: 'structured' | 'checkpoint' | 'disabled';
   commit_mode_settings?: string; // JSON string of CommitModeSettings
   skip_continue_next?: boolean;
+  // Multi-provider support fields
+  provider_id?: string;
+  provider_model?: string;
+  provider_config?: string; // JSON string of provider-specific config
+}
+
+export interface ToolPanel {
+  id: string;
+  session_id: string;
+  type: string;
+  title: string;
+  state?: string; // JSON string
+  metadata?: string; // JSON string
+  created_at: string;
+  updated_at: string;
+  // Multi-provider support fields
+  provider_id?: string;
+  provider_model?: string;
 }
 
 export interface SessionOutput {

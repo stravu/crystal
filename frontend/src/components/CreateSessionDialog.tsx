@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
 import { useErrorStore } from '../stores/errorStore';
-import { Sparkles, GitBranch, ChevronRight, ChevronDown, Brain, X, FileText, Paperclip, Code2, Settings2 } from 'lucide-react';
+import { Sparkles, GitBranch, ChevronRight, ChevronDown, X, FileText, Paperclip, Code2, Settings2 } from 'lucide-react';
 import FilePathAutocomplete from './FilePathAutocomplete';
 import { CommitModeSettings } from './CommitModeSettings';
 import type { CommitModeSettings as CommitModeSettingsType } from '../../../shared/types';
@@ -14,6 +14,8 @@ import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/Claud
 import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
 import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
 import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
+import { ProviderSelection } from './ProviderSelection';
+import type { ProviderSelection as ProviderSelectionType } from '../types/providers';
 
 const LARGE_TEXT_THRESHOLD = 5000;
 const TEXT_FILE_EXTENSIONS = /\.(?:txt|md|markdown|log|json|js|jsx|ts|tsx|py|rb|go|java|cs|c|cpp|h|hpp|rs|yml|yaml|sh|bash|zsh|html|css|scss|less|xml|csv)$/i;
@@ -71,7 +73,9 @@ interface CreateSessionDialogProps {
 export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }: CreateSessionDialogProps) {
   const [sessionName, setSessionName] = useState<string>('');
   const [sessionCount, setSessionCount] = useState<number>(1);
-  const [toolType, setToolType] = useState<'claude' | 'codex' | 'none'>('none');
+  const [selectedProvider, setSelectedProvider] = useState<string>('anthropic');
+  const [selectedModel, setSelectedModel] = useState<string>('claude-3-opus-20240229');
+  const [providerConfig, setProviderConfig] = useState<ProviderSelectionType | null>(null);
   const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
     prompt: '',
     model: 'auto',
@@ -213,12 +217,21 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   useEffect(() => {
     setIsDragging(false);
     dragCounterRef.current = 0;
-  }, [toolType]);
+  }, [selectedProvider]);
 
   // Apply loaded preferences to state
   useEffect(() => {
     if (preferences) {
-      setToolType(preferences.toolType);
+      // Convert old toolType preferences to new provider system
+      if (preferences.toolType === 'claude') {
+        setSelectedProvider('anthropic');
+        setSelectedModel(preferences.claudeConfig.model || 'claude-3-opus-20240229');
+      } else if (preferences.toolType === 'codex') {
+        setSelectedProvider('openai');
+        setSelectedModel(preferences.codexConfig.model || 'gpt-4');
+      } else {
+        setSelectedProvider('none');
+      }
       setClaudeConfig(prev => ({
         ...prev,
         model: preferences.claudeConfig.model,
@@ -561,24 +574,20 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       // Model is now managed at panel level, not session level
       let finalPermissionMode: 'ignore' | 'approve' = 'ignore';
       
-      // Get attachments from the active config
-      const activeAttachedImages = toolType === 'claude' ? (claudeConfig.attachedImages || []) :
-                                   toolType === 'codex' ? (codexConfig.attachedImages || []) : [];
-      const activeAttachedTexts = toolType === 'claude' ? (claudeConfig.attachedTexts || []) :
-                                 toolType === 'codex' ? (codexConfig.attachedTexts || []) : [];
-      
-      if (toolType === 'claude') {
+      // Get attachments from the active config based on provider
+      const activeAttachedImages = selectedProvider === 'anthropic' ? (claudeConfig.attachedImages || []) :
+                                   selectedProvider === 'openai' ? (codexConfig.attachedImages || []) : [];
+      const activeAttachedTexts = selectedProvider === 'anthropic' ? (claudeConfig.attachedTexts || []) :
+                                 selectedProvider === 'openai' ? (codexConfig.attachedTexts || []) : [];
+
+      if (selectedProvider === 'anthropic') {
         finalPrompt = claudeConfig.prompt || '';
         if (claudeConfig.ultrathink && finalPrompt) {
           finalPrompt += '\nultrathink';
         }
-        // Model is stored at panel level for Claude panels
         finalPermissionMode = claudeConfig.permissionMode;
-      } else if (toolType === 'codex') {
-        // Use Codex config directly
+      } else if (selectedProvider === 'openai') {
         finalPrompt = codexConfig.prompt || '';
-        // Model is stored at panel level for Codex panels
-        // Keep session permission mode independent of Codex approval policy; default to ignore unless explicitly set
         finalPermissionMode = formData.permissionMode || 'ignore';
       }
       
@@ -636,21 +645,25 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       console.log('[CreateSessionDialog] Creating session with:', {
         sessionName: sessionName || '(auto-generate)',
         count: sessionCount,
-        toolType,
+        provider: selectedProvider,
+        model: selectedModel,
         prompt: finalPrompt || '(no prompt)'
       });
       const response = await API.sessions.create({
         prompt: finalPrompt || undefined,
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
-        // Model is now managed at panel level, not session level
-        toolType,
+        // Use new provider system
+        providerSelection: providerConfig || {
+          providerId: selectedProvider,
+          modelId: selectedModel
+        },
         permissionMode: finalPermissionMode,
         projectId,
         commitMode: commitModeSettings.mode,
         commitModeSettings: JSON.stringify(commitModeSettings),
         baseBranch: formData.baseBranch,
-        codexConfig: toolType === 'codex' ? {
+        codexConfig: selectedProvider === 'openai' ? {
           model: codexConfig.model,
           modelProvider: codexConfig.modelProvider,
           approvalPolicy: codexConfig.approvalPolicy,
@@ -740,9 +753,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       onClick={async () => {
                         setIsGeneratingName(true);
                         try {
-                          // Use the active tool's prompt for name generation
-                          const promptForName = toolType === 'claude' ? claudeConfig.prompt : 
-                                               toolType === 'codex' ? codexConfig.prompt : '';
+                          // Use the active provider's prompt for name generation
+                          const promptForName = selectedProvider === 'anthropic' ? claudeConfig.prompt :
+                                               selectedProvider === 'openai' ? codexConfig.prompt : '';
                           const response = await API.sessions.generateName(promptForName || 'New session');
                           if (response.success && response.data) {
                             setSessionName(response.data);
@@ -765,9 +778,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       }}
                       variant="secondary"
                       loading={isGeneratingName}
-                      disabled={toolType === 'none' || 
-                               (toolType === 'claude' && !claudeConfig.prompt?.trim()) ||
-                               (toolType === 'codex' && !codexConfig.prompt?.trim())}
+                      disabled={!selectedProvider || selectedProvider === 'none' ||
+                               (selectedProvider === 'anthropic' && !claudeConfig.prompt?.trim()) ||
+                               (selectedProvider === 'openai' && !codexConfig.prompt?.trim())}
                       title="Generate name from prompt"
                       size="md"
                     >
@@ -823,85 +836,24 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 <span className="text-xs text-text-tertiary">(Optional - for launching AI tools in sessions)</span>
               </div>
               
-              {/* Tool Type Selection */}
+              {/* Provider Selection */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Select Tool
+                  Select AI Provider
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Card
-                    variant={toolType === 'none' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      toolType === 'none'
-                        ? 'border-interactive bg-interactive/10'
-                        : ''
-                    }`}
-                    onClick={() => {
-                      setToolType('none');
-                      savePreferences({ toolType: 'none' });
-                    }}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <X className={`w-5 h-5 ${toolType === 'none' ? 'text-interactive' : 'text-text-tertiary'}`} />
-                      <span className={`text-sm font-medium ${toolType === 'none' ? 'text-interactive' : ''}`}>None</span>
-                      <span className="text-xs opacity-75">Empty session</span>
-                    </div>
-                    {toolType === 'none' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-                    )}
-                  </Card>
-                  
-                  <Card
-                    variant={toolType === 'claude' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      toolType === 'claude'
-                        ? 'border-interactive bg-interactive/10'
-                        : ''
-                    }`}
-                    onClick={() => {
-                      setToolType('claude');
-                      savePreferences({ toolType: 'claude' });
-                    }}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <Brain className={`w-5 h-5 ${toolType === 'claude' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${toolType === 'claude' ? 'text-interactive' : ''}`}>Claude Code</span>
-                      <span className="text-xs opacity-75">AI assistant</span>
-                    </div>
-                    {toolType === 'claude' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-                    )}
-                  </Card>
-                  
-                  <Card
-                    variant={toolType === 'codex' ? 'interactive' : 'bordered'}
-                    padding="sm"
-                    className={`relative cursor-pointer transition-all ${
-                      toolType === 'codex'
-                        ? 'border-interactive bg-interactive/10'
-                        : ''
-                    }`}
-                    onClick={() => {
-                      setToolType('codex');
-                      savePreferences({ toolType: 'codex' });
-                    }}
-                  >
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      <Code2 className={`w-5 h-5 ${toolType === 'codex' ? 'text-interactive' : ''}`} />
-                      <span className={`text-sm font-medium ${toolType === 'codex' ? 'text-interactive' : ''}`}>Codex</span>
-                      <span className="text-xs opacity-75">Multi-model AI</span>
-                    </div>
-                    {toolType === 'codex' && (
-                      <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-                    )}
-                  </Card>
-                </div>
+                <ProviderSelection
+                  selectedProvider={selectedProvider}
+                  selectedModel={selectedModel}
+                  onProviderChange={(providerId, modelId) => {
+                    setSelectedProvider(providerId);
+                    setSelectedModel(modelId);
+                    setProviderConfig({ providerId, modelId });
+                  }}
+                />
               </div>
               
-              {/* Tool-specific configuration */}
-              {toolType === 'claude' && (
+              {/* Provider-specific configuration */}
+              {selectedProvider === 'anthropic' && (
                 <Card
                   variant="bordered"
                   className={`relative p-4 transition-colors ${
@@ -943,8 +895,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   </div>
                 </Card>
               )}
-              
-              {toolType === 'codex' && (
+
+              {selectedProvider === 'openai' && (
                 <Card
                   variant="bordered"
                   className={`relative p-4 transition-colors ${
@@ -989,10 +941,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   </div>
                 </Card>
               )}
-              
-              {toolType === 'none' && (
+
+              {!selectedProvider || selectedProvider === 'none' && (
                 <Card variant="bordered" className="p-4 text-center text-text-tertiary">
-                  <p className="text-sm">No tool will be launched. You can add tools later from within the session.</p>
+                  <p className="text-sm">No AI tool will be launched. You can add tools later from within the session.</p>
                 </Card>
               )}
               
@@ -1192,7 +1144,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
               isSubmitting ? 'Creating session...' :
               worktreeError ? 'Please fix the session name error' :
               (!hasApiKey && !sessionName) ? 'Please enter a session name (required without API key)' :
-              toolType === 'none' ? 'Session will be created without AI tool' :
+              !selectedProvider || selectedProvider === 'none' ? 'Session will be created without AI tool' :
               undefined
             }
           >

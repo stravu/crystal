@@ -525,6 +525,29 @@ export class API {
       return window.electronAPI.claudePanels.setModel(panelId, model);
     },
   };
+
+  // Provider management
+  static providers = {
+    async discover() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.providers.discover();
+    },
+
+    async getConfigs() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.providers.getConfigs();
+    },
+
+    async switch(providerId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.providers.switch(providerId);
+    },
+
+    async getModels(providerId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.providers.getModels(providerId);
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete

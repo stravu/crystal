@@ -20,6 +20,7 @@ import { registerPanelHandlers } from './panels';
 import { registerClaudePanelHandlers } from './claudePanel';
 import { registerCodexPanelHandlers } from './codexPanel';
 import { registerEditorPanelHandlers } from './editorPanel';
+import { registerProviderHandlers } from './provider';
 
 
 export function registerIpcHandlers(services: AppServices): void {
@@ -43,4 +44,5 @@ export function registerIpcHandlers(services: AppServices): void {
   registerClaudePanelHandlers(ipcMain, services);
   registerCodexPanelHandlers(ipcMain, services);
   registerEditorPanelHandlers(ipcMain, services);
+  registerProviderHandlers(ipcMain, services);
 } 
