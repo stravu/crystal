@@ -27,6 +27,9 @@ export interface Session {
   baseBranch?: string;
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
+  // Multi-provider support fields
+  providerId?: string;
+  providerModel?: string;
 }
 
 export interface GitStatus {
@@ -63,6 +66,9 @@ export interface CreateSessionRequest {
   toolType?: 'claude' | 'codex' | 'none';
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
+  // Multi-provider support fields
+  providerId?: string;
+  providerModel?: string;
   codexConfig?: {
     model?: string;
     modelProvider?: string;

@@ -3,6 +3,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import { StatusIndicator } from './StatusIndicator';
 import { GitStatusIndicator } from './GitStatusIndicator';
+import { ProviderIndicator } from './ProviderIndicator';
 import { ConfirmDialog } from './ConfirmDialog';
 import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
@@ -364,6 +365,14 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
                 <GitStatusIndicator gitStatus={gitStatus} size="small" sessionId={session.id} isLoading={gitStatusLoading} />
               )}
               <StatusIndicator session={session} size="small" />
+              {session.providerId && (
+                <ProviderIndicator
+                  providerId={session.providerId}
+                  providerModel={session.providerModel}
+                  size="small"
+                  showModel={false}
+                />
+              )}
               <span className="ml-1">{session.name}</span>
               {!!session.isMainRepo && (
                 <span className="ml-1 text-xs text-interactive">(main)</span>

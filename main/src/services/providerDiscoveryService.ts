@@ -2,22 +2,16 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { PROVIDERS } from '../data/providers';
-import type { Logger } from '../utils/logger';
 import { ProviderEnvironment, DiscoveredProvider, ProviderAvailability, ProviderConfig } from '../../../shared/types/providerConfig';
 
 export class ProviderDiscoveryService {
-  private logger?: Logger;
-
-  constructor(logger?: Logger) {
-    this.logger = logger;
-  }
 
   private configPriority = [
     path.join(os.homedir(), '.claude', 'settings.json'),
-    path.join(os.homedir(), '.claude', 'settings.local.json'),
     path.join(process.cwd(), '.claude', 'settings.json'),
-    path.join(process.cwd(), '.claude', 'settings.local.json'),
-    path.join(os.homedir(), '.claude.json')
+    path.join(os.homedir(), '.claude.json'),
+    path.join(os.homedir(), '.claude', 'settings.local.json'),
+    path.join(process.cwd(), '.claude', 'settings.local.json')
   ];
 
   async discoverAvailableProviders(): Promise<DiscoveredProvider[]> {
@@ -79,12 +73,24 @@ export class ProviderDiscoveryService {
   }
 
   private detectModels(env: ProviderEnvironment, provider: ProviderConfig): string[] {
+    const detectedModels: string[] = [];
+
+    // Check for MODEL (standard)
     if (env.MODEL && provider.models.find(m => m.id === env.MODEL)) {
-      return [env.MODEL];
+      detectedModels.push(env.MODEL);
     }
 
-    // Return all available models as fallback
-    return provider.models.map(m => m.id);
+    // Check for SMALL_FAST_MODEL (for providers that support it)
+    if (env.SMALL_FAST_MODEL && provider.models.find(m => m.id === env.SMALL_FAST_MODEL)) {
+      detectedModels.push(env.SMALL_FAST_MODEL);
+    }
+
+    // If no specific models found, return all available models as fallback
+    if (detectedModels.length === 0) {
+      return provider.models.map(m => m.id);
+    }
+
+    return detectedModels;
   }
 
   async getProviderConfig(providerId: string): Promise<ProviderConfig | null> {

@@ -9,7 +9,49 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   // Panel CRUD operations
   ipcMain.handle('panels:create', async (_, request: CreatePanelRequest) => {
     console.log('[IPC] Creating panel:', request);
-    const panel = await panelManager.createPanel(request);
+
+    let finalRequest = { ...request };
+
+    // For Claude panels, inherit provider information from the session
+    if (request.type === 'claude') {
+      try {
+        // Get session details to inherit provider information
+        const session = services.sessionManager.getSession(request.sessionId);
+        if (session) {
+          // Update the initial state to include provider information
+          finalRequest = {
+            ...request,
+            initialState: {
+              ...request.initialState,
+              providerId: session.providerId || 'anthropic',
+              providerModel: session.providerModel || 'claude-3-opus-20240229'
+            }
+          };
+
+          // Update panel with provider information in database after creation
+          // We'll do this after the panel is created
+        }
+      } catch (err) {
+        console.error('[Panels IPC] Failed to get session for Claude panel provider inheritance:', err);
+      }
+    }
+
+    const panel = await panelManager.createPanel(finalRequest);
+
+    // For Claude panels, update the database with provider information
+    if (panel.type === 'claude') {
+      try {
+        const session = services.sessionManager.getSession(panel.sessionId);
+        if (session) {
+          databaseService.updatePanel(panel.id, {
+            provider_id: session.providerId || 'anthropic',
+            provider_model: session.providerModel || 'claude-3-opus-20240229'
+          });
+        }
+      } catch (err) {
+        console.error('[Panels IPC] Failed to update Claude panel with provider information:', err);
+      }
+    }
 
     // Auto-register Claude panels so they're hooked to the Claude runtime
     if (panel.type === 'claude') {

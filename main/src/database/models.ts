@@ -120,6 +120,9 @@ export interface CreateSessionData {
   base_branch?: string;
   commit_mode?: 'structured' | 'checkpoint' | 'disabled';
   commit_mode_settings?: string; // JSON string of CommitModeSettings
+  // Multi-provider support fields
+  provider_id?: string;
+  provider_model?: string;
 }
 
 export interface UpdateSessionData {

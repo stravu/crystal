@@ -28,6 +28,8 @@ export interface Session {
   baseBranch?: string;
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string; // JSON string of CommitModeSettings
+  providerId?: string;
+  providerModel?: string;
 }
 
 export interface GitStatus {
@@ -72,6 +74,8 @@ export interface CreateSessionRequest {
     webSearch?: boolean;
     thinkingLevel?: 'low' | 'medium' | 'high';
   };
+  providerId?: string;
+  providerModel?: string;
 }
 
 export interface SessionUpdate {

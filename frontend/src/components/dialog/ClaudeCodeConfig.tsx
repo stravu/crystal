@@ -6,7 +6,7 @@ import FilePathAutocomplete from '../FilePathAutocomplete';
 
 export interface ClaudeCodeConfig {
   prompt?: string;
-  model: 'auto' | 'sonnet' | 'opus' | 'haiku';
+  model: string; // Changed to support both Claude and GLM models
   permissionMode: 'ignore' | 'approve';
   ultrathink?: boolean;
   attachedImages?: any[];
@@ -21,6 +21,7 @@ interface ClaudeCodeConfigProps {
   onPaste?: (e: React.ClipboardEvent) => void;
   onRemoveImage?: (id: string) => void;
   onRemoveText?: (id: string) => void;
+  providerId?: string; // Add provider ID to determine which models to show
 }
 
 export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
@@ -30,9 +31,30 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
   disabled = false,
   onPaste,
   onRemoveImage,
-  onRemoveText
+  onRemoveText,
+  providerId = 'anthropic' // Default to anthropic
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Define available models based on provider
+  const getAvailableModels = () => {
+    if (providerId === 'zai') {
+      return [
+        { id: 'glm-4.5', name: 'GLM-4.5', description: 'High capability', icon: Brain, default: true },
+        { id: 'glm-4.5-air', name: 'GLM-4.5-Air', description: 'Fast & efficient', icon: Zap, default: false }
+      ];
+    }
+
+    // Default Claude models
+    return [
+      { id: 'auto', name: 'Auto', description: 'Default', icon: Sparkles, default: true },
+      { id: 'sonnet', name: 'Sonnet', description: 'Balanced', icon: Brain, default: false },
+      { id: 'opus', name: 'Opus', description: 'Advanced', icon: Target, default: false },
+      { id: 'haiku', name: 'Haiku', description: 'Fast', icon: Zap, default: false }
+    ];
+  };
+
+  const availableModels = getAvailableModels();
   
   const processFile = async (file: File): Promise<any | null> => {
     const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -186,86 +208,39 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
         <label className="block text-sm font-medium text-text-secondary mb-2">
           Model
         </label>
-        <div className="grid grid-cols-4 gap-2">
-          <Card
-            variant={config.model === 'auto' ? 'interactive' : 'bordered'}
-            padding="sm"
-            className={`relative cursor-pointer transition-all ${
-              config.model === 'auto'
-                ? 'border-interactive bg-interactive/10'
-                : ''
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => !disabled && onChange({ ...config, model: 'auto' })}
-          >
-            <div className="flex flex-col items-center gap-1 py-2">
-              <Sparkles className={`w-5 h-5 ${config.model === 'auto' ? 'text-interactive' : ''}`} />
-              <span className={`text-sm font-medium ${config.model === 'auto' ? 'text-interactive' : ''}`}>Auto</span>
-              <span className="text-xs opacity-75">Default</span>
-            </div>
-            {config.model === 'auto' && (
-              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-            )}
-          </Card>
-          
-          <Card
-            variant={config.model === 'sonnet' ? 'interactive' : 'bordered'}
-            padding="sm"
-            className={`relative cursor-pointer transition-all ${
-              config.model === 'sonnet'
-                ? 'border-interactive bg-interactive/10'
-                : ''
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => !disabled && onChange({ ...config, model: 'sonnet' })}
-          >
-            <div className="flex flex-col items-center gap-1 py-2">
-              <Target className={`w-5 h-5 ${config.model === 'sonnet' ? 'text-interactive' : ''}`} />
-              <span className={`text-sm font-medium ${config.model === 'sonnet' ? 'text-interactive' : ''}`}>Sonnet</span>
-              <span className="text-xs opacity-75">Balanced</span>
-            </div>
-            {config.model === 'sonnet' && (
-              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-            )}
-          </Card>
-          
-          <Card
-            variant={config.model === 'opus' ? 'interactive' : 'bordered'}
-            padding="sm"
-            className={`relative cursor-pointer transition-all ${
-              config.model === 'opus'
-                ? 'border-interactive bg-interactive/10'
-                : ''
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => !disabled && onChange({ ...config, model: 'opus' })}
-          >
-            <div className="flex flex-col items-center gap-1 py-2">
-              <Brain className={`w-5 h-5 ${config.model === 'opus' ? 'text-interactive' : ''}`} />
-              <span className={`text-sm font-medium ${config.model === 'opus' ? 'text-interactive' : ''}`}>Opus</span>
-              <span className="text-xs opacity-75">Maximum</span>
-            </div>
-            {config.model === 'opus' && (
-              <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
-            )}
-          </Card>
-          
-          <Card
-            variant={config.model === 'haiku' ? 'interactive' : 'bordered'}
-            padding="sm"
-            className={`relative cursor-pointer transition-all ${
-              config.model === 'haiku'
-                ? 'border-status-success bg-status-success/10'
-                : ''
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => !disabled && onChange({ ...config, model: 'haiku' })}
-          >
-            <div className="flex flex-col items-center gap-1 py-2">
-              <Zap className={`w-5 h-5 ${config.model === 'haiku' ? 'text-status-success' : ''}`} />
-              <span className={`text-sm font-medium ${config.model === 'haiku' ? 'text-status-success' : ''}`}>Haiku</span>
-              <span className="text-xs opacity-75">Fast</span>
-            </div>
-            {config.model === 'haiku' && (
-              <div className="absolute top-1 right-1 w-2 h-2 bg-status-success rounded-full" />
-            )}
-          </Card>
+        <div className={`grid gap-2 ${availableModels.length <= 4 ? 'grid-cols-4' : 'grid-cols-2'}`}>
+          {availableModels.map((model) => {
+            const IconComponent = model.icon;
+            const isSelected = config.model === model.id;
+            const isDefault = model.default;
+
+            return (
+              <Card
+                key={model.id}
+                variant={isSelected ? 'interactive' : 'bordered'}
+                padding="sm"
+                className={`relative cursor-pointer transition-all ${
+                  isSelected
+                    ? 'border-interactive bg-interactive/10'
+                    : ''
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (!disabled) {
+                    onChange({ ...config, model: model.id });
+                  }
+                }}
+              >
+                <div className="flex flex-col items-center gap-1 py-2">
+                  <IconComponent className={`w-5 h-5 ${isSelected ? 'text-interactive' : ''}`} />
+                  <span className={`text-sm font-medium ${isSelected ? 'text-interactive' : ''}`}>{model.name}</span>
+                  <span className="text-xs opacity-75">{isDefault ? 'Default' : model.description}</span>
+                </div>
+                {isSelected && (
+                  <div className="absolute top-1 right-1 w-2 h-2 bg-interactive rounded-full" />
+                )}
+              </Card>
+            );
+          })}
         </div>
       </div>
 

@@ -5,6 +5,8 @@ export interface ToolPanel {
   title: string;                 // Display title (e.g., "Terminal 1")
   state: ToolPanelState;         // Panel-specific state
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
+  providerId?: string;          // AI provider ID (anthropic, zai, etc.)
+  providerModel?: string;       // AI model being used
 }
 
 export type ToolPanelType = 'terminal' | 'claude' | 'codex' | 'diff' | 'editor' | 'logs' | 'dashboard'; // Will expand later

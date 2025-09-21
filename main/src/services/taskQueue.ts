@@ -41,6 +41,9 @@ interface CreateSessionJob {
     webSearch?: boolean;
     thinkingLevel?: 'low' | 'medium' | 'high';
   };
+  // Multi-provider support fields
+  providerId?: string;
+  providerModel?: string;
 }
 
 interface ContinueSessionJob {
@@ -136,10 +139,10 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig, providerId, providerModel } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
-      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
+      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, providerId, providerModel });
 
       try {
         let targetProject;
@@ -225,7 +228,9 @@ export class TaskQueue {
           baseCommit,
           actualBaseBranch,
           job.data.commitMode,
-          job.data.commitModeSettings
+          job.data.commitModeSettings,
+          providerId,
+          providerModel
         );
         console.log(`[TaskQueue] Session created with ID: ${session.id}`);
         
@@ -490,7 +495,9 @@ export class TaskQueue {
       sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
       webSearch?: boolean;
       thinkingLevel?: 'low' | 'medium' | 'high';
-    }
+    },
+    providerId?: string,
+    providerModel?: string
   ): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
@@ -548,7 +555,7 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, toolType, commitMode, commitModeSettings, codexConfig }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, toolType, commitMode, commitModeSettings, codexConfig, providerId, providerModel }));
     }
     return Promise.all(jobs);
   }

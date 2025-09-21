@@ -68,13 +68,6 @@ export interface ProviderAvailability {
   detectedModels: string[];
 }
 
-// UI-specific types for provider selection
-export interface ProviderSelection {
-  providerId: string;
-  modelId: string;
-  config?: Record<string, any>;
-}
-
 // Extended session interface with provider support
 export interface SessionWithProvider {
   id: string;
@@ -103,7 +96,6 @@ export interface SessionWithProvider {
   // New provider architecture
   providerId?: string;
   providerModel?: string;
-  providerConfig?: string; // JSON string of provider-specific config
   archived?: boolean;
   gitStatus?: any;
   baseCommit?: string;
@@ -125,7 +117,8 @@ export interface CreateSessionWithProviderRequest {
   // Legacy support
   toolType?: 'claude' | 'codex' | 'none';
   // New provider architecture
-  providerSelection?: ProviderSelection;
+  providerId?: string;
+  providerModel?: string;
   commitMode?: 'structured' | 'checkpoint' | 'disabled';
   commitModeSettings?: string;
   codexConfig?: {

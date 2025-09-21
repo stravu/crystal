@@ -89,7 +89,17 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       // Fetch model from Claude panel settings
       API.claudePanels.getModel(panelId).then((response) => {
         if (response.success && response.data) {
-          setSelectedModel(response.data);
+          // Handle both old format (string) and new format (object with model and providerId)
+          if (typeof response.data === 'string') {
+            setSelectedModel(response.data);
+          } else if (response.data.model) {
+            setSelectedModel(response.data.model);
+            // Update the session's providerId if we got provider info from the panel
+            if (response.data.providerId && activeSession) {
+              // Update the active session's provider info for UI purposes
+              activeSession.providerId = response.data.providerId;
+            }
+          }
         }
       }).catch((error) => {
         console.error('Failed to fetch panel model:', error);
@@ -99,7 +109,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       // Fallback for non-panel usage (if any)
       setSelectedModel('auto');
     }
-  }, [panelId]); // Reload when panel ID changes
+  }, [panelId, activeSession]); // Reload when panel ID changes
 
   const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -581,6 +591,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   setSelectedModel={setSelectedModel}
                   setShowDropdown={() => {}}
                   panelId={panelId}
+                  providerId={activeSession.providerId || 'anthropic'}
                 />
 
                 {/* Auto-Commit Mode Pill - always visible */}
@@ -730,6 +741,7 @@ interface ModelSelectorProps {
   setSelectedModel: (model: string) => void;
   setShowDropdown: (show: boolean) => void;
   panelId?: string;
+  providerId: string; // Provider ID from session
 }
 
 const ModelSelector: React.FC<ModelSelectorProps> = ({
@@ -737,6 +749,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   setSelectedModel,
   setShowDropdown,
   panelId,
+  providerId,
 }) => {
   const handleModelChange = async (modelId: string) => {
     setSelectedModel(modelId);
@@ -758,8 +771,22 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
   };
 
-  // Model configurations
-  const modelConfigs = {
+  // Dynamic model configurations based on provider
+  const modelConfigs = providerId === 'zai' ? {
+    'glm-4.5': {
+      label: 'GLM-4.5',
+      icon: Brain,
+      iconColor: 'text-interactive',
+      description: 'High capability',
+    },
+    'glm-4.5-air': {
+      label: 'GLM-4.5-Air',
+      icon: Zap,
+      iconColor: 'text-status-success',
+      description: 'Fast & efficient',
+    },
+  } : {
+    // Default Claude models
     'auto': {
       label: 'Auto',
       icon: CheckCircle,

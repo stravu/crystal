@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select';
 import { Badge } from './ui/Badge';
 import { API } from '../utils/api';
 import { Brain, Zap, Shield, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
@@ -9,7 +8,6 @@ import type { ProviderConfig, DiscoveredProvider, ProviderModel } from '../types
 
 interface ProviderSelectionProps {
   selectedProvider?: string;
-  selectedModel?: string;
   onProviderChange: (providerId: string, modelId: string) => void;
   className?: string;
   disabled?: boolean;
@@ -17,20 +15,19 @@ interface ProviderSelectionProps {
 
 export function ProviderSelection({
   selectedProvider,
-  selectedModel,
   onProviderChange,
   className = '',
   disabled = false
-}: ProviderSelectionProps) {
+}: Readonly<ProviderSelectionProps>) {
   const [availableProviders, setAvailableProviders] = useState<DiscoveredProvider[]>([]);
   const [providerConfigs, setProviderConfigs] = useState<ProviderConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  
   useEffect(() => {
     loadProviders();
   }, []);
-
+    
   const loadProviders = async () => {
     try {
       setLoading(true);
@@ -90,10 +87,21 @@ export function ProviderSelection({
     return discovered?.isAvailable ? 'available' : 'unavailable';
   };
 
-  const selectedProviderConfig = selectedProvider ? getProviderConfig(selectedProvider) : undefined;
-  const availableModels = selectedProvider ? getAvailableModels(selectedProvider) : [];
-  const currentStatus = selectedProvider ? getProviderStatus(selectedProvider) : 'loading';
+  const getProviderUnavailableReason = (providerId: string): string => {
+    const discovered = availableProviders.find(p => p.providerId === providerId);
+    if (!discovered) {
+      return 'Provider not found in discovery results';
+    }
+    if (!discovered.isAvailable) {
+      return 'Provider configuration not available';
+    }
+    return 'Unknown reason';
+  };
 
+  
+  const selectedProviderConfig = selectedProvider ? getProviderConfig(selectedProvider) : undefined;
+  const currentStatus = selectedProvider ? getProviderStatus(selectedProvider) : 'loading';
+  
   if (loading && availableProviders.length === 0) {
     return (
       <div className={`flex items-center justify-center p-8 ${className}`}>
@@ -109,6 +117,20 @@ export function ProviderSelection({
         <div className="flex items-center">
           <AlertCircle className="w-5 h-5 mr-2" />
           <span>{error}</span>
+          <Button variant="ghost" size="sm" onClick={loadProviders} className="ml-auto">
+            Retry
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!loading && providerConfigs.length === 0) {
+    return (
+      <Card variant="bordered" className={`p-4 border-yellow-500 ${className}`}>
+        <div className="flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          <span>No provider configurations found</span>
           <Button variant="ghost" size="sm" onClick={loadProviders} className="ml-auto">
             Retry
           </Button>
@@ -161,13 +183,31 @@ export function ProviderSelection({
                       </h4>
                       <div className="flex items-center space-x-2">
                         {status === 'available' && (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <div className="relative group">
+                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              Available
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
                         )}
                         {status === 'unavailable' && (
-                          <AlertCircle className="w-4 h-4 text-red-500" />
+                          <div className="relative group">
+                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              {getProviderUnavailableReason(provider.id)}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
                         )}
                         {status === 'loading' && (
-                          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                          <div className="relative group">
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-400 cursor-help" />
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              Loading...
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -202,50 +242,14 @@ export function ProviderSelection({
         </div>
       </div>
 
-      {/* Model Selection */}
-      {selectedProviderConfig && availableModels.length > 0 && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Model
-          </label>
-          <Select
-            value={selectedModel}
-            onValueChange={(modelId) => onProviderChange(selectedProvider!, modelId)}
-            disabled={disabled || currentStatus !== 'available'}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a model" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableModels.map((model) => (
-                <SelectItem key={model.id} value={model.id}>
-                  <div className="flex items-center justify-between w-full">
-                    <span>{model.name}</span>
-                    {model.default && (
-                      <Badge variant="default" className="ml-2 text-xs">
-                        Default
-                      </Badge>
-                    )}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedProviderConfig.costTracking && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Pricing: ${selectedProviderConfig.costTracking.prices[selectedModel || selectedProviderConfig.models[0]?.id]?.inputPricePer1m || 0}/1M input tokens
-            </p>
-          )}
-        </div>
-      )}
-
+      
       {/* Status Messages */}
       {selectedProvider && currentStatus === 'unavailable' && (
         <Card variant="bordered" className="p-3 border-yellow-500">
           <div className="flex items-center">
             <AlertCircle className="w-4 h-4 mr-2" />
             <span className="text-sm">
-              Provider "{selectedProviderConfig?.name}" is not available. Please check your configuration.
+              Provider "{selectedProviderConfig?.name || selectedProvider}" is not available. Please check your configuration.
             </span>
           </div>
         </Card>

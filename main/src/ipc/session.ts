@@ -166,7 +166,9 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           request.toolType,
           request.commitMode,
           request.commitModeSettings,
-          request.codexConfig
+          request.codexConfig,
+          request.providerId,
+          request.providerModel
         );
         console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
         
@@ -185,7 +187,9 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           toolType: request.toolType,
           commitMode: request.commitMode,
           commitModeSettings: request.commitModeSettings,
-          codexConfig: request.codexConfig
+          codexConfig: request.codexConfig,
+          providerId: request.providerId,
+          providerModel: request.providerModel
         });
         console.log('[IPC] Created job with ID:', job.id);
         

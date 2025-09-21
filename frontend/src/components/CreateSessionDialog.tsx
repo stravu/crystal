@@ -15,7 +15,6 @@ import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
 import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
 import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
 import { ProviderSelection } from './ProviderSelection';
-import type { ProviderSelection as ProviderSelectionType } from '../types/providers';
 
 const LARGE_TEXT_THRESHOLD = 5000;
 const TEXT_FILE_EXTENSIONS = /\.(?:txt|md|markdown|log|json|js|jsx|ts|tsx|py|rb|go|java|cs|c|cpp|h|hpp|rs|yml|yaml|sh|bash|zsh|html|css|scss|less|xml|csv)$/i;
@@ -75,7 +74,6 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   const [sessionCount, setSessionCount] = useState<number>(1);
   const [selectedProvider, setSelectedProvider] = useState<string>('anthropic');
   const [selectedModel, setSelectedModel] = useState<string>('claude-3-opus-20240229');
-  const [providerConfig, setProviderConfig] = useState<ProviderSelectionType | null>(null);
   const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
     prompt: '',
     model: 'auto',
@@ -217,6 +215,17 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   useEffect(() => {
     setIsDragging(false);
     dragCounterRef.current = 0;
+  }, [selectedProvider]);
+
+  // Update default model when provider changes
+  useEffect(() => {
+    if (selectedProvider === 'zai') {
+      // Set GLM-4.5 as default for Z.ai
+      setClaudeConfig(prev => ({ ...prev, model: 'glm-4.5' }));
+    } else if (selectedProvider === 'anthropic') {
+      // Set auto as default for Anthropic
+      setClaudeConfig(prev => ({ ...prev, model: 'auto' }));
+    }
   }, [selectedProvider]);
 
   // Apply loaded preferences to state
@@ -575,12 +584,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       let finalPermissionMode: 'ignore' | 'approve' = 'ignore';
       
       // Get attachments from the active config based on provider
-      const activeAttachedImages = selectedProvider === 'anthropic' ? (claudeConfig.attachedImages || []) :
+      const activeAttachedImages = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? (claudeConfig.attachedImages || []) :
                                    selectedProvider === 'openai' ? (codexConfig.attachedImages || []) : [];
-      const activeAttachedTexts = selectedProvider === 'anthropic' ? (claudeConfig.attachedTexts || []) :
+      const activeAttachedTexts = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? (claudeConfig.attachedTexts || []) :
                                  selectedProvider === 'openai' ? (codexConfig.attachedTexts || []) : [];
 
-      if (selectedProvider === 'anthropic') {
+      if (selectedProvider === 'anthropic' || selectedProvider === 'zai') {
         finalPrompt = claudeConfig.prompt || '';
         if (claudeConfig.ultrathink && finalPrompt) {
           finalPrompt += '\nultrathink';
@@ -653,11 +662,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         prompt: finalPrompt || undefined,
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
-        // Use new provider system
-        providerSelection: providerConfig || {
-          providerId: selectedProvider,
-          modelId: selectedModel
-        },
+        providerId: selectedProvider,
+        providerModel: selectedModel,
         permissionMode: finalPermissionMode,
         projectId,
         commitMode: commitModeSettings.mode,
@@ -701,8 +707,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   };
   
   return (
-    <Modal 
-      isOpen={isOpen} 
+    <Modal
+      isOpen={isOpen}
       onClose={() => {
         setWorktreeError(null);
         onClose();
@@ -754,7 +760,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         setIsGeneratingName(true);
                         try {
                           // Use the active provider's prompt for name generation
-                          const promptForName = selectedProvider === 'anthropic' ? claudeConfig.prompt :
+                          const promptForName = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? claudeConfig.prompt :
                                                selectedProvider === 'openai' ? codexConfig.prompt : '';
                           const response = await API.sessions.generateName(promptForName || 'New session');
                           if (response.success && response.data) {
@@ -779,7 +785,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                       variant="secondary"
                       loading={isGeneratingName}
                       disabled={!selectedProvider || selectedProvider === 'none' ||
-                               (selectedProvider === 'anthropic' && !claudeConfig.prompt?.trim()) ||
+                               ((selectedProvider === 'anthropic' || selectedProvider === 'zai') && !claudeConfig.prompt?.trim()) ||
                                (selectedProvider === 'openai' && !codexConfig.prompt?.trim())}
                       title="Generate name from prompt"
                       size="md"
@@ -843,17 +849,15 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                 </label>
                 <ProviderSelection
                   selectedProvider={selectedProvider}
-                  selectedModel={selectedModel}
                   onProviderChange={(providerId, modelId) => {
                     setSelectedProvider(providerId);
                     setSelectedModel(modelId);
-                    setProviderConfig({ providerId, modelId });
                   }}
                 />
               </div>
               
               {/* Provider-specific configuration */}
-              {selectedProvider === 'anthropic' && (
+              {(selectedProvider === 'anthropic' || selectedProvider === 'zai') && (
                 <Card
                   variant="bordered"
                   className={`relative p-4 transition-colors ${
@@ -874,8 +878,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                   <div className={isDragging ? 'opacity-60' : ''}>
                     <ClaudeCodeConfigComponent
                       config={claudeConfig}
+                      providerId={selectedProvider} // Pass the selected provider ID
                       onChange={(newConfig) => {
                         setClaudeConfig(newConfig);
+                        // Update the selected model to keep in sync with ProviderSelection
+                        if (newConfig.model !== claudeConfig.model) {
+                          setSelectedModel(newConfig.model);
+                        }
                         syncPromptAcrossConfigs(newConfig.prompt ?? '', 'claude');
                         syncImageAttachments(() => [...(newConfig.attachedImages || [])]);
                         syncTextAttachments(() => [...(newConfig.attachedTexts || [])]);

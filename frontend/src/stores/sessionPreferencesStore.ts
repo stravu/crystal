@@ -7,7 +7,7 @@ export interface SessionCreationPreferences {
   sessionCount: number;
   toolType: 'claude' | 'codex' | 'none';
   claudeConfig: {
-    model: 'auto' | 'sonnet' | 'opus' | 'haiku';
+    model: string; // Support both Claude and GLM models
     permissionMode: 'ignore' | 'approve';
     ultrathink: boolean;
   };

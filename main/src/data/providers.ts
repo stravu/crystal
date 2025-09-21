@@ -41,7 +41,7 @@ export const PROVIDERS: ProviderConfig[] = [
     id: 'zai',
     name: 'Z.ai',
     description: 'Z.ai Claude-compatible API (uses claude CLI with different endpoint)',
-    envPrefix: 'ZAI_',
+    envPrefix: 'ANTHROPIC_',
     models: [
       { id: 'glm-4.5', name: 'GLM-4.5', default: true, description: 'High capability model' },
       { id: 'glm-4.5-air', name: 'GLM-4.5-Air', default: false, description: 'Fast and efficient' }
