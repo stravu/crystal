@@ -11,6 +11,7 @@ import { formatForDisplay } from '../utils/timestampUtils';
 import { addSessionLog, cleanupSessionLogs } from '../ipc/logs';
 import { withLock } from '../utils/mutex';
 import * as os from 'os';
+import { panelManager } from './panelManager';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
@@ -338,7 +339,9 @@ export class SessionManager extends EventEmitter {
       const existingSession = this.db.getMainRepoSession(projectId);
       if (existingSession) {
         console.log(`[SessionManager] Found existing main repo session: ${existingSession.id}`);
-        return this.convertDbSessionToSession(existingSession);
+        const session = this.convertDbSessionToSession(existingSession);
+        await panelManager.ensureDiffPanel(session.id);
+        return session;
       }
       
       // Get the project
@@ -375,6 +378,7 @@ export class SessionManager extends EventEmitter {
       );
       
       console.log(`[SessionManager] Created main repo session: ${session.id}`);
+      await panelManager.ensureDiffPanel(session.id);
       return session;
     });
   }

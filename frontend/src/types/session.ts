@@ -90,6 +90,7 @@ export interface GitCommands {
   rebaseCommands: string[];
   squashCommands: string[];
   mainBranch?: string;
+  originBranch?: string;
   currentBranch?: string;
   getPullCommand?: () => string;
   getPushCommand?: () => string;

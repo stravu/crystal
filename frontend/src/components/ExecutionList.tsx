@@ -10,9 +10,12 @@ const ExecutionList: React.FC<ExecutionListProps> = memo(({
   onSelectionChange,
   onCommit,
   onRevert,
-  onRestore
+  onRestore,
+  historyLimitReached = false,
+  historyLimit
 }) => {
   const [rangeStart, setRangeStart] = useState<number | null>(null);
+  const limitDisplay = historyLimit ?? 50;
 
   const handleCommitClick = (executionId: number, event: React.MouseEvent) => {
     if (event.shiftKey && rangeStart !== null) {
@@ -206,6 +209,13 @@ const ExecutionList: React.FC<ExecutionListProps> = memo(({
             </div>
           );
         })}
+        {historyLimitReached && (
+          <div
+            className="flex items-center p-4 border-b border-border-secondary bg-bg-secondary text-text-tertiary text-xs"
+          >
+            Showing the most recent {limitDisplay} commits. Older commits are hidden.
+          </div>
+        )}
       </div>
 
       {/* Selection summary */}

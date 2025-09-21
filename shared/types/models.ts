@@ -43,4 +43,4 @@ export function getCodexModelList(): CodexModelConfig[] {
 }
 
 // Default model if none specified
-export const DEFAULT_CODEX_MODEL: OpenAICodexModel = 'gpt-5';
+export const DEFAULT_CODEX_MODEL: OpenAICodexModel = 'gpt-5-codex';

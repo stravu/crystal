@@ -11,6 +11,8 @@ import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 const LAST_CODEX_THINKING_LEVEL_KEY = 'codex.lastSelectedThinkingLevel';
+const LAST_CODEX_SANDBOX_MODE_KEY = 'codex.lastSelectedSandboxMode';
+const LAST_CODEX_WEB_SEARCH_KEY = 'codex.lastWebSearchEnabled';
 
 interface CodexInputPanelStyledProps {
   session: Session;
@@ -56,7 +58,7 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
 
   const [selectedModel, setSelectedModel] = useState<OpenAICodexModel>(getInitialModel());
   const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>(() => {
-    // Check if the panel has stored codexConfig with sandboxMode
+    // First, check if the panel has stored codexConfig with sandboxMode
     const customState = panel?.state?.customState as any;
     if (customState?.codexConfig?.sandboxMode) {
       const storedMode = customState.codexConfig.sandboxMode;
@@ -64,15 +66,22 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
         return storedMode;
       }
     }
+    // Otherwise fall back to localStorage
+    const saved = localStorage.getItem(LAST_CODEX_SANDBOX_MODE_KEY);
+    if (saved === 'read-only' || saved === 'workspace-write' || saved === 'danger-full-access') {
+      return saved;
+    }
     return 'workspace-write';
   });
   const [webSearch, setWebSearch] = useState(() => {
-    // Check if the panel has stored codexConfig with webSearch
+    // First, check if the panel has stored codexConfig with webSearch
     const customState = panel?.state?.customState as any;
     if (customState?.codexConfig?.webSearch !== undefined) {
       return customState.codexConfig.webSearch;
     }
-    return false;
+    // Otherwise fall back to localStorage
+    const saved = localStorage.getItem(LAST_CODEX_WEB_SEARCH_KEY);
+    return saved === 'true';
   });
   const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
     // First, check if the panel has stored codexConfig with thinkingLevel
@@ -138,6 +147,16 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   useEffect(() => {
     localStorage.setItem(LAST_CODEX_THINKING_LEVEL_KEY, thinkingLevel);
   }, [thinkingLevel]);
+
+  // Save sandbox mode to localStorage
+  useEffect(() => {
+    localStorage.setItem(LAST_CODEX_SANDBOX_MODE_KEY, sandboxMode);
+  }, [sandboxMode]);
+
+  // Save web search setting to localStorage
+  useEffect(() => {
+    localStorage.setItem(LAST_CODEX_WEB_SEARCH_KEY, String(webSearch));
+  }, [webSearch]);
   
   // Update model and thinking level when panel changes (e.g., when switching sessions)
   useEffect(() => {

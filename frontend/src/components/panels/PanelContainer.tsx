@@ -28,7 +28,8 @@ const PanelErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => voi
 
 export const PanelContainer: React.FC<PanelContainerProps> = ({
   panel,
-  isActive
+  isActive,
+  isMainRepo = false
 }) => {
   console.log('[PanelContainer] Rendering panel:', panel.id, 'Type:', panel.type, 'Active:', isActive);
   
@@ -50,7 +51,7 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
       case 'terminal':
         return <TerminalPanel panel={panel} isActive={isActive} />;
       case 'diff':
-        return <DiffPanel panel={panel} isActive={isActive} sessionId={panel.sessionId} />;
+        return <DiffPanel panel={panel} isActive={isActive} sessionId={panel.sessionId} isMainRepo={isMainRepo} />;
       case 'editor':
         return <EditorPanel panel={panel} isActive={isActive} />;
       case 'logs':
@@ -74,7 +75,7 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
           </div>
         );
     }
-  }, [panel.type, panel.id, isActive]); // Include stable deps only
+  }, [panel.type, panel.id, isActive, isMainRepo]); // Include stable deps only
 
   return (
     <ErrorBoundary
