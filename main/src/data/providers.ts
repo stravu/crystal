@@ -76,5 +76,44 @@ export const PROVIDERS: ProviderConfig[] = [
         }
       }
     }
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    description: 'OpenAI API for GPT models and Codex (uses existing Codex infrastructure)',
+    envPrefix: 'OPENAI_',
+    models: [
+      { id: 'gpt-5', name: 'GPT-5', default: true, description: 'Most capable model' },
+      { id: 'gpt-5-codex', name: 'GPT-5 Codex', default: false, description: 'Latest GPT-5 model for code' },
+      { id: 'gpt-4', name: 'GPT-4', default: false, description: 'Fast and cost-effective' }
+    ],
+    capabilities: {
+      supportsResume: true, // Codex infrastructure supports resume
+      supportsMultipleModels: true,
+      supportsFileOperations: true,
+      supportsGitIntegration: false,
+      supportsSystemPrompts: true,
+      outputFormats: ['json']
+    },
+    command: {
+      executable: 'codex', // This will be handled by the existing CodexManager
+      args: ['exec', '--json'] // Standard Codex arguments
+    },
+    ui: {
+      configComponent: 'CodexConfig', // Use existing Codex config component
+      statsComponent: 'SessionStats'
+    },
+    costTracking: {
+      enabled: true,
+      currency: 'USD',
+      prices: {
+        'gpt-5': { inputPricePer1m: 1.25, outputPricePer1m: 10 },
+        'gpt-5-codex': { inputPricePer1m: 1.25, outputPricePer1m: 10 },
+        'gpt-4.1': { inputPricePer1m: 2, outputPricePer1m: 8 },
+        'gpt-4': { inputPricePer1m: 2, outputPricePer1m: 8 },
+        'gpt-4-turbo': { inputPricePer1m: 10, outputPricePer1m: 30 },
+        'gpt-3.5-turbo': { inputPricePer1m: 0.5, outputPricePer1m: 1.50 }
+      }
+    }
   }
 ];

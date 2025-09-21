@@ -109,7 +109,27 @@ export class DynamicProviderManager extends AbstractCliManager {
     if (this.currentProvider) {
       const providerConfig = this.availableProviders.get(this.currentProvider.id);
       if (providerConfig) {
-        // Test if the CLI executable is available
+        // Special handling for OpenAI provider - it uses the existing Codex infrastructure
+        if (this.currentProvider.id === 'openai') {
+          try {
+            // Test if the existing Codex infrastructure is available by checking if we can import the CodexManager
+            const { CodexManager } = await import('../../panels/codex/codexManager');
+            if (CodexManager) {
+              return {
+                available: true,
+                version: 'Uses existing Codex infrastructure',
+                path: 'codex-manager'
+              };
+            }
+          } catch (error) {
+            return {
+              available: false,
+              error: 'Codex infrastructure not available'
+            };
+          }
+        }
+
+        // Test if the CLI executable is available for other providers
         try {
           const { execSync } = await import('child_process');
           execSync(`which ${this.currentProvider.command.executable}`, { stdio: 'pipe' });

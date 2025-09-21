@@ -69,7 +69,6 @@ export interface Session {
   // Multi-provider support fields
   provider_id?: string;
   provider_model?: string;
-  provider_config?: string; // JSON string of provider-specific config
 }
 
 export interface ToolPanel {
@@ -123,6 +122,7 @@ export interface CreateSessionData {
   // Multi-provider support fields
   provider_id?: string;
   provider_model?: string;
+  active_panel_id?: string;
 }
 
 export interface UpdateSessionData {

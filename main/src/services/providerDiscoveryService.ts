@@ -31,7 +31,41 @@ export class ProviderDiscoveryService {
   }
 
   private async discoverProviderConfig(provider: ProviderConfig): Promise<ProviderAvailability> {
-    // Check each config file in priority order
+    // Special handling for OpenAI provider - it uses the existing Codex infrastructure
+    if (provider.id === 'openai') {
+      // Check if we have OpenAI API key configuration
+      for (const configPath of this.configPriority) {
+        try {
+          const config = await this.loadConfigFile(configPath);
+          const envConfig = this.extractEnvironmentVariables(config, provider.envPrefix);
+
+          if (envConfig.API_KEY) {
+            return {
+              isAvailable: true,
+              config: envConfig,
+              configPath,
+              detectedModels: this.detectModels(envConfig, provider)
+            };
+          }
+        } catch {
+          // File doesn't exist or can't be read, continue to next
+          continue;
+        }
+      }
+
+      // Also check environment variable as fallback
+      if (process.env.OPENAI_API_KEY) {
+        return {
+          isAvailable: true,
+          config: { API_KEY: process.env.OPENAI_API_KEY },
+          detectedModels: this.detectModels({ API_KEY: process.env.OPENAI_API_KEY }, provider)
+        };
+      }
+
+      return { isAvailable: false, detectedModels: [] };
+    }
+
+    // Check each config file in priority order for other providers
     for (const configPath of this.configPriority) {
       try {
         const config = await this.loadConfigFile(configPath);

@@ -34,6 +34,7 @@ export interface AppConfig {
   sessionCreationPreferences?: {
     sessionCount?: number;
     toolType?: 'claude' | 'codex' | 'none';
+    selectedProvider?: string;
     claudeConfig?: {
       model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
       permissionMode?: 'ignore' | 'approve';
@@ -78,6 +79,7 @@ export interface UpdateConfigRequest {
   sessionCreationPreferences?: {
     sessionCount?: number;
     toolType?: 'claude' | 'codex' | 'none';
+    selectedProvider?: string;
     claudeConfig?: {
       model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
       permissionMode?: 'ignore' | 'approve';

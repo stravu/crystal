@@ -98,9 +98,9 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
       // Get model from panel settings if not provided
       let modelToUse = model;
       if (!modelToUse) {
-        // Use the panel's provider model from the database
-        const panelFromDb = databaseService.getPanel(panelId);
-        modelToUse = panelFromDb?.providerModel || 'claude-3-opus-20240229';
+        // Use the panel's settings (now supports Z.ai through getClaudePanelSettings)
+        const settings = databaseService.getClaudePanelSettings(panelId);
+        modelToUse = settings?.model || 'claude-3-opus-20240229';
       }
 
       // Start Claude via the panel manager
@@ -160,9 +160,9 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
       // Get model from panel settings if not provided
       let modelToUse = model;
       if (!modelToUse) {
-        // Use the panel's provider model from the database
-        const panelFromDb = databaseService.getPanel(panelId);
-        modelToUse = panelFromDb?.providerModel || 'claude-3-opus-20240229';
+        // Use the panel's settings (now supports Z.ai through getClaudePanelSettings)
+        const settings = databaseService.getClaudePanelSettings(panelId);
+        modelToUse = settings?.model || 'claude-3-opus-20240229';
       }
 
       // Continue Claude via the panel manager
@@ -341,68 +341,22 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
     try {
       console.log('[IPC] claude-panels:get-model called for panelId:', panelId);
 
-      // Get the panel to find the session
-      const panel = panelManager.getPanel(panelId);
-      if (!panel) {
-        return { success: false, error: 'Panel not found' };
-      }
-
-      // Get session details to check provider information
-      const session = sessionManager.getSession(panel.sessionId);
-      if (!session) {
-        return { success: false, error: 'Session not found' };
-      }
-
-      // Get panel from database to check stored provider information
-      const panelFromDb = databaseService.getPanel(panelId);
-
-      // First, try to get model from panel settings (check all possible model properties)
-      const claudeState = panel.state as any; // Type assertion to access Claude-specific properties
-      let model = claudeState.model || claudeState.selectedModel || claudeState.customState?.model;
-
-      if (model) {
-        // Try to get provider from session or panel database, fallback to anthropic
-        const providerId = session?.providerId || panelFromDb?.providerId || 'anthropic';
-        return {
-          success: true,
-          data: {
-            model,
-            providerId
-          }
-        };
-      }
-
-      // If no model in panel state, check if we have session provider information
-      if (session?.providerId && session?.providerModel) {
-        return {
-          success: true,
-          data: {
-            model: session.providerModel,
-            providerId: session.providerId
-          }
-        };
-      }
-
-      // If no model in panel state or session, check database
-      if (panelFromDb?.providerModel) {
-        const providerId = panelFromDb?.providerId || 'anthropic';
-        return {
-          success: true,
-          data: {
-            model: panelFromDb.providerModel,
-            providerId
-          }
-        };
-      }
-
-      // Finally, fall back to default model from config
+      // Get Claude panel settings (now supports Z.ai automatically)
       const settings = databaseService.getClaudePanelSettings(panelId);
-      if (!settings) {
-        const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
-        return { success: true, data: { model: defaultModel, providerId: 'anthropic' } };
+
+      if (settings) {
+        return {
+          success: true,
+          data: {
+            model: settings.model,
+            providerId: settings.providerId
+          }
+        };
       }
 
-      return { success: true, data: { model: settings.model, providerId: 'anthropic' } };
+      // Fallback to default model
+      const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
+      return { success: true, data: { model: defaultModel, providerId: 'anthropic' } };
     } catch (error) {
       console.error('Failed to get Claude panel model:', error);
       return { success: false, error: 'Failed to get Claude panel model' };

@@ -1012,14 +1012,13 @@ export class DatabaseService {
         // Check if columns already exist (from manual migration)
         const columns = this.db.prepare("PRAGMA table_info(sessions)").all() as any[];
         const hasProviderColumns = columns.some(col =>
-          col.name === 'provider_id' || col.name === 'provider_model' || col.name === 'provider_config'
+          col.name === 'provider_id' || col.name === 'provider_model'
         );
 
         if (!hasProviderColumns) {
           // Add provider columns to sessions table
           this.db.prepare("ALTER TABLE sessions ADD COLUMN provider_id TEXT DEFAULT 'anthropic'").run();
           this.db.prepare("ALTER TABLE sessions ADD COLUMN provider_model TEXT DEFAULT 'claude-3-opus-20240229'").run();
-          this.db.prepare("ALTER TABLE sessions ADD COLUMN provider_config TEXT").run();
           console.log('[Database] Added provider columns to sessions table');
         }
 
@@ -1513,8 +1512,8 @@ export class DatabaseService {
       const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
       
       this.db.prepare(`
-        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, base_commit, base_branch, commit_mode, commit_mode_settings, provider_id, provider_model, provider_config, active_panel_id)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, base_commit, base_branch, commit_mode, commit_mode_settings, provider_id, provider_model, active_panel_id)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.id,
         data.name,
@@ -1533,7 +1532,8 @@ export class DatabaseService {
         data.commit_mode || null,
         data.commit_mode_settings || null,
         data.provider_id || null,
-        data.provider_model || null
+        data.provider_model || null,
+        data.active_panel_id || null
       );
       
       const session = this.getSession(data.id);
@@ -2591,22 +2591,45 @@ export class DatabaseService {
     updated_at: string;
     providerId: string;
   } | null {
+    // D'abord récupérer le panel pour connaître son provider
+    const panel = this.getPanel(panelId);
+    if (!panel) return null;
+
     const row = this.db.prepare(`
       SELECT * FROM claude_panel_settings WHERE panel_id = ?
     `).get(panelId) as any;
 
-    if (!row) return null;
+    if (!row) {
+      // Si pas de settings, créer des settings par défaut selon le provider
+      const defaultModel = panel.providerId === 'zai'
+        ? 'glm-4.5'
+        : panel.providerModel || 'claude-3-opus-20240229';
 
+      return {
+        panel_id: panelId,
+        model: defaultModel,
+        commit_mode: false,
+        system_prompt: null,
+        max_tokens: 4096,
+        temperature: 0.7,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        providerId: panel.providerId || 'anthropic'
+      };
+    }
+
+    // Retourner les settings existants mais avec le modèle potentiellement mis à jour
+    const model = panel.providerModel || row.model;
     return {
       panel_id: row.panel_id,
-      model: row.model,
+      model: model,
       commit_mode: Boolean(row.commit_mode),
       system_prompt: row.system_prompt,
       max_tokens: row.max_tokens,
       temperature: row.temperature,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      providerId: row.provider_id,
+      providerId: panel.providerId || row.provider_id || 'anthropic'
     };
   }
 

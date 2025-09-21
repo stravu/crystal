@@ -35,6 +35,7 @@ export class ConfigManager extends EventEmitter {
       sessionCreationPreferences: {
         sessionCount: 1,
         toolType: 'none',
+        selectedProvider: 'anthropic',
         claudeConfig: {
           model: 'auto',
           permissionMode: 'ignore',

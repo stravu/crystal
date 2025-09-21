@@ -72,6 +72,7 @@ interface CreateSessionDialogProps {
 export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }: CreateSessionDialogProps) {
   const [sessionName, setSessionName] = useState<string>('');
   const [sessionCount, setSessionCount] = useState<number>(1);
+  const [toolType, setToolType] = useState<'claude' | 'codex' | 'none'>('none');
   const [selectedProvider, setSelectedProvider] = useState<string>('anthropic');
   const [selectedModel, setSelectedModel] = useState<string>('claude-3-opus-20240229');
   const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
@@ -215,7 +216,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
   useEffect(() => {
     setIsDragging(false);
     dragCounterRef.current = 0;
-  }, [selectedProvider]);
+  }, [toolType, selectedProvider]);
 
   // Update default model when provider changes
   useEffect(() => {
@@ -228,18 +229,49 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     }
   }, [selectedProvider]);
 
+  // Synchronize toolType with selectedProvider
+  useEffect(() => {
+    // Mapping providerId → toolType
+    if (selectedProvider === 'anthropic' || selectedProvider === 'zai') {
+      setToolType('claude');  // Both use Claude CLI implementation
+    } else if (selectedProvider === 'openai') {
+      setToolType('codex');   // Uses Codex CLI implementation
+    } else {
+      setToolType('none');
+    }
+  }, [selectedProvider]);
+
+  // Save selectedProvider to preferences when it changes
+  useEffect(() => {
+    if (selectedProvider && selectedProvider !== 'none') {
+      savePreferences({ selectedProvider });
+    }
+  }, [selectedProvider]);
+
   // Apply loaded preferences to state
   useEffect(() => {
     if (preferences) {
-      // Convert old toolType preferences to new provider system
-      if (preferences.toolType === 'claude') {
-        setSelectedProvider('anthropic');
-        setSelectedModel(preferences.claudeConfig.model || 'claude-3-opus-20240229');
-      } else if (preferences.toolType === 'codex') {
-        setSelectedProvider('openai');
-        setSelectedModel(preferences.codexConfig.model || 'gpt-4');
+      setToolType(preferences.toolType);
+      // Use the persisted selectedProvider if available, otherwise fallback to toolType mapping
+      if (preferences.selectedProvider && preferences.selectedProvider !== 'none') {
+        setSelectedProvider(preferences.selectedProvider);
+        // Set model based on the persisted provider
+        if (preferences.selectedProvider === 'anthropic' || preferences.selectedProvider === 'zai') {
+          setSelectedModel(preferences.claudeConfig.model || 'claude-3-opus-20240229');
+        } else if (preferences.selectedProvider === 'openai') {
+          setSelectedModel(preferences.codexConfig.model || 'gpt-4');
+        }
       } else {
-        setSelectedProvider('none');
+        // Fallback to old toolType mapping for backward compatibility
+        if (preferences.toolType === 'claude') {
+          setSelectedProvider('anthropic');
+          setSelectedModel(preferences.claudeConfig.model || 'claude-3-opus-20240229');
+        } else if (preferences.toolType === 'codex') {
+          setSelectedProvider('openai');
+          setSelectedModel(preferences.codexConfig.model || 'gpt-4');
+        } else {
+          setSelectedProvider('none');
+        }
       }
       setClaudeConfig(prev => ({
         ...prev,
@@ -582,21 +614,25 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       let finalPrompt = '';
       // Model is now managed at panel level, not session level
       let finalPermissionMode: 'ignore' | 'approve' = 'ignore';
-      
+
       // Get attachments from the active config based on provider
-      const activeAttachedImages = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? (claudeConfig.attachedImages || []) :
-                                   selectedProvider === 'openai' ? (codexConfig.attachedImages || []) : [];
-      const activeAttachedTexts = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? (claudeConfig.attachedTexts || []) :
-                                 selectedProvider === 'openai' ? (codexConfig.attachedTexts || []) : [];
+        const activeAttachedImages = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? (claudeConfig.attachedImages || []) :
+                                    selectedProvider === 'openai' ? (codexConfig.attachedImages || []) : [];
+        const activeAttachedTexts = (selectedProvider === 'anthropic' || selectedProvider === 'zai') ? (claudeConfig.attachedTexts || []) :
+                                  selectedProvider === 'openai' ? (codexConfig.attachedTexts || []) : [];
 
       if (selectedProvider === 'anthropic' || selectedProvider === 'zai') {
         finalPrompt = claudeConfig.prompt || '';
         if (claudeConfig.ultrathink && finalPrompt) {
           finalPrompt += '\nultrathink';
         }
+        // Model is stored at panel level for Claude panels
         finalPermissionMode = claudeConfig.permissionMode;
       } else if (selectedProvider === 'openai') {
+        // Use Codex config directly
         finalPrompt = codexConfig.prompt || '';
+        // Model is stored at panel level for Codex panels
+        // Keep session permission mode independent of Codex approval policy; default to ignore unless explicitly set
         finalPermissionMode = formData.permissionMode || 'ignore';
       }
       
@@ -651,9 +687,17 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         console.log('[CreateSessionDialog] Attachment paths:', attachmentPaths);
       }
       
+      // Synchronize toolType with selectedProvider before API call
+      const synchronizedToolType = selectedProvider === 'anthropic' || selectedProvider === 'zai'
+        ? 'claude'
+        : selectedProvider === 'openai'
+          ? 'codex'
+          : 'none';
+
       console.log('[CreateSessionDialog] Creating session with:', {
         sessionName: sessionName || '(auto-generate)',
         count: sessionCount,
+        toolType: synchronizedToolType,
         provider: selectedProvider,
         model: selectedModel,
         prompt: finalPrompt || '(no prompt)'
@@ -662,6 +706,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         prompt: finalPrompt || undefined,
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
+        toolType: synchronizedToolType,
         providerId: selectedProvider,
         providerModel: selectedModel,
         permissionMode: finalPermissionMode,
@@ -669,7 +714,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         commitMode: commitModeSettings.mode,
         commitModeSettings: JSON.stringify(commitModeSettings),
         baseBranch: formData.baseBranch,
-        codexConfig: selectedProvider === 'openai' ? {
+        codexConfig: synchronizedToolType === 'codex' ? {
           model: codexConfig.model,
           modelProvider: codexConfig.modelProvider,
           approvalPolicy: codexConfig.approvalPolicy,
@@ -953,7 +998,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
 
               {!selectedProvider || selectedProvider === 'none' && (
                 <Card variant="bordered" className="p-4 text-center text-text-tertiary">
-                  <p className="text-sm">No AI tool will be launched. You can add tools later from within the session.</p>
+                  <p className="text-sm">No tool will be launched. You can add tools later from within the session.</p>
                 </Card>
               )}
               
