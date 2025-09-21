@@ -107,7 +107,14 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
           approvalPolicy: options?.approvalPolicy || 'manual',
           sandboxMode: options?.sandboxMode || 'workspace-write',
           webSearch: options?.webSearch ?? currentCustomState?.webSearch ?? false,
-          lastActivityTime: new Date().toISOString()
+          lastActivityTime: new Date().toISOString(),
+          // Save codexConfig for the frontend to read
+          codexConfig: {
+            model: options?.model || DEFAULT_CODEX_MODEL,
+            thinkingLevel: options?.thinkingLevel || 'medium',
+            sandboxMode: options?.sandboxMode || 'workspace-write',
+            webSearch: options?.webSearch ?? false
+          }
         };
         
         // Preserve any existing or new codexSessionId
@@ -197,6 +204,14 @@ export function registerCodexPanelHandlers(ipcMain: IpcMain, services: AppServic
         if (options?.webSearch !== undefined) {
           updatedState.webSearch = options.webSearch;
         }
+        
+        // Save codexConfig for the frontend to read
+        updatedState.codexConfig = {
+          model: options?.model || currentCustomState?.model || DEFAULT_CODEX_MODEL,
+          thinkingLevel: options?.thinkingLevel || currentCustomState?.codexConfig?.thinkingLevel || 'medium',
+          sandboxMode: options?.sandboxMode || currentCustomState?.sandboxMode || 'workspace-write',
+          webSearch: options?.webSearch ?? currentCustomState?.webSearch ?? false
+        };
         
         // CRITICAL: Restore the saved codexSessionId
         if (savedCodexSessionId) {

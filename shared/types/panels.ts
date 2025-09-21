@@ -76,6 +76,14 @@ export interface CodexPanelState {
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; // Sandbox mode
   webSearch?: boolean;           // Whether web search is enabled
   lastActivityTime?: string;     // For "idle since" indicators
+  
+  // Settings to remember for new tabs
+  codexConfig?: {
+    model: string;
+    thinkingLevel: 'low' | 'medium' | 'high';
+    sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch: boolean;
+  };
 }
 
 export interface EditorPanelState {

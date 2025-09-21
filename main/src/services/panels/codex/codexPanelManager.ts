@@ -4,6 +4,7 @@ import { CodexManager } from './codexManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
+import type { CodexPanelState } from '../../../../../shared/types/panels';
 
 const SIGNAL_NAME_BY_VALUE: Map<number, string> = (() => {
   const map = new Map<number, string>();
@@ -18,19 +19,8 @@ const SIGNAL_NAME_BY_VALUE: Map<number, string> = (() => {
   return map;
 })();
 
-/**
- * Codex-specific panel state
- */
-export interface CodexPanelState {
-  isInitialized: boolean;
-  codexResumeId?: string;
-  lastActivityTime: string;
-  model?: string;
-  modelProvider?: string;
-  approvalPolicy?: 'auto' | 'manual';
-  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
-  webSearch?: boolean;
-}
+// CodexPanelState is now imported from shared/types/panels
+export type { CodexPanelState };
 
 /**
  * Manager for OpenAI Codex panels
