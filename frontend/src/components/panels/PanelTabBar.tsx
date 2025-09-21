@@ -50,6 +50,9 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   
   const handleStartRename = useCallback((e: React.MouseEvent, panel: ToolPanel) => {
     e.stopPropagation();
+    if (panel.type === 'diff') {
+      return;
+    }
     setEditingPanelId(panel.id);
     setEditingTitle(panel.title);
   }, []);
@@ -164,6 +167,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         {panels.map((panel) => {
           const isPermanent = panel.metadata?.permanent === true;
           const isEditing = editingPanelId === panel.id;
+          const isDiffPanel = panel.type === 'diff';
+          const displayTitle = isDiffPanel ? 'Diff' : panel.title;
           
           return (
             <div
@@ -191,8 +196,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
                 />
               ) : (
                 <>
-                  <span className="ml-2 text-sm">{panel.title}</span>
-                  {!isPermanent && (
+                  <span className="ml-2 text-sm">{displayTitle}</span>
+                  {!isPermanent && !isDiffPanel && (
                     <button
                       className="ml-1 p-0.5 hover:bg-gray-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => handleStartRename(e, panel)}

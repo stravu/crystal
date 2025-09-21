@@ -436,6 +436,7 @@ export const SessionView = memo(() => {
                   <PanelContainer
                     panel={panel}
                     isActive={panel.id === currentActivePanel.id}
+                    isMainRepo={!!activeSession.isMainRepo}
                   />
                 </div>
               ))}

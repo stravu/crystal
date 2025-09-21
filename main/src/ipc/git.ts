@@ -5,6 +5,8 @@ import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 import { panelManager } from '../services/panelManager';
 import { panelEventBus } from '../services/panelEventBus';
 import { PanelEventType } from '../../../shared/types/panels';
+import type { Session } from '../types/session';
+import type { GitCommit } from '../services/gitDiffManager';
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService } = services;
@@ -74,6 +76,90 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
     }
   };
 
+  const getSessionCommitHistory = async (
+    session: Session,
+    limit: number = 50
+  ): Promise<{
+    commits: GitCommit[];
+    mainBranch: string;
+    comparisonBranch: string;
+    historySource: 'remote' | 'local' | 'branch';
+    limitReached: boolean;
+  }> => {
+    if (!session.worktreePath) {
+      throw new Error('Session has no worktree path');
+    }
+
+    const project = sessionManager.getProjectForSession(session.id);
+    if (!project?.path) {
+      throw new Error('Project path not found for session');
+    }
+
+    const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
+    let comparisonBranch = mainBranch;
+    let historySource: 'remote' | 'local' | 'branch' = 'branch';
+    let useFallback = false;
+
+    if (session.isMainRepo) {
+      const originBranch = await worktreeManager.getOriginBranch(session.worktreePath, mainBranch);
+      if (originBranch) {
+        comparisonBranch = originBranch;
+        historySource = 'remote';
+      } else {
+        historySource = 'local';
+        comparisonBranch = mainBranch;
+        useFallback = true;
+      }
+    }
+
+    let commits: GitCommit[] = [];
+
+    if (!useFallback) {
+      try {
+        commits = gitDiffManager.getCommitHistory(session.worktreePath, limit, comparisonBranch);
+      } catch (error) {
+        if (session.isMainRepo) {
+          console.warn(`[IPC:git] Falling back to local commit history for session ${session.id}:`, error);
+          useFallback = true;
+          historySource = 'local';
+          comparisonBranch = mainBranch;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (useFallback) {
+      const fallbackLimit = limit;
+      const fallbackCommits = await worktreeManager.getLastCommits(session.worktreePath, fallbackLimit);
+      commits = fallbackCommits.map((commit: any) => ({
+        hash: commit.hash,
+        message: commit.message,
+        date: new Date(commit.date),
+        author: commit.author || 'Unknown',
+        stats: {
+          additions: commit.additions || 0,
+          deletions: commit.deletions || 0,
+          filesChanged: commit.filesChanged || 0
+        }
+      }));
+    }
+
+    if (!session.isMainRepo) {
+      historySource = 'branch';
+    }
+
+    const limitReached = commits.length === limit;
+
+    return {
+      commits,
+      mainBranch,
+      comparisonBranch,
+      historySource,
+      limitReached
+    };
+  };
+
   ipcMain.handle('sessions:get-executions', async (_event, sessionId: string) => {
     try {
       const session = await sessionManager.getSession(sessionId);
@@ -81,18 +167,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: false, error: 'Session or worktree path not found' };
       }
 
-      // Get project and main branch
-      const project = sessionManager.getProjectForSession(sessionId);
-      if (!project?.path) {
-        throw new Error('Project path not found for session');
-      }
-      const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
-      
-      // Get git commit history
-      const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
-      
+      const { commits, comparisonBranch, historySource, limitReached } = await getSessionCommitHistory(session, 50);
+
       console.log(`[IPC:git] Getting git commits for session ${sessionId}`);
-      console.log(`[IPC:git] Found ${commits.length} commits`);
+      console.log(`[IPC:git] Found ${commits.length} commits (source: ${historySource}, comparison branch: ${comparisonBranch})`);
 
       // Transform git commits to execution format expected by frontend
       const executions = commits.map((commit, index) => ({
@@ -105,7 +183,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         stats_additions: commit.stats.additions,
         stats_deletions: commit.stats.deletions,
         stats_files_changed: commit.stats.filesChanged,
-        author: commit.author
+        author: commit.author,
+        comparison_branch: comparisonBranch,
+        history_source: historySource,
+        history_limit_reached: limitReached
       }));
 
       // Check for uncommitted changes
@@ -125,7 +206,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           stats_additions: uncommittedDiff.stats.additions,
           stats_deletions: uncommittedDiff.stats.deletions,
           stats_files_changed: uncommittedDiff.stats.filesChanged,
-          author: 'You'
+          author: 'You',
+          comparison_branch: comparisonBranch,
+          history_source: historySource,
+          history_limit_reached: limitReached
         });
       }
 
@@ -144,14 +228,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: false, error: 'Session or worktree path not found' };
       }
 
-      // Get git commit history
-      const project = sessionManager.getProjectForSession(sessionId);
-      // Get the main branch from the project directory's current branch
-      if (!project?.path) {
-        throw new Error('Project path not found for session');
-      }
-      const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
-      const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
+      const { commits } = await getSessionCommitHistory(session, 50);
       const executionIndex = parseInt(executionId) - 1;
 
       if (executionIndex < 0 || executionIndex >= commits.length) {
@@ -280,14 +357,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: true, data: uncommittedDiff };
       }
 
-      // Get git commit history
-      const project = sessionManager.getProjectForSession(sessionId);
-      // Get the main branch from the project directory's current branch
-      if (!project?.path) {
-        throw new Error('Project path not found for session');
-      }
-      const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
-      const commits = gitDiffManager.getCommitHistory(session.worktreePath, 50, mainBranch);
+      const { commits, comparisonBranch, historySource } = await getSessionCommitHistory(session, 50);
+      console.log(`[IPC] Combined diff commit history source: ${historySource}, comparison branch: ${comparisonBranch}, commits: ${commits.length}`);
 
       if (!commits.length) {
         return {
@@ -1131,7 +1202,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
     }
   });
 
-  ipcMain.handle('sessions:get-last-commits', async (_event, sessionId: string, count: number = 20) => {
+  ipcMain.handle('sessions:get-last-commits', async (_event, sessionId: string, count: number = 50) => {
     try {
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
@@ -1144,6 +1215,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
       // Get the last N commits from the repository
       const commits = await worktreeManager.getLastCommits(session.worktreePath, count);
+      const limitReached = commits.length === count;
 
       // Transform commits to match ExecutionDiff format
       const executionDiffs = commits.map((commit, index) => ({
@@ -1156,7 +1228,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         stats_files_changed: commit.filesChanged || 0,
         commit_hash: commit.hash,
         timestamp: commit.date,
-        author: commit.author || 'Unknown'
+        author: commit.author || 'Unknown',
+        history_limit_reached: limitReached
       }));
 
       return { success: true, data: executionDiffs };
@@ -1219,6 +1292,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         encoding: 'utf8' 
       }).trim();
 
+      const originBranch = session.isMainRepo
+        ? await worktreeManager.getOriginBranch(session.worktreePath, mainBranch)
+        : null;
+
       const rebaseCommands = worktreeManager.generateRebaseCommands(mainBranch);
       const squashCommands = worktreeManager.generateSquashCommands(mainBranch, currentBranch);
 
@@ -1228,6 +1305,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           rebaseCommands,
           squashCommands,
           mainBranch,
+          originBranch: originBranch || undefined,
           currentBranch
         }
       };

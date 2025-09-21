@@ -144,6 +144,9 @@ export interface ExecutionDiff {
   after_commit_hash?: string;
   commit_message?: string;
   timestamp: string;
+  comparison_branch?: string;
+  history_source?: 'remote' | 'local' | 'branch';
+  history_limit_reached?: boolean;
 }
 
 export interface CreateExecutionDiffData {

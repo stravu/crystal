@@ -705,13 +705,13 @@ export class WorktreeManager {
 
   async getLastCommits(worktreePath: string, count: number = 20): Promise<any[]> {
     const currentDir = process.cwd();
-    
+
     try {
       process.chdir(worktreePath);
       
       // Get the last N commits with stats
       const { stdout } = await execWithShellPath(
-        `git log -${count} --pretty=format:'%H|%s|%ai' --shortstat`
+        `git log -${count} --pretty=format:'%H|%s|%ai|%an' --shortstat`
       );
       
       // Parse the output
@@ -726,11 +726,17 @@ export class WorktreeManager {
           continue;
         }
         
-        const [hash, message, date] = commitLine.split('|');
+        const parts = commitLine.split('|');
+        const hash = parts.shift() || '';
+        const author = (parts.pop() || '').trim();
+        const date = (parts.pop() || '').trim();
+        const message = parts.join('|');
+
         const commit: any = {
           hash: hash.trim(),
           message: message.trim(),
-          date: date.trim()
+          date,
+          author: author || 'Unknown'
         };
         
         // Check if next line contains stats
@@ -757,6 +763,20 @@ export class WorktreeManager {
       gitError.gitOutput = error.stderr || error.stdout || error.message || '';
       gitError.workingDirectory = worktreePath;
       throw gitError;
+    } finally {
+      process.chdir(currentDir);
+    }
+  }
+
+  async getOriginBranch(worktreePath: string, branch: string): Promise<string | null> {
+    const currentDir = process.cwd();
+
+    try {
+      process.chdir(worktreePath);
+      await execWithShellPath(`git rev-parse --verify origin/${branch}`);
+      return `origin/${branch}`;
+    } catch {
+      return null;
     } finally {
       process.chdir(currentDir);
     }

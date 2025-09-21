@@ -8,6 +8,8 @@ import type { CombinedDiffViewProps } from '../../../types/diff';
 import type { ExecutionDiff, GitDiffResult } from '../../../types/diff';
 import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 
+const HISTORY_LIMIT = 50;
+
 const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({ 
   sessionId, 
   selectedExecutions: initialSelected,
@@ -25,6 +27,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   const [modifiedFiles, setModifiedFiles] = useState<Set<string>>(new Set());
   const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [mainBranch, setMainBranch] = useState<string>('main');
+  const [historySource, setHistorySource] = useState<'remote' | 'local' | 'branch'>(isMainRepo ? 'remote' : 'branch');
   const [lastVisibleState, setLastVisibleState] = useState<boolean>(isVisible);
   const [forceRefresh, setForceRefresh] = useState<number>(0);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
@@ -37,7 +40,11 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       try {
         const response = await API.sessions.getGitCommands(sessionId);
         if (response.success && response.data) {
-          setMainBranch(response.data.mainBranch || 'main');
+          const baseBranch = response.data.originBranch || response.data.mainBranch || 'main';
+          setMainBranch(baseBranch);
+          if (isMainRepo) {
+            setHistorySource(response.data.originBranch ? 'remote' : 'local');
+          }
         }
       } catch (err) {
         console.error('Failed to load git commands:', err);
@@ -45,7 +52,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
     };
     
     loadGitCommands();
-  }, [sessionId]);
+  }, [sessionId, isMainRepo]);
 
   // Reset selection when session changes
   useEffect(() => {
@@ -56,8 +63,9 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       setCombinedDiff(null);
       setExecutions([]);
       setSelectedFile(undefined);
+      setHistorySource(isMainRepo ? 'remote' : 'branch');
     }
-  }, [sessionId, lastSessionId]);
+  }, [sessionId, lastSessionId, isMainRepo]);
 
   // Detect when tab becomes visible and force refresh
   useEffect(() => {
@@ -86,21 +94,33 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       const loadExecutions = async () => {
         try {
           setLoading(true);
-          let response;
-          
-          if (isMainRepo) {
-            // For main repo sessions, get the last 20 commits
-            response = await API.sessions.getLastCommits(sessionId, 20);
-          } else {
-            // For regular sessions, get executions
-            response = await API.sessions.getExecutions(sessionId);
-          }
-          
+          const response = await API.sessions.getExecutions(sessionId);
+
           if (!response.success) {
             throw new Error(response.error || 'Failed to load executions');
           }
-          const data = response.data;
+          const data: ExecutionDiff[] = response.data || [];
+          setError(null);
           setExecutions(data);
+
+          if (data.length > 0) {
+            const metadata = data.find(exec => exec.comparison_branch || exec.history_source) || data[0];
+            if (metadata?.comparison_branch) {
+              setMainBranch(metadata.comparison_branch);
+            }
+            if (metadata?.history_source) {
+              setHistorySource(metadata.history_source);
+            } else {
+              setHistorySource(isMainRepo ? 'remote' : 'branch');
+            }
+          } else {
+            setHistorySource(prev => {
+              if (isMainRepo) {
+                return prev;
+              }
+              return 'branch';
+            });
+          }
           
           // If no initial selection and session just changed, select all executions by default
           if (selectedExecutions.length === 0 && data.length > 0) {
@@ -128,7 +148,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
     }, 100); // Reduced to 100ms for more responsive loading
 
     return () => clearTimeout(timeoutId);
-  }, [sessionId, initialSelected, isMainRepo, isVisible, forceRefresh]); // Added isVisible and forceRefresh to dependencies
+  }, [sessionId, isMainRepo, isVisible, forceRefresh]);
 
   // Load combined diff when selection changes
   useEffect(() => {
@@ -140,12 +160,6 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
     // Add debouncing to prevent rapid API calls
     const timeoutId = setTimeout(() => {
       const loadCombinedDiff = async () => {
-        // For main repo sessions, we don't show diffs, just commit history
-        if (isMainRepo) {
-          setCombinedDiff(null);
-          return;
-        }
-        
         if (selectedExecutions.length === 0) {
           setCombinedDiff(null);
           return;
@@ -158,8 +172,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
           console.log('CombinedDiffView loadCombinedDiff called:', {
             sessionId,
             selectedExecutions,
-            executionsLength: executions.length,
-            isMainRepo
+            executionsLength: executions.length
           });
           
           let response;
@@ -208,7 +221,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
     }, 100); // Reduced to 100ms for more responsive loading
 
     return () => clearTimeout(timeoutId);
-  }, [selectedExecutions, sessionId, executions.length, isMainRepo, isVisible]);
+  }, [selectedExecutions, sessionId, executions.length, isVisible]);
 
   const handleSelectionChange = (newSelection: number[]) => {
     setSelectedExecutions(newSelection);
@@ -318,6 +331,11 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   useEffect(() => {
     setSelectedFile(undefined);
   }, [combinedDiff]);
+
+  const limitReached = useMemo(
+    () => executions.some(exec => exec.history_limit_reached),
+    [executions]
+  );
 
   // Parse files from the diff
   const filesFromDiff = useMemo(() => {
@@ -480,7 +498,18 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
     <div className={`combined-diff-view flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-bg-primary' : 'h-full'}`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border-primary bg-surface-secondary">
-        <h2 className="text-xl font-semibold text-text-primary">File Changes</h2>
+        <div className="flex flex-col">
+          <h2 className="text-xl font-semibold text-text-primary">File Changes</h2>
+          {isMainRepo && (
+            <span
+              className={`text-xs mt-1 ${historySource === 'local' ? 'text-status-warning' : 'text-text-tertiary'}`}
+            >
+              {historySource === 'remote'
+                ? `Comparing to ${mainBranch}`
+                : 'Origin remote not found; showing latest local commits'}
+            </span>
+          )}
+        </div>
         <div className="flex items-center space-x-4">
           {isGitOperationRunning && (
             <div className="flex items-center space-x-2 text-sm text-interactive">
@@ -546,6 +575,8 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
                 onCommit={() => setShowCommitDialog(true)}
                 onRevert={handleRevert}
                 onRestore={handleRestore}
+                historyLimitReached={limitReached}
+                historyLimit={HISTORY_LIMIT}
               />
             </div>
           </div>
@@ -603,11 +634,21 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
               })()}
               mainBranch={mainBranch}
             />
-          ) : isMainRepo ? (
+          ) : executions.length === 0 ? (
             <div className="flex items-center justify-center h-full text-text-secondary">
-              <div className="text-center">
-                <p className="mb-2">Showing last 20 commits from the main repository</p>
-                <p className="text-sm">Select commits to view details</p>
+              <div className="text-center space-y-2">
+                <p>
+                  {isMainRepo
+                    ? historySource === 'remote'
+                      ? `No commits ahead of ${mainBranch}`
+                      : 'Origin remote not found; showing recent local commits'
+                    : 'No commits found for this session'}
+                </p>
+                {isMainRepo && historySource === 'remote' && (
+                  <p className="text-sm text-text-tertiary">
+                    Create new commits to see them here.
+                  </p>
+                )}
               </div>
             </div>
           ) : (
