@@ -4,7 +4,7 @@ import { ProviderDiscoveryService } from '../services/providerDiscoveryService';
 import { PROVIDERS } from '../data/providers';
 
 export function registerProviderHandlers(ipcMain: IpcMain, { logger }: AppServices): void {
-  const providerDiscoveryService = new ProviderDiscoveryService(logger);
+  const providerDiscoveryService = new ProviderDiscoveryService();
 
   ipcMain.handle('providers:discover', async () => {
     try {

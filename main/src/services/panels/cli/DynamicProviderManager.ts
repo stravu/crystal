@@ -3,6 +3,7 @@ import { PROVIDERS } from '../../../data/providers';
 import { ProviderDiscoveryService } from '../../providerDiscoveryService';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+
 // Inline types to avoid import resolution issues
 export interface ProviderEnvironment {
   [key: string]: string;
@@ -75,7 +76,7 @@ export class DynamicProviderManager extends AbstractCliManager {
     configManager?: ConfigManager
   ) {
     super(sessionManager, logger, configManager);
-    this.providerDiscoveryService = new ProviderDiscoveryService(logger);
+    this.providerDiscoveryService = new ProviderDiscoveryService();
   }
 
   // Abstract method implementations
