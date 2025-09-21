@@ -1,7 +1,7 @@
 
 All notable changes to Crystal will be documented in this file.
 
-## [0.3.0] - 2025-09-18
+## [0.3.0] - 2025-09-21
 
 ### Major Changes
 - **OpenAI Codex support** - Run OpenAI Codex as well as Claude Code
