@@ -83,6 +83,9 @@ When everything looks good:
   - Open the DMG file and drag Crystal to your Applications folder
   - On first launch, you may need to right-click and select "Open" due to macOS security settings
 
+- **Windows** (Unofficial - Build from source): Windows is currently supported through local builds only. An installer will be provided in future releases.
+  - Follow the "Building from Source" instructions below
+
 ### Homebrew 
 ```bash
 brew install --cask stravu-crystal
