@@ -10,7 +10,6 @@ import { findExecutableInPath } from '../../../utils/shellPath';
 import { PermissionManager } from '../../permissionManager';
 import { findNodeExecutable, findClaudeCodeScript } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
-import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 import { withLock } from '../../../utils/mutex';
 
 interface ClaudeSpawnOptions {
@@ -584,31 +583,6 @@ export class ClaudeCodeManager extends AbstractCliManager {
     return systemPromptParts.length > 0 ? systemPromptParts.join('\n\n') : undefined;
   }
 
-  private enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
-    // Check if session has structured commit mode
-    if (dbSession?.commit_mode === 'structured') {
-      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
-
-      let commitModeSettings;
-      if (dbSession.commit_mode_settings) {
-        try {
-          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
-        } catch (e) {
-          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
-        }
-      }
-
-      // Get structured prompt template from settings or use default
-      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
-
-      // Add structured commit instructions to the prompt
-      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
-      this.logger?.verbose(`Added structured commit instructions to prompt`);
-      return enhancedPrompt;
-    }
-
-    return prompt;
-  }
 
   private async setupMcpConfigurationSync(sessionId: string): Promise<string> {
     // Create MCP config for permission approval

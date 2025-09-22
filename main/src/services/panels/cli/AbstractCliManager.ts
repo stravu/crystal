@@ -9,6 +9,7 @@ import type { ConfigManager } from '../../configManager';
 import { getShellPath, findExecutableInPath } from '../../../utils/shellPath';
 import { getAugmentedPath } from '../../../utils/claudeCodeTest';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
+import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 
 interface CliProcess {
   process: pty.IPty;
@@ -477,6 +478,36 @@ export abstract class AbstractCliManager extends EventEmitter {
       ...process.env,
       PATH: pathWithNode
     } as { [key: string]: string };
+  }
+
+  /**
+   * Enhance prompt with structured commit instructions if session has structured commit mode
+   * This is shared logic between Claude and Codex implementations
+   */
+  protected enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
+    // Check if session has structured commit mode
+    if (dbSession?.commit_mode === 'structured') {
+      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
+
+      let commitModeSettings;
+      if (dbSession.commit_mode_settings) {
+        try {
+          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
+        } catch (e) {
+          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
+        }
+      }
+
+      // Get structured prompt template from settings or use default
+      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
+
+      // Add structured commit instructions to the prompt
+      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
+      this.logger?.verbose(`Added structured commit instructions to prompt`);
+      return enhancedPrompt;
+    }
+
+    return prompt;
   }
 
   /**
