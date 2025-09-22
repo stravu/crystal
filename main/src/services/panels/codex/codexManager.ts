@@ -10,7 +10,6 @@ import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/
 import type { CodexPanelState } from '../../../../../shared/types/panels';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { panelManager } from '../../panelManager';
-import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -1155,35 +1154,6 @@ export class CodexManager extends AbstractCliManager {
     
     // Default fallback
     return 'x86_64-unknown-linux-musl';
-  }
-
-  /**
-   * Enhance prompt for structured commit mode (similar to Claude implementation)
-   */
-  private enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
-    // Check if session has structured commit mode
-    if (dbSession?.commit_mode === 'structured') {
-      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
-
-      let commitModeSettings;
-      if (dbSession.commit_mode_settings) {
-        try {
-          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
-        } catch (e) {
-          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
-        }
-      }
-
-      // Get structured prompt template from settings or use default
-      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
-
-      // Add structured commit instructions to the prompt
-      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
-      this.logger?.verbose(`Added structured commit instructions to prompt`);
-      return enhancedPrompt;
-    }
-
-    return prompt;
   }
 
   /**
