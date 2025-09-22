@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Card } from '../ui/Card';
-import { Shield, ShieldOff, Cpu, Paperclip, X, FileText, Brain, Gauge, Zap } from 'lucide-react';
+import { Cpu, Paperclip, X, FileText, Brain, Gauge, Zap } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { CODEX_MODELS, type OpenAICodexModel } from '../../../../shared/types/models';
 
@@ -288,40 +288,9 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
           disabled={disabled}
         /> */}
         
-        {/* Approval Policy */}
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Approval Policy
-          </label>
-          <div className="space-y-2">
-            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <input
-                type="radio"
-                name="codex-approval"
-                value="auto"
-                checked={config.approvalPolicy === 'auto'}
-                onChange={(e) => onChange({ ...config, approvalPolicy: e.target.value as 'auto' | 'manual' })}
-                className="text-interactive"
-                disabled={disabled}
-              />
-              <ShieldOff className="w-4 h-4 text-text-tertiary" />
-              <span className="text-sm text-text-secondary">Auto-approve tools</span>
-            </label>
-            <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <input
-                type="radio"
-                name="codex-approval"
-                value="manual"
-                checked={config.approvalPolicy === 'manual'}
-                onChange={(e) => onChange({ ...config, approvalPolicy: e.target.value as 'auto' | 'manual' })}
-                className="text-interactive"
-                disabled={disabled}
-              />
-              <Shield className="w-4 h-4 text-status-success" />
-              <span className="text-sm text-text-secondary">Manual approval</span>
-            </label>
-          </div>
-        </div>
+        {/* Approval Policy - Hidden as Crystal doesn't implement approval handling for Codex */}
+        {/* Manual approval mode requires implementing exec_approval_request and patch_approval_request handlers */}
+        {/* which Crystal currently doesn't support, so we default to 'auto' */}
         
         {/* Sandbox Mode */}
         <div>

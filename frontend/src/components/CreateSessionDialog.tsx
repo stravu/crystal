@@ -87,7 +87,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     prompt: '',
     model: DEFAULT_CODEX_MODEL,
     modelProvider: 'openai',
-    approvalPolicy: 'auto',
+    approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
     sandboxMode: 'workspace-write',
     webSearch: false,
     thinkingLevel: 'medium',
@@ -283,7 +283,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         ...prev,
         model: preferences.codexConfig.model as OpenAICodexModel,
         modelProvider: preferences.codexConfig.modelProvider,
-        approvalPolicy: preferences.codexConfig.approvalPolicy,
+        approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
         sandboxMode: preferences.codexConfig.sandboxMode,
         webSearch: preferences.codexConfig.webSearch,
         thinkingLevel: preferences.codexConfig.thinkingLevel || 'medium'
@@ -717,7 +717,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         codexConfig: synchronizedToolType === 'codex' ? {
           model: codexConfig.model,
           modelProvider: codexConfig.modelProvider,
-          approvalPolicy: codexConfig.approvalPolicy,
+          approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
           sandboxMode: codexConfig.sandboxMode,
           webSearch: codexConfig.webSearch,
           thinkingLevel: codexConfig.thinkingLevel
@@ -981,7 +981,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
                         savePreferences({ codexConfig: {
                           model: (configToSave.model ?? DEFAULT_CODEX_MODEL) as string,
                           modelProvider: configToSave.modelProvider ?? 'openai',
-                          approvalPolicy: configToSave.approvalPolicy ?? 'auto',
+                          approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
                           sandboxMode: configToSave.sandboxMode ?? 'workspace-write',
                           webSearch: configToSave.webSearch ?? false,
                           thinkingLevel: configToSave.thinkingLevel ?? 'medium'
