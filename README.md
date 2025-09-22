@@ -18,7 +18,11 @@ Crystal is an Electron desktop application that lets you run, inspect, and test 
 
 
 
-https://github.com/user-attachments/assets/5534f535-40fc-4de1-a5e1-896524d260c9
+
+
+https://github.com/user-attachments/assets/5ca66e5b-8d05-4570-8417-5e8dcd7726ef
+
+
 
 
 
