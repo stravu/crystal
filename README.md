@@ -1,4 +1,4 @@
-# Crystal - Multi-Session Claude Code Manager
+# Crystal - Multi-Session AI Code Assistant Manager
 
 <div align="center">
   <h3><a href="https://github.com/stravu/crystal/releases/latest">**Get the Latest Release Here**</a></h3>
@@ -12,7 +12,7 @@
 
 </div>
 
-Crystal is an Electron desktop application that lets you run, inspect, and test multiple Claude Code instances simultaneously using git worktrees. Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
+Crystal is an Electron desktop application that lets you run, inspect, and test multiple AI coding assistant instances simultaneously using git worktrees. Crystal supports both **Claude Code** (Anthropic) and **Codex** (OpenAI) assistants. Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
 
 
 
@@ -27,13 +27,14 @@ https://github.com/user-attachments/assets/5534f535-40fc-4de1-a5e1-896524d260c9
 ## The Crystal Workflow
 
 1. Create sessions from prompts, each in an isolated git worktree
-2. Iterate with Claude Code inside your sessions. Each iteration will make a commit so you can always go back.
+2. Iterate with your AI assistant (Claude Code or Codex) inside your sessions. Each iteration will make a commit so you can always go back.
 3. Review the diff changes and make manual edits as needed
 4. Squash your commits together with a new message and rebase to your main branch.
 
 ## ✨ Key Features
 
-- **🚀 Parallel Sessions** - Run multiple Claude Code instances at once
+- **🤖 Multiple AI Assistants** - Support for Claude Code (Anthropic) and Codex (OpenAI)
+- **🚀 Parallel Sessions** - Run multiple AI assistant instances at once
 - **🌳 Git Worktree Isolation** - Each session gets its own branch
 - **💾 Session Persistence** - Resume conversations anytime
 - **🔧 Git Integration** - Built-in rebase and squash operations
@@ -44,7 +45,8 @@ https://github.com/user-attachments/assets/5534f535-40fc-4de1-a5e1-896524d260c9
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Claude Code installed and logged in or API key provided
+- **For Claude Code**: Claude Code installed and logged in or API key provided
+- **For Codex**: Codex installed (via npm: `@openai/codex` or Homebrew) with ChatGPT account or API key
 - Git installed
 - Git repository (Crystal will initialize one if needed)
 
@@ -59,7 +61,7 @@ For any feature you're working on, create one or multiple new sessions:
 As sessions complete:
 - **Configure run scripts** in project settings to test your application without leaving Crystal
 - **Use the diff viewer** to review all changes and make manual edits as needed
-- **Continue conversations** with Claude Code if you need additional changes
+- **Continue conversations** with your AI assistant if you need additional changes
 
 ### 4. Finalize Your Changes
 When everything looks good:
@@ -165,7 +167,7 @@ pnpm run generate-notices
 
 ## Disclaimer
 
-Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Claude™ is a trademark of Anthropic, PBC. Crystal is not affiliated with, endorsed by, or sponsored by Anthropic. This tool is designed to work with Claude Code, which must be installed separately.
+Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Claude™ is a trademark of Anthropic, PBC. Codex™ is a trademark of OpenAI, Inc. Crystal is not affiliated with, endorsed by, or sponsored by Anthropic or OpenAI. This tool is designed to work with Claude Code and Codex, which must be installed separately.
 
 ---
 
