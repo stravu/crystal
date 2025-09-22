@@ -2,6 +2,7 @@ import React from 'react';
 import { Session } from '../../types/session';
 import { StatusIndicator } from '../StatusIndicator';
 import { CommitModeIndicator } from '../CommitModeIndicator';
+import { ProviderIndicator } from '../ProviderIndicator';
 
 interface SessionHeaderProps {
   activeSession: Session;
@@ -54,14 +55,21 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
             )}
             
             {/* Status and Mode Indicators */}
-            <div className="flex items-center gap-3 mt-2">
-              <StatusIndicator 
-                key={`status-${activeSession.id}-${activeSession.status}`} 
-                session={activeSession} 
-                size="medium" 
-                showText 
-                showProgress 
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <StatusIndicator
+                key={`status-${activeSession.id}-${activeSession.status}`}
+                session={activeSession}
+                size="medium"
+                showText
+                showProgress
               />
+              {activeSession.providerId && (
+                <ProviderIndicator
+                  providerId={activeSession.providerId}
+                  providerModel={activeSession.providerModel}
+                  size="medium"
+                />
+              )}
               {activeSession.commitMode && activeSession.commitMode !== 'disabled' && (
                 <CommitModeIndicator mode={activeSession.commitMode} />
               )}

@@ -148,6 +148,9 @@ export class SessionManager extends EventEmitter {
       folderId: dbSession.folder_id,
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
+      // Provider information from database
+      providerId: dbSession.provider_id,
+      providerModel: dbSession.provider_model,
       // Model is now managed at panel level
       toolType: normalizedToolType,
       archived: dbSession.archived || false,
@@ -218,7 +221,9 @@ export class SessionManager extends EventEmitter {
     baseCommit?: string,
     baseBranch?: string,
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
-    commitModeSettings?: string
+    commitModeSettings?: string,
+    providerId?: string,
+    providerModel?: string
   ): Promise<Session> {
     return await withLock(`session-creation`, async () => {
       return this.createSessionWithId(
@@ -236,7 +241,9 @@ export class SessionManager extends EventEmitter {
         baseCommit,
         baseBranch,
         commitMode,
-        commitModeSettings
+        commitModeSettings,
+        providerId,
+        providerModel
       );
     });
   }
@@ -256,7 +263,9 @@ export class SessionManager extends EventEmitter {
     baseCommit?: string,
     baseBranch?: string,
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
-    commitModeSettings?: string
+    commitModeSettings?: string,
+    providerId?: string,
+    providerModel?: string
   ): Session {
     console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
     
@@ -301,7 +310,9 @@ export class SessionManager extends EventEmitter {
       base_branch: baseBranch,
       tool_type: toolType,
       commit_mode: commitMode,
-      commit_mode_settings: commitModeSettings
+      commit_mode_settings: commitModeSettings,
+      provider_id: providerId,
+      provider_model: providerModel
     };
     console.log(`[SessionManager] Session data:`, sessionData);
 

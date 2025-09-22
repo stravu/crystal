@@ -273,6 +273,14 @@ interface ElectronAPI {
     setModel: (panelId: string, model: string) => Promise<IPCResponse>;
   };
 
+  // Provider management
+  providers: {
+    discover: () => Promise<IPCResponse>;
+    getConfigs: () => Promise<IPCResponse>;
+    switch: (providerId: string) => Promise<IPCResponse>;
+    getModels: (providerId: string) => Promise<IPCResponse>;
+  };
+
   // Logs panel operations
   logs: {
     runScript: (sessionId: string, command: string, cwd: string) => Promise<IPCResponse>;

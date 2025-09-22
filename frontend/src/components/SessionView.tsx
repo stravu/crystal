@@ -195,8 +195,21 @@ export const SessionView = memo(() => {
             }
           }
         };
+      }  else if (type === 'claude') {
+        const freshSessionResponse = await API.sessions.get(activeSession.id);
+        if (!freshSessionResponse.success || !freshSessionResponse.data) {
+          console.error('Failed to fetch fresh session data');
+          return;
+        }
+        const freshSession = freshSessionResponse.data;
+        // For Claude panels, include provider information from the session
+        initialState = {
+          customState: {
+            providerId: freshSession.providerId || 'anthropic',
+            providerModel: freshSession.providerModel || 'claude-3-opus-20240229'
+          }
+        };
       }
-      
       await panelApi.createPanel({
         sessionId: activeSession.id,
         type,

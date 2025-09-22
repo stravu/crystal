@@ -6,8 +6,9 @@ import type { CommitModeSettings } from '../../../shared/types';
 export interface SessionCreationPreferences {
   sessionCount: number;
   toolType: 'claude' | 'codex' | 'none';
+  selectedProvider: string; // Add provider persistence
   claudeConfig: {
-    model: 'auto' | 'sonnet' | 'opus' | 'haiku';
+    model: string; // Support both Claude and GLM models
     permissionMode: 'ignore' | 'approve';
     ultrathink: boolean;
   };
@@ -27,6 +28,7 @@ export interface SessionCreationPreferences {
 const defaultPreferences: SessionCreationPreferences = {
   sessionCount: 1,
   toolType: 'none',
+  selectedProvider: 'anthropic', // Default to Anthropic
   claudeConfig: {
     model: 'auto',
     permissionMode: 'ignore',

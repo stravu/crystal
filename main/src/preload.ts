@@ -434,6 +434,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   claudePanels: {
     getModel: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('claude-panels:get-model', panelId),
     setModel: (panelId: string, model: string): Promise<IPCResponse> => ipcRenderer.invoke('claude-panels:set-model', panelId, model),
+    updateProvider: (panelId: string, providerId: string, providerModel: string): Promise<IPCResponse> => ipcRenderer.invoke('claude-panels:update-provider', panelId, providerId, providerModel),
   },
 
   // Logs panel operations
@@ -446,6 +447,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Debug utilities
   debug: {
     getTableStructure: (tableName: 'folders' | 'sessions'): Promise<IPCResponse> => ipcRenderer.invoke('debug:get-table-structure', tableName),
+  },
+
+  // Provider management
+  providers: {
+    discover: (): Promise<IPCResponse> => ipcRenderer.invoke('providers:discover'),
+    getConfigs: (): Promise<IPCResponse> => ipcRenderer.invoke('providers:configs'),
+    switch: (providerId: string): Promise<IPCResponse> => ipcRenderer.invoke('providers:switch', providerId),
+    getModels: (providerId: string): Promise<IPCResponse> => ipcRenderer.invoke('providers:models', providerId),
   },
 });
 

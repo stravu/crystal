@@ -999,14 +999,69 @@ export class DatabaseService {
         // Don't throw - allow app to continue
       }
     }
-    
-    // Migration 005: Ensure all sessions have diff panels
+
+    // Migration 005: Add provider support
+    const providerMigrationComplete = this.db.prepare(
+      "SELECT value FROM user_preferences WHERE key = 'provider_migrated'"
+    ).get() as { value: string } | undefined;
+
+    if (!providerMigrationComplete) {
+      console.log('[Database] Running provider migration 005: Add provider support...');
+
+      try {
+        // Check if columns already exist (from manual migration)
+        const columns = this.db.prepare("PRAGMA table_info(sessions)").all() as any[];
+        const hasProviderColumns = columns.some(col =>
+          col.name === 'provider_id' || col.name === 'provider_model'
+        );
+
+        if (!hasProviderColumns) {
+          // Add provider columns to sessions table
+          this.db.prepare("ALTER TABLE sessions ADD COLUMN provider_id TEXT DEFAULT 'anthropic'").run();
+          this.db.prepare("ALTER TABLE sessions ADD COLUMN provider_model TEXT DEFAULT 'claude-3-opus-20240229'").run();
+          console.log('[Database] Added provider columns to sessions table');
+        }
+
+        // Check if tool_panels has provider columns
+        const panelColumns = this.db.prepare("PRAGMA table_info(tool_panels)").all() as any[];
+        const hasPanelProviderColumns = panelColumns.some(col =>
+          col.name === 'provider_id' || col.name === 'provider_model'
+        );
+
+        if (!hasPanelProviderColumns) {
+          // Add provider columns to tool_panels table
+          this.db.prepare("ALTER TABLE tool_panels ADD COLUMN provider_id TEXT DEFAULT 'anthropic'").run();
+          this.db.prepare("ALTER TABLE tool_panels ADD COLUMN provider_model TEXT DEFAULT 'claude-3-opus-20240229'").run();
+          console.log('[Database] Added provider columns to tool_panels table');
+        }
+
+        // Create indexes for provider queries
+        try {
+          this.db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_provider ON sessions(provider_id)").run();
+          this.db.prepare("CREATE INDEX IF NOT EXISTS idx_panels_provider ON tool_panels(provider_id)").run();
+          console.log('[Database] Created provider indexes');
+        } catch (indexError) {
+          // Indexes might already exist, that's fine
+          console.log('[Database] Provider indexes already exist or could not be created', indexError);
+        }
+
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('provider_migrated', 'true')").run();
+        console.log('[Database] Completed provider migration 005');
+
+      } catch (error) {
+        console.error('[Database] Failed to run provider migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
+
+    // Migration 006: Ensure all sessions have diff panels
     const diffPanelsMigrationComplete = this.db.prepare(
       "SELECT value FROM user_preferences WHERE key = 'diff_panels_migrated'"
     ).get() as { value: string } | undefined;
     
     if (!diffPanelsMigrationComplete) {
-      console.log('[Database] Running diff panels migration 005: Ensure all sessions have diff panels');
+      console.log('[Database] Running diff panels migration 006: Ensure all sessions have diff panels');
       
       try {
         // Get all sessions
@@ -1048,7 +1103,7 @@ export class DatabaseService {
         
         // Mark migration as complete
         this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('diff_panels_migrated', 'true')").run();
-        console.log('[Database] Completed diff panels migration 005');
+        console.log('[Database] Completed diff panels migration 006');
         
       } catch (error) {
         console.error('[Database] Failed to run diff panels migration:', error);
@@ -1457,8 +1512,8 @@ export class DatabaseService {
       const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
       
       this.db.prepare(`
-        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, base_commit, base_branch, commit_mode, commit_mode_settings)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, base_commit, base_branch, commit_mode, commit_mode_settings, provider_id, provider_model, active_panel_id)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.id,
         data.name,
@@ -1475,7 +1530,10 @@ export class DatabaseService {
         data.base_commit || null,
         data.base_branch || null,
         data.commit_mode || null,
-        data.commit_mode_settings || null
+        data.commit_mode_settings || null,
+        data.provider_id || null,
+        data.provider_model || null,
+        data.active_panel_id || null
       );
       
       const session = this.getSession(data.id);
@@ -2310,6 +2368,8 @@ export class DatabaseService {
     title?: string;
     state?: any;
     metadata?: any;
+    provider_id?: string;
+    provider_model?: string;
   }): void {
     // Add debug logging to track panel state changes
     if (updates.state !== undefined) {
@@ -2338,7 +2398,17 @@ export class DatabaseService {
         setClauses.push('metadata = ?');
         values.push(JSON.stringify(updates.metadata));
       }
-      
+
+      if (updates.provider_id !== undefined) {
+        setClauses.push('provider_id = ?');
+        values.push(updates.provider_id);
+      }
+
+      if (updates.provider_model !== undefined) {
+        setClauses.push('provider_model = ?');
+        values.push(updates.provider_model);
+      }
+
       if (setClauses.length > 0) {
         setClauses.push('updated_at = CURRENT_TIMESTAMP');
         values.push(panelId);
@@ -2393,16 +2463,18 @@ export class DatabaseService {
 
   getPanel(panelId: string): ToolPanel | null {
     const row = this.db.prepare('SELECT * FROM tool_panels WHERE id = ?').get(panelId) as any;
-    
+
     if (!row) return null;
-    
+
     return {
       id: row.id,
       sessionId: row.session_id,
       type: row.type,
       title: row.title,
       state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      providerId: row.provider_id,
+      providerModel: row.provider_model
     };
   }
 
@@ -2415,7 +2487,9 @@ export class DatabaseService {
       type: row.type,
       title: row.title,
       state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      providerId: row.provider_id,
+      providerModel: row.provider_model
     }));
   }
 
@@ -2428,7 +2502,9 @@ export class DatabaseService {
       type: row.type,
       title: row.title,
       state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      providerId: row.provider_id,
+      providerModel: row.provider_model
     }));
   }
 
@@ -2446,7 +2522,9 @@ export class DatabaseService {
       type: row.type,
       title: row.title,
       state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      providerId: row.provider_id,
+      providerModel: row.provider_model
     }));
   }
 
@@ -2511,22 +2589,47 @@ export class DatabaseService {
     temperature: number;
     created_at: string;
     updated_at: string;
+    providerId: string;
   } | null {
+    // D'abord récupérer le panel pour connaître son provider
+    const panel = this.getPanel(panelId);
+    if (!panel) return null;
+
     const row = this.db.prepare(`
       SELECT * FROM claude_panel_settings WHERE panel_id = ?
     `).get(panelId) as any;
 
-    if (!row) return null;
+    if (!row) {
+      // Si pas de settings, créer des settings par défaut selon le provider
+      const defaultModel = panel.providerId === 'zai'
+        ? 'glm-4.5'
+        : panel.providerModel || 'claude-3-opus-20240229';
 
+      return {
+        panel_id: panelId,
+        model: defaultModel,
+        commit_mode: false,
+        system_prompt: null,
+        max_tokens: 4096,
+        temperature: 0.7,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        providerId: panel.providerId || 'anthropic'
+      };
+    }
+
+    // Retourner les settings existants mais avec le modèle potentiellement mis à jour
+    const model = panel.providerModel || row.model;
     return {
       panel_id: row.panel_id,
-      model: row.model,
+      model: model,
       commit_mode: Boolean(row.commit_mode),
       system_prompt: row.system_prompt,
       max_tokens: row.max_tokens,
       temperature: row.temperature,
       created_at: row.created_at,
-      updated_at: row.updated_at
+      updated_at: row.updated_at,
+      providerId: panel.providerId || row.provider_id || 'anthropic'
     };
   }
 

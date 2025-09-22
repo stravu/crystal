@@ -40,6 +40,12 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
     try {
       console.log('[IPC] claude-panels:create called for sessionId:', sessionId);
 
+      const session = sessionManager.getSession(sessionId);
+      
+      if (!session) {
+        return { success: false, error: 'Session not found' };
+      }
+      
       // Create the panel using the generic panel manager
       const panel = await panelManager.createPanel({
         sessionId,
@@ -47,8 +53,16 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
         title: title || 'Claude',
         initialState: {
           isInitialized: false,
-          claudeResumeId: undefined
+          claudeResumeId: undefined,
+          providerId: session.providerId || 'anthropic',
+          providerModel: session.providerModel || 'claude-3-opus-20240229'
         }
+      });
+
+      // Update panel with provider information in database
+      databaseService.updatePanel(panel.id, {
+        provider_id: session.providerId || 'anthropic',
+        provider_model: session.providerModel || 'claude-3-opus-20240229'
       });
 
       // Register the panel with the Claude panel manager
@@ -84,6 +98,7 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
       // Get model from panel settings if not provided
       let modelToUse = model;
       if (!modelToUse) {
+        // Use the panel's settings (now supports Z.ai through getClaudePanelSettings)
         const settings = databaseService.getClaudePanelSettings(panelId);
         modelToUse = settings?.model || 'claude-3-opus-20240229';
       }
@@ -145,6 +160,7 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
       // Get model from panel settings if not provided
       let modelToUse = model;
       if (!modelToUse) {
+        // Use the panel's settings (now supports Z.ai through getClaudePanelSettings)
         const settings = databaseService.getClaudePanelSettings(panelId);
         modelToUse = settings?.model || 'claude-3-opus-20240229';
       }
@@ -325,15 +341,22 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
     try {
       console.log('[IPC] claude-panels:get-model called for panelId:', panelId);
 
-      // Get panel settings from database
+      // Get Claude panel settings (now supports Z.ai automatically)
       const settings = databaseService.getClaudePanelSettings(panelId);
-      if (!settings) {
-        // Return default from config if settings don't exist yet
-        const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
-        return { success: true, data: defaultModel };
+
+      if (settings) {
+        return {
+          success: true,
+          data: {
+            model: settings.model,
+            providerId: settings.providerId
+          }
+        };
       }
 
-      return { success: true, data: settings.model };
+      // Fallback to default model
+      const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
+      return { success: true, data: { model: defaultModel, providerId: 'anthropic' } };
     } catch (error) {
       console.error('Failed to get Claude panel model:', error);
       return { success: false, error: 'Failed to get Claude panel model' };
@@ -360,6 +383,25 @@ export function registerClaudePanelHandlers(ipcMain: IpcMain, services: AppServi
     } catch (error) {
       console.error('Failed to set Claude panel model:', error);
       return { success: false, error: 'Failed to set Claude panel model' };
+    }
+  });
+
+  // Update panel provider information (for testing/migration purposes)
+  ipcMain.handle('claude-panels:update-provider', async (_event, panelId: string, providerId: string, providerModel: string) => {
+    try {
+      console.log('[IPC] claude-panels:update-provider called for panelId:', panelId, 'providerId:', providerId, 'providerModel:', providerModel);
+
+      // Update panel with new provider information
+      databaseService.updatePanel(panelId, {
+        provider_id: providerId,
+        provider_model: providerModel
+      });
+
+      console.log('[IPC] Successfully updated panel provider info');
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to update Claude panel provider:', error);
+      return { success: false, error: 'Failed to update Claude panel provider' };
     }
   });
 
