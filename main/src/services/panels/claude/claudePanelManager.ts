@@ -1,192 +1,35 @@
-import { ClaudeCodeManager } from './claudeCodeManager';
+import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
-import { ClaudePanelState, PanelEvent } from '../../../../../shared/types/panels';
-import { panelEventBus } from '../../panelEventBus';
+import { ClaudePanelState } from '../../../../../shared/types/panels';
 
-interface PanelMapping {
-  panelId: string;
-  sessionId: string;
-  claudeResumeId?: string;
-}
-
-export class ClaudePanelManager {
-  private panelMappings = new Map<string, PanelMapping>(); // panelId -> mapping
-  private resumeIdToPanel = new Map<string, string>(); // claudeResumeId -> panelId
-
-  constructor(
-    private claudeCodeManager: AbstractCliManager,
-    private sessionManager: any, // SessionManager with panel-based methods
-    private logger?: Logger,
-    private configManager?: ConfigManager
-  ) {
-    // Listen to Claude Code Manager events and translate them to panel events
-    this.setupEventHandlers();
-  }
-
-  private setupEventHandlers(): void {
-    // Forward events from Claude Code Manager to panel events
-    this.claudeCodeManager.on('output', (data: any) => {
-      // Data now includes panelId directly from ClaudeCodeManager
-      const { panelId, sessionId } = data;
-      if (panelId && this.panelMappings.has(panelId)) {
-        // Store output using panel-based method for Claude data
-        try {
-          if (this.sessionManager && this.sessionManager.addPanelOutput) {
-            this.sessionManager.addPanelOutput(panelId, {
-              type: data.type,
-              data: data.data,
-              timestamp: data.timestamp || new Date()
-            });
-          }
-        } catch (error) {
-          this.logger?.error(`[ClaudePanelManager] Failed to store panel output: ${error}`);
-        }
-
-        // Emit as panel event instead of session event
-        this.claudeCodeManager.emit('panel-output', {
-          panelId,
-          sessionId,
-          type: data.type,
-          data: data.data,
-          timestamp: data.timestamp
-        });
-      }
-    });
-
-    this.claudeCodeManager.on('spawned', (data: any) => {
-      // Data now includes panelId directly from ClaudeCodeManager
-      const { panelId, sessionId } = data;
-      if (panelId && this.panelMappings.has(panelId)) {
-        this.claudeCodeManager.emit('panel-spawned', {
-          panelId,
-          sessionId
-        });
-      }
-    });
-
-    this.claudeCodeManager.on('exit', (data: any) => {
-      // Data now includes panelId directly from ClaudeCodeManager
-      const { panelId, sessionId, exitCode, signal } = data;
-      if (panelId && this.panelMappings.has(panelId)) {
-        this.claudeCodeManager.emit('panel-exit', {
-          panelId,
-          sessionId,
-          exitCode,
-          signal
-        });
-      }
-    });
-
-    this.claudeCodeManager.on('error', (data: any) => {
-      // Data now includes panelId directly from ClaudeCodeManager
-      const { panelId, sessionId, error } = data;
-      if (panelId && this.panelMappings.has(panelId)) {
-        this.claudeCodeManager.emit('panel-error', {
-          panelId,
-          sessionId,
-          error
-        });
-      }
-    });
-  }
-
-  // Removed findPanelBySessionId method - no longer needed since events now include panelId directly
-
-  private generateClaudeResumeId(panelId: string): string {
-    // For now, use panel ID as the resume ID
-    // This could be enhanced later with a proper mapping
-    return `panel-${panelId}`;
-  }
-
-  registerPanel(panelId: string, sessionId: string, initialState?: ClaudePanelState): void {
-    const mapping: PanelMapping = {
-      panelId,
-      sessionId,
-      claudeResumeId: initialState?.claudeResumeId || this.generateClaudeResumeId(panelId)
-    };
-
-    this.panelMappings.set(panelId, mapping);
-    if (mapping.claudeResumeId) {
-      this.resumeIdToPanel.set(mapping.claudeResumeId, panelId);
-    }
-
-    // Subscribe this panel to git operation events
-    this.subscribeToGitEvents(panelId, sessionId);
-
-    this.logger?.info(`[ClaudePanelManager] Registered panel ${panelId} for session ${sessionId} with resumeId ${mapping.claudeResumeId}`);
-  }
+/**
+ * Manager for Claude Code panels
+ * Extends AbstractAIPanelManager to leverage common AI panel functionality
+ */
+export class ClaudePanelManager extends AbstractAIPanelManager {
   
-  private subscribeToGitEvents(panelId: string, sessionId: string): void {
-    // Subscribe to git operation events for this panel
-    const gitEventCallback = (event: PanelEvent) => {
-      // Only process git events from the same session
-      if (event.source.panelId !== panelId && event.type.startsWith('git:')) {
-        // Debug logging to understand what's happening
-        this.logger?.verbose(`[Claude] Git event received in panel ${panelId} (session: ${sessionId})`);
-        this.logger?.verbose(`[Claude] Event triggeringSessionId: ${event.data.triggeringSessionId}`);
-        this.logger?.verbose(`[Claude] Panel sessionId: ${sessionId}`);
-        this.logger?.verbose(`[Claude] Match: ${event.data.triggeringSessionId === sessionId}`);
-        
-        // Only show git operation messages in panels from the same session
-        if (event.data.triggeringSessionId === sessionId) {
-          this.logger?.info(`[Claude] Forwarding git event to panel ${panelId} for session ${sessionId}`);
-          
-          // Format the git operation message for Claude
-          const gitMessage = {
-            type: 'system',
-            subtype: 'git_operation',
-            timestamp: event.timestamp,
-            message: event.data.message,
-            details: {
-              operation: event.data.operation,
-              triggeringSession: event.data.triggeringSessionName || event.data.triggeringSessionId,
-              ...event.data
-            }
-          };
-          
-          // Send the git operation message to this Claude panel
-          // This will automatically be saved to session output by the output handler
-          this.claudeCodeManager.emit('output', {
-            panelId,
-            sessionId,
-            type: 'json',
-            data: gitMessage,
-            timestamp: new Date()
-          });
-        } else {
-          this.logger?.verbose(`[Claude] Skipping git event for panel ${panelId} - different session`);
-        }
-      }
-    };
-    
-    // Subscribe to git events
-    panelEventBus.subscribe({
-      panelId,
-      eventTypes: ['git:operation_started', 'git:operation_completed', 'git:operation_failed'],
-      callback: gitEventCallback
-    });
-    
-    this.logger?.verbose(`Claude panel ${panelId} subscribed to git operation events`);
+  constructor(
+    claudeCodeManager: AbstractCliManager,
+    sessionManager: any,
+    logger?: Logger,
+    configManager?: ConfigManager
+  ) {
+    super(claudeCodeManager, sessionManager, logger, configManager);
   }
 
-  unregisterPanel(panelId: string): void {
-    const mapping = this.panelMappings.get(panelId);
-    if (mapping) {
-      if (mapping.claudeResumeId) {
-        this.resumeIdToPanel.delete(mapping.claudeResumeId);
-      }
-      this.panelMappings.delete(panelId);
-      
-      // Unsubscribe from panel events
-      panelEventBus.unsubscribePanel(panelId);
-      
-      this.logger?.info(`[ClaudePanelManager] Unregistered panel ${panelId}`);
-    }
+  /**
+   * Get the agent name for logging and identification
+   */
+  protected getAgentName(): string {
+    return 'Claude';
   }
 
-  // Delegate methods to claudeCodeManager, passing panel_id directly
+  /**
+   * Claude-specific panel start method with additional parameters
+   * Delegates to the base class startPanel after validation
+   */
   async startPanel(panelId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
     if (!mapping) {
@@ -194,9 +37,14 @@ export class ClaudePanelManager {
     }
 
     this.logger?.info(`[ClaudePanelManager] Starting Claude panel ${panelId} (session: ${mapping.sessionId})`);
-    return this.claudeCodeManager.startPanel(panelId, mapping.sessionId, worktreePath, prompt, permissionMode, model);
+    // Pass Claude-specific parameters through the args spread
+    return this.cliManager.startPanel(panelId, mapping.sessionId, worktreePath, prompt, permissionMode, model);
   }
 
+  /**
+   * Claude-specific panel continue method with model parameter
+   * Delegates to the base class continuePanel
+   */
   async continuePanel(panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
     if (!mapping) {
@@ -204,97 +52,46 @@ export class ClaudePanelManager {
     }
 
     this.logger?.info(`[ClaudePanelManager] Continuing Claude panel ${panelId} (session: ${mapping.sessionId})`);
-    return this.claudeCodeManager.continuePanel(panelId, mapping.sessionId, worktreePath, prompt, conversationHistory, model);
+    // Pass model parameter through the args spread
+    return this.cliManager.continuePanel(panelId, mapping.sessionId, worktreePath, prompt, conversationHistory, model);
   }
 
-  async stopPanel(panelId: string): Promise<void> {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      throw new Error(`Panel ${panelId} not registered`);
-    }
-
-    this.logger?.info(`[ClaudePanelManager] Stopping Claude panel ${panelId} (session: ${mapping.sessionId})`);
-    return this.claudeCodeManager.stopPanel(panelId);
-  }
-
-  sendInputToPanel(panelId: string, input: string): void {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      throw new Error(`Panel ${panelId} not registered`);
-    }
-
-    this.logger?.verbose(`[ClaudePanelManager] Sending input to panel ${panelId} (session: ${mapping.sessionId})`);
-    this.claudeCodeManager.sendInput(panelId, input);
-  }
-
-  isPanelRunning(panelId: string): boolean {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      return false;
-    }
-
-    return this.claudeCodeManager.isPanelRunning(panelId);
-  }
-
-  getPanelProcess(panelId: string): any {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      return undefined;
-    }
-
-    return this.claudeCodeManager.getProcess(panelId);
-  }
-
-  getAllPanels(): string[] {
-    return Array.from(this.panelMappings.keys());
-  }
-
+  /**
+   * Get Claude-specific panel state
+   * Returns ClaudePanelState with claudeResumeId instead of generic resumeId
+   */
   getPanelState(panelId: string): ClaudePanelState | undefined {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
+    const baseState = super.getPanelState(panelId);
+    if (!baseState) {
       return undefined;
     }
 
-    const isRunning = this.claudeCodeManager.isPanelRunning(panelId);
-    
+    // Transform base state to Claude-specific state
     return {
-      isInitialized: isRunning,
-      claudeResumeId: mapping.claudeResumeId,
-      lastActivityTime: new Date().toISOString()
+      isInitialized: baseState.isInitialized,
+      claudeResumeId: baseState.resumeId, // Map resumeId to claudeResumeId for Claude
+      lastActivityTime: baseState.lastActivityTime
     };
   }
 
-  // Utility method to get session ID from panel ID
-  getSessionIdForPanel(panelId: string): string | undefined {
-    return this.panelMappings.get(panelId)?.sessionId;
+  /**
+   * Register panel with Claude-specific state handling
+   */
+  registerPanel(panelId: string, sessionId: string, initialState?: ClaudePanelState): void {
+    // Transform Claude-specific state to base state if needed
+    const baseInitialState = initialState ? {
+      ...initialState,
+      resumeId: initialState.claudeResumeId // Map claudeResumeId to resumeId for base class
+    } : undefined;
+
+    super.registerPanel(panelId, sessionId, baseInitialState);
   }
 
-  // Utility method to get panel ID from Claude resume ID
-  getPanelIdFromResumeId(claudeResumeId: string): string | undefined {
-    return this.resumeIdToPanel.get(claudeResumeId);
-  }
-
-  // Clean up all panels for a session
-  async cleanupSessionPanels(sessionId: string): Promise<void> {
-    const panelsToCleanup: string[] = [];
-    
-    // Find all panels for this session
-    for (const [panelId, mapping] of this.panelMappings.entries()) {
-      if (mapping.sessionId === sessionId) {
-        panelsToCleanup.push(panelId);
-      }
-    }
-
-    // Clean up each panel
-    for (const panelId of panelsToCleanup) {
-      try {
-        await this.stopPanel(panelId);
-      } catch (error) {
-        this.logger?.warn(`[ClaudePanelManager] Error stopping panel ${panelId}:`, error as Error);
-      }
-      this.unregisterPanel(panelId);
-    }
-
-    this.logger?.info(`[ClaudePanelManager] Cleaned up ${panelsToCleanup.length} Claude panels for session ${sessionId}`);
+  /**
+   * Utility method to get panel ID from Claude resume ID
+   * This is a Claude-specific convenience method
+   */
+  getPanelIdFromClaudeResumeId(claudeResumeId: string): string | undefined {
+    return this.getPanelIdFromResumeId(claudeResumeId);
   }
 }
