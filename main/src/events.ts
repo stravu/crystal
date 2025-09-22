@@ -23,7 +23,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     gitStatusManager,
     worktreeManager,
     archiveProgressManager,
-    logger
+    logger,
+    databaseService
   } = services;
 
   let codexCliManager: AbstractCliManager | undefined;
@@ -50,8 +51,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
     manager.on('spawned', async ({ panelId, sessionId }: { panelId?: string; sessionId: string }) => {
       const validation = panelId
-        ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
-        : validateEventContext({ sessionId }, sessionId);
+        ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId, databaseService)
+        : validateEventContext({ sessionId }, sessionId, databaseService);
 
       if (!validation.valid) {
         logValidationFailure(`${toolLabel} spawned event`, validation);
@@ -101,8 +102,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
     manager.on('exit', async ({ panelId, sessionId, exitCode, signal }: { panelId?: string; sessionId: string; exitCode: number | null; signal: number | null | string }) => {
       const validation = panelId
-        ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
-        : validateEventContext({ sessionId }, sessionId);
+        ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId, databaseService)
+        : validateEventContext({ sessionId }, sessionId, databaseService);
 
       if (!validation.valid) {
         logValidationFailure(`${toolLabel} exit event`, validation);
@@ -296,7 +297,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   sessionManager.on('session-output', (output) => {
     // Validate the output has valid session context
-    const validation = validateEventContext(output);
+    const validation = validateEventContext(output, undefined, databaseService);
     if (!validation.valid) {
       logValidationFailure('session-output event', validation);
       return; // Don't broadcast invalid events
@@ -354,8 +355,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   claudeCodeManager.on('output', async (output: any) => {
     // Validate the output has valid context
     const validation = output.panelId 
-      ? validatePanelEventContext(output, output.panelId, output.sessionId)
-      : validateEventContext(output, output.sessionId);
+      ? validatePanelEventContext(output, output.panelId, output.sessionId, databaseService)
+      : validateEventContext(output, output.sessionId, databaseService);
 
     if (!validation.valid) {
       logValidationFailure('claudeCodeManager output event', validation);

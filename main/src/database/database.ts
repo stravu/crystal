@@ -3,16 +3,19 @@ import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, CreatePanelExecutionDiffData } from './models';
 import type { ToolPanel } from '../../../shared/types/panels';
+import type { ConfigManager } from '../services/configManager';
 
 export class DatabaseService {
   private db: Database.Database;
+  private configManager: ConfigManager | null = null;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, configManager?: ConfigManager) {
     // Ensure the directory exists before creating the database
     const dir = dirname(dbPath);
     mkdirSync(dir, { recursive: true });
     
     this.db = new Database(dbPath);
+    this.configManager = configManager || null;
   }
 
   /**
@@ -222,8 +225,7 @@ export class DatabaseService {
 
         // Import existing config as default project if it exists
         try {
-          const configManager = require('../services/configManager').configManager;
-          const gitRepoPath = configManager.getGitRepoPath();
+          const gitRepoPath = this.configManager?.getGitRepoPath();
           
           if (gitRepoPath) {
             const projectName = gitRepoPath.split('/').pop() || 'Default Project';
@@ -948,8 +950,7 @@ export class DatabaseService {
           );
 
           // Create Claude panel settings with default model from config
-          const { configManager } = require('../services/configManager');
-          const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
+          const defaultModel = this.configManager?.getDefaultModel() || 'claude-3-opus-20240229';
           this.db.prepare(`
             INSERT INTO claude_panel_settings (panel_id, model)
             VALUES (?, ?)
@@ -2486,8 +2487,7 @@ export class DatabaseService {
     temperature?: number;
   }): void {
     // Get the default model from config if not provided
-    const { configManager } = require('../services/configManager');
-    const defaultModel = settings.model || configManager.getDefaultModel() || 'claude-3-opus-20240229';
+    const defaultModel = settings.model || this.configManager?.getDefaultModel() || 'claude-3-opus-20240229';
     
     this.db.prepare(`
       INSERT INTO claude_panel_settings (panel_id, model, commit_mode, system_prompt, max_tokens, temperature)
