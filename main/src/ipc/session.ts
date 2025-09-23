@@ -359,7 +359,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('sessions:input', async (_event, sessionId: string, input: string) => {
     try {
       // Validate session exists and is active
-      const sessionValidation = validateSessionIsActive(sessionId);
+      const sessionValidation = validateSessionIsActive(sessionId, databaseService);
       if (!sessionValidation.valid) {
         logValidationFailure('sessions:input', sessionValidation);
         return createValidationError(sessionValidation);
@@ -561,7 +561,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string) => {
     try {
       // Validate session exists and is active
-      const sessionValidation = validateSessionIsActive(sessionId);
+      const sessionValidation = validateSessionIsActive(sessionId, databaseService);
       if (!sessionValidation.valid) {
         logValidationFailure('sessions:continue', sessionValidation);
         return createValidationError(sessionValidation);
@@ -735,7 +735,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('sessions:get-output', async (_event, sessionId: string, limit?: number) => {
     try {
       // Validate session exists
-      const sessionValidation = validateSessionExists(sessionId);
+      const sessionValidation = validateSessionExists(sessionId, databaseService);
       if (!sessionValidation.valid) {
         logValidationFailure('sessions:get-output', sessionValidation);
         return createValidationError(sessionValidation);
@@ -1004,7 +1004,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       }
 
       // Additional validation that the session is active
-      const sessionValidation = validateSessionIsActive(panelValidation.sessionId!);
+      const sessionValidation = validateSessionIsActive(panelValidation.sessionId!, databaseService);
       if (!sessionValidation.valid) {
         logValidationFailure('panels:send-input session check', sessionValidation);
         return createValidationError(sessionValidation);
@@ -1061,7 +1061,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       }
 
       // Additional validation that the session is active
-      const sessionValidation = validateSessionIsActive(panelValidation.sessionId!);
+      const sessionValidation = validateSessionIsActive(panelValidation.sessionId!, databaseService);
       if (!sessionValidation.valid) {
         logValidationFailure('panels:continue session check', sessionValidation);
         return createValidationError(sessionValidation);

@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ToolPanel, CreatePanelRequest, PanelEventType, ToolPanelState, ToolPanelMetadata, ToolPanelType } from '../../../shared/types/panels';
-import { databaseService } from './database';
+import { getDatabaseService } from './serviceRegistry';
 import { panelEventBus } from './panelEventBus';
 import { mainWindow } from '../index';
 import { withLock } from '../utils/mutex';
@@ -53,6 +53,7 @@ export class PanelManager {
       };
       
       // Save to database and set as active in a single transaction
+      const databaseService = getDatabaseService();
       databaseService.createPanelAndSetActive({
         id: panel.id,
         sessionId: panel.sessionId,
@@ -121,7 +122,7 @@ export class PanelManager {
       panelEventBus.unsubscribePanel(panelId);
       
       // If this was the active panel, activate another one
-      const activePanelId = databaseService.getActivePanel(panel.sessionId)?.id;
+      const activePanelId = getDatabaseService().getActivePanel(panel.sessionId)?.id;
       if (activePanelId === panelId) {
         const otherPanels = this.getPanelsForSession(panel.sessionId).filter(p => p.id !== panelId);
         if (otherPanels.length > 0) {
@@ -132,7 +133,7 @@ export class PanelManager {
       }
       
       // Remove from database
-      databaseService.deletePanel(panelId);
+      getDatabaseService().deletePanel(panelId);
       
       // Remove from cache
       this.panels.delete(panelId);
@@ -155,7 +156,7 @@ export class PanelManager {
       }
       
       // Update in database
-      databaseService.updatePanel(panelId, {
+      getDatabaseService().updatePanel(panelId, {
         title: updates.title,
         state: updates.state,
         metadata: updates.metadata
@@ -178,7 +179,7 @@ export class PanelManager {
   async setActivePanel(sessionId: string, panelId: string | null): Promise<void> {
     return await withLock(`panel-active-${sessionId}`, async () => {
       // Update database
-      databaseService.setActivePanel(sessionId, panelId);
+      getDatabaseService().setActivePanel(sessionId, panelId);
       
       // Update panel states
       const panels = this.getPanelsForSession(sessionId);
@@ -191,7 +192,7 @@ export class PanelManager {
           }
           // Don't call updatePanel here to avoid nested locks
           // Update in database directly
-          databaseService.updatePanel(panel.id, {
+          getDatabaseService().updatePanel(panel.id, {
             state: panel.state,
             metadata: panel.metadata
           });
@@ -217,7 +218,7 @@ export class PanelManager {
     }
     
     // Load from database if not cached
-    const panel = databaseService.getPanel(panelId);
+    const panel = getDatabaseService().getPanel(panelId);
     if (panel) {
       // Fix any panels that have state stored as a string (defensive programming)
       if (typeof panel.state === 'string') {
@@ -245,10 +246,10 @@ export class PanelManager {
   
   getPanelsForSession(sessionId: string): ToolPanel[] {
     // Always get fresh from database to ensure consistency
-    const panels = databaseService.getPanelsForSession(sessionId);
+    const panels = getDatabaseService().getPanelsForSession(sessionId);
     
     // Fix any panels that have state stored as a string (defensive programming)
-    panels.forEach(panel => {
+    panels.forEach((panel: ToolPanel) => {
       if (typeof panel.state === 'string') {
         try {
           panel.state = JSON.parse(panel.state);
@@ -338,7 +339,7 @@ export class PanelManager {
     }
     
     // Delete all from database (cascade delete should handle this too)
-    databaseService.deletePanelsForSession(sessionId);
+    getDatabaseService().deletePanelsForSession(sessionId);
     
     console.log(`[PanelManager] Cleaned up ${panels.length} panels for session ${sessionId}`);
   }

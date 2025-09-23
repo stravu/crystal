@@ -1,5 +1,6 @@
-import { databaseService } from '../services/database';
 import { panelManager } from '../services/panelManager';
+import type { DatabaseService } from '../database/database';
+import { getDatabaseService } from '../services/serviceRegistry';
 
 export interface ValidationResult {
   valid: boolean;
@@ -11,12 +12,15 @@ export interface ValidationResult {
 /**
  * Validates that a session exists and is not archived
  */
-export function validateSessionExists(sessionId: string): ValidationResult {
+export function validateSessionExists(sessionId: string, databaseService?: DatabaseService): ValidationResult {
+  // If no databaseService provided, try to get it from the registry
+  const db = databaseService || getDatabaseService();
+  
   if (!sessionId) {
     return { valid: false, error: 'Session ID is required', sessionId };
   }
 
-  const session = databaseService.getSession(sessionId);
+  const session = db.getSession(sessionId);
   if (!session) {
     return { valid: false, error: `Session ${sessionId} not found`, sessionId };
   }
@@ -31,7 +35,7 @@ export function validateSessionExists(sessionId: string): ValidationResult {
 /**
  * Validates that a panel exists and belongs to the specified session
  */
-export function validatePanelSessionOwnership(panelId: string, expectedSessionId: string): ValidationResult {
+export function validatePanelSessionOwnership(panelId: string, expectedSessionId: string, databaseService?: DatabaseService): ValidationResult {
   if (!panelId) {
     return { valid: false, error: 'Panel ID is required', panelId, sessionId: expectedSessionId };
   }
@@ -41,7 +45,7 @@ export function validatePanelSessionOwnership(panelId: string, expectedSessionId
   }
 
   // First validate the session exists
-  const sessionValidation = validateSessionExists(expectedSessionId);
+  const sessionValidation = validateSessionExists(expectedSessionId, databaseService);
   if (!sessionValidation.valid) {
     return { ...sessionValidation, panelId };
   }
@@ -83,13 +87,14 @@ export function validatePanelExists(panelId: string): ValidationResult {
 /**
  * Validates that a session is active (not archived and status allows operations)
  */
-export function validateSessionIsActive(sessionId: string): ValidationResult {
-  const sessionValidation = validateSessionExists(sessionId);
+export function validateSessionIsActive(sessionId: string, databaseService?: DatabaseService): ValidationResult {
+  const db = databaseService || getDatabaseService();
+  const sessionValidation = validateSessionExists(sessionId, db);
   if (!sessionValidation.valid) {
     return sessionValidation;
   }
 
-  const session = databaseService.getSession(sessionId);
+  const session = db.getSession(sessionId);
   if (!session) {
     return { valid: false, error: `Session ${sessionId} not found`, sessionId };
   }
@@ -110,7 +115,7 @@ export function validateSessionIsActive(sessionId: string): ValidationResult {
 /**
  * Validates that an event matches the expected session context
  */
-export function validateEventContext(eventData: any, expectedSessionId?: string): ValidationResult {
+export function validateEventContext(eventData: any, expectedSessionId?: string, databaseService?: DatabaseService): ValidationResult {
   if (!eventData) {
     return { valid: false, error: 'Event data is required' };
   }
@@ -120,7 +125,7 @@ export function validateEventContext(eventData: any, expectedSessionId?: string)
     if (!eventData.sessionId) {
       return { valid: false, error: 'Event must contain sessionId' };
     }
-    return validateSessionExists(eventData.sessionId);
+    return validateSessionExists(eventData.sessionId, databaseService);
   }
 
   // Validate event session matches expected session
@@ -141,7 +146,7 @@ export function validateEventContext(eventData: any, expectedSessionId?: string)
   }
 
   // Validate the session exists
-  return validateSessionExists(expectedSessionId);
+  return validateSessionExists(expectedSessionId, databaseService);
 }
 
 /**
@@ -150,7 +155,8 @@ export function validateEventContext(eventData: any, expectedSessionId?: string)
 export function validatePanelEventContext(
   eventData: any, 
   expectedPanelId?: string, 
-  expectedSessionId?: string
+  expectedSessionId?: string,
+  databaseService?: DatabaseService
 ): ValidationResult {
   if (!eventData) {
     return { valid: false, error: 'Event data is required' };
@@ -178,7 +184,7 @@ export function validatePanelEventContext(
 
     // If we have expected session, validate panel ownership
     if (expectedSessionId) {
-      return validatePanelSessionOwnership(expectedPanelId, expectedSessionId);
+      return validatePanelSessionOwnership(expectedPanelId, expectedSessionId, databaseService);
     } else {
       // Just validate panel exists
       return validatePanelExists(expectedPanelId);
@@ -187,14 +193,14 @@ export function validatePanelEventContext(
 
   // Fall back to session validation if only session is provided
   if (expectedSessionId) {
-    return validateEventContext(eventData, expectedSessionId);
+    return validateEventContext(eventData, expectedSessionId, databaseService);
   }
 
   // No specific expectations, just validate event has required data
   if (eventData.panelId) {
     return validatePanelExists(eventData.panelId);
   } else if (eventData.sessionId) {
-    return validateSessionExists(eventData.sessionId);
+    return validateSessionExists(eventData.sessionId, databaseService);
   }
 
   return { valid: false, error: 'Event must contain either panelId or sessionId' };

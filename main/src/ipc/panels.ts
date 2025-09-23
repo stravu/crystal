@@ -1,11 +1,11 @@
 import { IpcMain } from 'electron';
 import { panelManager } from '../services/panelManager';
 import { terminalPanelManager } from '../services/terminalPanelManager';
-import { databaseService } from '../services/database';
 import { CreatePanelRequest, PanelEventType } from '../../../shared/types/panels';
 import type { AppServices } from './types';
 
 export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
+  const { databaseService } = services;
   // Panel CRUD operations
   ipcMain.handle('panels:create', async (_, request: CreatePanelRequest) => {
     console.log('[IPC] Creating panel:', request);

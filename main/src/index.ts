@@ -36,6 +36,7 @@ import { AppServices } from './ipc/types';
 import { CliManagerFactory } from './services/cliManagerFactory';
 import { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
 import { setupConsoleWrapper } from './utils/consoleWrapper';
+import { registerService } from './services/serviceRegistry';
 import * as fs from 'fs';
 
 export let mainWindow: BrowserWindow | null = null;
@@ -403,6 +404,7 @@ async function createWindow() {
 async function initializeServices() {
   configManager = new ConfigManager();
   await configManager.initialize();
+  registerService('configManager', configManager);
 
   // Initialize logger early so it can capture all logs
   logger = new Logger(configManager);
@@ -410,7 +412,8 @@ async function initializeServices() {
 
   // Use the same database path as the original backend
   const dbPath = configManager.getDatabasePath();
-  databaseService = new DatabaseService(dbPath);
+  databaseService = new DatabaseService(dbPath, configManager);
+  registerService('databaseService', databaseService);
   databaseService.initialize();
 
   sessionManager = new SessionManager(databaseService);
