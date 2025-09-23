@@ -3,6 +3,7 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { CodexManager } from './codexManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig } from '../../../../../shared/types/aiPanelConfig';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
 import type { CodexPanelState } from '../../../../../shared/types/panels';
 
@@ -24,7 +25,7 @@ export type { CodexPanelState };
 
 /**
  * Manager for OpenAI Codex panels
- * Handles Codex-specific functionality while leveraging base AI panel management
+ * Uses unified configuration object approach
  */
 export class CodexPanelManager extends AbstractAIPanelManager {
   
@@ -44,6 +45,21 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    */
   protected getAgentName(): string {
     return 'Codex';
+  }
+
+  /**
+   * Extract Codex-specific configuration parameters
+   * Codex uses: model, modelProvider, thinkingLevel, approvalPolicy, sandboxMode, webSearch
+   */
+  protected extractAgentConfig(config: AIPanelConfig): any[] {
+    return [
+      config.model || DEFAULT_CODEX_MODEL,
+      config.modelProvider || 'openai',
+      config.thinkingLevel || 'medium',
+      config.approvalPolicy || 'manual',
+      config.sandboxMode || 'workspace-write',
+      config.webSearch ?? false
+    ];
   }
 
   /**
@@ -164,7 +180,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
   }
 
   /**
-   * Start a Codex panel with specific configuration
+   * Start a Codex panel with specific configuration for backward compatibility
    */
   async startPanel(
     panelId: string, 
@@ -176,28 +192,36 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch?: boolean,
     thinkingLevel?: 'low' | 'medium' | 'high'
+  ): Promise<void>;
+  async startPanel(config: StartPanelConfig): Promise<void>;
+  async startPanel(
+    panelIdOrConfig: string | StartPanelConfig,
+    worktreePath?: string,
+    prompt?: string,
+    model?: string,
+    modelProvider?: string,
+    approvalPolicy?: 'auto' | 'manual',
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
+    webSearch?: boolean,
+    thinkingLevel?: 'low' | 'medium' | 'high'
   ): Promise<void> {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      this.logger?.error(`[codex-debug] Panel ${panelId} not found in mappings. Available panels: ${Array.from(this.panelMappings.keys()).join(', ')}`);
-      throw new Error(`Panel ${panelId} not registered`);
+    // Handle both signatures for backward compatibility
+    if (typeof panelIdOrConfig === 'string') {
+      const config: StartPanelConfig = {
+        panelId: panelIdOrConfig,
+        worktreePath: worktreePath!,
+        prompt: prompt!,
+        model,
+        modelProvider,
+        approvalPolicy,
+        sandboxMode,
+        webSearch,
+        thinkingLevel
+      };
+      return super.startPanel(config);
+    } else {
+      return super.startPanel(panelIdOrConfig);
     }
-
-    this.logger?.info(`[codex-debug] Starting Codex panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  Model: ${model || DEFAULT_CODEX_MODEL}\n  Provider: ${modelProvider || 'openai'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"\n  Approval: ${approvalPolicy || 'on-request'}\n  Sandbox: ${sandboxMode || 'workspace-write'}\n  Web Search: ${webSearch || false}\n  Thinking Level: ${thinkingLevel || 'medium'}`);
-    
-    // Use the CodexManager's startPanel method with Codex-specific parameters
-    return this.codexManager.startPanel(
-      panelId,
-      mapping.sessionId,
-      worktreePath,
-      prompt,
-      model,
-      modelProvider,
-      thinkingLevel,
-      approvalPolicy,
-      sandboxMode,
-      webSearch
-    );
   }
 
   /**
@@ -239,6 +263,28 @@ export class CodexPanelManager extends AbstractAIPanelManager {
   }
 
   /**
+   * Register panel with Codex-specific state handling
+   */
+  registerPanel(panelId: string, sessionId: string, initialState?: CodexPanelState): void {
+    // Transform Codex-specific state to base state if needed
+    const baseInitialState = initialState ? {
+      isInitialized: initialState.isInitialized,
+      resumeId: initialState.codexResumeId,
+      lastActivityTime: initialState.lastActivityTime,
+      config: {
+        model: initialState.model,
+        modelProvider: initialState.modelProvider,
+        approvalPolicy: initialState.approvalPolicy,
+        sandboxMode: initialState.sandboxMode,
+        webSearch: initialState.webSearch,
+        thinkingLevel: initialState.codexConfig?.thinkingLevel
+      }
+    } : undefined;
+
+    super.registerPanel(panelId, sessionId, baseInitialState);
+  }
+
+  /**
    * Send user input to Codex - DEPRECATED in interactive mode
    * In interactive mode, each prompt spawns a new process via startPanel or continuePanel
    * @deprecated Use continuePanel instead for subsequent prompts
@@ -253,27 +299,36 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    * Get Codex-specific panel state
    */
   getPanelState(panelId: string): CodexPanelState | undefined {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      this.logger?.warn(`[codex-debug] getPanelState: Panel ${panelId} not found`);
+    const baseState = super.getPanelState(panelId);
+    if (!baseState) {
       return undefined;
     }
 
-    const isRunning = this.codexManager.isPanelRunning(panelId);
-    this.logger?.info(`[codex-debug] Panel ${panelId} state: running=${isRunning}, sessionId=${mapping.sessionId}`);
-    
+    const mapping = this.panelMappings.get(panelId);
+    const config = mapping?.config;
+
+    // Transform base state to Codex-specific state
     return {
-      isInitialized: isRunning,
-      codexResumeId: mapping.resumeId,
-      lastActivityTime: new Date().toISOString(),
-      // Additional Codex-specific state can be retrieved here
-      model: DEFAULT_CODEX_MODEL, // Default or retrieve from stored state
-      modelProvider: 'openai'
+      isInitialized: baseState.isInitialized,
+      codexResumeId: baseState.resumeId,
+      lastActivityTime: baseState.lastActivityTime,
+      lastPrompt: config?.prompt,
+      model: config?.model || DEFAULT_CODEX_MODEL,
+      modelProvider: config?.modelProvider || 'openai',
+      approvalPolicy: config?.approvalPolicy || 'manual',
+      sandboxMode: config?.sandboxMode || 'workspace-write',
+      webSearch: config?.webSearch ?? false,
+      codexConfig: {
+        model: config?.model || DEFAULT_CODEX_MODEL,
+        thinkingLevel: config?.thinkingLevel || 'medium',
+        sandboxMode: config?.sandboxMode || 'workspace-write',
+        webSearch: config?.webSearch ?? false
+      }
     };
   }
 
   /**
-   * Continue panel with conversation history (Codex-specific implementation)
+   * Continue panel with conversation history for backward compatibility
    */
   async continuePanel(
     panelId: string, 
@@ -286,28 +341,38 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     approvalPolicy?: 'auto' | 'manual',
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch?: boolean
+  ): Promise<void>;
+  async continuePanel(config: ContinuePanelConfig): Promise<void>;
+  async continuePanel(
+    panelIdOrConfig: string | ContinuePanelConfig,
+    worktreePath?: string,
+    prompt?: string,
+    conversationHistory?: any[],
+    model?: string,
+    modelProvider?: string,
+    thinkingLevel?: 'low' | 'medium' | 'high',
+    approvalPolicy?: 'auto' | 'manual',
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
+    webSearch?: boolean
   ): Promise<void> {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      throw new Error(`Panel ${panelId} not registered`);
+    // Handle both signatures for backward compatibility
+    if (typeof panelIdOrConfig === 'string') {
+      const config: ContinuePanelConfig = {
+        panelId: panelIdOrConfig,
+        worktreePath: worktreePath!,
+        prompt: prompt!,
+        conversationHistory: conversationHistory!,
+        model,
+        modelProvider,
+        thinkingLevel,
+        approvalPolicy,
+        sandboxMode,
+        webSearch
+      };
+      return super.continuePanel(config);
+    } else {
+      return super.continuePanel(panelIdOrConfig);
     }
-
-    this.logger?.info(`[codex-debug] Continuing panel:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  History items: ${conversationHistory.length}\n  Model: ${model || DEFAULT_CODEX_MODEL}\n  Provider: ${modelProvider || 'openai'}\n  Thinking Level: ${thinkingLevel || 'medium'}\n  Sandbox: ${sandboxMode || 'not specified'}\n  Web Search: ${webSearch ?? 'not specified'}\n  Worktree: ${worktreePath}\n  Prompt: "${prompt}"`);
-    
-    // Codex doesn't fully support history replay yet, but GPT-5 has improved context handling
-    // For now, we'll start a new session with the prompt
-    return this.codexManager.continuePanel(
-      panelId,
-      mapping.sessionId,
-      worktreePath,
-      prompt,
-      conversationHistory,
-      model,
-      modelProvider,
-      thinkingLevel,
-      sandboxMode,
-      webSearch
-    );
   }
 
   /**

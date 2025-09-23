@@ -50,32 +50,36 @@ export interface DiffPanelState {
   commitSha?: string;               // Specific commit being viewed
 }
 
-export interface ClaudePanelState {
-  // Basic state
-  isInitialized?: boolean;       // Whether Claude process has been started
-  claudeResumeId?: string;       // Claude's internal resume ID for session continuation
-  
-  // Enhanced persistence (can be added incrementally)
+// Base interface for AI panel states (Claude, Codex, etc.)
+export interface BaseAIPanelState {
+  // Common state for all AI tools
+  isInitialized?: boolean;       // Whether AI process has been started
   lastPrompt?: string;           // Last user prompt
-  model?: string;                // Model being used (sonnet, opus, haiku)
-  permissionMode?: 'approve' | 'ignore'; // Permission mode
+  model?: string;                // Model being used
   lastActivityTime?: string;     // For "idle since" indicators
+  lastInput?: string;            // Last input sent to the AI
+  
+  // Generic agent session ID for resume functionality (used by all AI agents)
+  agentSessionId?: string;        // The AI agent's session ID for resuming conversations
+  
+  // Legacy fields for backward compatibility (will be migrated to agentSessionId)
+  claudeSessionId?: string;       // Deprecated: Use agentSessionId instead
+  codexSessionId?: string;        // Deprecated: Use agentSessionId instead
+  claudeResumeId?: string;        // Deprecated: Claude's old resume ID
+  codexResumeId?: string;         // Deprecated: Codex's old resume ID
 }
 
-export interface CodexPanelState {
-  // Basic state
-  isInitialized?: boolean;       // Whether Codex process has been started
-  codexResumeId?: string;        // Codex's internal resume ID for session continuation (deprecated)
-  codexSessionId?: string;       // Codex's session ID for resuming conversations
-  
-  // Enhanced persistence
-  lastPrompt?: string;           // Last user prompt
-  model?: string;                // Model being used (gpt-5, gpt-4-turbo, etc.)
+export interface ClaudePanelState extends BaseAIPanelState {
+  // Claude-specific state
+  permissionMode?: 'approve' | 'ignore'; // Permission mode for Claude
+}
+
+export interface CodexPanelState extends BaseAIPanelState {
+  // Codex-specific state
   modelProvider?: string;        // Provider (openai, anthropic, etc.)
   approvalPolicy?: 'auto' | 'manual'; // Approval policy for tool calls
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; // Sandbox mode
   webSearch?: boolean;           // Whether web search is enabled
-  lastActivityTime?: string;     // For "idle since" indicators
   
   // Settings to remember for new tabs
   codexConfig?: {
