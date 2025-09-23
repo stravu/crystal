@@ -10,6 +10,7 @@ import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/
 import type { CodexPanelState } from '../../../../../shared/types/panels';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { panelManager } from '../../panelManager';
+import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -178,7 +179,7 @@ export class CodexManager extends AbstractCliManager {
     const dbSession = this.sessionManager.getDbSession(options.sessionId);
     
     // Enhance prompt for structured commit mode if needed
-    const finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
+    const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession, this.logger);
 
     const args: string[] = ['exec', '--json'];
 
@@ -357,7 +358,7 @@ export class CodexManager extends AbstractCliManager {
             const db = (this.sessionManager as any).db;
             if (db) {
               const panel = db.getPanel(panelId);
-              existingSessionId = panel?.state?.customState?.codexSessionId;
+              existingSessionId = panel?.state?.customState?.agentSessionId || panel?.state?.customState?.codexSessionId;
             }
           }
           
@@ -406,10 +407,14 @@ export class CodexManager extends AbstractCliManager {
                 const customState = currentState.customState || {};
                 
                 // Only update if we don't have one - never overwrite existing session IDs
-                if (!customState.codexSessionId) {
+                if (!customState.agentSessionId && !customState.codexSessionId) {
                   const updatedState = {
                     ...currentState,
-                    customState: { ...customState, codexSessionId }
+                    customState: { 
+                      ...customState, 
+                      agentSessionId: codexSessionId, // Use new generic field
+                      codexSessionId  // Keep legacy field for backward compatibility
+                    }
                   };
                   // Use panelManager to update so cache is properly updated
                   // Schedule the update asynchronously since parseCliOutput is not async
@@ -534,80 +539,14 @@ export class CodexManager extends AbstractCliManager {
     ].join('\n');
   }
 
-  // Override spawnPtyProcess to handle Node.js fallback for Codex (similar to Claude)
+  // Codex now uses the base class spawnPtyProcess with Node.js fallback
+  // Override only to add Codex-specific logging
   protected async spawnPtyProcess(command: string, args: string[], cwd: string, env: { [key: string]: string }): Promise<import('@homebridge/node-pty-prebuilt-multiarch').IPty> {
-    const pty = await import('@homebridge/node-pty-prebuilt-multiarch');
-    
-    if (!pty) {
-      throw new Error('node-pty not available');
-    }
-
-    const fullCommand = `${command} ${args.join(' ')}`;
-    this.logger?.verbose(`[codex] Executing Codex command: ${fullCommand}`);
     this.logger?.info(`[session-id-debug] Spawning Codex in directory: ${cwd}`);
     this.logger?.info(`[session-id-debug] This is where ~/.codex/sessions will be created`);
-
-    let ptyProcess: import('@homebridge/node-pty-prebuilt-multiarch').IPty;
-    let spawnAttempt = 0;
-    let lastError: any;
-
-    // Try normal spawn first, then fallback to Node.js invocation if it fails
-    while (spawnAttempt < 2) {
-      try {
-        if (spawnAttempt === 0 && !(global as any).codexNeedsNodeFallback) {
-          // First attempt: normal spawn
-          ptyProcess = pty.spawn(command, args, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        } else {
-          // Second attempt or if we know we need Node.js: use Node.js directly
-          this.logger?.verbose(`[codex] Using Node.js fallback for Codex execution`);
-          
-          const nodePath = await findNodeExecutable();
-          this.logger?.verbose(`[codex] Using Node.js: ${nodePath}`);
-          
-          // Spawn with Node.js directly
-          const nodeArgs = [command, ...args];
-          ptyProcess = pty.spawn(nodePath, nodeArgs, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        }
-
-        this.logger?.verbose(`[codex] Process spawned successfully`);
-        return ptyProcess;
-      } catch (spawnError) {
-        lastError = spawnError;
-        spawnAttempt++;
-
-        if (spawnAttempt === 1 && !(global as any).codexNeedsNodeFallback) {
-          const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
-          this.logger?.error(`[codex] First spawn attempt failed: ${errorMsg}`);
-
-          // Check for typical shebang-related errors
-          if (errorMsg.includes('No such file or directory') ||
-              errorMsg.includes('env: node:') ||
-              errorMsg.includes('ENOENT')) {
-            this.logger?.verbose(`[codex] Error suggests shebang issue, will try Node.js fallback`);
-            (global as any).codexNeedsNodeFallback = true;
-            continue;
-          }
-        }
-        break;
-      }
-    }
-
-    // If we failed after all attempts, handle the error
-    const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
-    this.logger?.error(`[codex] Failed to spawn Codex process after ${spawnAttempt} attempts: ${errorMsg}`);
-    throw new Error(`Failed to spawn Codex: ${errorMsg}`);
+    
+    // Use the base class implementation which now handles Node.js fallback
+    return super.spawnPtyProcess(command, args, cwd, env);
   }
 
   // Public methods for panel interaction (similar to Claude's interface)
@@ -832,7 +771,7 @@ export class CodexManager extends AbstractCliManager {
                 if (panel) {
                   const currentState = panel.state || {};
                   const customState = currentState.customState || {};
-                  const existingSessionId = customState.codexSessionId;
+                  const existingSessionId = customState.agentSessionId || customState.codexSessionId;
                   
                   if (existingSessionId) {
                     this.logger?.warn(`[session-id-debug] WARNING: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
@@ -841,7 +780,11 @@ export class CodexManager extends AbstractCliManager {
                   
                   const updatedState = { 
                     ...currentState, 
-                    customState: { ...customState, codexSessionId: sessionId } 
+                    customState: { 
+                      ...customState, 
+                      agentSessionId: sessionId, // Use new generic field
+                      codexSessionId: sessionId  // Keep legacy field for backward compatibility
+                    } 
                   };
                   
                   this.logger?.info(`[session-id-debug] About to update panel state with: ${JSON.stringify(updatedState)}`);
@@ -851,7 +794,7 @@ export class CodexManager extends AbstractCliManager {
                   // Verify it was saved
                   const verifyPanel = panelManager.getPanel(panelId);
                   const verifyCustomState = verifyPanel?.state?.customState as any;
-                  const savedSessionId = verifyCustomState?.codexSessionId;
+                  const savedSessionId = verifyCustomState?.agentSessionId || verifyCustomState?.codexSessionId;
                   if (savedSessionId === sessionId) {
                     this.logger?.info(`[session-id-debug] ✅ Verified session ID was stored correctly: ${savedSessionId}`);
                   } else {
@@ -908,7 +851,7 @@ export class CodexManager extends AbstractCliManager {
                   const customState = currentState.customState || {};
                   
                   // Check if session ID already exists
-                  const existingSessionId = customState.codexSessionId;
+                  const existingSessionId = customState.agentSessionId || customState.codexSessionId;
                   if (existingSessionId) {
                     this.logger?.warn(`[session-id-debug] FALLBACK: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
                     return; // Don't overwrite existing session ID
@@ -916,7 +859,11 @@ export class CodexManager extends AbstractCliManager {
                   
                   const updatedState = { 
                     ...currentState, 
-                    customState: { ...customState, codexSessionId: sessionId } 
+                    customState: { 
+                      ...customState, 
+                      agentSessionId: sessionId, // Use new generic field
+                      codexSessionId: sessionId  // Keep legacy field for backward compatibility
+                    } 
                   };
                   
                   this.logger?.info(`[session-id-debug] FALLBACK: About to update panel state with: ${JSON.stringify(updatedState)}`);
@@ -926,7 +873,7 @@ export class CodexManager extends AbstractCliManager {
                   // Verify it was saved
                   const verifyPanel = panelManager.getPanel(panelId);
                   const verifyCustomState = verifyPanel?.state?.customState as any;
-                  const savedSessionId = verifyCustomState?.codexSessionId;
+                  const savedSessionId = verifyCustomState?.agentSessionId || verifyCustomState?.codexSessionId;
                   if (savedSessionId === sessionId) {
                     this.logger?.info(`[session-id-debug] ✅ FALLBACK: Verified session ID was stored correctly: ${savedSessionId}`);
                   } else {
@@ -979,7 +926,7 @@ export class CodexManager extends AbstractCliManager {
         const panel = db.getPanel(panelId);
         if (panel) {
           panelState = panel.state?.customState as CodexPanelState | undefined;
-          codexSessionId = panelState?.codexSessionId;
+          codexSessionId = panelState?.agentSessionId || panelState?.codexSessionId;
           this.logger?.info(`[session-id-debug] Retrieved from panel state: ${codexSessionId || 'null'}`);
           this.logger?.info(`[session-id-debug] Full panel state: ${JSON.stringify(panel.state)}`);
         } else {
@@ -1203,16 +1150,16 @@ export class CodexManager extends AbstractCliManager {
     let codexSessionId = null;
     
     // Try to get from panel's custom state first
-    if (panel?.state?.customState?.codexSessionId) {
-      codexSessionId = panel.state.customState.codexSessionId;
+    if (panel?.state?.customState?.agentSessionId || panel?.state?.customState?.codexSessionId) {
+      codexSessionId = panel.state.customState.agentSessionId || panel.state.customState.codexSessionId;
       this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from panel state: ${codexSessionId}`);
     } else if (this.sessionManager) {
       // Fallback to trying to get from sessionManager/db directly
       const db = (this.sessionManager as any).db;
       if (db) {
         const dbPanel = db.getPanel(panelId);
-        if (dbPanel?.state?.customState?.codexSessionId) {
-          codexSessionId = dbPanel.state.customState.codexSessionId;
+        if (dbPanel?.state?.customState?.agentSessionId || dbPanel?.state?.customState?.codexSessionId) {
+          codexSessionId = dbPanel.state.customState.agentSessionId || dbPanel.state.customState.codexSessionId;
           this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from DB: ${codexSessionId}`);
         } else {
           this.logger?.info(`[session-id-debug] Debug state: No session ID found in DB for panel ${panelId}`);

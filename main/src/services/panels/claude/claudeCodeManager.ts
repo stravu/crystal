@@ -8,9 +8,10 @@ import type { ConfigManager } from '../../configManager';
 import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../../../utils/claudeCodeTest';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { PermissionManager } from '../../permissionManager';
-import { findNodeExecutable, findClaudeCodeScript } from '../../../utils/nodeFinder';
+import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { withLock } from '../../../utils/mutex';
+import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
 
 interface ClaudeSpawnOptions {
   panelId: string;
@@ -111,12 +112,12 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }
       // If a new prompt is provided, add it
       if (prompt && prompt.trim()) {
-        const finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
+        const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession, this.logger);
         args.push('-p', finalPrompt);
       }
     } else {
       // Initial prompt for new session
-      let finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
+      let finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession, this.logger);
 
       // Add system prompts for new sessions
       const systemPromptAppend = this.buildSystemPromptAppend(dbSession);
@@ -372,94 +373,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
     });
   }
 
-  // Override spawnPtyProcess to add Node.js fallback for Claude
-  protected async spawnPtyProcess(command: string, args: string[], cwd: string, env: { [key: string]: string }): Promise<import('@homebridge/node-pty-prebuilt-multiarch').IPty> {
-    const pty = await import('@homebridge/node-pty-prebuilt-multiarch');
-    
-    if (!pty) {
-      throw new Error('node-pty not available');
-    }
-
-    const fullCommand = `${command} ${args.join(' ')}`;
-    this.logger?.verbose(`Executing Claude Code command: ${fullCommand}`);
-    this.logger?.verbose(`Working directory: ${cwd}`);
-
-    let ptyProcess: import('@homebridge/node-pty-prebuilt-multiarch').IPty;
-    let spawnAttempt = 0;
-    let lastError: any;
-
-    // Try normal spawn first, then fallback to Node.js invocation if it fails
-    while (spawnAttempt < 2) {
-      try {
-        const startTime = Date.now();
-
-        // On Linux, add a small delay before spawning to avoid resource contention
-        if (os.platform() === 'linux' && this.processes.size > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-
-        if (spawnAttempt === 0) {
-          // First attempt: normal spawn
-          ptyProcess = pty.spawn(command, args, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        } else {
-          // Second attempt: use Node.js directly with Claude script
-          this.logger?.verbose(`First spawn failed, trying Node.js direct invocation...`);
-
-          // Find the Claude Code script
-          const claudeScript = findClaudeCodeScript(command);
-          if (!claudeScript) {
-            throw new Error('Could not find Claude Code script for Node.js invocation');
-          }
-
-          const nodePath = await findNodeExecutable();
-          this.logger?.verbose(`Using Node.js: ${nodePath}`);
-          this.logger?.verbose(`Claude script: ${claudeScript}`);
-
-          // Spawn with Node.js directly, bypassing the shebang
-          const nodeArgs = ['--no-warnings', '--enable-source-maps', claudeScript, ...args];
-          ptyProcess = pty.spawn(nodePath, nodeArgs, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        }
-
-        const spawnTime = Date.now() - startTime;
-        this.logger?.verbose(`Claude process spawned successfully in ${spawnTime}ms`);
-        return ptyProcess;
-      } catch (spawnError) {
-        lastError = spawnError;
-        spawnAttempt++;
-
-        if (spawnAttempt === 1) {
-          const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
-          this.logger?.error(`First Claude spawn attempt failed: ${errorMsg}`);
-
-          // Check for typical shebang-related errors
-          if (errorMsg.includes('No such file or directory') ||
-              errorMsg.includes('env: node:') ||
-              errorMsg.includes('ENOENT')) {
-            this.logger?.verbose(`Error suggests shebang issue, will try Node.js fallback`);
-            continue;
-          }
-        }
-        break;
-      }
-    }
-
-    // If we failed after all attempts, handle the error
-    const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
-    this.logger?.error(`Failed to spawn Claude process after ${spawnAttempt} attempts: ${errorMsg}`);
-    throw new Error(`Failed to spawn Claude Code: ${errorMsg}`);
-  }
+  // Claude now uses the base class spawnPtyProcess with Node.js fallback
+  // No override needed - the base class handles everything
 
   // Implementation of abstract methods from AbstractCliManager
 

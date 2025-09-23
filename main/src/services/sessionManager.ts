@@ -74,7 +74,9 @@ export class SessionManager extends EventEmitter {
   getPanelClaudeSessionId(panelId: string): string | undefined {
     try {
       const panel = this.db.getPanel(panelId);
-      const claudeSessionId = (panel as any)?.state?.customState?.claudeSessionId;
+      // Check new agentSessionId first, then fall back to legacy claudeSessionId
+      const claudeSessionId = (panel as any)?.state?.customState?.agentSessionId || 
+                              (panel as any)?.state?.customState?.claudeSessionId;
       console.log(`[SessionManager] Getting Claude session ID for panel ${panelId}: ${claudeSessionId || 'not found'}`);
       return claudeSessionId;
     } catch (e) {
@@ -86,9 +88,27 @@ export class SessionManager extends EventEmitter {
   getPanelCodexSessionId(panelId: string): string | undefined {
     try {
       const panel = this.db.getPanel(panelId);
-      const codexSessionId = (panel as any)?.state?.customState?.codexSessionId;
+      // Check new agentSessionId first, then fall back to legacy codexSessionId
+      const codexSessionId = (panel as any)?.state?.customState?.agentSessionId || 
+                             (panel as any)?.state?.customState?.codexSessionId;
       console.log(`[SessionManager] Getting Codex session ID for panel ${panelId}: ${codexSessionId || 'not found'}`);
       return codexSessionId;
+    } catch (e) {
+      return undefined;
+    }
+  }
+  
+  // Generic method for getting agent session ID (works for any AI panel)
+  getPanelAgentSessionId(panelId: string): string | undefined {
+    try {
+      const panel = this.db.getPanel(panelId);
+      const customState = (panel as any)?.state?.customState;
+      // Check new field first, then fall back to legacy fields based on panel type
+      const agentSessionId = customState?.agentSessionId || 
+                             customState?.claudeSessionId || 
+                             customState?.codexSessionId;
+      console.log(`[SessionManager] Getting agent session ID for panel ${panelId}: ${agentSessionId || 'not found'}`);
+      return agentSessionId;
     } catch (e) {
       return undefined;
     }
@@ -736,7 +756,11 @@ export class SessionManager extends EventEmitter {
             const customState = currentState.customState || {};
             const updatedState = {
               ...currentState,
-              customState: { ...customState, claudeSessionId: sessionIdFromMsg }
+              customState: { 
+                ...customState, 
+                agentSessionId: sessionIdFromMsg, // Use new generic field
+                claudeSessionId: sessionIdFromMsg  // Keep legacy field for backward compatibility
+              }
             };
             this.db.updatePanel(panelId, { state: updatedState });
             console.log(`[SessionManager] Stored Claude session_id for panel ${panelId}: ${sessionIdFromMsg}`);

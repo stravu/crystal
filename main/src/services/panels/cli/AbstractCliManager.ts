@@ -7,9 +7,7 @@ import { promisify } from 'util';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
 import { getShellPath, findExecutableInPath } from '../../../utils/shellPath';
-import { getAugmentedPath } from '../../../utils/claudeCodeTest';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
-import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 
 interface CliProcess {
   process: pty.IPty;
@@ -381,6 +379,78 @@ export abstract class AbstractCliManager extends EventEmitter {
   // Protected utility methods
 
   /**
+   * Find and store tool-specific session ID for resume functionality
+   * This is used by CLI tools that have their own session management systems
+   * @param panelId The panel ID
+   * @param sessionIdPath Path to search for session files
+   * @param extractSessionId Function to extract session ID from a session file
+   */
+  protected async findAndStoreToolSessionId(
+    panelId: string,
+    sessionIdPath: string,
+    extractSessionId: (filePath: string, worktreePath: string) => Promise<string | null>
+  ): Promise<void> {
+    try {
+      const fs = await import('fs').then(m => m.promises);
+      const path = await import('path');
+      
+      // Check if session directory exists
+      try {
+        await fs.access(sessionIdPath);
+      } catch {
+        this.logger?.verbose(`[${this.getCliToolName()}] Session directory not found: ${sessionIdPath}`);
+        return;
+      }
+
+      // Get the worktree path for this panel
+      const process = this.processes.get(panelId);
+      if (!process) {
+        this.logger?.warn(`[${this.getCliToolName()}] No process found for panel ${panelId}`);
+        return;
+      }
+
+      // Extract session ID
+      const sessionId = await extractSessionId(sessionIdPath, process.worktreePath);
+      
+      if (sessionId) {
+        this.logger?.info(`[${this.getCliToolName()}] Found session ID for panel ${panelId}: ${sessionId}`);
+        
+        // Store the session ID in the panel's custom state
+        if (this.sessionManager) {
+          const db = (this.sessionManager as any).db;
+          if (db) {
+            const panel = db.getPanel(panelId);
+            if (panel) {
+              const currentState = panel.state || {};
+              const customState = currentState.customState || {};
+              
+              // Only update if we don't already have a session ID
+              const toolSessionKey = `${this.getCliToolName().toLowerCase()}SessionId`;
+              if (!customState[toolSessionKey]) {
+                const updatedState = {
+                  ...currentState,
+                  customState: { ...customState, [toolSessionKey]: sessionId }
+                };
+                
+                // Use dynamic import to avoid circular dependency
+                const { panelManager } = await import('../../panelManager');
+                await panelManager.updatePanel(panelId, { state: updatedState });
+                this.logger?.info(`[${this.getCliToolName()}] Stored session ID for panel ${panelId}: ${sessionId}`);
+              } else {
+                this.logger?.verbose(`[${this.getCliToolName()}] Panel ${panelId} already has a session ID, skipping update`);
+              }
+            }
+          }
+        }
+      } else {
+        this.logger?.verbose(`[${this.getCliToolName()}] No session ID found for panel ${panelId}`);
+      }
+    } catch (error) {
+      this.logger?.error(`[${this.getCliToolName()}] Error finding session ID: ${error}`);
+    }
+  }
+
+  /**
    * Get cached availability result or perform fresh check
    */
   protected async getCachedAvailability(): Promise<{ available: boolean; error?: string; version?: string; path?: string }> {
@@ -408,7 +478,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   protected async handleCliNotAvailable(availability: { available: boolean; error?: string }, panelId: string, sessionId: string): Promise<void> {
     this.logger?.error(`${this.getCliToolName()} not available: ${availability.error}`);
     this.logger?.error(`Current PATH: ${process.env.PATH}`);
-    this.logger?.error(`Augmented PATH will be: ${getAugmentedPath()}`);
+    this.logger?.error(`Enhanced PATH searched: ${getShellPath()}`);
 
     // Emit error message to show in the UI
     const errorMessage = {
@@ -453,7 +523,7 @@ export abstract class AbstractCliManager extends EventEmitter {
       `- Add the ${this.getCliToolName()} installation directory to your PATH environment variable`,
       '- Or set a custom executable path in Crystal Settings',
       '',
-      `Current PATH: ${process.env.PATH}`,
+      `Enhanced PATH searched: ${getShellPath()}`,
       `Attempted command: ${this.getCliToolName()} --version`
     ].join('\n');
   }
@@ -480,38 +550,11 @@ export abstract class AbstractCliManager extends EventEmitter {
     } as { [key: string]: string };
   }
 
-  /**
-   * Enhance prompt with structured commit instructions if session has structured commit mode
-   * This is shared logic between Claude and Codex implementations
-   */
-  protected enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
-    // Check if session has structured commit mode
-    if (dbSession?.commit_mode === 'structured') {
-      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
-
-      let commitModeSettings;
-      if (dbSession.commit_mode_settings) {
-        try {
-          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
-        } catch (e) {
-          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
-        }
-      }
-
-      // Get structured prompt template from settings or use default
-      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
-
-      // Add structured commit instructions to the prompt
-      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
-      this.logger?.verbose(`Added structured commit instructions to prompt`);
-      return enhancedPrompt;
-    }
-
-    return prompt;
-  }
 
   /**
-   * Spawn PTY process with error handling and fallbacks
+   * Spawn PTY process with error handling and Node.js fallback
+   * This handles the common case where CLI tools are Node.js scripts with shebangs
+   * that may not work correctly on all systems
    */
   protected async spawnPtyProcess(command: string, args: string[], cwd: string, env: { [key: string]: string }): Promise<pty.IPty> {
     if (!pty) {
@@ -525,6 +568,8 @@ export abstract class AbstractCliManager extends EventEmitter {
     let ptyProcess: pty.IPty;
     let spawnAttempt = 0;
     let lastError: any;
+    const toolName = this.getCliToolName().toLowerCase();
+    const needsNodeFallbackKey = `${toolName}NeedsNodeFallback`;
 
     // Try normal spawn first, then fallback to Node.js invocation if it fails
     while (spawnAttempt < 2) {
@@ -536,13 +581,53 @@ export abstract class AbstractCliManager extends EventEmitter {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        ptyProcess = pty.spawn(command, args, {
-          name: 'xterm-color',
-          cols: 80,
-          rows: 30,
-          cwd,
-          env
-        });
+        if (spawnAttempt === 0 && !(global as any)[needsNodeFallbackKey]) {
+          // First attempt: normal spawn
+          ptyProcess = pty.spawn(command, args, {
+            name: 'xterm-color',
+            cols: 80,
+            rows: 30,
+            cwd,
+            env
+          });
+        } else {
+          // Second attempt or if we know we need Node.js: use Node.js directly
+          this.logger?.verbose(`[${this.getCliToolName()}] Using Node.js fallback for execution`);
+
+          // Try to find the CLI script (for npm-installed tools)
+          let scriptPath = command;
+          
+          // For tools installed via npm, the command might be a symlink to a script
+          // Try using the nodeFinder utility to locate the actual script
+          try {
+            // Use dynamic import to avoid circular dependencies
+            const { findCliNodeScript } = await import('../../../utils/nodeFinder');
+            const foundScript = findCliNodeScript(command);
+            if (foundScript) {
+              scriptPath = foundScript;
+              this.logger?.verbose(`[${this.getCliToolName()}] Found script at: ${scriptPath}`);
+            }
+          } catch (e) {
+            // If we can't find the script helper, just use the command as-is
+            this.logger?.verbose(`[${this.getCliToolName()}] Using command directly for Node.js invocation`);
+          }
+
+          const nodePath = await findNodeExecutable();
+          this.logger?.verbose(`[${this.getCliToolName()}] Using Node.js: ${nodePath}`);
+
+          // Spawn with Node.js directly
+          const nodeArgs = scriptPath === command 
+            ? [command, ...args] // Command might be a direct script path
+            : ['--no-warnings', '--enable-source-maps', scriptPath, ...args]; // Found script path
+            
+          ptyProcess = pty.spawn(nodePath, nodeArgs, {
+            name: 'xterm-color',
+            cols: 80,
+            rows: 30,
+            cwd,
+            env
+          });
+        }
 
         const spawnTime = Date.now() - startTime;
         this.logger?.verbose(`${this.getCliToolName()} process spawned successfully in ${spawnTime}ms`);
@@ -551,15 +636,17 @@ export abstract class AbstractCliManager extends EventEmitter {
         lastError = spawnError;
         spawnAttempt++;
 
-        if (spawnAttempt === 1) {
+        if (spawnAttempt === 1 && !(global as any)[needsNodeFallbackKey]) {
           const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
           this.logger?.error(`First ${this.getCliToolName()} spawn attempt failed: ${errorMsg}`);
 
-          // Check for typical shebang-related errors (mainly for Node.js-based CLIs)
+          // Check for typical shebang-related errors
           if (errorMsg.includes('No such file or directory') ||
               errorMsg.includes('env: node:') ||
+              errorMsg.includes('is not recognized') ||
               errorMsg.includes('ENOENT')) {
             this.logger?.verbose(`Error suggests shebang issue, will try Node.js fallback`);
+            (global as any)[needsNodeFallbackKey] = true;
             continue;
           }
         }

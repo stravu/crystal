@@ -2,11 +2,12 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig } from '../../../../../shared/types/aiPanelConfig';
 import { ClaudePanelState } from '../../../../../shared/types/panels';
 
 /**
  * Manager for Claude Code panels
- * Extends AbstractAIPanelManager to leverage common AI panel functionality
+ * Uses unified configuration object approach
  */
 export class ClaudePanelManager extends AbstractAIPanelManager {
   
@@ -27,33 +28,70 @@ export class ClaudePanelManager extends AbstractAIPanelManager {
   }
 
   /**
-   * Claude-specific panel start method with additional parameters
-   * Delegates to the base class startPanel after validation
+   * Extract Claude-specific configuration parameters
+   * Claude uses: permissionMode, model
    */
-  async startPanel(panelId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void> {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      throw new Error(`Panel ${panelId} not registered`);
-    }
-
-    this.logger?.info(`[ClaudePanelManager] Starting Claude panel ${panelId} (session: ${mapping.sessionId})`);
-    // Pass Claude-specific parameters through the args spread
-    return this.cliManager.startPanel(panelId, mapping.sessionId, worktreePath, prompt, permissionMode, model);
+  protected extractAgentConfig(config: AIPanelConfig): any[] {
+    return [
+      config.permissionMode, // 'approve' | 'ignore' | undefined
+      config.model          // model string
+    ];
   }
 
   /**
-   * Claude-specific panel continue method with model parameter
-   * Delegates to the base class continuePanel
+   * Claude-specific panel start method for backward compatibility
+   * Delegates to the base class startPanel with unified config
    */
-  async continuePanel(panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
-    const mapping = this.panelMappings.get(panelId);
-    if (!mapping) {
-      throw new Error(`Panel ${panelId} not registered`);
+  async startPanel(panelId: string, worktreePath: string, prompt: string, permissionMode?: 'approve' | 'ignore', model?: string): Promise<void>;
+  async startPanel(config: StartPanelConfig): Promise<void>;
+  async startPanel(
+    panelIdOrConfig: string | StartPanelConfig,
+    worktreePath?: string,
+    prompt?: string,
+    permissionMode?: 'approve' | 'ignore',
+    model?: string
+  ): Promise<void> {
+    // Handle both signatures for backward compatibility
+    if (typeof panelIdOrConfig === 'string') {
+      const config: StartPanelConfig = {
+        panelId: panelIdOrConfig,
+        worktreePath: worktreePath!,
+        prompt: prompt!,
+        permissionMode,
+        model
+      };
+      return super.startPanel(config);
+    } else {
+      return super.startPanel(panelIdOrConfig);
     }
+  }
 
-    this.logger?.info(`[ClaudePanelManager] Continuing Claude panel ${panelId} (session: ${mapping.sessionId})`);
-    // Pass model parameter through the args spread
-    return this.cliManager.continuePanel(panelId, mapping.sessionId, worktreePath, prompt, conversationHistory, model);
+  /**
+   * Claude-specific panel continue method for backward compatibility
+   * Delegates to the base class continuePanel with unified config
+   */
+  async continuePanel(panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void>;
+  async continuePanel(config: ContinuePanelConfig): Promise<void>;
+  async continuePanel(
+    panelIdOrConfig: string | ContinuePanelConfig,
+    worktreePath?: string,
+    prompt?: string,
+    conversationHistory?: any[],
+    model?: string
+  ): Promise<void> {
+    // Handle both signatures for backward compatibility
+    if (typeof panelIdOrConfig === 'string') {
+      const config: ContinuePanelConfig = {
+        panelId: panelIdOrConfig,
+        worktreePath: worktreePath!,
+        prompt: prompt!,
+        conversationHistory: conversationHistory!,
+        model
+      };
+      return super.continuePanel(config);
+    } else {
+      return super.continuePanel(panelIdOrConfig);
+    }
   }
 
   /**
