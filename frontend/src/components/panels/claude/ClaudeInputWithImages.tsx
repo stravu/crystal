@@ -32,7 +32,11 @@ interface SessionInputWithImagesProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleTerminalCommand: () => void;
   handleSendInput: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
-  handleContinueConversation: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
+  handleContinueConversation: (
+    attachedImages?: AttachedImage[],
+    attachedTexts?: AttachedText[],
+    modelOverride?: string
+  ) => void;
   isStravuConnected: boolean;
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
@@ -241,7 +245,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
           setAttachedImages([]);
           setAttachedTexts([]);
         } else {
-          await handleContinueConversation(attachedImages, attachedTexts);
+          await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
           setAttachedImages([]);
           setAttachedTexts([]);
         }
@@ -269,7 +273,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         setAttachedImages([]);
         setAttachedTexts([]);
       } else {
-        await handleContinueConversation(attachedImages, attachedTexts);
+        await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
         setAttachedImages([]);
         setAttachedTexts([]);
       }

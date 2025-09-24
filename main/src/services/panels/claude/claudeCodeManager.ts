@@ -391,7 +391,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
     return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
   }
 
-  async continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
+  async continuePanel(
+    panelId: string,
+    sessionId: string,
+    worktreePath: string,
+    prompt: string,
+    conversationHistory: any[],
+    permissionModeOverride?: 'approve' | 'ignore',
+    model?: string
+  ): Promise<void> {
     return await withLock(`claude-continue-${panelId}`, async () => {
       // Validate panel ownership before continuing
       const { validatePanelSessionOwnership, logValidationFailure } = require('../../../utils/sessionValidation');
@@ -417,7 +425,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
       // Get the session's permission mode from database
       const dbSession = this.sessionManager.getDbSession(sessionId);
-      const permissionMode = dbSession?.permission_mode;
+      const permissionModeFromDb = dbSession?.permission_mode;
+      const permissionMode = permissionModeOverride ?? permissionModeFromDb;
 
       // Check if we should skip --resume flag this time (after prompt compaction)
       const skipContinueRaw = dbSession?.skip_continue_next;

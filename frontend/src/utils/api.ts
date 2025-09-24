@@ -53,9 +53,9 @@ export class API {
       return window.electronAPI.sessions.sendInput(sessionId, input);
     },
 
-    async continue(sessionId: string, prompt?: string) {
+    async continue(sessionId: string, prompt?: string, model?: string) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.sessions.continue(sessionId, prompt);
+      return window.electronAPI.sessions.continue(sessionId, prompt, model);
     },
 
     async getOutput(sessionId: string, limit?: number) {
@@ -507,9 +507,9 @@ export class API {
       return window.electronAPI.panels.sendInput(panelId, input);
     },
 
-    async continue(panelId: string, input: string) {
+    async continue(panelId: string, input: string, model?: string) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.panels.continue(panelId, input);
+      return window.electronAPI.panels.continue(panelId, input, model);
     },
   };
 
