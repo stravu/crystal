@@ -1444,12 +1444,35 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 }
                 
                 if (todos) {
+                  // Wrap TodoListDisplay in an assistant message block
                   elements.push(
                     <div
                       key={`todo-display-${i}-${groupIdx}`}
-                      className={`${settings.compactMode ? 'mt-2' : 'mt-3'}`}
+                      className={`
+                        rounded-lg transition-all relative group
+                        bg-surface-primary
+                        ${settings.compactMode ? 'p-3 mt-2' : 'p-4 mt-3'}
+                      `}
                     >
-                      <TodoListDisplay todos={todos} timestamp={todoMsg.timestamp} />
+                      {/* Message Header */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="rounded-full p-1.5 flex-shrink-0 bg-interactive/20 text-interactive-on-dark">
+                          <Bot className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 flex items-baseline gap-2">
+                          <span className="font-medium text-text-primary text-sm">
+                            {messageTransformer.getAgentName()}
+                          </span>
+                          <span className="text-xs text-text-tertiary">
+                            {formatDistanceToNow(parseTimestamp(todoMsg.timestamp))}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Todo List Content */}
+                      <div className="ml-7">
+                        <TodoListDisplay todos={todos} timestamp={todoMsg.timestamp} />
+                      </div>
                     </div>
                   );
                 }
@@ -1542,13 +1565,35 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             // First add the regular message (with TodoWrite filtered out in renderMessage)
             elements.push(element);
             
-            // Then add the TodoWrite display separately
+            // Then add the TodoWrite display separately, wrapped in an assistant message block
             const todoElement = (
               <div
                 key={`todo-display-${msg.id}`}
-                className={`${settings.compactMode ? 'mt-2' : 'mt-3'}`}
+                className={`
+                  rounded-lg transition-all relative group
+                  bg-surface-primary
+                  ${settings.compactMode ? 'p-3 mt-2' : 'p-4 mt-3'}
+                `}
               >
-                <TodoListDisplay todos={lastTodoSegment.tool.input.todos} timestamp={msg.timestamp} />
+                {/* Message Header */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-full p-1.5 flex-shrink-0 bg-interactive/20 text-interactive-on-dark">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 flex items-baseline gap-2">
+                    <span className="font-medium text-text-primary text-sm">
+                      {messageTransformer.getAgentName()}
+                    </span>
+                    <span className="text-xs text-text-tertiary">
+                      {formatDistanceToNow(parseTimestamp(msg.timestamp))}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Todo List Content */}
+                <div className="ml-7">
+                  <TodoListDisplay todos={lastTodoSegment.tool.input.todos} timestamp={msg.timestamp} />
+                </div>
               </div>
             );
             elements.push(todoElement);
