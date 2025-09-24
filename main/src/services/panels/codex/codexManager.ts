@@ -904,6 +904,7 @@ export class CodexManager extends AbstractCliManager {
     model?: string,
     modelProvider?: string,
     thinkingLevel?: 'low' | 'medium' | 'high',
+    approvalPolicy?: 'auto' | 'manual',
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch?: boolean
   ): Promise<void> {
@@ -914,9 +915,10 @@ export class CodexManager extends AbstractCliManager {
     this.logger?.info(`[session-id-debug] Worktree: ${worktreePath}`);
     this.logger?.info(`[session-id-debug] New prompt: "${prompt}"`);
     this.logger?.info(`[session-id-debug] History items: ${conversationHistory.length}`);
+    this.logger?.info(`[session-id-debug] Passed approvalPolicy: ${approvalPolicy || 'undefined'}`);
     this.logger?.info(`[session-id-debug] Passed sandboxMode: ${sandboxMode || 'undefined'}`);
     this.logger?.info(`[session-id-debug] Passed webSearch: ${webSearch !== undefined ? webSearch : 'undefined'}`);
-    
+
     let panelState: CodexPanelState | undefined;
     // Try to get the session ID from the panel's custom state
     let codexSessionId = null;
@@ -958,10 +960,10 @@ export class CodexManager extends AbstractCliManager {
       // Prefer the passed parameters over the saved panel state
       const resolvedModel = model || panelState?.model || DEFAULT_CODEX_MODEL;
       const resolvedModelProvider = modelProvider || panelState?.modelProvider || 'openai';
-      const resolvedApprovalPolicy = panelState?.approvalPolicy;
+      const resolvedApprovalPolicy = approvalPolicy ?? panelState?.approvalPolicy;
       const resolvedSandboxMode = sandboxMode !== undefined ? sandboxMode : (panelState?.sandboxMode || 'workspace-write');
       const resolvedWebSearch = webSearch !== undefined ? webSearch : (panelState?.webSearch || false);
-      
+
       this.logger?.info(`[session-id-debug] Resolved sandboxMode: ${resolvedSandboxMode}`);
       this.logger?.info(`[session-id-debug] Resolved webSearch: ${resolvedWebSearch}`);
 
@@ -1013,7 +1015,7 @@ export class CodexManager extends AbstractCliManager {
         model || panelState?.model,
         modelProvider || panelState?.modelProvider,
         thinkingLevel,
-        panelState?.approvalPolicy,
+        approvalPolicy ?? panelState?.approvalPolicy,
         sandboxMode !== undefined ? sandboxMode : panelState?.sandboxMode,
         webSearch !== undefined ? webSearch : panelState?.webSearch
       );
