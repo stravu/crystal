@@ -72,6 +72,11 @@ export interface CreateSessionRequest {
     webSearch?: boolean;
     thinkingLevel?: 'low' | 'medium' | 'high';
   };
+  claudeConfig?: {
+    model?: string;
+    permissionMode?: 'approve' | 'ignore';
+    ultrathink?: boolean;
+  };
 }
 
 export interface SessionUpdate {
