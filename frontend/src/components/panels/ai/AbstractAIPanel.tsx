@@ -104,7 +104,7 @@ export abstract class AbstractAIPanel<T extends AIPanelProps = AIPanelProps> ext
     return saved ? JSON.parse(saved) : {
       showToolCalls: true,
       compactMode: false,
-      collapseTools: true,  // Changed to true for collapsed by default
+      collapseTools: false,  // Show tools expanded by default
       showThinking: true,
       showSessionInit: false,
     };

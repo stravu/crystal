@@ -15,7 +15,7 @@ import { CodexMessageTransformer } from './transformers/CodexMessageTransformer'
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
   compactMode: false,
-  collapseTools: true, // Collapse tools by default for cleaner view
+  collapseTools: false, // Expand tools by default to show all tool calls
   showThinking: true,
   showSessionInit: false, // Hide by default - it's developer info
 };
@@ -170,6 +170,25 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         if (existingOutputs && existingOutputs.length > 0) {
           const transformedMessages = messageTransformer.transform(existingOutputs);
           setMessages(transformedMessages);
+          
+          // Auto-expand sub-agent (Task) tools for Codex too
+          const newSubAgentIds = new Set<string>();
+          transformedMessages.forEach(msg => {
+            msg.segments.forEach(seg => {
+              if (seg.type === 'tool_call' && seg.tool.name === 'Task') {
+                newSubAgentIds.add(seg.tool.id);
+              }
+            });
+          });
+          
+          // Add sub-agent IDs to expanded tools
+          if (newSubAgentIds.size > 0) {
+            setExpandedTools(prev => {
+              const next = new Set(prev);
+              newSubAgentIds.forEach(id => next.add(id));
+              return next;
+            });
+          }
         }
       } else {
         // For Claude panels, use the existing API calls
@@ -212,6 +231,25 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         // Transform messages using the provided transformer
         const conversationMessages = messageTransformer.transform(allMessages);
         setMessages(conversationMessages);
+        
+        // Auto-expand sub-agent (Task) tools
+        const newSubAgentIds = new Set<string>();
+        conversationMessages.forEach(msg => {
+          msg.segments.forEach(seg => {
+            if (seg.type === 'tool_call' && seg.tool.name === 'Task') {
+              newSubAgentIds.add(seg.tool.id);
+            }
+          });
+        });
+        
+        // Add sub-agent IDs to expanded tools
+        if (newSubAgentIds.size > 0) {
+          setExpandedTools(prev => {
+            const next = new Set(prev);
+            newSubAgentIds.forEach(id => next.add(id));
+            return next;
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load messages:', err);
