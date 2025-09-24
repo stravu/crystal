@@ -30,7 +30,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
     return saved ? JSON.parse(saved) : {
       showToolCalls: true,
       compactMode: false,
-      collapseTools: false,
+      collapseTools: true,  // Changed to true for collapsed by default
       showThinking: true,
       showSessionInit: false,
     };
