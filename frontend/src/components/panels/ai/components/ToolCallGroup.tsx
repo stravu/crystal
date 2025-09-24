@@ -27,7 +27,7 @@ export const ToolCallGroup: React.FC<ToolCallGroupProps> = ({
     return (
       <ToolCallView
         tool={tool}
-        isExpanded={collapseTools ? expandedTools.has(tool.id) : false}
+        isExpanded={collapseTools ? expandedTools.has(tool.id) : true}
         collapseTools={collapseTools}
         onToggleExpand={onToggleToolExpand}
         expandedTools={expandedTools}
@@ -68,7 +68,7 @@ export const ToolCallGroup: React.FC<ToolCallGroupProps> = ({
           <div key={`tool-${tool.id}-${idx}`} className="first:border-t-0">
             <ToolCallView
               tool={tool}
-              isExpanded={collapseTools ? expandedTools.has(tool.id) : false}
+              isExpanded={collapseTools ? expandedTools.has(tool.id) : true}
               collapseTools={collapseTools}
               onToggleExpand={onToggleToolExpand}
               expandedTools={expandedTools}

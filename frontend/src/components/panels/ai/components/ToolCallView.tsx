@@ -1,6 +1,7 @@
 import React from 'react';
 import { Wrench, CheckCircle, XCircle, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { ToolCall } from '../transformers/MessageTransformer';
+import { MarkdownPreview } from '../../../MarkdownPreview';
 
 interface ToolCallViewProps {
   tool: ToolCall;
@@ -157,6 +158,9 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
   const isTaskAgent = tool.isSubAgent && tool.name === 'Task';
   const hasChildTools = tool.childToolCalls && tool.childToolCalls.length > 0;
   
+  // Sub-agents (Task tools) should always be expanded by default
+  const effectiveIsExpanded = isTaskAgent ? (expandedTools ? expandedTools.has(tool.id) : true) : isExpanded;
+  
   // Get compact summary for the tool
   const compactSummary = getCompactToolSummary(tool);
   
@@ -178,7 +182,7 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
         className="w-full px-2 py-1 flex items-center gap-2 hover:bg-surface-tertiary/20 transition-colors text-left"
       >
         {/* Always show chevron for expandable tools */}
-        {isExpanded ? <ChevronDown className="w-3 h-3 text-text-tertiary flex-shrink-0" /> : <ChevronRight className="w-3 h-3 text-text-tertiary flex-shrink-0" />}
+        {effectiveIsExpanded ? <ChevronDown className="w-3 h-3 text-text-tertiary flex-shrink-0" /> : <ChevronRight className="w-3 h-3 text-text-tertiary flex-shrink-0" />}
         
         {/* Tool icon */}
         {isTaskAgent ? (
@@ -206,7 +210,7 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
         {tool.status === 'pending' && <Clock className="w-3 h-3 text-text-tertiary flex-shrink-0 animate-pulse" />}
       </button>
       
-      {isExpanded && (
+      {effectiveIsExpanded && (
         <div className="px-2 py-1.5 text-xs border-t border-border-primary/15">
           {/* Tool Parameters - more compact display */}
           {tool.input && Object.keys(tool.input).length > 0 && (
@@ -238,14 +242,14 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
             </div>
           )}
           
-          {/* Tool Result - more compact */}
+          {/* Tool Result - render in markdown */}
           {tool.result && (
             <div className="mt-1.5">
               <div className="text-text-tertiary text-[10px] uppercase tracking-wider mb-0.5">
                 {tool.result.isError ? 'Error' : 'Result'}
               </div>
               <div className={`${tool.result.isError ? 'text-status-error' : 'text-text-primary'} text-[11px]`}>
-                {formatToolResult(tool.name, tool.result.content)}
+                {formatToolResultMarkdown(tool.name, tool.result.content, tool.result.isError || false)}
               </div>
             </div>
           )}
@@ -361,8 +365,8 @@ const formatToolInput = (toolName: string, input: any): React.ReactNode => {
   }
 };
 
-// Format tool result for display - compact version
-const formatToolResult = (toolName: string, result: string): React.ReactNode => {
+// Format tool result in markdown - replaces the old formatToolResult
+const formatToolResultMarkdown = (toolName: string, result: string, isError: boolean): React.ReactNode => {
   if (!result) {
     return <div className="text-[10px] text-text-tertiary italic">No result</div>;
   }
@@ -380,19 +384,11 @@ const formatToolResult = (toolName: string, result: string): React.ReactNode => 
         .join('\n\n');
       
       if (textContent) {
-        const lines = textContent.split('\n');
-        const preview = lines.slice(0, 3).join('\n');
-        const hasMore = lines.length > 3;
-        
+        // Render task results as markdown
         return (
-          <details className="text-[11px]">
-            <summary className="cursor-pointer text-text-secondary hover:text-text-primary">
-              {preview.substring(0, 100)}...{hasMore && ` (+${lines.length - 3} lines)`}
-            </summary>
-            <div className="mt-1 text-text-primary whitespace-pre-wrap max-h-48 overflow-y-auto">
-              {textContent}
-            </div>
-          </details>
+          <div className="rich-output-markdown tool-result-markdown">
+            <MarkdownPreview content={textContent} />
+          </div>
         );
       }
     }
@@ -406,84 +402,49 @@ const formatToolResult = (toolName: string, result: string): React.ReactNode => 
       );
     }
     
-    // For other JSON results, show compact summary
+    // For other JSON results, pretty-print them in a code block
     return (
       <details className="text-[10px]">
         <summary className="cursor-pointer text-text-tertiary hover:text-text-secondary">
-          {JSON.stringify(parsed).substring(0, 50)}...
+          View JSON result
         </summary>
-        <pre className="mt-0.5 overflow-x-auto max-h-24">
+        <pre className="mt-0.5 overflow-x-auto max-h-24 bg-surface-tertiary/30 p-2 rounded">
           {JSON.stringify(parsed, null, 2)}
         </pre>
       </details>
     );
   } catch {
-    // Not JSON, display as text with smart truncation
-    const lines = result.split('\n');
-    const firstLine = lines[0] || '';
-    const lineCount = lines.length;
+    // Not JSON - render as markdown for text content
     
-    // For short results, show inline
-    if (result.length < 100 && lineCount <= 2) {
-      return <div className="text-[11px] text-text-primary">{result}</div>;
-    }
-    
-    // For bash results with specific patterns
-    if (toolName === 'Bash') {
-      // Check for common patterns
-      if (result.includes('Found') && result.includes('files')) {
-        const match = result.match(/Found (\d+) files?/);
-        if (match) {
-          return <div className="text-[11px] text-status-success">{match[0]}</div>;
-        }
-      }
-      if (result.includes('error') || result.includes('Error')) {
-        return (
-          <details className="text-[11px]">
-            <summary className="cursor-pointer text-status-error">
-              Error occurred (click to see details)
-            </summary>
-            <pre className="mt-0.5 whitespace-pre-wrap max-h-32 overflow-y-auto text-status-error">
-              {result}
-            </pre>
-          </details>
-        );
-      }
-    }
-    
-    // For Grep results
-    if (toolName === 'Grep' && firstLine.startsWith('Found')) {
+    // For error messages, show them prominently
+    if (isError) {
       return (
-        <div className="text-[11px]">
-          <div className="text-status-success">{firstLine}</div>
-          {lineCount > 5 && (
-            <details>
-              <summary className="cursor-pointer text-text-tertiary text-[10px] hover:text-text-secondary">
-                View files ({lineCount - 1})
-              </summary>
-              <pre className="mt-0.5 text-[10px] max-h-24 overflow-y-auto">{lines.slice(1).join('\n')}</pre>
-            </details>
-          )}
-          {lineCount <= 5 && lineCount > 1 && (
-            <div className="text-[10px] text-text-secondary mt-0.5">
-              {lines.slice(1, 4).map((line, i) => (
-                <div key={i} className="truncate">• {line}</div>
-              ))}
-              {lineCount > 4 && <div>...and {lineCount - 4} more</div>}
-            </div>
-          )}
+        <div className="text-status-error bg-status-error/10 p-2 rounded border border-status-error/30">
+          <MarkdownPreview content={result} />
         </div>
       );
     }
     
-    // Default expandable view for longer content
+    // For short results, render inline markdown
+    if (result.length < 200) {
+      return (
+        <div className="rich-output-markdown tool-result-markdown">
+          <MarkdownPreview content={result} />
+        </div>
+      );
+    }
+    
+    // For longer results, make them expandable but still render as markdown
     return (
       <details className="text-[11px]">
-        <summary className="cursor-pointer text-text-secondary hover:text-text-primary">
-          {firstLine.substring(0, 80)}...{lineCount > 1 && ` (${lineCount} lines)`}
+        <summary className="cursor-pointer text-text-secondary hover:text-text-primary mb-1">
+          View full result ({result.split('\n').length} lines)
         </summary>
-        <pre className="mt-0.5 whitespace-pre-wrap max-h-32 overflow-y-auto">{result}</pre>
+        <div className="rich-output-markdown tool-result-markdown mt-1 max-h-48 overflow-y-auto">
+          <MarkdownPreview content={result} />
+        </div>
       </details>
     );
   }
 };
+
