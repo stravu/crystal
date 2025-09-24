@@ -438,8 +438,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Codex panel operations
   codexPanels: {
-    getSettings: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:getSettings', panelId),
-    setSettings: (panelId: string, settings: Record<string, any>): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:setSettings', panelId, settings),
+    getSettings: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:get-settings', panelId),
+    setSettings: (panelId: string, settings: Record<string, any>): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:set-settings', panelId, settings),
   },
 
   // Logs panel operations

@@ -657,6 +657,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           sandboxMode: codexConfig.sandboxMode,
           webSearch: codexConfig.webSearch,
           thinkingLevel: codexConfig.thinkingLevel
+        } : undefined,
+        claudeConfig: toolType === 'claude' ? {
+          model: claudeConfig.model,
+          permissionMode: claudeConfig.permissionMode,
+          ultrathink: claudeConfig.ultrathink
         } : undefined
       });
       

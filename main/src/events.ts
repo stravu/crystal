@@ -23,6 +23,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     gitStatusManager,
     worktreeManager,
     archiveProgressManager,
+    databaseService,
     logger
   } = services;
 
@@ -195,6 +196,16 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
               }
             };
             console.log(`[Events] Creating Codex panel with customState:`, customState);
+          } else if (panelType === 'claude') {
+            const claudeConfig = (session as any).claudeConfig || {};
+            customState = {
+              claudeConfig: {
+                model: claudeConfig.model || 'auto',
+                permissionMode: claudeConfig.permissionMode || 'ignore',
+                ultrathink: claudeConfig.ultrathink || false
+              }
+            };
+            console.log(`[Events] Creating Claude panel with customState:`, customState);
           }
           
           const panel = await panelManager.createPanel({
@@ -204,6 +215,18 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
             initialState: customState
           });
           console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
+          
+          // For Codex panels, also save the config to the settings column for persistence
+          if (panelType === 'codex' && customState?.codexConfig) {
+            databaseService.updatePanelSettings(panel.id, customState.codexConfig);
+            console.log(`[Events] Saved Codex panel settings to database for panel ${panel.id}`);
+          }
+          
+          // For Claude panels, also save the config to the settings column for persistence
+          if (panelType === 'claude' && customState?.claudeConfig) {
+            databaseService.updatePanelSettings(panel.id, customState.claudeConfig);
+            console.log(`[Events] Saved Claude panel settings to database for panel ${panel.id}`);
+          }
 
           // Register with the appropriate panel manager
           try {
