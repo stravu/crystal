@@ -436,6 +436,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setModel: (panelId: string, model: string): Promise<IPCResponse> => ipcRenderer.invoke('claude-panels:set-model', panelId, model),
   },
 
+  // Codex panel operations
+  codexPanels: {
+    getSettings: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:getSettings', panelId),
+    setSettings: (panelId: string, settings: Record<string, any>): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:setSettings', panelId, settings),
+  },
+
   // Logs panel operations
   logs: {
     runScript: (sessionId: string, command: string, cwd: string): Promise<IPCResponse> => ipcRenderer.invoke('logs:runScript', sessionId, command, cwd),

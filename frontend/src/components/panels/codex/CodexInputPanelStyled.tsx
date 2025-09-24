@@ -8,11 +8,9 @@ import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
 import { Pill } from '../../ui/Pill';
 import { CommitModePill } from '../../CommitModeToggle';
+import { API } from '../../../utils/api';
 
-const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
-const LAST_CODEX_THINKING_LEVEL_KEY = 'codex.lastSelectedThinkingLevel';
-const LAST_CODEX_SANDBOX_MODE_KEY = 'codex.lastSelectedSandboxMode';
-const LAST_CODEX_WEB_SEARCH_KEY = 'codex.lastWebSearchEnabled';
+// Settings are now stored in database, no longer using localStorage
 
 interface CodexInputPanelStyledProps {
   session: Session;
@@ -27,75 +25,20 @@ interface CodexInputPanelStyledProps {
 
 export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(({
   session,
+  panelId,
   onSendMessage,
   disabled = false,
-  initialModel,
   onCancel,
   gitCommands,
   panel
 }) => {
   // Initialize model
-  const getInitialModel = (): OpenAICodexModel => {
-    // First, check if the panel has stored codexConfig with model
-    const customState = panel?.state?.customState as any;
-    if (customState?.codexConfig?.model) {
-      const storedModel = customState.codexConfig.model;
-      if (storedModel in CODEX_MODELS) {
-        return storedModel as OpenAICodexModel;
-      }
-    }
-    // Then check if initialModel prop is provided
-    if (initialModel && initialModel in CODEX_MODELS) {
-      return initialModel as OpenAICodexModel;
-    }
-    // Otherwise fall back to localStorage
-    const saved = localStorage.getItem(LAST_CODEX_MODEL_KEY);
-    if (saved && saved in CODEX_MODELS) {
-      return saved as OpenAICodexModel;
-    }
-    return DEFAULT_CODEX_MODEL;
-  };
-
-  const [selectedModel, setSelectedModel] = useState<OpenAICodexModel>(getInitialModel());
-  const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>(() => {
-    // First, check if the panel has stored codexConfig with sandboxMode
-    const customState = panel?.state?.customState as any;
-    if (customState?.codexConfig?.sandboxMode) {
-      const storedMode = customState.codexConfig.sandboxMode;
-      if (storedMode === 'read-only' || storedMode === 'workspace-write' || storedMode === 'danger-full-access') {
-        return storedMode;
-      }
-    }
-    // Otherwise fall back to localStorage
-    const saved = localStorage.getItem(LAST_CODEX_SANDBOX_MODE_KEY);
-    if (saved === 'read-only' || saved === 'workspace-write' || saved === 'danger-full-access') {
-      return saved;
-    }
-    return 'workspace-write';
-  });
-  const [webSearch, setWebSearch] = useState(() => {
-    // First, check if the panel has stored codexConfig with webSearch
-    const customState = panel?.state?.customState as any;
-    if (customState?.codexConfig?.webSearch !== undefined) {
-      return customState.codexConfig.webSearch;
-    }
-    // Otherwise fall back to localStorage
-    const saved = localStorage.getItem(LAST_CODEX_WEB_SEARCH_KEY);
-    return saved === 'true';
-  });
-  const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>(() => {
-    // First, check if the panel has stored codexConfig with thinkingLevel
-    const customState = panel?.state?.customState as any;
-    if (customState?.codexConfig?.thinkingLevel) {
-      const storedLevel = customState.codexConfig.thinkingLevel;
-      if (storedLevel === 'low' || storedLevel === 'medium' || storedLevel === 'high') {
-        return storedLevel;
-      }
-    }
-    // Otherwise fall back to localStorage
-    const saved = localStorage.getItem(LAST_CODEX_THINKING_LEVEL_KEY);
-    return (saved === 'low' || saved === 'medium' || saved === 'high') ? saved : 'medium';
-  });
+  // Initialize state with defaults, will be updated from database
+  const [selectedModel, setSelectedModel] = useState<OpenAICodexModel>(DEFAULT_CODEX_MODEL);
+  const [sandboxMode, setSandboxMode] = useState<'read-only' | 'workspace-write' | 'danger-full-access'>('workspace-write');
+  const [webSearch, setWebSearch] = useState(false);
+  const [thinkingLevel, setThinkingLevel] = useState<'low' | 'medium' | 'high'>('medium');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [textareaHeight, setTextareaHeight] = useState<number>(52);
@@ -137,26 +80,55 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
     disabled
   });
 
-  // Save model selection to localStorage
+  // Load settings from database on mount
   useEffect(() => {
-    localStorage.setItem(LAST_CODEX_MODEL_KEY, selectedModel);
-    // Note: The model will be saved to panel state when sending a message
-  }, [selectedModel]);
+    const loadSettings = async () => {
+      try {
+        const result = await API.codexPanels.getSettings(panelId);
+        if (result.success && result.data) {
+          const settings = result.data;
+          if (settings.model && settings.model in CODEX_MODELS) {
+            setSelectedModel(settings.model as OpenAICodexModel);
+          }
+          if (settings.sandboxMode) {
+            setSandboxMode(settings.sandboxMode);
+          }
+          if (settings.webSearch !== undefined) {
+            setWebSearch(settings.webSearch);
+          }
+          if (settings.thinkingLevel) {
+            setThinkingLevel(settings.thinkingLevel);
+          }
+          setSettingsLoaded(true);
+        }
+      } catch (error) {
+        console.error('Failed to load Codex panel settings:', error);
+        setSettingsLoaded(true); // Mark as loaded even on error to prevent blocking
+      }
+    };
+    
+    loadSettings();
+  }, [panelId]);
 
-  // Save thinking level to localStorage
+  // Save settings to database when they change
   useEffect(() => {
-    localStorage.setItem(LAST_CODEX_THINKING_LEVEL_KEY, thinkingLevel);
-  }, [thinkingLevel]);
-
-  // Save sandbox mode to localStorage
-  useEffect(() => {
-    localStorage.setItem(LAST_CODEX_SANDBOX_MODE_KEY, sandboxMode);
-  }, [sandboxMode]);
-
-  // Save web search setting to localStorage
-  useEffect(() => {
-    localStorage.setItem(LAST_CODEX_WEB_SEARCH_KEY, String(webSearch));
-  }, [webSearch]);
+    if (!settingsLoaded) return; // Don't save until initial load is complete
+    
+    const saveSettings = async () => {
+      try {
+        await API.codexPanels.setSettings(panelId, {
+          model: selectedModel,
+          sandboxMode,
+          webSearch,
+          thinkingLevel
+        });
+      } catch (error) {
+        console.error('Failed to save Codex panel settings:', error);
+      }
+    };
+    
+    saveSettings();
+  }, [selectedModel, sandboxMode, webSearch, thinkingLevel, settingsLoaded, panelId]);
   
   // Update model and thinking level when panel changes (e.g., when switching sessions)
   useEffect(() => {

@@ -1055,6 +1055,68 @@ export class DatabaseService {
         // Don't throw - allow app to continue
       }
     }
+
+    // Migration 006: Unified panel settings storage
+    const unifiedSettingsMigrationComplete = this.db.prepare(
+      "SELECT value FROM user_preferences WHERE key = 'unified_panel_settings_migrated'"
+    ).get() as { value: string } | undefined;
+    
+    if (!unifiedSettingsMigrationComplete) {
+      console.log('[Database] Running migration 006: Unified panel settings storage');
+      
+      try {
+        // Step 1: Add settings column to tool_panels if it doesn't exist
+        const toolPanelsInfo = this.db.prepare("PRAGMA table_info(tool_panels)").all();
+        const hasSettingsColumn = toolPanelsInfo.some((col: any) => col.name === 'settings');
+        
+        if (!hasSettingsColumn) {
+          this.db.prepare("ALTER TABLE tool_panels ADD COLUMN settings TEXT DEFAULT '{}'").run();
+          console.log('[Database] Added settings column to tool_panels table');
+        }
+
+        // Step 2: Check if claude_panel_settings table exists
+        const claudePanelSettingsExists = this.db.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='claude_panel_settings'"
+        ).get();
+
+        if (claudePanelSettingsExists) {
+          // Migrate data from claude_panel_settings to unified settings
+          const claudeSettings = this.db.prepare("SELECT * FROM claude_panel_settings").all() as any[];
+          
+          for (const setting of claudeSettings) {
+            const unifiedSettings = {
+              model: setting.model || 'auto',
+              commitMode: Boolean(setting.commit_mode),
+              systemPrompt: setting.system_prompt,
+              maxTokens: setting.max_tokens || 4096,
+              temperature: setting.temperature || 0.7,
+              createdAt: setting.created_at,
+              updatedAt: setting.updated_at
+            };
+            
+            this.db.prepare(`
+              UPDATE tool_panels 
+              SET settings = ?
+              WHERE id = ? AND type = 'claude'
+            `).run(JSON.stringify(unifiedSettings), setting.panel_id);
+            
+            console.log(`[Database] Migrated settings for Claude panel ${setting.panel_id}`);
+          }
+          
+          // Drop the old table
+          this.db.prepare("DROP TABLE claude_panel_settings").run();
+          console.log('[Database] Dropped claude_panel_settings table');
+        }
+
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('unified_panel_settings_migrated', 'true')").run();
+        console.log('[Database] Completed unified panel settings migration 006');
+        
+      } catch (error) {
+        console.error('[Database] Failed to run unified panel settings migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
   }
 
   // Project operations
@@ -2477,7 +2539,73 @@ export class DatabaseService {
     this.db.prepare('DELETE FROM tool_panels WHERE session_id = ?').run(sessionId);
   }
 
-  // Claude panel settings operations
+  // ========== UNIFIED PANEL SETTINGS OPERATIONS ==========
+  // These methods store all panel-specific settings as JSON in the tool_panels.settings column
+  // This provides a flexible, extensible way to store settings without schema changes
+
+  /**
+   * Get panel settings from the unified JSON storage
+   * Returns the parsed settings object or an empty object if none exist
+   */
+  getPanelSettings(panelId: string): Record<string, any> {
+    const row = this.db.prepare(`
+      SELECT settings FROM tool_panels WHERE id = ?
+    `).get(panelId) as any;
+
+    if (!row || !row.settings) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(row.settings);
+    } catch (e) {
+      console.error(`Failed to parse settings for panel ${panelId}:`, e);
+      return {};
+    }
+  }
+
+  /**
+   * Update panel settings in the unified JSON storage
+   * Merges the provided settings with existing ones
+   */
+  updatePanelSettings(panelId: string, settings: Record<string, any>): void {
+    // Get existing settings
+    const existingSettings = this.getPanelSettings(panelId);
+    
+    // Merge with new settings
+    const mergedSettings = {
+      ...existingSettings,
+      ...settings,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Update the database
+    this.db.prepare(`
+      UPDATE tool_panels
+      SET settings = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(JSON.stringify(mergedSettings), panelId);
+  }
+
+  /**
+   * Set panel settings (replaces all existing settings)
+   */
+  setPanelSettings(panelId: string, settings: Record<string, any>): void {
+    const settingsWithTimestamp = {
+      ...settings,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.db.prepare(`
+      UPDATE tool_panels
+      SET settings = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(JSON.stringify(settingsWithTimestamp), panelId);
+  }
+
+  // ========== LEGACY CLAUDE PANEL SETTINGS (for backward compatibility) ==========
+  // These will be deprecated but are kept for migration purposes
+
   createClaudePanelSettings(panelId: string, settings: {
     model?: string;
     commit_mode?: boolean;
@@ -2485,21 +2613,14 @@ export class DatabaseService {
     max_tokens?: number;
     temperature?: number;
   }): void {
-    // Get the default model from config if not provided
-    const { configManager } = require('../services/configManager');
-    const defaultModel = settings.model || configManager.getDefaultModel() || 'claude-3-opus-20240229';
-    
-    this.db.prepare(`
-      INSERT INTO claude_panel_settings (panel_id, model, commit_mode, system_prompt, max_tokens, temperature)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      panelId,
-      defaultModel,
-      settings.commit_mode ? 1 : 0,
-      settings.system_prompt || null,
-      settings.max_tokens || 4096,
-      settings.temperature || 0.7
-    );
+    // Use the new unified settings storage
+    this.updatePanelSettings(panelId, {
+      model: settings.model || 'auto',
+      commitMode: settings.commit_mode || false,
+      systemPrompt: settings.system_prompt || null,
+      maxTokens: settings.max_tokens || 4096,
+      temperature: settings.temperature || 0.7
+    });
   }
 
   getClaudePanelSettings(panelId: string): {
@@ -2512,21 +2633,22 @@ export class DatabaseService {
     created_at: string;
     updated_at: string;
   } | null {
-    const row = this.db.prepare(`
-      SELECT * FROM claude_panel_settings WHERE panel_id = ?
-    `).get(panelId) as any;
+    const settings = this.getPanelSettings(panelId);
+    
+    if (!settings || Object.keys(settings).length === 0) {
+      return null;
+    }
 
-    if (!row) return null;
-
+    // Convert from new format to old format for compatibility
     return {
-      panel_id: row.panel_id,
-      model: row.model,
-      commit_mode: Boolean(row.commit_mode),
-      system_prompt: row.system_prompt,
-      max_tokens: row.max_tokens,
-      temperature: row.temperature,
-      created_at: row.created_at,
-      updated_at: row.updated_at
+      panel_id: panelId,
+      model: settings.model || 'auto',
+      commit_mode: settings.commitMode || false,
+      system_prompt: settings.systemPrompt || null,
+      max_tokens: settings.maxTokens || 4096,
+      temperature: settings.temperature || 0.7,
+      created_at: settings.createdAt || new Date().toISOString(),
+      updated_at: settings.updatedAt || new Date().toISOString()
     };
   }
 
@@ -2537,44 +2659,15 @@ export class DatabaseService {
     max_tokens?: number;
     temperature?: number;
   }): void {
-    const setClauses: string[] = [];
-    const values: any[] = [];
-
-    if (settings.model !== undefined) {
-      setClauses.push('model = ?');
-      values.push(settings.model);
-    }
-
-    if (settings.commit_mode !== undefined) {
-      setClauses.push('commit_mode = ?');
-      values.push(settings.commit_mode ? 1 : 0);
-    }
-
-    if (settings.system_prompt !== undefined) {
-      setClauses.push('system_prompt = ?');
-      values.push(settings.system_prompt);
-    }
-
-    if (settings.max_tokens !== undefined) {
-      setClauses.push('max_tokens = ?');
-      values.push(settings.max_tokens);
-    }
-
-    if (settings.temperature !== undefined) {
-      setClauses.push('temperature = ?');
-      values.push(settings.temperature);
-    }
-
-    if (setClauses.length > 0) {
-      setClauses.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(panelId);
-
-      this.db.prepare(`
-        UPDATE claude_panel_settings
-        SET ${setClauses.join(', ')}
-        WHERE panel_id = ?
-      `).run(...values);
-    }
+    const updateObj: Record<string, any> = {};
+    
+    if (settings.model !== undefined) updateObj.model = settings.model;
+    if (settings.commit_mode !== undefined) updateObj.commitMode = settings.commit_mode;
+    if (settings.system_prompt !== undefined) updateObj.systemPrompt = settings.system_prompt;
+    if (settings.max_tokens !== undefined) updateObj.maxTokens = settings.max_tokens;
+    if (settings.temperature !== undefined) updateObj.temperature = settings.temperature;
+    
+    this.updatePanelSettings(panelId, updateObj);
   }
 
   deleteClaudePanelSettings(panelId: string): void {
