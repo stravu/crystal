@@ -525,6 +525,19 @@ export class API {
       return window.electronAPI.claudePanels.setModel(panelId, model);
     },
   };
+  
+  // Codex panel operations
+  static codexPanels = {
+    async getSettings(panelId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.codexPanels.getSettings(panelId);
+    },
+    
+    async setSettings(panelId: string, settings: Record<string, any>) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.codexPanels.setSettings(panelId, settings);
+    },
+  };
 }
 
 // Legacy support - removed as migration is complete

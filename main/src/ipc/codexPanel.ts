@@ -31,8 +31,23 @@ class CodexPanelHandler extends BaseAIPanelHandler {
     };
   }
 
+  /**
+   * Apply Codex-specific default settings
+   */
+  protected applySettingsDefaults(settings: Record<string, any>): Record<string, any> {
+    return {
+      model: settings.model || DEFAULT_CODEX_MODEL,
+      modelProvider: settings.modelProvider || 'openai',
+      sandboxMode: settings.sandboxMode || 'workspace-write',
+      webSearch: settings.webSearch ?? false,
+      thinkingLevel: settings.thinkingLevel || 'medium',
+      approvalPolicy: settings.approvalPolicy || 'manual',
+      ...settings
+    };
+  }
+
   protected registerCustomHandlers(): void {
-    const { sessionManager, logger } = this.services;
+    const { sessionManager, logger, databaseService } = this.services;
 
     // Codex-specific initialize handler
     this.ipcMain.handle('codexPanel:initialize', async (_, panelId: string, sessionId: string, worktreePath: string, prompt?: string) => {
@@ -95,7 +110,21 @@ class CodexPanelHandler extends BaseAIPanelHandler {
           options?.thinkingLevel
         );
         
-        // Update panel state with the model and other settings
+        // Save settings to unified database storage
+        const settingsToSave = {
+          model: options?.model || DEFAULT_CODEX_MODEL,
+          modelProvider: options?.modelProvider || 'openai',
+          approvalPolicy: options?.approvalPolicy || 'manual',
+          sandboxMode: options?.sandboxMode || 'workspace-write',
+          webSearch: options?.webSearch ?? false,
+          thinkingLevel: options?.thinkingLevel || 'medium',
+          lastPrompt: prompt,
+          lastActivityTime: new Date().toISOString()
+        };
+        
+        databaseService.updatePanelSettings(panelId, settingsToSave);
+        
+        // Also update panel state for runtime tracking
         const currentPanel = panelManager.getPanel(panelId);
         if (currentPanel) {
           const currentCustomState = currentPanel.state.customState as CodexPanelState;
@@ -103,17 +132,17 @@ class CodexPanelHandler extends BaseAIPanelHandler {
             ...currentCustomState,
             isInitialized: true,
             lastPrompt: prompt,
-            model: options?.model || DEFAULT_CODEX_MODEL,
-            modelProvider: options?.modelProvider || 'openai',
-            approvalPolicy: options?.approvalPolicy || 'manual',
-            sandboxMode: options?.sandboxMode || 'workspace-write',
-            webSearch: options?.webSearch ?? currentCustomState?.webSearch ?? false,
-            lastActivityTime: new Date().toISOString(),
+            model: settingsToSave.model,
+            modelProvider: settingsToSave.modelProvider,
+            approvalPolicy: settingsToSave.approvalPolicy,
+            sandboxMode: settingsToSave.sandboxMode,
+            webSearch: settingsToSave.webSearch,
+            lastActivityTime: settingsToSave.lastActivityTime,
             codexConfig: {
-              model: options?.model || DEFAULT_CODEX_MODEL,
-              thinkingLevel: options?.thinkingLevel || 'medium',
-              sandboxMode: options?.sandboxMode || 'workspace-write',
-              webSearch: options?.webSearch ?? false
+              model: settingsToSave.model,
+              thinkingLevel: settingsToSave.thinkingLevel,
+              sandboxMode: settingsToSave.sandboxMode,
+              webSearch: settingsToSave.webSearch
             }
           };
           
@@ -159,34 +188,53 @@ class CodexPanelHandler extends BaseAIPanelHandler {
           options?.webSearch
         );
         
-        // Update panel state with the new prompt
+        // Get existing settings from database
+        const existingSettings = databaseService.getPanelSettings(panelId);
+        
+        // Build updated settings with only changed values
+        const settingsToUpdate: Record<string, any> = {
+          lastPrompt: prompt,
+          lastActivityTime: new Date().toISOString()
+        };
+        
+        if (options?.model) {
+          settingsToUpdate.model = options.model;
+          settingsToUpdate.modelProvider = options.modelProvider || existingSettings.modelProvider || 'openai';
+        }
+        
+        if (options?.sandboxMode) {
+          settingsToUpdate.sandboxMode = options.sandboxMode;
+        }
+        
+        if (options?.webSearch !== undefined) {
+          settingsToUpdate.webSearch = options.webSearch;
+        }
+        
+        if (options?.thinkingLevel) {
+          settingsToUpdate.thinkingLevel = options.thinkingLevel;
+        }
+        
+        // Save to database
+        databaseService.updatePanelSettings(panelId, settingsToUpdate);
+        
+        // Also update panel state for runtime tracking
         const panel = panelManager.getPanel(panelId);
         if (panel) {
           const currentCustomState = panel.state.customState as CodexPanelState;
           const updatedState: CodexPanelState = {
             ...currentCustomState,
             lastPrompt: prompt,
-            lastActivityTime: new Date().toISOString()
-          };
-          
-          if (options?.model) {
-            updatedState.model = options.model;
-            updatedState.modelProvider = options.modelProvider || currentCustomState?.modelProvider || 'openai';
-          }
-          
-          if (options?.sandboxMode) {
-            updatedState.sandboxMode = options.sandboxMode;
-          }
-          
-          if (options?.webSearch !== undefined) {
-            updatedState.webSearch = options.webSearch;
-          }
-          
-          updatedState.codexConfig = {
-            model: options?.model || currentCustomState?.model || DEFAULT_CODEX_MODEL,
-            thinkingLevel: options?.thinkingLevel || currentCustomState?.codexConfig?.thinkingLevel || 'medium',
-            sandboxMode: options?.sandboxMode || currentCustomState?.sandboxMode || 'workspace-write',
-            webSearch: options?.webSearch ?? currentCustomState?.webSearch ?? false
+            lastActivityTime: settingsToUpdate.lastActivityTime,
+            model: settingsToUpdate.model || currentCustomState?.model || DEFAULT_CODEX_MODEL,
+            modelProvider: settingsToUpdate.modelProvider || currentCustomState?.modelProvider || 'openai',
+            sandboxMode: settingsToUpdate.sandboxMode || currentCustomState?.sandboxMode || 'workspace-write',
+            webSearch: settingsToUpdate.webSearch ?? currentCustomState?.webSearch ?? false,
+            codexConfig: {
+              model: settingsToUpdate.model || currentCustomState?.model || DEFAULT_CODEX_MODEL,
+              thinkingLevel: settingsToUpdate.thinkingLevel || currentCustomState?.codexConfig?.thinkingLevel || 'medium',
+              sandboxMode: settingsToUpdate.sandboxMode || currentCustomState?.sandboxMode || 'workspace-write',
+              webSearch: settingsToUpdate.webSearch ?? currentCustomState?.webSearch ?? false
+            }
           };
           
           await panelManager.updatePanel(panelId, {
@@ -342,7 +390,8 @@ class CodexPanelHandler extends BaseAIPanelHandler {
       }
     });
 
-    // Get panel outputs (camelCase version for frontend compatibility)
+    // Register aliases for camelCase compatibility
+    // The base class registers codexPanel:get-outputs, but frontend uses codexPanel:getOutputs
     this.ipcMain.handle('codexPanel:getOutputs', async (_, panelId: string) => {
       try {
         const outputs = sessionManager.getPanelOutputs ? 
@@ -354,6 +403,22 @@ class CodexPanelHandler extends BaseAIPanelHandler {
         logger?.error(`Failed to get outputs for Codex panel:`, error as Error);
         return { success: false, error: 'Failed to get outputs' };
       }
+    });
+
+    // Register aliases for camelCase compatibility
+    // The base class registers codexPanel:get-settings, but we also want codexPanel:getSettings
+    this.ipcMain.handle('codexPanel:getSettings', async (_event, panelId: string) => {
+      // Delegate to the base class implementation
+      const settings = databaseService.getPanelSettings(panelId);
+      const settingsWithDefaults = this.applySettingsDefaults(settings);
+      return { success: true, data: settingsWithDefaults };
+    });
+
+    // Register alias for camelCase compatibility
+    this.ipcMain.handle('codexPanel:setSettings', async (_event, panelId: string, settings: Record<string, any>) => {
+      // Delegate to the base class implementation
+      databaseService.updatePanelSettings(panelId, settings);
+      return { success: true };
     });
 
     // Setup event forwarding

@@ -195,6 +195,41 @@ export abstract class BaseAIPanelHandler {
       }
     });
 
+    // Generic get settings handler
+    this.ipcMain.handle(`${this.config.ipcPrefix}:get-settings`, async (_event, panelId: string) => {
+      const { databaseService } = this.services;
+      try {
+        logger?.info(`[IPC] ${this.config.ipcPrefix}:get-settings called for panelId: ${panelId}`);
+        
+        // Get all settings from unified storage
+        const settings = databaseService.getPanelSettings(panelId);
+        
+        // Allow derived classes to provide defaults via override
+        const settingsWithDefaults = this.applySettingsDefaults(settings);
+        
+        return { success: true, data: settingsWithDefaults };
+      } catch (error) {
+        logger?.error(`Failed to get ${this.config.panelTypeName} panel settings: ${error}`);
+        return { success: false, error: `Failed to get ${this.config.panelTypeName} panel settings` };
+      }
+    });
+
+    // Generic set settings handler
+    this.ipcMain.handle(`${this.config.ipcPrefix}:set-settings`, async (_event, panelId: string, settings: Record<string, any>) => {
+      const { databaseService } = this.services;
+      try {
+        logger?.info(`[IPC] ${this.config.ipcPrefix}:set-settings called for panelId: ${panelId}`);
+        
+        // Update settings in unified storage
+        databaseService.updatePanelSettings(panelId, settings);
+        
+        return { success: true };
+      } catch (error) {
+        logger?.error(`Failed to set ${this.config.panelTypeName} panel settings: ${error}`);
+        return { success: false, error: `Failed to set ${this.config.panelTypeName} panel settings` };
+      }
+    });
+
     // Delete a panel
     this.ipcMain.handle(`${this.config.ipcPrefix}:delete`, async (_event, panelId: string) => {
       try {
@@ -262,6 +297,16 @@ export abstract class BaseAIPanelHandler {
         return { success: false, error: `Failed to list ${this.config.panelTypeName} panels` };
       }
     });
+  }
+
+  /**
+   * Apply default settings for the panel type
+   * Override this in derived classes to provide panel-specific defaults
+   */
+  protected applySettingsDefaults(settings: Record<string, any>): Record<string, any> {
+    // Base implementation just returns settings as-is
+    // Derived classes can override to add their defaults
+    return settings;
   }
 
   /**

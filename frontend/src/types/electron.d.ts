@@ -273,6 +273,12 @@ interface ElectronAPI {
     setModel: (panelId: string, model: string) => Promise<IPCResponse>;
   };
 
+  // Codex panel operations
+  codexPanels: {
+    getSettings: (panelId: string) => Promise<IPCResponse>;
+    setSettings: (panelId: string, settings: Record<string, any>) => Promise<IPCResponse>;
+  };
+
   // Logs panel operations
   logs: {
     runScript: (sessionId: string, command: string, cwd: string) => Promise<IPCResponse>;

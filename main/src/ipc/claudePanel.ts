@@ -20,6 +20,21 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
     };
   }
 
+  /**
+   * Apply Claude-specific default settings
+   */
+  protected applySettingsDefaults(settings: Record<string, any>): Record<string, any> {
+    const { configManager } = this.services;
+    return {
+      model: settings.model || configManager.getDefaultModel() || 'auto',
+      commitMode: settings.commitMode ?? false,
+      systemPrompt: settings.systemPrompt || null,
+      maxTokens: settings.maxTokens || 4096,
+      temperature: settings.temperature || 0.7,
+      ...settings
+    };
+  }
+
   protected registerCustomHandlers(): void {
     const { sessionManager, databaseService, configManager, logger } = this.services;
 
@@ -43,8 +58,8 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
         // Get model from panel settings if not provided
         let modelToUse = model;
         if (!modelToUse) {
-          const settings = databaseService.getClaudePanelSettings(panelId);
-          modelToUse = settings?.model || configManager.getDefaultModel() || 'claude-3-opus-20240229';
+          const settings = databaseService.getPanelSettings(panelId);
+          modelToUse = settings?.model || configManager.getDefaultModel() || 'auto';
         }
 
         // Start Claude via the panel manager
@@ -109,42 +124,28 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
       }
     });
 
-    // Get Claude panel model settings
+    // Get Claude panel model settings (backward compatibility - delegates to get-settings)
     this.ipcMain.handle('claude-panels:get-model', async (_event, panelId: string) => {
       try {
         console.log('[IPC] claude-panels:get-model called for panelId:', panelId);
-
-        // Get panel settings from database
-        const settings = databaseService.getClaudePanelSettings(panelId);
-        if (!settings) {
-          // Return default from config if settings don't exist yet
-          const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
-          return { success: true, data: defaultModel };
-        }
-
-        return { success: true, data: settings.model };
+        
+        const settings = databaseService.getPanelSettings(panelId);
+        const settingsWithDefaults = this.applySettingsDefaults(settings);
+        
+        return { success: true, data: settingsWithDefaults.model };
       } catch (error) {
         console.error('Failed to get Claude panel model:', error);
         return { success: false, error: 'Failed to get Claude panel model' };
       }
     });
 
-    // Set Claude panel model settings
+    // Set Claude panel model settings (backward compatibility - delegates to set-settings)
     this.ipcMain.handle('claude-panels:set-model', async (_event, panelId: string, model: string) => {
       try {
         console.log('[IPC] claude-panels:set-model called for panelId:', panelId, 'model:', model);
-
-        // Check if settings exist
-        const existingSettings = databaseService.getClaudePanelSettings(panelId);
         
-        if (!existingSettings) {
-          // Create new settings
-          databaseService.createClaudePanelSettings(panelId, { model });
-        } else {
-          // Update existing settings
-          databaseService.updateClaudePanelSettings(panelId, { model });
-        }
-
+        databaseService.updatePanelSettings(panelId, { model });
+        
         return { success: true };
       } catch (error) {
         console.error('Failed to set Claude panel model:', error);
