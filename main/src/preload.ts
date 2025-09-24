@@ -83,7 +83,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (request: any): Promise<IPCResponse> => ipcRenderer.invoke('sessions:create', request),
     delete: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:delete', sessionId),
     sendInput: (sessionId: string, input: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:input', sessionId, input),
-    continue: (sessionId: string, prompt?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt),
+    continue: (sessionId: string, prompt?: string, model?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt, model),
     getOutput: (sessionId: string, limit?: number): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-output', sessionId, limit),
     getJsonMessages: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-json-messages', sessionId),
     getStatistics: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-statistics', sessionId),
@@ -427,7 +427,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getJsonMessages: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('panels:get-json-messages', panelId),
     getPrompts: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('panels:get-prompts', panelId),
     sendInput: (panelId: string, input: string): Promise<IPCResponse> => ipcRenderer.invoke('panels:send-input', panelId, input),
-    continue: (panelId: string, input: string): Promise<IPCResponse> => ipcRenderer.invoke('panels:continue', panelId, input),
+    continue: (panelId: string, input: string, model?: string): Promise<IPCResponse> => ipcRenderer.invoke('panels:continue', panelId, input, model),
   },
 
   // Claude Panels - specific API for Claude panels

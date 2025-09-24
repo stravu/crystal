@@ -10,7 +10,11 @@ interface SessionInputProps {
   setInput: (input: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleSendInput: () => void;
-  handleContinueConversation: (model?: string) => void;
+  handleContinueConversation: (
+    attachedImages?: unknown[],
+    attachedTexts?: unknown[],
+    modelOverride?: string
+  ) => Promise<void> | void;
   isStravuConnected: boolean;
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
@@ -60,7 +64,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
         if (activeSession.status === 'waiting') {
           await handleSendInput();
         } else {
-          await handleContinueConversation(selectedModel);
+          await handleContinueConversation(undefined, undefined, selectedModel);
         }
       } finally {
         // Reset submission state after a short delay to prevent rapid resubmissions
@@ -82,7 +86,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
       if (activeSession.status === 'waiting') {
         await handleSendInput();
       } else {
-        await handleContinueConversation(selectedModel);
+        await handleContinueConversation(undefined, undefined, selectedModel);
       }
     } finally {
       // Reset submission state after a short delay to prevent rapid resubmissions

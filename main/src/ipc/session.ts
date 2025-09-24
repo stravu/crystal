@@ -560,7 +560,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string) => {
+  ipcMain.handle('sessions:continue', async (_event, sessionId: string, prompt?: string, model?: string) => {
     try {
       // Validate session exists and is active
       const sessionValidation = validateSessionIsActive(sessionId);
@@ -695,12 +695,25 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           const claudePanel = mainRepoClaudePanels[0];
           console.log(`[IPC] Starting Claude via panel ${claudePanel.id} for main repo session ${sessionId}`);
           // Model is now managed at panel level
-          await claudeCodeManager.startPanel(claudePanel.id, sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode);
+          await claudeCodeManager.startPanel(
+            claudePanel.id,
+            sessionId,
+            session.worktreePath,
+            continuePrompt,
+            dbSession?.permission_mode,
+            model
+          );
         } else {
           // Fallback to session-based start
           console.log(`[IPC] No Claude panels found, falling back to session-based start for ${sessionId}`);
           // Model is now managed at panel level  
-          await claudeCodeManager.startSession(sessionId, session.worktreePath, continuePrompt, dbSession?.permission_mode);
+          await claudeCodeManager.startSession(
+            sessionId,
+            session.worktreePath,
+            continuePrompt,
+            dbSession?.permission_mode,
+            model
+          );
         }
       } else {
         // Normal continue for existing sessions
@@ -717,12 +730,25 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           const claudePanel = normalContinueClaudePanels[0];
           // Model is now managed at panel level
           console.log(`[IPC] Continuing Claude via panel ${claudePanel.id} for session ${sessionId}`);
-          await claudeCodeManager.continuePanel(claudePanel.id, sessionId, session.worktreePath, continuePrompt, conversationHistory);
+          await claudeCodeManager.continuePanel(
+            claudePanel.id,
+            sessionId,
+            session.worktreePath,
+            continuePrompt,
+            conversationHistory,
+            model
+          );
         } else {
           // Fallback to session-based continue
           // Model is now managed at panel level
           console.log(`[IPC] No Claude panels found, continuing session ${sessionId}`);
-          await claudeCodeManager.continueSession(sessionId, session.worktreePath, continuePrompt, conversationHistory);
+          await claudeCodeManager.continueSession(
+            sessionId,
+            session.worktreePath,
+            continuePrompt,
+            conversationHistory,
+            model
+          );
         }
       }
 
@@ -1051,7 +1077,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('panels:continue', async (_event, panelId: string, input: string) => {
+  ipcMain.handle('panels:continue', async (_event, panelId: string, input: string, model?: string) => {
     try {
       console.log(`[IPC] panels:continue called for panel: ${panelId}`);
 
@@ -1155,7 +1181,13 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               console.log('[IPC] panels:continue starting fresh via startPanel (no running process, no claude_session_id)');
               const dbSession = sessionManager.getDbSession(panel.sessionId);
               // Model is now managed at panel level in Claude panel settings
-              await claudePanelManager.startPanel(panelId, session.worktreePath, input || '', dbSession?.permission_mode);
+              await claudePanelManager.startPanel(
+                panelId,
+                session.worktreePath,
+                input || '',
+                dbSession?.permission_mode,
+                model
+              );
               return { success: true };
             }
 
@@ -1165,7 +1197,13 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               : await sessionManager.getConversationMessages(panel.sessionId);
 
             // Model is now managed at panel level in Claude panel settings
-            await claudePanelManager.continuePanel(panelId, session.worktreePath, input || '', conversationHistory);
+            await claudePanelManager.continuePanel(
+              panelId,
+              session.worktreePath,
+              input || '',
+              conversationHistory,
+              model
+            );
             return { success: true };
           } catch (err) {
             console.error('Failed to continue Claude panel:', err);
