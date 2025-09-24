@@ -36,7 +36,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     configManager?: ConfigManager
   ) {
     super(codexManager, sessionManager, logger, configManager);
-    this.logger?.info('[codex-debug] CodexPanelManager initialized');
+    this.logger?.verbose('CodexPanelManager initialized');
     this.setupCodexSpecificHandlers();
   }
 
@@ -66,18 +66,18 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    * Setup Codex-specific event handlers
    */
   private setupCodexSpecificHandlers(): void {
-    this.logger?.info('[codex-debug] Setting up Codex-specific event handlers');
+    this.logger?.verbose('Setting up Codex-specific event handlers');
     this.cliManager.on('panel-exit', (data: any) => {
       const panelId: string | undefined = data?.panelId;
       if (!panelId) {
-        this.logger?.warn('[codex-debug] Received panel-exit event without panelId');
+        this.logger?.warn('Received panel-exit event without panelId');
         return;
       }
 
       const mapping = this.panelMappings.get(panelId);
       const sessionId = data?.sessionId ?? mapping?.sessionId;
       if (!sessionId) {
-        this.logger?.warn(`[codex-debug] Panel ${panelId} exit event missing sessionId`);
+        this.logger?.warn(`Panel ${panelId} exit event missing sessionId`);
         return;
       }
       const rawExitCode = data?.exitCode;
@@ -123,8 +123,8 @@ export class CodexPanelManager extends AbstractAIPanelManager {
         `Finished at: ${finishedAt.toISOString()}`
       ];
 
-      this.logger?.info(
-        `[codex-debug] Panel ${panelId} process exit recorded: status=${status}, exitCode=${exitCode}, signal=${signalDetail}`
+      this.logger?.verbose(
+        `Codex panel ${panelId} process exit: status=${status}, exitCode=${exitCode}, signal=${signalDetail}`
       );
 
       const message = {
@@ -155,7 +155,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
         return;
       }
 
-      this.logger?.info(`[codex-debug] Panel ${panelId} exit received after unregistration; emitting summary directly`);
+      this.logger?.verbose(`Panel ${panelId} exit received after unregistration`);
       this.cliManager.emit('panel-output', outputEvent);
 
       try {
@@ -167,7 +167,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
           });
         }
       } catch (error) {
-        this.logger?.warn(`[codex-debug] Failed to persist Codex session summary for panel ${panelId}:`, error as Error);
+        this.logger?.warn(`Failed to persist Codex session summary for panel ${panelId}:`, error as Error);
       }
     });
   }
@@ -234,10 +234,10 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex] Approval handling in interactive mode - may need configuration:\n  Panel ID: ${panelId}\n  Call ID: ${callId}\n  Decision: ${decision}\n  Type: ${type}`);
+    this.logger?.verbose(`Approval request for Codex panel ${panelId}: ${decision}`);
     // In interactive mode, approval may be handled through stdin or configuration
     // For now, log a warning as this functionality may need to be adapted
-    this.logger?.warn(`[codex] Approval handling in interactive mode is not yet fully implemented`);
+    this.logger?.warn(`Approval handling in interactive mode is not yet fully implemented`);
   }
 
   /**
@@ -252,12 +252,12 @@ export class CodexPanelManager extends AbstractAIPanelManager {
 
     // Check if process is running before trying to send interrupt
     if (!this.codexManager.isPanelRunning(panelId)) {
-      this.logger?.warn(`[codex] Cannot send interrupt - no running process for panel ${panelId}`);
+      this.logger?.verbose(`Cannot send interrupt - no running process for panel ${panelId}`);
       // No need to throw here as the process isn't running anyway
       return;
     }
 
-    this.logger?.info(`[codex] Sending interrupt signal (Ctrl+C) to panel ${panelId}`);
+    this.logger?.verbose(`Sending interrupt signal (Ctrl+C) to panel ${panelId}`);
     // In interactive mode, send Ctrl+C through the PTY
     this.codexManager.sendInput(panelId, '\x03'); // Ctrl+C
   }
@@ -389,7 +389,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       throw new Error(`Panel ${panelId} not registered`);
     }
 
-    this.logger?.info(`[codex-debug] Restarting panel with history:\n  Panel ID: ${panelId}\n  Session ID: ${mapping.sessionId}\n  History items: ${conversationHistory.length}\n  Worktree: ${worktreePath}\n  Initial prompt: "${initialPrompt}"`);
+    this.logger?.verbose(`Restarting Codex panel ${panelId} with ${conversationHistory.length} history items`);
     
     return this.codexManager.restartPanelWithHistory(
       panelId,

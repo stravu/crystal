@@ -355,9 +355,8 @@ class CodexPanelHandler extends BaseAIPanelHandler {
     // Get debug state for a panel
     this.ipcMain.handle('codexPanel:getDebugState', async (_, { panelId }: { panelId: string }) => {
       try {
-        logger?.info(`[codex-debug] IPC getDebugState: Panel ${panelId}`);
+        logger?.verbose(`Getting debug state for Codex panel ${panelId}`);
         const debugState = await codexManager.getDebugState(panelId);
-        logger?.info(`[codex-debug] Debug state retrieved for panel ${panelId}`);
         return debugState;
       } catch (error) {
         logger?.error(`[codex-debug] Failed to get debug state for panel ${panelId}:`, error as Error);
@@ -398,10 +397,12 @@ class CodexPanelHandler extends BaseAIPanelHandler {
           sessionManager.getPanelOutputs(panelId) :
           [];
         
-        return { success: true, data: outputs };
+        // Return just the array, not wrapped in an object, for compatibility
+        return outputs;
       } catch (error) {
         logger?.error(`Failed to get outputs for Codex panel:`, error as Error);
-        return { success: false, error: 'Failed to get outputs' };
+        // Return empty array on error to maintain consistent return type
+        return [];
       }
     });
 
@@ -426,38 +427,53 @@ class CodexPanelHandler extends BaseAIPanelHandler {
   }
 
   private setupEventForwarding(): void {
-    const { logger } = this.services;
-    const mainWindow = this.services.getMainWindow();
+    const { logger, getMainWindow } = this.services;
 
     // Forward panel-output events from the AbstractAIPanelManager
     codexManager.on('panel-output', (data) => {
       logger?.info(`[codex-debug] Event panel-output: Panel ${data.panelId}, Type: ${data.type}, Data length: ${JSON.stringify(data.data).length}`);
-      if (mainWindow) {
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        logger?.info(`[codex-debug] Sending codexPanel:output to renderer for panel ${data.panelId}`);
         mainWindow.webContents.send('codexPanel:output', data);
+      } else {
+        logger?.warn(`[codex-debug] Cannot send codexPanel:output - no main window available`);
       }
     });
 
     // Forward panel-spawned events from the AbstractAIPanelManager  
     codexManager.on('panel-spawned', (data) => {
       logger?.info(`[codex-debug] Event panel-spawned: Panel ${data.panelId}, Session ${data.sessionId}`);
-      if (mainWindow) {
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        logger?.info(`[codex-debug] Sending codexPanel:spawned to renderer for panel ${data.panelId}`);
         mainWindow.webContents.send('codexPanel:spawned', data);
+      } else {
+        logger?.warn(`[codex-debug] Cannot send codexPanel:spawned - no main window available`);
       }
     });
 
     // Forward panel-exit events from the AbstractAIPanelManager
     codexManager.on('panel-exit', (data) => {
       logger?.info(`[codex-debug] Event panel-exit: Panel ${data.panelId}, Exit code: ${data.exitCode}`);
-      if (mainWindow) {
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        logger?.info(`[codex-debug] Sending codexPanel:exit to renderer for panel ${data.panelId}`);
         mainWindow.webContents.send('codexPanel:exit', data);
+      } else {
+        logger?.warn(`[codex-debug] Cannot send codexPanel:exit - no main window available`);
       }
     });
 
     // Forward panel-error events from the AbstractAIPanelManager
     codexManager.on('panel-error', (data) => {
       logger?.error(`[codex-debug] Event panel-error: Panel ${data.panelId}, Error: ${data.error}`);
-      if (mainWindow) {
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        logger?.error(`[codex-debug] Sending codexPanel:error to renderer for panel ${data.panelId}`);
         mainWindow.webContents.send('codexPanel:error', data);
+      } else {
+        logger?.warn(`[codex-debug] Cannot send codexPanel:error - no main window available`);
       }
     });
   }
