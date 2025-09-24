@@ -70,9 +70,10 @@ export const MessageSegment: React.FC<MessageSegmentProps> = ({
       return (
         <ToolCallView
           tool={segment.tool}
-          isExpanded={!collapseTools || expandedTools.has(segment.tool.id)}
+          isExpanded={collapseTools ? expandedTools.has(segment.tool.id) : true}
           collapseTools={collapseTools}
           onToggleExpand={onToggleToolExpand}
+          expandedTools={expandedTools}
         />
       );
     

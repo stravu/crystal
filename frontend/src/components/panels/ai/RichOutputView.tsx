@@ -5,6 +5,9 @@ import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Cop
 import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 import { MessageSegment } from './components/MessageSegment';
+import { ToolCallView } from './components/ToolCallView';
+import { ToolCallGroup } from './components/ToolCallGroup';
+import { TodoListDisplay } from './components/TodoListDisplay';
 import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransformer';
 import { RichOutputSettings } from './AbstractAIPanel';
 import { CodexMessageTransformer } from './transformers/CodexMessageTransformer';
@@ -12,7 +15,7 @@ import { CodexMessageTransformer } from './transformers/CodexMessageTransformer'
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
   compactMode: false,
-  collapseTools: false,
+  collapseTools: true, // Collapse tools by default for cleaner view
   showThinking: true,
   showSessionInit: false, // Hide by default - it's developer info
 };
@@ -437,7 +440,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       return renderSystemMessage(message, needsExtraSpacing || false);
     }
     
-    // Check if this message has any renderable content
+    // Check if this message has any renderable content (including TodoWrite for now, filtered later)
     const hasRenderableContent = hasTextContent || hasToolCalls || hasThinking || hasDiffs || hasToolResults;
     
     // If no renderable content and not a special system message, skip or show raw
@@ -573,24 +576,83 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             />
           )}
           
-          {/* Tool calls */}
-          {settings.showToolCalls && message.segments
-            .filter(seg => seg.type === 'tool_call')
-            .map((seg, idx) => (
-              <MessageSegment
-                key={`${message.id}-tool-${idx}`}
-                segment={seg}
-                messageId={message.id}
-                index={idx}
-                isUser={isUser}
-                expandedTools={expandedTools}
-                collapseTools={settings.collapseTools}
-                showToolCalls={settings.showToolCalls}
-                showThinking={settings.showThinking}
-                onToggleToolExpand={toggleToolExpand}
-              />
-            ))
-          }
+          {/* Group consecutive tools, but break on TodoWrite */}
+          {settings.showToolCalls && (() => {
+            const toolSegments = message.segments.filter(seg => seg.type === 'tool_call');
+            if (toolSegments.length === 0) return null;
+            
+            const groups: { tools: typeof message.segments, isTodoWrite: boolean }[] = [];
+            let currentGroup: typeof message.segments = [];
+            
+            toolSegments.forEach((seg) => {
+              if (seg.type === 'tool_call' && seg.tool.name === 'TodoWrite') {
+                // If we have a current group, save it
+                if (currentGroup.length > 0) {
+                  groups.push({ tools: currentGroup, isTodoWrite: false });
+                  currentGroup = [];
+                }
+                // Add TodoWrite as its own group
+                groups.push({ tools: [seg], isTodoWrite: true });
+              } else {
+                // Add to current group
+                currentGroup.push(seg);
+              }
+            });
+            
+            // Don't forget the last group if it exists
+            if (currentGroup.length > 0) {
+              groups.push({ tools: currentGroup, isTodoWrite: false });
+            }
+            
+            return groups.map((group, groupIdx) => {
+              if (group.isTodoWrite && group.tools.length === 1) {
+                const seg = group.tools[0];
+                if (seg.type === 'tool_call' && seg.tool.result) {
+                  try {
+                    const resultData = typeof seg.tool.result.content === 'string' 
+                      ? JSON.parse(seg.tool.result.content)
+                      : seg.tool.result.content;
+                    if (resultData.todos && Array.isArray(resultData.todos)) {
+                      return (
+                        <TodoListDisplay
+                          key={`${message.id}-todo-${groupIdx}`}
+                          todos={resultData.todos}
+                        />
+                      );
+                    }
+                  } catch (e) {
+                    // If parsing fails, show as regular tool
+                  }
+                }
+                // Fallback to regular tool display if TodoWrite has no valid result
+                return (
+                  <MessageSegment
+                    key={`${message.id}-tool-group-${groupIdx}`}
+                    segment={seg}
+                    messageId={message.id}
+                    index={groupIdx}
+                    isUser={isUser}
+                    expandedTools={expandedTools}
+                    collapseTools={settings.collapseTools}
+                    showToolCalls={settings.showToolCalls}
+                    showThinking={settings.showThinking}
+                    onToggleToolExpand={toggleToolExpand}
+                  />
+                );
+              } else {
+                // Regular tool group
+                return (
+                  <ToolCallGroup
+                    key={`${message.id}-tool-group-${groupIdx}`}
+                    tools={group.tools}
+                    expandedTools={expandedTools}
+                    collapseTools={settings.collapseTools}
+                    onToggleToolExpand={toggleToolExpand}
+                  />
+                );
+              }
+            });
+          })()}
           
           {/* Diff segments */}
           {message.segments
@@ -1296,13 +1358,212 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   // Memoize the rendered messages to prevent unnecessary re-renders
   const renderedMessages = useMemo(() => {
     let userMessageIndex = 0;
-    return filteredMessages.map((msg, idx) => {
+    const elements: (React.ReactElement | null)[] = [];
+    
+    // Group consecutive tool-only messages
+    let i = 0;
+    while (i < filteredMessages.length) {
+      const msg = filteredMessages[i];
       const isUser = msg.role === 'user';
-      const element = renderMessage(msg, idx, isUser ? userMessageIndex : undefined);
-      if (isUser) userMessageIndex++;
-      return element;
-    }).filter(element => element !== null); // Filter out null elements
-  }, [filteredMessages, collapsedMessages, expandedTools, settings]);
+      
+      // Check if this message contains only tool calls
+      const hasOnlyToolCalls = !isUser && 
+        msg.segments.length > 0 && 
+        msg.segments.every(seg => seg.type === 'tool_call');
+      
+      if (hasOnlyToolCalls && settings.showToolCalls) {
+        // Collect consecutive tool messages, but break on TodoWrite
+        const toolGroups: { messages: typeof filteredMessages, isTodoWrite: boolean }[] = [];
+        let currentGroup: typeof filteredMessages = [];
+        const messagesToProcess = [msg];
+        let j = i + 1;
+        
+        // First collect all consecutive tool-only messages
+        while (j < filteredMessages.length) {
+          const nextMsg = filteredMessages[j];
+          const nextHasOnlyToolCalls = !nextMsg.role || (nextMsg.role === 'assistant' && 
+            nextMsg.segments.length > 0 && 
+            nextMsg.segments.every(seg => seg.type === 'tool_call'));
+          
+          if (nextHasOnlyToolCalls) {
+            messagesToProcess.push(nextMsg);
+            j++;
+          } else {
+            break;
+          }
+        }
+        
+        // Now group them, breaking on TodoWrite
+        for (const toolMsg of messagesToProcess) {
+          const hasTodoWrite = toolMsg.segments.some(seg => 
+            seg.type === 'tool_call' && seg.tool.name === 'TodoWrite'
+          );
+          
+          if (hasTodoWrite) {
+            // Save current group if any
+            if (currentGroup.length > 0) {
+              toolGroups.push({ messages: currentGroup, isTodoWrite: false });
+              currentGroup = [];
+            }
+            // Add TodoWrite message as its own group
+            toolGroups.push({ messages: [toolMsg], isTodoWrite: true });
+          } else {
+            // Add to current group
+            currentGroup.push(toolMsg);
+          }
+        }
+        
+        // Save last group if any
+        if (currentGroup.length > 0) {
+          toolGroups.push({ messages: currentGroup, isTodoWrite: false });
+        }
+        
+        // toolMessages is no longer needed since we use toolGroups now
+        
+        // Render each group
+        if (toolGroups.length > 0) {
+          toolGroups.forEach((group, groupIdx) => {
+            if (group.isTodoWrite) {
+              // Render TodoWrite display
+              const todoMsg = group.messages[0];
+              const todoSegment = todoMsg.segments.find(seg => 
+                seg.type === 'tool_call' && seg.tool.name === 'TodoWrite'
+              );
+              
+              if (todoSegment && todoSegment.type === 'tool_call') {
+                let todos = todoSegment.tool.input?.todos;
+                if (!todos && todoSegment.tool.result) {
+                  try {
+                    const resultContent = typeof todoSegment.tool.result.content === 'string' 
+                      ? JSON.parse(todoSegment.tool.result.content)
+                      : todoSegment.tool.result.content;
+                    todos = resultContent?.todos;
+                  } catch (e) {
+                    // Failed to parse result
+                  }
+                }
+                
+                if (todos) {
+                  elements.push(
+                    <div
+                      key={`todo-display-${i}-${groupIdx}`}
+                      className={`${settings.compactMode ? 'mt-2' : 'mt-3'}`}
+                    >
+                      <TodoListDisplay todos={todos} timestamp={todoMsg.timestamp} />
+                    </div>
+                  );
+                }
+              }
+            } else if (group.messages.length > 1) {
+              // Render tool group
+              const allToolSegments = group.messages.flatMap(m => 
+                m.segments.filter(seg => seg.type === 'tool_call')
+              );
+              
+              elements.push(
+                <div
+                  key={`tool-group-${i}-${groupIdx}`}
+                  className={`rounded-lg bg-surface-primary ${settings.compactMode ? 'p-3 mt-2' : 'p-4 mt-3'}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="rounded-full p-1.5 flex-shrink-0 bg-interactive/20 text-interactive-on-dark">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="font-medium text-text-primary text-sm">
+                        {messageTransformer.getAgentName()}
+                      </span>
+                      <span className="text-xs text-text-tertiary">
+                        Tool sequence
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'success').length > 0 && (
+                        <span className="text-status-success">
+                          {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'success').length}✓
+                        </span>
+                      )}
+                      {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'error').length > 0 && (
+                        <span className="text-status-error">
+                          {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'error').length}✗
+                        </span>
+                      )}
+                      {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'pending').length > 0 && (
+                        <span className="text-text-tertiary">
+                          {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'pending').length}⏳
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ml-7 space-y-[1px]">
+                    {allToolSegments.map((seg, segIdx) => (
+                      <div key={`grouped-tool-${i}-${groupIdx}-${segIdx}`}>
+                        {seg.type === 'tool_call' && (
+                          <ToolCallView
+                            tool={seg.tool}
+                            isExpanded={settings.collapseTools ? expandedTools.has(seg.tool.id) : false}
+                            collapseTools={settings.collapseTools}
+                            onToggleExpand={toggleToolExpand}
+                            expandedTools={expandedTools}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            } else if (group.messages.length === 1) {
+              // Single tool message, render normally
+              const element = renderMessage(group.messages[0], i);
+              elements.push(element);
+            }
+          });
+          
+          i = j; // Skip all the messages we processed
+        } else {
+          // Single tool-only message, render normally
+          const element = renderMessage(msg, i, isUser ? userMessageIndex : undefined);
+          if (isUser) userMessageIndex++;
+          elements.push(element);
+          i++;
+        }
+      } else {
+        // Regular message, render normally
+        const element = renderMessage(msg, i, isUser ? userMessageIndex : undefined);
+        if (isUser) userMessageIndex++;
+        
+        // If this message has TodoWrite mixed with other content, also render TodoWrite separately
+        if (!isUser && msg.segments.some(seg => seg.type === 'tool_call' && seg.tool.name === 'TodoWrite')) {
+          // Find the last TodoWrite in this message
+          const todoSegments = msg.segments.filter(seg => seg.type === 'tool_call' && seg.tool.name === 'TodoWrite');
+          const lastTodoSegment = todoSegments[todoSegments.length - 1];
+          
+          if (lastTodoSegment && lastTodoSegment.type === 'tool_call' && lastTodoSegment.tool.input?.todos) {
+            // First add the regular message (with TodoWrite filtered out in renderMessage)
+            elements.push(element);
+            
+            // Then add the TodoWrite display separately
+            const todoElement = (
+              <div
+                key={`todo-display-${msg.id}`}
+                className={`${settings.compactMode ? 'mt-2' : 'mt-3'}`}
+              >
+                <TodoListDisplay todos={lastTodoSegment.tool.input.todos} timestamp={msg.timestamp} />
+              </div>
+            );
+            elements.push(todoElement);
+          } else {
+            elements.push(element);
+          }
+        } else {
+          elements.push(element);
+        }
+        i++;
+      }
+    }
+    
+    return elements.filter(element => element !== null); // Filter out null elements
+  }, [filteredMessages, collapsedMessages, expandedTools, settings, toggleToolExpand]);
 
   if (loading) {
     return (
