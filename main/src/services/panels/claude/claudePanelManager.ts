@@ -14,7 +14,7 @@ export class ClaudePanelManager extends AbstractAIPanelManager {
   
   constructor(
     claudeCodeManager: AbstractCliManager,
-    sessionManager: any,
+    sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
     configManager?: ConfigManager
   ) {

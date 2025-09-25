@@ -32,7 +32,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
   
   constructor(
     codexManager: CodexManager,
-    sessionManager: any,
+    sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
     configManager?: ConfigManager
   ) {
@@ -68,7 +68,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    */
   private setupCodexSpecificHandlers(): void {
     this.logger?.verbose('Setting up Codex-specific event handlers');
-    this.cliManager.on('panel-exit', (data: any) => {
+    this.cliManager.on('panel-exit', (data: { panelId?: string; sessionId?: string; exitCode?: number; signal?: number; [key: string]: unknown }) => {
       const panelId: string | undefined = data?.panelId;
       if (!panelId) {
         this.logger?.warn('Received panel-exit event without panelId');

@@ -44,7 +44,7 @@ interface ClaudeCodeProcess {
  */
 export class ClaudeCodeManager extends AbstractCliManager {
   constructor(
-    sessionManager: any,
+    sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
     configManager?: ConfigManager,
     private permissionIpcPath?: string | null
@@ -119,15 +119,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }
       // If a new prompt is provided, add it
       if (prompt && prompt.trim()) {
-        const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession, this.logger);
+        const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
         args.push('-p', finalPrompt);
       }
     } else {
       // Initial prompt for new session
-      let finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession, this.logger);
+      let finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
 
       // Add system prompts for new sessions
-      const systemPromptAppend = this.buildSystemPromptAppend(dbSession);
+      const systemPromptAppend = this.buildSystemPromptAppend(dbSession ? { ...dbSession, project_id: dbSession.project_id } : { id: sessionId });
       if (systemPromptAppend) {
         finalPrompt = `${finalPrompt}\n\n${systemPromptAppend}`;
       }
@@ -159,8 +159,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
     }
   }
 
-  protected parseCliOutput(data: string, panelId: string, sessionId: string): Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: any; timestamp: Date }> {
-    const events: Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: any; timestamp: Date }> = [];
+  protected parseCliOutput(data: string, panelId: string, sessionId: string): Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: unknown; timestamp: Date }> {
+    const events: Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: unknown; timestamp: Date }> = [];
 
     try {
       const jsonMessage = JSON.parse(data.trim());
@@ -437,7 +437,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
       // Check if we should skip --resume flag this time (after prompt compaction)
       const skipContinueRaw = dbSession?.skip_continue_next;
-      const shouldSkipContinue = skipContinueRaw === 1 || skipContinueRaw === true;
+      const shouldSkipContinue = skipContinueRaw === true || (typeof skipContinueRaw === 'number' && skipContinueRaw === 1);
 
       console.log(`[ClaudeCodeManager] continuePanel called for ${panelId} (session ${sessionId}):`, {
         skip_continue_next_raw: skipContinueRaw,
@@ -496,7 +496,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
   // Private helper methods
 
-  private buildSystemPromptAppend(dbSession: any): string | undefined {
+  private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }): string | undefined {
     const systemPromptParts: string[] = [];
 
     // Add global system prompt first
@@ -673,8 +673,9 @@ export class ClaudeCodeManager extends AbstractCliManager {
     try {
       const testCmd = `"${nodePath}" "${mcpBridgePath}" --version`;
       execSync(testCmd, { encoding: 'utf8', timeout: 2000 });
-    } catch (testError: any) {
-      if (testError.code === 'EACCES' || testError.message.includes('EACCES')) {
+    } catch (testError: unknown) {
+      const error = testError as { code?: string; message?: string };
+      if (error.code === 'EACCES' || (error.message && error.message.includes('EACCES'))) {
         this.logger?.error(`[MCP] Permission denied executing MCP bridge script`);
         throw new Error('MCP bridge script is not executable');
       }

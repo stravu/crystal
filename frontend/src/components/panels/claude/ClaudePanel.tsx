@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AIPanelProps } from '../ai/AbstractAIPanel';
+import { AIPanelProps, RichOutputSettings } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
 import { SessionStats } from './SessionStats';
@@ -30,7 +30,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
 
-  const handleRichOutputSettingsChange = (newSettings: any) => {
+  const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
   };

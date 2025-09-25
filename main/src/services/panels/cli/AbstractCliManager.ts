@@ -28,14 +28,14 @@ interface CliSpawnOptions {
   worktreePath: string;
   prompt: string;
   isResume?: boolean;
-  [key: string]: any; // Allow CLI-specific options
+  [key: string]: unknown; // Allow CLI-specific options
 }
 
 interface CliOutputEvent {
   panelId: string;
   sessionId: string;
   type: 'json' | 'stdout' | 'stderr';
-  data: any;
+  data: unknown;
   timestamp: Date;
 }
 
@@ -68,7 +68,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   protected readonly execAsync = promisify(exec);
 
   constructor(
-    protected sessionManager: any,
+    protected sessionManager: import('../../sessionManager').SessionManager,
     protected logger?: Logger,
     protected configManager?: ConfigManager
   ) {
@@ -423,7 +423,7 @@ export abstract class AbstractCliManager extends EventEmitter {
           const panel = await panelManager.getPanel(panelId);
           if (panel) {
             const currentState = panel.state || {};
-            const customState = (currentState.customState as Record<string, any>) || {};
+            const customState = (currentState.customState as Record<string, unknown>) || {};
             
             // Only update if we don't already have a session ID
             const toolSessionKey = `${this.getCliToolName().toLowerCase()}SessionId`;
@@ -563,7 +563,7 @@ export abstract class AbstractCliManager extends EventEmitter {
 
     let ptyProcess: pty.IPty;
     let spawnAttempt = 0;
-    let lastError: any;
+    let lastError: unknown;
     const toolName = this.getCliToolName().toLowerCase();
     const needsNodeFallbackKey = `${toolName}NeedsNodeFallback`;
 

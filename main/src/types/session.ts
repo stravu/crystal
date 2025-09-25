@@ -99,7 +99,7 @@ export interface ToolUseContent {
   type: 'tool_use';
   id: string;
   name: string;
-  input: Record<string, any>;
+  input: Record<string, unknown>;
 }
 
 export interface ToolResultContent {
@@ -111,19 +111,36 @@ export interface ToolResultContent {
 
 export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
 
+// Tool definition interface
+export interface ToolDefinition {
+  name: string;
+  description?: string;
+  input_schema?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// MCP server definition interface  
+export interface McpServerDefinition {
+  name: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 // JSON message structure from Claude
 export interface ClaudeJsonMessage {
   id?: string;
-  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'result' | 'thinking';
+  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'result' | 'thinking' | 'session';
   role?: 'user' | 'assistant' | 'system';
   content?: string | MessageContent[];
   message?: { 
     content?: string | MessageContent[];
-    [key: string]: any;
+    [key: string]: unknown;
   };
   timestamp: string;
   name?: string;
-  input?: Record<string, any>;
+  input?: Record<string, unknown>;
   tool_use_id?: string;
   parent_tool_use_id?: string;
   session_id?: string;
@@ -131,8 +148,8 @@ export interface ClaudeJsonMessage {
   subtype?: string;
   cwd?: string;
   model?: string;
-  tools?: any[];
-  mcp_servers?: any[];
+  tools?: ToolDefinition[];
+  mcp_servers?: McpServerDefinition[];
   permissionMode?: string;
   summary?: string;
   error?: string;
@@ -145,13 +162,14 @@ export interface ClaudeJsonMessage {
   num_turns?: number;
   cost_usd?: number;
   thinking?: string;
-  [key: string]: any;
+  data?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface SessionOutput {
   sessionId: string;
   type: 'stdout' | 'stderr' | 'json' | 'error';
-  data: any; // Complex union type - can be string for stdout/stderr, or various JSON object structures
+  data: any; // Complex union type - can be string for stdout/stderr, or various JSON object structures with different schemas
   timestamp: Date;
   panelId?: string;
 }

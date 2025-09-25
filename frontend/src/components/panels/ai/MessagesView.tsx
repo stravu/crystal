@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API } from '../../../utils/api';
 import { cn } from '../../../utils/cn';
 import { ChevronRight, ChevronDown, Copy, Check, Terminal, FileText } from 'lucide-react';
+import { SessionOutput } from '../../../types/session';
 
 interface MessagesViewProps {
   panelId: string;
@@ -54,8 +55,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           // For Codex and other IPC-based panels
           const outputs = await window.electron.invoke(getMessagesHandler, panelId);
           const jsonMessages = outputs
-            .filter((output: any) => output.type === 'json')
-            .map((output: any) => ({
+            .filter((output: SessionOutput) => output.type === 'json')
+            .map((output: SessionOutput) => ({
               type: 'json' as const,
               data: typeof output.data === 'object' ? JSON.stringify(output.data) : output.data,
               timestamp: output.timestamp || new Date().toISOString()

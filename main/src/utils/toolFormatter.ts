@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { formatJsonForOutput } from './formatters';
+import type { ClaudeJsonMessage } from '../types/session';
 
 interface ToolCall {
   type: 'tool_use';
@@ -599,7 +600,7 @@ export function formatJsonForOutputEnhanced(jsonMessage: Record<string, unknown>
   }
   
   // Fall back to original formatter for other message types
-  return formatJsonForOutput(jsonMessage);
+  return formatJsonForOutput(jsonMessage as ClaudeJsonMessage);
 }
 
 // Re-export the original formatter for backwards compatibility

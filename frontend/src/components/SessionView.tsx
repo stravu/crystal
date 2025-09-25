@@ -25,13 +25,14 @@ import { PanelContainer } from './panels/PanelContainer';
 import { SessionProvider } from '../contexts/SessionContext';
 import { ToolPanel, ToolPanelType } from '../../../shared/types/panels';
 import { Download, Upload, GitMerge, Code2 } from 'lucide-react';
+import type { Project } from '../types/project';
 
 export const SessionView = memo(() => {
   const { activeView, activeProjectId } = useNavigationStore();
-  const [projectData, setProjectData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<Project | null>(null);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [isMergingProject, setIsMergingProject] = useState(false);
-  const [sessionProject, setSessionProject] = useState<any>(null);
+  const [sessionProject, setSessionProject] = useState<Project | null>(null);
 
   // Get active session by subscribing directly to store state
   // This ensures the component re-renders when git status or other session properties update
@@ -179,7 +180,7 @@ export const SessionView = memo(() => {
       if (!activeSession) return;
       
       // For Codex panels, include the last selected model and thinking level in initial state
-      let initialState: any = undefined;
+      let initialState: { customState?: unknown } | undefined = undefined;
       if (type === 'codex') {
         const savedModel = localStorage.getItem('codex.lastSelectedModel');
         const savedThinkingLevel = localStorage.getItem('codex.lastSelectedThinkingLevel');
@@ -216,7 +217,7 @@ export const SessionView = memo(() => {
         try {
           const response = await API.projects.getAll();
           if (response.success && response.data) {
-            const project = response.data.find((p: any) => p.id === activeSession.projectId);
+            const project = response.data.find((p: Project) => p.id === activeSession.projectId);
             if (project) {
               setSessionProject(project);
             }
@@ -240,7 +241,7 @@ export const SessionView = memo(() => {
           // Get all projects and find the one we need
           const response = await API.projects.getAll();
           if (response.success && response.data) {
-            const project = response.data.find((p: any) => p.id === activeProjectId);
+            const project = response.data.find((p: Project) => p.id === activeProjectId);
             if (project) {
               setProjectData(project);
             }

@@ -8,13 +8,13 @@ interface PermissionRequest {
   id: string;
   sessionId: string;
   toolName: string;
-  input: any;
+  input: Record<string, unknown>;
   timestamp: number;
 }
 
 interface PermissionDialogProps {
   request: PermissionRequest | null;
-  onRespond: (requestId: string, behavior: 'allow' | 'deny', updatedInput?: any, message?: string) => void;
+  onRespond: (requestId: string, behavior: 'allow' | 'deny', updatedInput?: Record<string, unknown>, message?: string) => void;
   session?: { name: string };
 }
 
@@ -86,15 +86,24 @@ export const PermissionDialog: React.FC<PermissionDialogProps> = ({ request, onR
   const renderInputPreview = () => {
     const { input, toolName } = request;
     
+    // Helper to safely get string value
+    const getStringValue = (obj: Record<string, unknown>, key: string): string | undefined => {
+      const value = obj[key];
+      return typeof value === 'string' ? value : undefined;
+    };
+    
     if (toolName.includes('Bash')) {
+      const command = getStringValue(input, 'command');
+      const description = getStringValue(input, 'description');
+      
       return (
         <div className="bg-surface-secondary p-3 rounded font-mono text-sm border border-border-primary">
           <div className="text-text-tertiary text-xs mb-1">Command:</div>
-          <div className="text-text-primary">{input.command || 'No command specified'}</div>
-          {input.description && (
+          <div className="text-text-primary">{command || 'No command specified'}</div>
+          {description && (
             <>
               <div className="text-text-tertiary text-xs mt-2 mb-1">Description:</div>
-              <div className="text-text-secondary">{input.description}</div>
+              <div className="text-text-secondary">{description}</div>
             </>
           )}
         </div>
@@ -102,15 +111,18 @@ export const PermissionDialog: React.FC<PermissionDialogProps> = ({ request, onR
     }
     
     if (toolName.includes('Write') || toolName.includes('Edit')) {
+      const filePath = getStringValue(input, 'file_path') || getStringValue(input, 'path');
+      const content = getStringValue(input, 'content');
+      
       return (
         <div className="bg-surface-secondary p-3 rounded font-mono text-sm border border-border-primary">
           <div className="text-text-tertiary text-xs mb-1">File Path:</div>
-          <div className="text-text-primary">{input.file_path || input.path || 'No path specified'}</div>
-          {input.content && (
+          <div className="text-text-primary">{filePath || 'No path specified'}</div>
+          {content && (
             <>
               <div className="text-text-tertiary text-xs mt-2 mb-1">Content Preview:</div>
               <div className="text-text-secondary max-h-32 overflow-y-auto whitespace-pre-wrap">
-                {input.content.length > 500 ? input.content.substring(0, 500) + '...' : input.content}
+                {content.length > 500 ? content.substring(0, 500) + '...' : content}
               </div>
             </>
           )}

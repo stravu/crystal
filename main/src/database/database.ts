@@ -28,6 +28,23 @@ interface ToolPanelRow {
   created_at: string;
 }
 
+// Interface for execution diff database rows
+interface ExecutionDiffRow {
+  id: number;
+  session_id: string;
+  prompt_marker_id?: number;
+  execution_sequence: number;
+  git_diff?: string;
+  files_changed?: string;
+  stats_additions: number;
+  stats_deletions: number;
+  stats_files_changed: number;
+  before_commit_hash?: string;
+  after_commit_hash?: string;
+  commit_message?: string;
+  timestamp: string;
+}
+
 export class DatabaseService {
   private db: Database.Database;
 
@@ -1624,6 +1641,11 @@ export class DatabaseService {
     return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND is_main_repo = 1 AND (archived = 0 OR archived IS NULL)').get(projectId) as Session | undefined;
   }
 
+  checkSessionNameExists(name: string): boolean {
+    const result = this.db.prepare('SELECT id FROM sessions WHERE (name = ? OR worktree_name = ?) LIMIT 1').get(name, name);
+    return result !== undefined;
+  }
+
   updateSession(id: string, data: UpdateSessionData): Session | undefined {
     console.log(`[Database] Updating session ${id} with data:`, data);
     
@@ -2095,7 +2117,10 @@ export class DatabaseService {
       data.commit_message || null
     );
 
-    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
+    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid) as ExecutionDiffRow | undefined;
+    if (!diff) {
+      throw new Error('Failed to retrieve created execution diff');
+    }
     return this.convertDbExecutionDiff(diff);
   }
 
@@ -2104,13 +2129,13 @@ export class DatabaseService {
       SELECT * FROM execution_diffs 
       WHERE session_id = ? 
       ORDER BY execution_sequence ASC
-    `).all(sessionId);
+    `).all(sessionId) as ExecutionDiffRow[];
     
-    return rows.map(this.convertDbExecutionDiff);
+    return rows.map(this.convertDbExecutionDiff.bind(this));
   }
 
   getExecutionDiff(id: number): ExecutionDiff | undefined {
-    const row = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(id);
+    const row = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(id) as ExecutionDiffRow | undefined;
     return row ? this.convertDbExecutionDiff(row) : undefined;
   }
 
@@ -2119,12 +2144,12 @@ export class DatabaseService {
       SELECT MAX(execution_sequence) as max_seq 
       FROM execution_diffs 
       WHERE session_id = ?
-    `).get(sessionId) as any;
+    `).get(sessionId) as { max_seq: number | null } | undefined;
     
     return (result?.max_seq || 0) + 1;
   }
 
-  private convertDbExecutionDiff(row: any): ExecutionDiff {
+  private convertDbExecutionDiff(row: ExecutionDiffRow): ExecutionDiff {
     return {
       id: row.id,
       session_id: row.session_id,
@@ -2165,7 +2190,10 @@ export class DatabaseService {
       data.commit_message || null
     );
 
-    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
+    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid) as ExecutionDiffRow | undefined;
+    if (!diff) {
+      throw new Error('Failed to retrieve created panel execution diff');
+    }
     return this.convertDbExecutionDiff(diff);
   }
 
@@ -2174,9 +2202,9 @@ export class DatabaseService {
       SELECT * FROM execution_diffs 
       WHERE panel_id = ? 
       ORDER BY execution_sequence ASC
-    `).all(panelId);
+    `).all(panelId) as ExecutionDiffRow[];
     
-    return rows.map(this.convertDbExecutionDiff);
+    return rows.map(this.convertDbExecutionDiff.bind(this));
   }
 
   getNextPanelExecutionSequence(panelId: string): number {
@@ -2184,7 +2212,7 @@ export class DatabaseService {
       SELECT MAX(execution_sequence) as max_seq 
       FROM execution_diffs 
       WHERE panel_id = ?
-    `).get(panelId) as any;
+    `).get(panelId) as { max_seq: number | null } | undefined;
     
     return (result?.max_seq || 0) + 1;
   }
@@ -2245,7 +2273,7 @@ export class DatabaseService {
       name: string; 
       type: string; 
       notnull: number; 
-      dflt_value: any; 
+      dflt_value: unknown; 
       pk: number 
     }>;
     foreignKeys: Array<{
@@ -2272,7 +2300,7 @@ export class DatabaseService {
       name: string;
       type: string;
       notnull: number;
-      dflt_value: any;
+      dflt_value: unknown;
       pk: number;
     }>;
     
@@ -2340,7 +2368,7 @@ export class DatabaseService {
       FROM app_opens
       ORDER BY opened_at DESC
       LIMIT 1
-    `).get() as any;
+    `).get() as { opened_at: string; welcome_hidden: number; discord_shown: number } | undefined;
 
     if (!result) return null;
     
@@ -2396,8 +2424,8 @@ export class DatabaseService {
     sessionId: string;
     type: string;
     title: string;
-    state?: any;
-    metadata?: any;
+    state?: unknown;
+    metadata?: unknown;
   }): void {
     this.transaction(() => {
       const stateJson = data.state ? JSON.stringify(data.state) : null;
@@ -2412,8 +2440,8 @@ export class DatabaseService {
 
   updatePanel(panelId: string, updates: {
     title?: string;
-    state?: any;
-    metadata?: any;
+    state?: unknown;
+    metadata?: unknown;
   }): void {
     // Add debug logging to track panel state changes
     if (updates.state !== undefined) {
@@ -2477,8 +2505,8 @@ export class DatabaseService {
     sessionId: string;
     type: string;
     title: string;
-    state?: any;
-    metadata?: any;
+    state?: unknown;
+    metadata?: unknown;
   }): void {
     this.transaction(() => {
       // Create the panel
@@ -2496,17 +2524,17 @@ export class DatabaseService {
   }
 
   getPanel(panelId: string): ToolPanel | null {
-    const row = this.db.prepare('SELECT * FROM tool_panels WHERE id = ?').get(panelId) as any;
+    const row = this.db.prepare('SELECT * FROM tool_panels WHERE id = ?').get(panelId) as ToolPanelRow | undefined;
     
     if (!row) return null;
     
     return {
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     };
   }
 
@@ -2563,17 +2591,17 @@ export class DatabaseService {
       SELECT tp.* FROM tool_panels tp
       JOIN sessions s ON s.active_panel_id = tp.id
       WHERE s.id = ?
-    `).get(sessionId) as any;
+    `).get(sessionId) as ToolPanelRow | undefined;
     
     if (!row) return null;
     
     return {
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     };
   }
 
@@ -2730,7 +2758,7 @@ export class DatabaseService {
       FROM session_outputs 
       WHERE session_id = ? AND type = 'json'
       ORDER BY timestamp ASC
-    `).all(sessionId);
+    `).all(sessionId) as { data: string }[];
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -2738,7 +2766,7 @@ export class DatabaseService {
     let totalCacheCreationTokens = 0;
     let messageCount = 0;
 
-    rows.forEach((row: any) => {
+    rows.forEach((row: { data: string }) => {
       try {
         const data = JSON.parse(row.data);
         if (data.input_tokens) {
@@ -2776,7 +2804,7 @@ export class DatabaseService {
       FROM session_outputs
       WHERE session_id = ?
       GROUP BY type
-    `).all(sessionId);
+    `).all(sessionId) as { type: string; count: number }[];
 
     const counts: { json: number; stdout: number; stderr: number } = {
       json: 0,
@@ -2784,7 +2812,7 @@ export class DatabaseService {
       stderr: 0
     };
 
-    result.forEach((row: any) => {
+    result.forEach((row: { type: string; count: number }) => {
       if (row.type in counts) {
         counts[row.type as keyof typeof counts] = row.count;
       }
@@ -2798,7 +2826,7 @@ export class DatabaseService {
       SELECT COUNT(*) as count 
       FROM conversation_messages 
       WHERE session_id = ?
-    `).get(sessionId) as any;
+    `).get(sessionId) as { count: number } | undefined;
     
     return result?.count || 0;
   }
@@ -2808,7 +2836,7 @@ export class DatabaseService {
       SELECT COUNT(*) as count 
       FROM conversation_messages 
       WHERE panel_id = ?
-    `).get(panelId) as any;
+    `).get(panelId) as { count: number } | undefined;
     
     return result?.count || 0;
   }
@@ -2830,7 +2858,7 @@ export class DatabaseService {
       FROM session_outputs 
       WHERE session_id = ? AND type = 'json'
       ORDER BY timestamp ASC
-    `).all(sessionId);
+    `).all(sessionId) as { data: string; timestamp: string }[];
 
     const toolStats = new Map<string, {
       count: number;
@@ -2844,17 +2872,18 @@ export class DatabaseService {
     let totalToolCalls = 0;
 
     // Process each message
-    toolUseRows.forEach((row: any, index: number) => {
+    toolUseRows.forEach((row: { data: string; timestamp: string }, index: number) => {
       try {
         const data = JSON.parse(row.data);
         
         // Check if this is a tool_use message
         if (data.type === 'assistant' && data.message?.content) {
-          data.message.content.forEach((content: any) => {
-            if (content.type === 'tool_use' && content.name) {
+          data.message.content.forEach((content: unknown) => {
+            const contentObj = content as { type?: string; name?: string; id?: string };
+            if (contentObj.type === 'tool_use' && contentObj.name) {
               totalToolCalls++;
-              const toolName = content.name;
-              const toolId = content.id;
+              const toolName = contentObj.name!;
+              const toolId = contentObj.id;
               
               if (!toolStats.has(toolName)) {
                 toolStats.set(toolName, {
@@ -2868,7 +2897,9 @@ export class DatabaseService {
               
               const stats = toolStats.get(toolName)!;
               stats.count++;
-              stats.pendingCalls.set(toolId, row.timestamp);
+              if (toolId) {
+                stats.pendingCalls.set(toolId, row.timestamp);
+              }
               
               // Add token usage if available
               if (data.message.usage) {
@@ -2881,13 +2912,14 @@ export class DatabaseService {
         
         // Check if this is a tool_result message
         if (data.type === 'user' && data.message?.content) {
-          data.message.content.forEach((content: any) => {
-            if (content.type === 'tool_result' && content.tool_use_id) {
+          data.message.content.forEach((content: unknown) => {
+            const contentObj = content as { type?: string; tool_use_id?: string };
+            if (contentObj.type === 'tool_result' && contentObj.tool_use_id) {
               // Find which tool this result belongs to
               for (const [toolName, stats] of toolStats.entries()) {
-                if (stats.pendingCalls.has(content.tool_use_id)) {
-                  const startTime = stats.pendingCalls.get(content.tool_use_id)!;
-                  stats.pendingCalls.delete(content.tool_use_id);
+                if (stats.pendingCalls.has(contentObj.tool_use_id)) {
+                  const startTime = stats.pendingCalls.get(contentObj.tool_use_id)!;
+                  stats.pendingCalls.delete(contentObj.tool_use_id);
                   
                   // Calculate duration in milliseconds
                   const start = new Date(startTime).getTime();

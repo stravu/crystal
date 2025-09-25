@@ -75,7 +75,7 @@ const getCompactToolSummary = (tool: ToolCall): string => {
     case 'TodoWrite':
       if (input.todos && Array.isArray(input.todos)) {
         const total = input.todos.length;
-        const completed = input.todos.filter((t: any) => t.status === 'completed').length;
+        const completed = input.todos.filter((t: { status: string; content: string }) => t.status === 'completed').length;
         return `${completed}/${total} tasks`;
       }
       return '';
@@ -265,7 +265,7 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
 };
 
 // Format tool input for display - compact version
-const formatToolInput = (toolName: string, input: any): React.ReactNode => {
+const formatToolInput = (toolName: string, input: Record<string, any>): React.ReactNode => {
   switch (toolName) {
     case 'Read':
       return (
@@ -341,7 +341,7 @@ const formatToolInput = (toolName: string, input: any): React.ReactNode => {
     case 'TodoWrite':
       return (
         <div className="text-[11px] space-y-0.5">
-          {input.todos && Array.isArray(input.todos) && input.todos.map((todo: any, idx: number) => {
+          {input.todos && Array.isArray(input.todos) && input.todos.map((todo: { status: string; content: string }, idx: number) => {
             const icon = todo.status === 'completed' ? '✓' : 
                         todo.status === 'in_progress' ? '→' : '○';
             const color = todo.status === 'completed' ? 'text-status-success' : 

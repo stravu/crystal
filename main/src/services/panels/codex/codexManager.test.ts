@@ -6,8 +6,8 @@ import * as fs from 'fs';
 // Test for Codex with GPT-5 (released August 7, 2025)
 // GPT-5 provides significant improvements over previous models
 
-// Simple logger for testing - cast to any to bypass type checking
-const testLogger: any = {
+// Simple logger for testing 
+const testLogger = {
   verbose: (msg: string) => console.log(`[VERBOSE] ${msg}`),
   info: (msg: string) => console.log(`[INFO] ${msg}`),
   warn: (msg: string) => console.warn(`[WARN] ${msg}`),
@@ -22,11 +22,11 @@ const mockSessionManager = {
   getDbSession: (sessionId: string) => ({ id: sessionId }),
   getProjectById: (projectId: string) => null,
   getPanelClaudeSessionId: (panelId: string) => null,
-  updateSession: (sessionId: string, updates: any) => {}
+  updateSession: (sessionId: string, updates: Record<string, unknown>) => {}
 };
 
-// Mock config manager - cast to any to bypass type checking
-const mockConfigManager: any = {
+// Mock config manager
+const mockConfigManager = {
   getConfig: () => ({
     verbose: true,
     codexExecutablePath: null, // Will use auto-discovery
@@ -40,9 +40,9 @@ async function testCodexManager() {
   
   // Create manager instance
   const manager = new CodexManager(
-    mockSessionManager as any,
-    testLogger,
-    mockConfigManager
+    mockSessionManager as unknown as import('../../sessionManager').SessionManager,
+    testLogger as unknown as import('../../../utils/logger').Logger,
+    mockConfigManager as unknown as import('../../configManager').ConfigManager
   );
   
   // Test 1: Check availability

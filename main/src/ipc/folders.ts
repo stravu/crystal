@@ -24,9 +24,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
       const folders = databaseService.getFoldersForProject(projectId);
       const convertedFolders = folders.map(convertDbFolderToFolder);
       return { success: true, data: convertedFolders };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to get folders:', error);
-      return { success: false, error: error.message || 'Failed to get folders' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to get folders' };
     }
   });
 
@@ -36,9 +36,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
       const folder = databaseService.createFolder(name, projectId, parentFolderId);
       const convertedFolder = convertDbFolderToFolder(folder);
       return { success: true, data: convertedFolder };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to create folder:', error);
-      return { success: false, error: error.message || 'Failed to create folder' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to create folder' };
     }
   });
 
@@ -61,9 +61,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
       }
       
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to update folder:', error);
-      return { success: false, error: error.message || 'Failed to update folder' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to update folder' };
     }
   });
 
@@ -72,9 +72,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
     try {
       databaseService.deleteFolder(folderId);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to delete folder:', error);
-      return { success: false, error: error.message || 'Failed to delete folder' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to delete folder' };
     }
   });
 
@@ -83,9 +83,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
     try {
       databaseService.reorderFolders(projectId, folderIds);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to reorder folders:', error);
-      return { success: false, error: error.message || 'Failed to reorder folders' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to reorder folders' };
     }
   });
 
@@ -112,9 +112,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
       // Update the session
       databaseService.updateSession(sessionId, { folder_id: folderId });
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to move session to folder:', error);
-      return { success: false, error: error.message || 'Failed to move session to folder' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to move session to folder' };
     }
   });
 
@@ -152,9 +152,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
       // Update the folder
       databaseService.updateFolder(folderId, { parent_folder_id: parentFolderId });
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC] Failed to move folder:', error);
-      return { success: false, error: error.message || 'Failed to move folder' };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to move folder' };
     }
   });
 }

@@ -22,6 +22,17 @@ interface UserPromptMessage {
   timestamp: string;
 }
 
+// Interface for conversation messages from database
+interface ConversationMessage {
+  id: number;
+  session_id: string;
+  message_type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+// We'll use any for event handling since events can come from different sources with different shapes
+
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
   compactMode: false,
@@ -210,7 +221,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         // Combine both sources - conversation messages have the actual user prompts
         const userPrompts: UserPromptMessage[] = [];
         if (conversationResponse.success && Array.isArray(conversationResponse.data)) {
-          conversationResponse.data.forEach((msg: any) => {
+          conversationResponse.data.forEach((msg: ConversationMessage) => {
             if (msg.message_type === 'user') {
               userPrompts.push({
                 type: 'user',
@@ -299,7 +310,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       window.electron?.on(outputEventName, handleOutputAvailable);
       // Don't also add a window event listener - this causes duplicate handling
     } else {
-      window.addEventListener('session-output-available', handleOutputAvailable as any);
+      window.addEventListener('session-output-available', handleOutputAvailable as EventListener);
     }
     
     return () => {
@@ -307,7 +318,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       if (outputEventName.includes('codex')) {
         window.electron?.off(outputEventName, handleOutputAvailable);
       } else {
-        window.removeEventListener('session-output-available', handleOutputAvailable as any);
+        window.removeEventListener('session-output-available', handleOutputAvailable as EventListener);
       }
     };
   }, [panelId, outputEventName]); // Remove messageTransformer from dependencies to avoid re-registering

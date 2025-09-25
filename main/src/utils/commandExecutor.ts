@@ -38,10 +38,10 @@ class CommandExecutor {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log error
       console.error(`[CommandExecutor] Failed: ${command}`);
-      console.error(`[CommandExecutor] Error: ${error.message}`);
+      console.error(`[CommandExecutor] Error: ${error instanceof Error ? error.message : String(error)}`);
       
       throw error;
     }
@@ -81,10 +81,10 @@ class CommandExecutor {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log error
       console.error(`[CommandExecutor] Async Failed: ${command}`);
-      console.error(`[CommandExecutor] Async Error: ${error.message}`);
+      console.error(`[CommandExecutor] Async Error: ${error instanceof Error ? error.message : String(error)}`);
       
       throw error;
     }

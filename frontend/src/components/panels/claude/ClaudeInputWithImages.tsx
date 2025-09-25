@@ -26,7 +26,7 @@ interface AttachedText {
 
 interface SessionInputWithImagesProps {
   activeSession: Session;
-  viewMode?: any; // ViewMode removed - kept for compatibility
+  viewMode?: unknown; // ViewMode removed - kept for compatibility
   input: string;
   setInput: (input: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -438,7 +438,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             // Use a timeout to check if focus moved outside the toolbar
             setTimeout(() => {
               const activeElement = document.activeElement;
-              const toolbar = (e as any).currentTarget;
+              const toolbar = e.currentTarget as HTMLElement;
               
               if (!activeElement || !toolbar || !toolbar.contains(activeElement)) {
                 setIsToolbarActive(false);
@@ -520,7 +520,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
                 onFocus={handleFocus}
-                onBlur={handleBlur as any}
+                onBlur={() => handleBlur({} as React.FocusEvent)}
                 style={{ 
                   height: `${textareaHeight}px`,
                   minHeight: '52px', 

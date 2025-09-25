@@ -13,6 +13,7 @@ import { getCodexModelConfig } from '../../../shared/types/models';
 import type { Session } from '../types/session';
 import type { ToolPanel } from '../../../shared/types/panels';
 import type { DatabaseService } from '../database/database';
+import type { Project } from '../database/models';
 
 interface TaskQueueOptions {
   sessionManager: SessionManager;
@@ -533,7 +534,7 @@ export class TaskQueue {
     if (count > 1 && projectId) {
       try {
         const { sessionManager } = this.options;
-        const db = (sessionManager as any).db as DatabaseService;
+        const db = sessionManager.db as DatabaseService;
         const folderName = worktreeTemplate || generatedBaseName || 'Multi-session prompt';
         
         console.log(`[TaskQueue] Creating folder for multi-session prompt. ProjectId: ${projectId}, type: ${typeof projectId}`);
@@ -586,7 +587,7 @@ export class TaskQueue {
 
   private async ensureUniqueSessionName(baseName: string, index?: number): Promise<string> {
     const { sessionManager } = this.options;
-    const db = (sessionManager as any).db;
+    const db = sessionManager.db;
     
     let candidateName = baseName;
     
@@ -601,13 +602,7 @@ export class TaskQueue {
     
     while (true) {
       // Check both active and archived sessions
-      const existingSession = db.db.prepare(`
-        SELECT id FROM sessions 
-        WHERE (name = ? OR worktree_name = ?)
-        LIMIT 1
-      `).get(uniqueName, uniqueName);
-      
-      if (!existingSession) {
+      if (!db.checkSessionNameExists(uniqueName)) {
         break;
       }
       
@@ -623,9 +618,9 @@ export class TaskQueue {
     return uniqueName;
   }
 
-  private async ensureUniqueNames(baseSessionName: string, baseWorktreeName: string, project: any, index?: number): Promise<{ sessionName: string; worktreeName: string }> {
+  private async ensureUniqueNames(baseSessionName: string, baseWorktreeName: string, project: Project, index?: number): Promise<{ sessionName: string; worktreeName: string }> {
     const { sessionManager, worktreeManager } = this.options;
-    const db = (sessionManager as any).db;
+    const db = sessionManager.db;
     
     let candidateSessionName = baseSessionName;
     let candidateWorktreeName = baseWorktreeName;
@@ -642,20 +637,11 @@ export class TaskQueue {
     let uniqueWorktreeName = candidateWorktreeName;
     
     while (true) {
-      // Check session name and worktree name separately
+      // Check session name and worktree name separately using public methods
       // This is important because different session names could map to the same worktree name
       // e.g., "Fix Auth Bug" and "Fix-Auth-Bug" both become "fix-auth-bug"
-      const sessionNameExists = db.db.prepare(`
-        SELECT id FROM sessions 
-        WHERE name = ?
-        LIMIT 1
-      `).get(uniqueSessionName);
-      
-      const worktreeNameExists = db.db.prepare(`
-        SELECT id FROM sessions 
-        WHERE worktree_name = ?
-        LIMIT 1
-      `).get(uniqueWorktreeName);
+      const sessionNameExists = db.checkSessionNameExists(uniqueSessionName);
+      const worktreeNameExists = db.checkSessionNameExists(uniqueWorktreeName);
       
       // Check if worktree directory exists on filesystem
       // This handles cases where a worktree was created outside of Crystal

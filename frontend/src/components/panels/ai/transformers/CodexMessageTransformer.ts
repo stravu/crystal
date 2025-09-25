@@ -3,10 +3,18 @@ import { MessageTransformer, UnifiedMessage, ToolCall, ToolResult } from './Mess
 // Interface for raw outputs from Codex (typically from database)
 interface CodexRawOutput {
   type: 'json' | 'stdout' | 'stderr';
-  data: string | any;
+  data: string | unknown;
   timestamp?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+// Interface for text items from Codex user input
+interface CodexTextItem {
+  type: 'text';
+  text: string;
+}
+
+// Codex message structures are complex and dynamic, so we'll use 'any' for flexibility
 
 export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
@@ -202,8 +210,8 @@ export class CodexMessageTransformer implements MessageTransformer {
       
       if (op.type === 'user_input' && op.items) {
         // Extract text from items array
-        const textItems = op.items.filter((item: any) => item.type === 'text');
-        const content = textItems.map((item: any) => item.text).join('\n');
+        const textItems = op.items.filter((item: CodexTextItem) => item.type === 'text');
+        const content = textItems.map((item: CodexTextItem) => item.text).join('\n');
         
         // Use original prompt if available (for structured commit mode), otherwise use content as-is
         const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 

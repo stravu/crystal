@@ -134,16 +134,12 @@ export function useCliPanel(
   /**
    * Send input to the CLI process
    */
-  const sendInput = useCallback(async (input: string, options?: Partial<CliInputOptions>) => {
+  const sendInput = useCallback(async (input: string) => {
     if (!panel) {
       setError('Panel not initialized');
       return;
     }
 
-    const inputOptions: CliInputOptions = {
-      text: input,
-      ...options
-    };
 
     try {
       setError(null);
@@ -171,7 +167,7 @@ export function useCliPanel(
   /**
    * Start the CLI process
    */
-  const startProcess = useCallback(async (initialPrompt?: string) => {
+  const startProcess = useCallback(async () => {
     if (!panel) {
       setError('Panel not initialized');
       return;
@@ -388,7 +384,7 @@ export function useCliPanel(
     /*
     if (!panel || !window.electron) return;
 
-    const handlePanelOutput = (_event: any, data: any) => {
+    const handlePanelOutput = (_event: Electron.IpcRendererEvent, data: { panelId: string; sessionId: string; type: string; data: unknown; timestamp: Date; content?: string; metadata?: unknown }) => {
       if (data.panelId !== panelId) return;
 
       const newOutput: CliOutput = {

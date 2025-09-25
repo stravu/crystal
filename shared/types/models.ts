@@ -44,3 +44,24 @@ export function getCodexModelList(): CodexModelConfig[] {
 
 // Default model if none specified
 export const DEFAULT_CODEX_MODEL: OpenAICodexModel = 'gpt-5-codex';
+
+// Codex input options interface
+export interface CodexInputOptions {
+  model: OpenAICodexModel;
+  modelProvider: 'openai';
+  sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
+  webSearch: boolean;
+  attachedImages?: Array<{
+    id: string;
+    name: string;
+    dataUrl: string;
+    size: number;
+    type: string;
+  }>;
+  attachedTexts?: Array<{
+    id: string;
+    name: string;
+    content: string;
+    size: number;
+  }>;
+}

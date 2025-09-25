@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
+import type { CodexInputOptions } from '../../../shared/types/models';
 
 export interface AttachedImage {
   id: string;
@@ -16,7 +17,7 @@ export interface AttachedText {
 }
 
 export interface UseAIInputPanelOptions {
-  onSendMessage: (message: string, options?: any, attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => Promise<void>;
+  onSendMessage: (message: string, options?: CodexInputOptions | Record<string, unknown>, attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => Promise<void>;
   onCancel?: () => void;
   disabled?: boolean;
 }
@@ -216,7 +217,7 @@ export const useAIInputPanel = (options: UseAIInputPanelOptions) => {
     setAttachedTexts(prev => prev.filter(txt => txt.id !== id));
   }, []);
 
-  const handleSubmit = useCallback(async (additionalOptions?: any) => {
+  const handleSubmit = useCallback(async (additionalOptions?: CodexInputOptions | Record<string, unknown>) => {
     if (!input.trim() || isSubmitting || disabled) return;
 
     const message = input.trim();
