@@ -15,5 +15,9 @@ export function setupTestUpdater() {
   
   // Log all events for debugging
   autoUpdater.logger = console;
-  (autoUpdater.logger as any).transports.file.level = 'debug';
+  // Set debug level for winston-based loggers if available
+  const logger = autoUpdater.logger as any;
+  if (logger && logger.transports && logger.transports.file) {
+    logger.transports.file.level = 'debug';
+  }
 }

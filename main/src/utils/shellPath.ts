@@ -117,7 +117,7 @@ export function getShellPath(): string {
       
       // Execute the command to get the PATH
       // For packaged apps, ALWAYS use login shell to get the user's real PATH
-      const isPackaged = process.env.NODE_ENV === 'production' || (process as any).pkg || app?.isPackaged;
+      const isPackaged = process.env.NODE_ENV === 'production' || 'pkg' in process || app?.isPackaged;
       
       if (isPackaged) {
         console.log('Running in packaged app, using login shell to get full PATH...');

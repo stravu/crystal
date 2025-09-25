@@ -5,6 +5,7 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { ConversationMessage } from '../../../database/models';
 import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../../../utils/claudeCodeTest';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { PermissionManager } from '../../permissionManager';
@@ -12,6 +13,12 @@ import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { withLock } from '../../../utils/mutex';
 import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
+
+// Extend global object for MCP configuration storage  
+interface GlobalMcpStorage {
+  [key: string]: string | undefined;
+}
+declare const globalThis: GlobalMcpStorage;
 
 interface ClaudeSpawnOptions {
   panelId: string;
@@ -221,7 +228,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
     PermissionManager.getInstance().clearPendingRequests(sessionId);
 
     // Clean up MCP config file if it exists
-    const mcpConfigPath = (global as any)[`mcp_config_${sessionId}`];
+    const mcpConfigPath = globalThis[`mcp_config_${sessionId}`];
     if (mcpConfigPath && fs.existsSync(mcpConfigPath)) {
       setTimeout(() => {
         try {
@@ -229,7 +236,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
             fs.unlinkSync(mcpConfigPath);
             this.logger?.verbose(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
           }
-          delete (global as any)[`mcp_config_${sessionId}`];
+          delete globalThis[`mcp_config_${sessionId}`];
         } catch (error) {
           this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
         }
@@ -237,7 +244,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
     }
 
     // Clean up temporary MCP script file if it exists
-    const mcpScriptPath = (global as any)[`mcp_script_${sessionId}`];
+    const mcpScriptPath = globalThis[`mcp_script_${sessionId}`];
     if (mcpScriptPath && fs.existsSync(mcpScriptPath)) {
       setTimeout(() => {
         try {
@@ -245,7 +252,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
             fs.unlinkSync(mcpScriptPath);
             this.logger?.verbose(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
           }
-          delete (global as any)[`mcp_script_${sessionId}`];
+          delete globalThis[`mcp_script_${sessionId}`];
         } catch (error) {
           this.logger?.error(`Failed to delete temporary MCP script file:`, error instanceof Error ? error : undefined);
         }
@@ -396,7 +403,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
     sessionId: string,
     worktreePath: string,
     prompt: string,
-    conversationHistory: any[],
+    conversationHistory: ConversationMessage[],
     permissionModeOverride?: 'approve' | 'ignore',
     model?: string
   ): Promise<void> {
@@ -457,12 +464,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
     await this.killProcess(panelId);
   }
 
-  async restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: string[]): Promise<void> {
+  async restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: ConversationMessage[]): Promise<void> {
     // Kill existing process if it exists
     await this.killProcess(panelId);
 
+    // Convert ConversationMessage[] to string[] for backward compatibility
+    const historyStrings = conversationHistory.map(msg => msg.content);
+
     // Restart with conversation history
-    await this.spawnClaudeCode(panelId, sessionId, worktreePath, initialPrompt, conversationHistory);
+    await this.spawnClaudeCode(panelId, sessionId, worktreePath, initialPrompt, historyStrings);
   }
 
   // Claude-specific public methods for backward compatibility
@@ -671,9 +681,9 @@ export class ClaudeCodeManager extends AbstractCliManager {
     }
 
     // Store config path and temp script path for cleanup
-    (global as any)[`mcp_config_${sessionId}`] = mcpConfigPath;
+    globalThis[`mcp_config_${sessionId}`] = mcpConfigPath;
     if (mcpBridgePath.includes(tempDir)) {
-      (global as any)[`mcp_script_${sessionId}`] = mcpBridgePath;
+      globalThis[`mcp_script_${sessionId}`] = mcpBridgePath;
     }
 
     // Add a small delay to ensure file is fully written and accessible

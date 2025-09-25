@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { API } from '../utils/api';
 import { GitCommands } from '../types/session';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
+import type { AttachedImage, AttachedText } from '../types/session';
 
 export const useClaudePanel = (
   panelId: string,
@@ -143,8 +144,8 @@ export const useClaudePanel = (
       }
       
       setLoadError(null);
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log(`[loadOutputContent] Request aborted for session ${sessionId} (panel ${panelId})`);
         loadingRef.current = false;
         loadingPanelIdRef.current = null;
@@ -259,7 +260,7 @@ export const useClaudePanel = (
     }
   }, [isActive, activeSession?.id, outputLoadState, loadOutputContent, panelId]);
 
-  const handleSendInput = async (attachedImages?: any[], attachedTexts?: any[]) => {
+  const handleSendInput = async (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => {
     console.log('[useClaudePanel] handleSendInput called', { input, activeSession: activeSession?.id, hasActiveSession: !!activeSession, panelId });
     if (!input.trim() || !activeSession) {
       console.log('[useClaudePanel] handleSendInput early return', { inputTrimmed: !input.trim(), noActiveSession: !activeSession });
@@ -335,8 +336,8 @@ export const useClaudePanel = (
   };
 
   const handleContinueConversation = async (
-    attachedImages?: any[],
-    attachedTexts?: any[],
+    attachedImages?: AttachedImage[],
+    attachedTexts?: AttachedText[],
     modelOverride?: string
   ) => {
     if (!input.trim() || !activeSession) return;
@@ -423,7 +424,7 @@ export const useClaudePanel = (
     if (activeSession) await API.sessions.stop(activeSession.id);
   };
 
-  const handleStravuFileSelect = (file: any, content: string) => {
+  const handleStravuFileSelect = (file: { name: string; type: string }, content: string) => {
     const formattedContent = `\n\n## File: ${file.name}\n\`\`\`${file.type}\n${content}\n\`\`\`\n\n`;
     setInput(prev => prev + formattedContent);
   };

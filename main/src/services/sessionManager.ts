@@ -7,6 +7,7 @@ import type { DatabaseService } from '../database/database';
 import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, Project } from '../database/models';
 import { getShellPath } from '../utils/shellPath';
 import { TerminalSessionManager } from './terminalSessionManager';
+import type { BaseAIPanelState } from '../../../shared/types/panels';
 import { formatForDisplay } from '../utils/timestampUtils';
 import { addSessionLog, cleanupSessionLogs } from '../ipc/logs';
 import { withLock } from '../utils/mutex';
@@ -20,7 +21,7 @@ export class SessionManager extends EventEmitter {
   private activeProject: Project | null = null;
   private terminalSessionManager: TerminalSessionManager;
 
-  constructor(private db: DatabaseService) {
+  constructor(public db: DatabaseService) {
     super();
     // Increase max listeners to prevent warnings when many components listen to events
     this.setMaxListeners(50);
@@ -75,8 +76,8 @@ export class SessionManager extends EventEmitter {
     try {
       const panel = this.db.getPanel(panelId);
       // Check new agentSessionId first, then fall back to legacy claudeSessionId
-      const claudeSessionId = (panel as any)?.state?.customState?.agentSessionId || 
-                              (panel as any)?.state?.customState?.claudeSessionId;
+      const panelState = panel?.state?.customState as BaseAIPanelState | undefined;
+      const claudeSessionId = panelState?.agentSessionId || panelState?.claudeSessionId;
       console.log(`[SessionManager] Getting Claude session ID for panel ${panelId}: ${claudeSessionId || 'not found'}`);
       return claudeSessionId;
     } catch (e) {
@@ -89,8 +90,8 @@ export class SessionManager extends EventEmitter {
     try {
       const panel = this.db.getPanel(panelId);
       // Check new agentSessionId first, then fall back to legacy codexSessionId
-      const codexSessionId = (panel as any)?.state?.customState?.agentSessionId || 
-                             (panel as any)?.state?.customState?.codexSessionId;
+      const panelState = panel?.state?.customState as BaseAIPanelState | undefined;
+      const codexSessionId = panelState?.agentSessionId || panelState?.codexSessionId;
       console.log(`[SessionManager] Getting Codex session ID for panel ${panelId}: ${codexSessionId || 'not found'}`);
       return codexSessionId;
     } catch (e) {
@@ -102,7 +103,7 @@ export class SessionManager extends EventEmitter {
   getPanelAgentSessionId(panelId: string): string | undefined {
     try {
       const panel = this.db.getPanel(panelId);
-      const customState = (panel as any)?.state?.customState;
+      const customState = panel?.state?.customState as BaseAIPanelState | undefined;
       // Check new field first, then fall back to legacy fields based on panel type
       const agentSessionId = customState?.agentSessionId || 
                              customState?.claudeSessionId || 
@@ -140,7 +141,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private convertDbSessionToSession(dbSession: DbSession): Session {
-    const toolTypeFromDb = (dbSession as any).tool_type as 'claude' | 'codex' | 'none' | null | undefined;
+    const toolTypeFromDb = (dbSession as DbSession & { tool_type?: string }).tool_type as 'claude' | 'codex' | 'none' | null | undefined;
     const normalizedToolType: 'claude' | 'codex' | 'none' = toolTypeFromDb === 'codex'
       ? 'codex'
       : toolTypeFromDb === 'none'
@@ -523,7 +524,7 @@ export class SessionManager extends EventEmitter {
       
       if (Array.isArray(content)) {
         // Look for text content in the array
-        const textContent = content.find((item: any) => item.type === 'text');
+        const textContent = content.find((item: { type: string; text?: string }) => item.type === 'text');
         if (textContent?.text) {
           promptText = textContent.text;
         }
@@ -549,8 +550,8 @@ export class SessionManager extends EventEmitter {
       if (Array.isArray(content)) {
         // Concatenate all text content from the array
         assistantText = content
-          .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text)
+          .filter((item: { type: string; text?: string }) => item.type === 'text')
+          .map((item: { type: string; text?: string }) => item.text || '')
           .join('\n');
       } else if (typeof content === 'string') {
         assistantText = content;
@@ -659,7 +660,7 @@ export class SessionManager extends EventEmitter {
     // Capture Claude's session ID from init/system messages for proper --resume handling
     try {
       if (output.type === 'json' && output.data && typeof output.data === 'object') {
-        const data: any = output.data;
+        const data = output.data as { type?: string; subtype?: string; session_id?: string; message_id?: string; [key: string]: any };
         const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
         if (sessionIdFromMsg) {
           const panel = this.db.getPanel(panelId);
@@ -682,8 +683,8 @@ export class SessionManager extends EventEmitter {
       if (Array.isArray(content)) {
         // Concatenate all text content from the array
         assistantText = content
-          .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text)
+          .filter((item: { type: string; text?: string }) => item.type === 'text')
+          .map((item: { type: string; text?: string }) => item.text || '')
           .join('\n');
       } else if (typeof content === 'string') {
         assistantText = content;
@@ -723,7 +724,7 @@ export class SessionManager extends EventEmitter {
       
       if (Array.isArray(content)) {
         // Look for text content in the array
-        const textContent = content.find((item: any) => item.type === 'text');
+        const textContent = content.find((item: { type: string; text?: string }) => item.type === 'text');
         if (textContent?.text) {
           promptText = textContent.text;
         }
@@ -747,12 +748,12 @@ export class SessionManager extends EventEmitter {
     // Capture Claude session ID per panel for proper --resume usage
     try {
       if (output.type === 'json' && output.data && typeof output.data === 'object') {
-        const data: any = output.data;
+        const data = output.data as { type?: string; subtype?: string; session_id?: string; message_id?: string; [key: string]: any };
         const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
         if (sessionIdFromMsg) {
           const panel = this.db.getPanel(panelId);
           if (panel) {
-            const currentState = (panel as any).state || {};
+            const currentState = panel.state as { customState?: Record<string, any>; [key: string]: any } || {};
             const customState = currentState.customState || {};
             const updatedState = {
               ...currentState,
@@ -1069,9 +1070,10 @@ export class SessionManager extends EventEmitter {
               addSessionLog(sessionId, 'warn', line, 'Build');
             });
           }
-        } catch (cmdError: any) {
+        } catch (cmdError: unknown) {
           console.error(`[SessionManager] Build command failed: ${command}`, cmdError);
-          const errorMessage = cmdError.stderr || cmdError.stdout || cmdError.message || String(cmdError);
+          const error = cmdError as { stderr?: string; stdout?: string; message?: string };
+          const errorMessage = error.stderr || error.stdout || error.message || String(cmdError);
           allOutput += errorMessage;
           
           addSessionLog(sessionId, 'error', `Command failed: ${command}`, 'Build');

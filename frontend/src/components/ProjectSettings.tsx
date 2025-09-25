@@ -59,11 +59,11 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
       const response = await API.projects.update(project.id.toString(), {
         name,
         path,
-        system_prompt: systemPrompt || null,
-        run_script: runScript || null,
-        build_script: buildScript || null,
-        open_ide_command: openIdeCommand || null,
-        worktree_folder: worktreeFolder || null
+        system_prompt: systemPrompt || undefined,
+        run_script: runScript || undefined,
+        build_script: buildScript || undefined,
+        open_ide_command: openIdeCommand || undefined,
+        worktree_folder: worktreeFolder || undefined
       });
 
       if (!response.success) {

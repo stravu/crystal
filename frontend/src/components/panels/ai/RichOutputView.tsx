@@ -12,6 +12,16 @@ import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransf
 import { RichOutputSettings } from './AbstractAIPanel';
 import { CodexMessageTransformer } from './transformers/CodexMessageTransformer';
 
+// Local interface for combining user prompts with output messages
+interface UserPromptMessage {
+  type: 'user';
+  message: {
+    role: 'user';
+    content: Array<{ type: 'text'; text: string }>;
+  };
+  timestamp: string;
+}
+
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
   compactMode: false,
@@ -198,7 +208,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         ]);
         
         // Combine both sources - conversation messages have the actual user prompts
-        const userPrompts: any[] = [];
+        const userPrompts: UserPromptMessage[] = [];
         if (conversationResponse.success && Array.isArray(conversationResponse.data)) {
           conversationResponse.data.forEach((msg: any) => {
             if (msg.message_type === 'user') {

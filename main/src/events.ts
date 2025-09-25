@@ -12,6 +12,7 @@ import {
   logValidationFailure 
 } from './utils/sessionValidation';
 import type { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
+import type { GitCommit } from './services/gitDiffManager';
 
 export function setupEventListeners(services: AppServices, getMainWindow: () => BrowserWindow | null): void {
   const {
@@ -185,7 +186,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
           // Prepare initial custom state for the panel
           let customState: any = undefined;
           if (panelType === 'codex') {
-            const codexConfig = (session as any).codexConfig || {};
+            const codexConfig = session.codexConfig || {};
             customState = {
               codexConfig: {
                 model: codexConfig.model || 'auto',
@@ -197,7 +198,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
             };
             console.log(`[Events] Creating Codex panel with customState:`, customState);
           } else if (panelType === 'claude') {
-            const claudeConfig = (session as any).claudeConfig || {};
+            const claudeConfig = session.claudeConfig || {};
             customState = {
               claudeConfig: {
                 model: claudeConfig.model || 'auto',
@@ -210,7 +211,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
           
           const panel = await panelManager.createPanel({
             sessionId: session.id,
-            type: panelType as any,
+            type: panelType,
             title: panelTitle,
             initialState: customState
           });
@@ -535,7 +536,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         
         // Verbose commit logging removed - details are in error cases if needed
         
-        let commits: any[] = [];
+        let commits: GitCommit[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
           // Commit count logging removed - shown in session summary
@@ -662,7 +663,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         
         // Verbose commit logging removed - details are in error cases if needed
         
-        let commits: any[] = [];
+        let commits: GitCommit[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
           // Commit count logging removed - shown in session summary

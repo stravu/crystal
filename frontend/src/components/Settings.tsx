@@ -558,7 +558,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
           <Button
             type={activeTab === 'general' ? 'submit' : 'button'}
             form={activeTab === 'general' ? 'settings-form' : undefined}
-            onClick={activeTab === 'notifications' ? (e) => handleSubmit(e as any) : undefined}
+            onClick={activeTab === 'notifications' ? (e) => handleSubmit(e as React.FormEvent) : undefined}
             disabled={isSubmitting}
             loading={isSubmitting}
             variant="primary"

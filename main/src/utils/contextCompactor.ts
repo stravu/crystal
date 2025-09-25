@@ -1,5 +1,6 @@
 import type { DatabaseService } from '../database/database';
-import type { Session, SessionOutput, ConversationMessage, PromptMarker, ExecutionDiff } from '../database/models';
+import type { Session, ConversationMessage, PromptMarker, ExecutionDiff } from '../database/models';
+import type { SessionOutput } from '../types/session';
 import { formatDuration, getTimeDifference, parseTimestamp } from './timestampUtils';
 
 interface CompactionData {
@@ -18,8 +19,30 @@ interface FileModification {
 
 interface ToolCall {
   name: string;
-  input: any;
+  input: unknown;
   id: string;
+}
+
+interface PromptAnalysis {
+  promptText: string;
+  isCompleted: boolean;
+  duration: string;
+  filesModified: string[];
+  lastMessage: string;
+  timestamp: string;
+}
+
+interface Todo {
+  id: string;
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+interface GitStatus {
+  filesChanged: number;
+  additions: number;
+  deletions: number;
+  hasUncommittedChanges?: boolean;
 }
 
 export class ProgrammaticCompactor {
@@ -55,7 +78,7 @@ export class ProgrammaticCompactor {
     });
   }
 
-  private analyzePrompts(promptMarkers: PromptMarker[], outputs: SessionOutput[]): any[] {
+  private analyzePrompts(promptMarkers: PromptMarker[], outputs: SessionOutput[]): PromptAnalysis[] {
     return promptMarkers.map((prompt, index) => {
       const nextPrompt = promptMarkers[index + 1];
       const isCompleted = !!prompt.completion_timestamp;
@@ -100,12 +123,22 @@ export class ProgrammaticCompactor {
       if (output.type === 'json') {
         try {
           // output.data is already parsed by sessionManager.getSessionOutputs
-          const message = output.data as any;
+          const message = output.data as {
+            type?: string;
+            message?: {
+              content?: Array<{
+                type?: string;
+                name?: string;
+                input?: { file_path?: string; todos?: Todo[]; edits?: unknown[] };
+                text?: string;
+              }>;
+            };
+          };
           if (message.type === 'assistant' && message.message?.content) {
-            message.message.content.forEach((content: any) => {
+            message.message.content.forEach((content) => {
               if (content.type === 'tool_use') {
                 const path = content.input?.file_path;
-                if (path && ['Edit', 'Write', 'MultiEdit'].includes(content.name)) {
+                if (path && content.name && ['Edit', 'Write', 'MultiEdit'].includes(content.name)) {
                   const existing = fileMap.get(path) || {
                     path,
                     operations: [] as Array<'create' | 'edit'>,
@@ -142,11 +175,21 @@ export class ProgrammaticCompactor {
       if (output.type === 'json') {
         try {
           // output.data is already parsed by sessionManager.getSessionOutputs
-          const message = output.data as any;
+          const message = output.data as {
+            type?: string;
+            message?: {
+              content?: Array<{
+                type?: string;
+                name?: string;
+                input?: { file_path?: string; todos?: Todo[]; edits?: unknown[] };
+                text?: string;
+              }>;
+            };
+          };
           if (message.type === 'assistant' && message.message?.content) {
-            message.message.content.forEach((content: any) => {
+            message.message.content.forEach((content) => {
               if (content.type === 'tool_use' && content.input?.file_path) {
-                if (['Edit', 'Write', 'MultiEdit'].includes(content.name)) {
+                if (content.name && ['Edit', 'Write', 'MultiEdit'].includes(content.name)) {
                   files.add(content.input.file_path);
                 }
               }
@@ -161,16 +204,26 @@ export class ProgrammaticCompactor {
     return Array.from(files);
   }
 
-  private extractTodos(outputs: SessionOutput[]): any[] {
-    const todos: any[] = [];
+  private extractTodos(outputs: SessionOutput[]): Todo[] {
+    const todos: Todo[] = [];
     
     outputs.forEach(output => {
       if (output.type === 'json') {
         try {
           // output.data is already parsed by sessionManager.getSessionOutputs
-          const message = output.data as any;
+          const message = output.data as {
+            type?: string;
+            message?: {
+              content?: Array<{
+                type?: string;
+                name?: string;
+                input?: { file_path?: string; todos?: Todo[]; edits?: unknown[] };
+                text?: string;
+              }>;
+            };
+          };
           if (message.type === 'assistant' && message.message?.content) {
-            message.message.content.forEach((content: any) => {
+            message.message.content.forEach((content) => {
               if (content.type === 'tool_use' && content.name === 'TodoWrite' && content.input?.todos) {
                 // Replace the todo list with the new state
                 todos.length = 0;
@@ -187,7 +240,7 @@ export class ProgrammaticCompactor {
     return todos;
   }
 
-  private analyzeGitStatus(diffs: ExecutionDiff[]): any {
+  private analyzeGitStatus(diffs: ExecutionDiff[]): GitStatus {
     if (diffs.length === 0) {
       return { filesChanged: 0, additions: 0, deletions: 0 };
     }
@@ -222,8 +275,18 @@ export class ProgrammaticCompactor {
       if (output.type === 'json') {
         try {
           // output.data is already parsed by sessionManager.getSessionOutputs
-          const message = output.data as any;
-          if (message.type === 'assistant' && message.message?.content) {
+          const message = output.data as {
+            type?: string;
+            message?: {
+              content?: Array<{
+                type?: string;
+                name?: string;
+                input?: { file_path?: string; todos?: Todo[]; edits?: unknown[] };
+                text?: string;
+              }>;
+            };
+          };
+          if (message.type === 'assistant' && message.message?.content && Array.isArray(message.message.content)) {
             // Look for text content
             for (const content of message.message.content) {
               if (content.type === 'text' && content.text) {
@@ -242,10 +305,10 @@ export class ProgrammaticCompactor {
 
   private buildSummary(data: {
     session: Session;
-    promptAnalysis: any[];
+    promptAnalysis: PromptAnalysis[];
     fileModifications: Map<string, FileModification>;
-    todos: any[];
-    gitStatus: any;
+    todos: Todo[];
+    gitStatus: GitStatus;
     wasInterrupted: boolean;
     conversationMessages: ConversationMessage[];
   }): string {
@@ -255,7 +318,7 @@ export class ProgrammaticCompactor {
     
     // Individual calls to Claude
     if (promptAnalysis.length > 0) {
-      promptAnalysis.forEach((prompt: any, index: number) => {
+      promptAnalysis.forEach((prompt, index: number) => {
         summary += `Call #${index + 1}:\n`;
         summary += `User Prompt: ${prompt.promptText}\n`;
         summary += `Final Assistant Message: ${prompt.lastMessage || 'No text response'}\n\n`;
@@ -295,9 +358,9 @@ export class ProgrammaticCompactor {
     
     // Current todos
     if (todos.length > 0) {
-      const pending = todos.filter((t: any) => t.status === 'pending');
-      const inProgress = todos.filter((t: any) => t.status === 'in_progress');
-      const completed = todos.filter((t: any) => t.status === 'completed');
+      const pending = todos.filter((t) => t.status === 'pending');
+      const inProgress = todos.filter((t) => t.status === 'in_progress');
+      const completed = todos.filter((t) => t.status === 'completed');
       
       summary += `### Task Status\n\n`;
       summary += `- **Completed**: ${completed.length}\n`;
@@ -306,7 +369,7 @@ export class ProgrammaticCompactor {
       
       if (inProgress.length > 0) {
         summary += `**Currently Working On**:\n`;
-        inProgress.forEach((todo: any) => {
+        inProgress.forEach((todo) => {
           summary += `- ${todo.content}\n`;
         });
         summary += '\n';
@@ -314,7 +377,7 @@ export class ProgrammaticCompactor {
       
       if (pending.length > 0) {
         summary += `**Next Tasks**:\n`;
-        pending.forEach((todo: any) => {
+        pending.forEach((todo) => {
           summary += `- ${todo.content}\n`;
         });
         // All pending tasks are now included

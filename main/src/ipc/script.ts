@@ -3,6 +3,7 @@ import type { AppServices } from './types';
 import { getShellPath, findExecutableInPath } from '../utils/shellPath';
 import { logsManager } from '../services/panels/logPanel/logsManager';
 import { panelManager } from '../services/panelManager';
+import { ExecException } from 'child_process';
 
 export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: AppServices): void {
   // Script execution handlers
@@ -54,7 +55,7 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
       // Otherwise stop the old running script (for backward compatibility)
       if (sessionId) {
         const panels = await panelManager.getPanelsForSession(sessionId);
-        const logsPanel = panels?.find((p: any) => p.type === 'logs');
+        const logsPanel = panels?.find((p: { type: string }) => p.type === 'logs');
         if (logsPanel) {
           await logsManager.stopScript(logsPanel.id);
         }
@@ -154,7 +155,7 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
               PATH: shellPath  // Use enhanced PATH that includes user's shell PATH
             }
           },
-          (error: any, stdout: string, stderr: string) => {
+          (error: ExecException | null, stdout: string, stderr: string) => {
             if (error) {
               console.error('Failed to open IDE:', error);
               console.error('stdout:', stdout);

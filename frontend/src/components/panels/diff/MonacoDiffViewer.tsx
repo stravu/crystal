@@ -6,6 +6,10 @@ import { debounce } from '../../../utils/debounce';
 import { MonacoErrorBoundary } from '../../MonacoErrorBoundary';
 import { MarkdownPreview } from '../../MarkdownPreview';
 
+interface IDisposable {
+  dispose(): void;
+}
+
 interface MonacoDiffViewerProps {
   file: FileDiff;
   sessionId: string;
@@ -303,7 +307,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       const modifiedEditor = editor.getModifiedEditor();
       
       // Store disposables for cleanup
-      const disposables: any[] = [];
+      const disposables: IDisposable[] = [];
       
       // Mark editor as ready
       setIsEditorReady(true);

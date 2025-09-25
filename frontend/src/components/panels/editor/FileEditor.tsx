@@ -124,7 +124,7 @@ function FileTreeNode({ file, level, onFileClick, onRefresh, onDelete, selectedP
 
 interface FileTreeProps {
   sessionId: string;
-  onFileSelect: (file: FileItem) => void;
+  onFileSelect: (file: FileItem | null) => void;
   selectedPath: string | null;
   initialExpandedDirs?: string[];
   initialSearchQuery?: string;
@@ -238,7 +238,7 @@ function FileTree({
         
         // If the deleted file was selected, clear the selection
         if (selectedPath === file.path) {
-          onFileSelect(null as any);
+          onFileSelect(null);
         }
       } else {
         setError(`Failed to delete ${file.isDirectory ? 'folder' : 'file'}: ${result.error}`);
@@ -614,8 +614,8 @@ export function FileEditor({
     return ext === 'md' || ext === 'markdown';
   }, [selectedFile]);
 
-  const loadFile = useCallback(async (file: FileItem) => {
-    if (file.isDirectory) return;
+  const loadFile = useCallback(async (file: FileItem | null) => {
+    if (!file || file.isDirectory) return;
     
     setLoading(true);
     setError(null);

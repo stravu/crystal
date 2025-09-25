@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { useErrorStore } from '../stores/errorStore';
-import { API } from '../utils/api';
+import { API, GitErrorResponse } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { Session, GitCommands, GitErrorDetails } from '../types/session';
+import { Session, GitCommands, GitErrorDetails, AttachedImage, AttachedText } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
@@ -1103,7 +1103,7 @@ export const useSessionView = (
     return () => window.removeEventListener('keydown', handleDebugKeyboard);
   }, [debugState, forceResetLoadingState]);
 
-  const handleSendInput = async (attachedImages?: any[], attachedTexts?: any[]) => {
+  const handleSendInput = async (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => {
     console.log('[useSessionView] handleSendInput called', { input, activeSession: activeSession?.id, hasActiveSession: !!activeSession });
     if (!input.trim() || !activeSession) {
       console.log('[useSessionView] handleSendInput early return', { inputTrimmed: !input.trim(), noActiveSession: !activeSession });
@@ -1179,8 +1179,8 @@ export const useSessionView = (
   };
 
   const handleContinueConversation = async (
-    attachedImages?: any[],
-    attachedTexts?: any[],
+    attachedImages?: AttachedImage[],
+    attachedTexts?: AttachedText[],
     modelOverride?: string
   ) => {
     if (!input.trim() || !activeSession) return;
@@ -1330,12 +1330,12 @@ export const useSessionView = (
     setMergeError(null);
     try {
       console.log(`[handleRebaseMainIntoWorktree] Calling API.sessions.rebaseMainIntoWorktree`);
-      const response = await API.sessions.rebaseMainIntoWorktree(activeSession.id);
+      const response: GitErrorResponse = await API.sessions.rebaseMainIntoWorktree(activeSession.id);
       console.log(`[handleRebaseMainIntoWorktree] API call completed`, response);
       
       if (!response.success) {
-        if ((response as any).gitError) {
-          const gitError = (response as any).gitError;
+        if (response.gitError) {
+          const gitError = response.gitError;
           setGitErrorDetails({
             title: gitError.hasConflicts ? 'Rebase Conflicts Detected' : 'Rebase Failed',
             message: response.error || 'Failed to rebase main into worktree',
@@ -1419,13 +1419,13 @@ export const useSessionView = (
     setMergeError(null);
     setShowCommitMessageDialog(false);
     try {
-      const response = shouldSquash
+      const response: GitErrorResponse = shouldSquash
         ? await API.sessions.squashAndRebaseToMain(activeSession.id, message)
         : await API.sessions.rebaseToMain(activeSession.id);
 
       if (!response.success) {
-        if ((response as any).gitError) {
-          const gitError = (response as any).gitError;
+        if (response.gitError) {
+          const gitError = response.gitError;
           setGitErrorDetails({
             title: shouldSquash ? 'Squash and Rebase Failed' : 'Rebase Failed',
             message: response.error || `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`,

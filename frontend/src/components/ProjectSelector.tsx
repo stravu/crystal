@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, Plus, Check, Settings } from 'lucide-react';
 import { API } from '../utils/api';
-import type { Project } from '../types/project';
+import type { Project, CreateProjectRequest } from '../types/project';
 import ProjectSettings from './ProjectSettings';
 import { useErrorStore } from '../stores/errorStore';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
@@ -20,7 +20,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [newProject, setNewProject] = useState<CreateProjectRequest>({ name: '', path: '', buildScript: '', runScript: '' });
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [detectedBranch, setDetectedBranch] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -90,7 +90,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
     if (!newProject.name || !newProject.path) return;
 
     try {
-      const response = await API.projects.create(newProject);
+      const response = await API.projects.create({ ...newProject, active: false });
 
       if (!response.success) {
         showError({

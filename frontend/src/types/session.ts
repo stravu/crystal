@@ -142,6 +142,7 @@ export interface SessionOutput {
   type: 'stdout' | 'stderr' | 'json' | 'error';
   data: string | ClaudeJsonMessage;
   timestamp: string;
+  panelId?: string;
 }
 
 export interface GitCommands {

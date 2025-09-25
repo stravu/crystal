@@ -1,7 +1,8 @@
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
-import { PanelEvent } from '../../../../../shared/types/panels';
+import type { ConversationMessage } from '../../../database/models';
+import { PanelEvent, PanelEventType } from '../../../../../shared/types/panels';
 import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig, AIPanelState } from '../../../../../shared/types/aiPanelConfig';
 import { panelEventBus } from '../../panelEventBus';
 
@@ -25,7 +26,7 @@ export abstract class AbstractAIPanelManager {
 
   constructor(
     protected cliManager: AbstractCliManager,
-    protected sessionManager: any,
+    protected sessionManager: import('../../sessionManager').SessionManager,
     protected logger?: Logger,
     protected configManager?: ConfigManager
   ) {
@@ -41,7 +42,7 @@ export abstract class AbstractAIPanelManager {
    * Extract agent-specific configuration from the unified config
    * Each subclass implements this to pick out its relevant fields
    */
-  protected abstract extractAgentConfig(config: AIPanelConfig): any[];
+  protected abstract extractAgentConfig(config: AIPanelConfig): unknown[];
 
   /**
    * Generate a resume ID for conversation continuation
@@ -55,13 +56,13 @@ export abstract class AbstractAIPanelManager {
    */
   protected setupEventHandlers(): void {
     // Forward output events
-    this.cliManager.on('output', (data: any) => {
+    this.cliManager.on('output', (data: { panelId: string; sessionId: string; type: string; data: unknown; timestamp: Date }) => {
       const { panelId, sessionId } = data;
       if (panelId && this.panelMappings.has(panelId)) {
         try {
           if (this.sessionManager?.addPanelOutput) {
             this.sessionManager.addPanelOutput(panelId, {
-              type: data.type,
+              type: data.type as 'json' | 'stdout' | 'stderr' | 'error',
               data: data.data,
               timestamp: data.timestamp || new Date()
             });
@@ -81,7 +82,7 @@ export abstract class AbstractAIPanelManager {
     });
 
     // Forward spawned events
-    this.cliManager.on('spawned', (data: any) => {
+    this.cliManager.on('spawned', (data: { panelId: string; sessionId: string }) => {
       const { panelId, sessionId } = data;
       if (panelId && this.panelMappings.has(panelId)) {
         this.cliManager.emit('panel-spawned', {
@@ -92,7 +93,7 @@ export abstract class AbstractAIPanelManager {
     });
 
     // Forward exit events
-    this.cliManager.on('exit', (data: any) => {
+    this.cliManager.on('exit', (data: { panelId: string; sessionId: string; exitCode?: number; signal?: string }) => {
       const { panelId, sessionId, exitCode, signal } = data;
       if (!panelId) {
         this.logger?.warn(`[${this.getAgentName()}PanelManager] Received exit event without panelId`);
@@ -116,7 +117,7 @@ export abstract class AbstractAIPanelManager {
     });
 
     // Forward error events
-    this.cliManager.on('error', (data: any) => {
+    this.cliManager.on('error', (data: { panelId: string; sessionId: string; error: Error | string }) => {
       const { panelId, sessionId, error } = data;
       if (panelId && this.panelMappings.has(panelId)) {
         this.cliManager.emit('panel-error', {
@@ -134,24 +135,34 @@ export abstract class AbstractAIPanelManager {
   protected subscribeToGitEvents(panelId: string, sessionId: string): void {
     const gitEventCallback = (event: PanelEvent) => {
       if (event.source.panelId !== panelId && event.type.startsWith('git:')) {
-        this.logger?.verbose(`[${this.getAgentName()}] Git event received in panel ${panelId} (session: ${sessionId})`);
-        this.logger?.verbose(`[${this.getAgentName()}] Event triggeringSessionId: ${event.data.triggeringSessionId}`);
-        this.logger?.verbose(`[${this.getAgentName()}] Panel sessionId: ${sessionId}`);
-        this.logger?.verbose(`[${this.getAgentName()}] Match: ${event.data.triggeringSessionId === sessionId}`);
+        // Type assertion for git event data
+        const gitEventData = event.data as {
+          triggeringSessionId?: string;
+          triggeringSessionName?: string;
+          message?: string;
+          operation?: string;
+          branch?: string;
+          targetBranch?: string;
+        };
         
-        if (event.data.triggeringSessionId === sessionId) {
+        this.logger?.verbose(`[${this.getAgentName()}] Git event received in panel ${panelId} (session: ${sessionId})`);
+        this.logger?.verbose(`[${this.getAgentName()}] Event triggeringSessionId: ${gitEventData.triggeringSessionId}`);
+        this.logger?.verbose(`[${this.getAgentName()}] Panel sessionId: ${sessionId}`);
+        this.logger?.verbose(`[${this.getAgentName()}] Match: ${gitEventData.triggeringSessionId === sessionId}`);
+        
+        if (gitEventData.triggeringSessionId === sessionId) {
           this.logger?.info(`[${this.getAgentName()}] Forwarding git event to panel ${panelId} for session ${sessionId}`);
           
           const gitMessage = {
             type: 'system',
             subtype: 'git_operation',
             timestamp: event.timestamp,
-            message: event.data.message,
+            message: gitEventData.message,
             details: {
-              operation: event.data.operation,
-              triggeringSession: event.data.triggeringSessionName || event.data.triggeringSessionId,
-              branch: event.data.branch,
-              targetBranch: event.data.targetBranch
+              operation: gitEventData.operation,
+              triggeringSession: gitEventData.triggeringSessionName || gitEventData.triggeringSessionId,
+              branch: gitEventData.branch,
+              targetBranch: gitEventData.targetBranch
             }
           };
 
@@ -171,7 +182,7 @@ export abstract class AbstractAIPanelManager {
     // Subscribe to git events for this panel
     const subscription = {
       panelId,
-      eventTypes: ['git:operation' as any],  // Listen for git events
+      eventTypes: ['git:operation_completed', 'git:operation_failed'] as PanelEventType[],  // Listen for git events
       callback: gitEventCallback
     };
     panelEventBus.subscribe(subscription);
@@ -261,12 +272,21 @@ export abstract class AbstractAIPanelManager {
     // Extract agent-specific parameters
     const agentParams = this.extractAgentConfig(config);
     
+    // Convert conversation history to database format
+    const dbConversationHistory: ConversationMessage[] = conversationHistory.map((msg, index) => ({
+      id: msg.id || index + 1, // Use index if id not provided
+      session_id: msg.session_id || mapping.sessionId,
+      message_type: msg.message_type,
+      content: msg.content,
+      timestamp: msg.timestamp || new Date().toISOString()
+    }));
+
     return this.cliManager.continuePanel(
       panelId,
       mapping.sessionId,
       worktreePath,
       prompt,
-      conversationHistory,
+      dbConversationHistory,
       ...agentParams
     );
   }
@@ -308,7 +328,7 @@ export abstract class AbstractAIPanelManager {
   /**
    * Get panel process
    */
-  getPanelProcess(panelId: string): any {
+  getPanelProcess(panelId: string): unknown {
     const mapping = this.panelMappings.get(panelId);
     if (!mapping) {
       return undefined;

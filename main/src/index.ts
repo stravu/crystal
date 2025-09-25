@@ -9,7 +9,7 @@ if (process.platform === 'linux') {
 }
 
 // Now import the rest of electron
-import { BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { BrowserWindow, ipcMain, shell, dialog, IpcMainInvokeEvent } from 'electron';
 import * as path from 'path';
 import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
@@ -149,8 +149,8 @@ async function createWindow() {
     
     // Log all IPC calls in main process
     const originalHandle = ipcMain.handle;
-    ipcMain.handle = function(channel: string, listener: any) {
-      const wrappedListener = async (event: any, ...args: any[]) => {
+    ipcMain.handle = function(channel: string, listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown> | unknown) {
+      const wrappedListener = async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
         if (channel.startsWith('stravu:')) {
           console.log(`[IPC] 📞 ${channel}`, args.length > 0 ? args : '(no args)');
         }
@@ -238,7 +238,7 @@ async function createWindow() {
   });
 
   // Override console methods to forward to renderer and logger
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     // Format the message
     const message = args.map(arg =>
       typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
@@ -262,13 +262,13 @@ async function createWindow() {
     }
   };
 
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     // Prevent infinite recursion by checking if we're already in an error handler
-    if ((console.error as any).__isHandlingError) {
+    if ((console.error as typeof console.error & { __isHandlingError?: boolean }).__isHandlingError) {
       return originalError.apply(console, args);
     }
     
-    (console.error as any).__isHandlingError = true;
+    (console.error as typeof console.error & { __isHandlingError?: boolean }).__isHandlingError = true;
     
     try {
       // If logger is not initialized or we're in the logger itself, use original console
@@ -278,7 +278,7 @@ async function createWindow() {
       }
 
       const message = args.map(arg => {
-        if (typeof arg === 'object') {
+        if (typeof arg === 'object' && arg !== null) {
           if (arg instanceof Error) {
             return `Error: ${arg.message}\nStack: ${arg.stack}`;
           }
@@ -310,13 +310,13 @@ async function createWindow() {
       // If anything fails in the error handler, fall back to original
       originalError.apply(console, args);
     } finally {
-      (console.error as any).__isHandlingError = false;
+      (console.error as typeof console.error & { __isHandlingError?: boolean }).__isHandlingError = false;
     }
   };
 
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const message = args.map(arg => {
-      if (typeof arg === 'object') {
+      if (typeof arg === 'object' && arg !== null) {
         if (arg instanceof Error) {
           return `Error: ${arg.message}\nStack: ${arg.stack}`;
         }
@@ -349,9 +349,9 @@ async function createWindow() {
     }
   };
 
-  console.info = (...args: any[]) => {
+  console.info = (...args: unknown[]) => {
     const message = args.map(arg => {
-      if (typeof arg === 'object') {
+      if (typeof arg === 'object' && arg !== null) {
         if (arg instanceof Error) {
           return `Error: ${arg.message}\nStack: ${arg.stack}`;
         }

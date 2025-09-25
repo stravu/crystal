@@ -4,13 +4,47 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { SessionManager } from '../../sessionManager';
+import type { ConversationMessage } from '../../../database/models';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
 import type { CodexPanelState } from '../../../../../shared/types/panels';
+import type { ToolPanel } from '../../../../../shared/types/panels';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { panelManager } from '../../panelManager';
 import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
+
+interface CodexDebugState {
+  pid?: number;
+  isConnected: boolean;
+  sessionId: string;
+  panelId: string;
+  worktreePath?: string;
+  codexSessionId?: string;
+  processState: string;
+  model?: string;
+  modelProvider?: string;
+  totalMessagesReceived: number;
+  totalMessagesSent: number;
+}
+
+interface SessionInfoMessage {
+  type: string;
+  initial_prompt: string;
+  original_prompt: string;
+  codex_command: string;
+  worktree_path: string;
+  model: string;
+  model_provider?: string;
+  approval_policy?: string;
+  sandbox_mode?: boolean | string;
+  permission_mode?: string;
+  resume_session_id?: string;
+  is_resume?: boolean;
+  web_search?: boolean;
+  timestamp?: string;
+}
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -51,7 +85,7 @@ export class CodexManager extends AbstractCliManager {
   private originalPrompts: Map<string, string> = new Map(); // Track original prompts per panel
   
   constructor(
-    sessionManager: any,
+    sessionManager: SessionManager,
     logger?: Logger,
     configManager?: ConfigManager
   ) {
@@ -126,7 +160,7 @@ export class CodexManager extends AbstractCliManager {
             this.logger?.info(`[codex] Codex version detected via Node.js fallback: ${version}`);
             
             // Store that we need Node.js fallback
-            (global as any).codexNeedsNodeFallback = true;
+            (global as typeof global & { codexNeedsNodeFallback?: boolean }).codexNeedsNodeFallback = true;
             this.logger?.info('[codex] Node.js fallback mode enabled for future executions');
             
             return {
@@ -254,7 +288,7 @@ export class CodexManager extends AbstractCliManager {
       webSearch
     } = params;
 
-    const sessionInfoMessage: Record<string, any> = {
+    const sessionInfoMessage: SessionInfoMessage = {
       type: 'session_info',
       initial_prompt: prompt,
       original_prompt: prompt, // Store original prompt separately for transformer use
@@ -300,7 +334,7 @@ export class CodexManager extends AbstractCliManager {
 
   protected async getCliExecutablePath(): Promise<string> {
     // Check for custom path in config
-    const config = this.configManager?.getConfig() as any;
+    const config = this.configManager?.getConfig();
     const customPath = config?.codexExecutablePath;
     if (customPath) {
       this.logger?.info(`[codex] Using custom Codex executable path: ${customPath}`);
@@ -355,7 +389,7 @@ export class CodexManager extends AbstractCliManager {
           // Check if we already have a session ID stored
           let existingSessionId: string | undefined;
           if (this.sessionManager) {
-            const db = (this.sessionManager as any).db;
+            const db = this.sessionManager.db;
             if (db) {
               const panel = db.getPanel(panelId);
               existingSessionId = panel?.state?.customState?.agentSessionId || panel?.state?.customState?.codexSessionId;
@@ -398,7 +432,7 @@ export class CodexManager extends AbstractCliManager {
           
           // Store the session ID in the panel's custom state (similar to Claude)
           if (this.sessionManager) {
-            const db = (this.sessionManager as any).db;
+            const db = this.sessionManager.db;
             if (db) {
               const panel = db.getPanel(panelId);
               if (panel) {
@@ -482,7 +516,7 @@ export class CodexManager extends AbstractCliManager {
     const env: { [key: string]: string } = {};
     
     // Get API key from environment or config
-    const config = this.configManager?.getConfig() as any;
+    const config = this.configManager?.getConfig();
     const apiKey = process.env.OPENAI_API_KEY || config?.openaiApiKey;
     if (apiKey) {
       env.OPENAI_API_KEY = apiKey;
@@ -765,7 +799,7 @@ export class CodexManager extends AbstractCliManager {
             
             // Store in the panel state (but check if we're overwriting)
             if (this.sessionManager) {
-              const db = (this.sessionManager as any).db;
+              const db = this.sessionManager.db;
               if (db) {
                 const panel = db.getPanel(panelId);
                 if (panel) {
@@ -793,7 +827,7 @@ export class CodexManager extends AbstractCliManager {
                   
                   // Verify it was saved
                   const verifyPanel = panelManager.getPanel(panelId);
-                  const verifyCustomState = verifyPanel?.state?.customState as any;
+                  const verifyCustomState = verifyPanel?.state?.customState as CodexPanelState;
                   const savedSessionId = verifyCustomState?.agentSessionId || verifyCustomState?.codexSessionId;
                   if (savedSessionId === sessionId) {
                     this.logger?.info(`[session-id-debug] ✅ Verified session ID was stored correctly: ${savedSessionId}`);
@@ -843,7 +877,7 @@ export class CodexManager extends AbstractCliManager {
             
             // Store in the panel state
             if (this.sessionManager) {
-              const db = (this.sessionManager as any).db;
+              const db = this.sessionManager.db;
               if (db) {
                 const panel = db.getPanel(panelId);
                 if (panel) {
@@ -872,7 +906,7 @@ export class CodexManager extends AbstractCliManager {
                   
                   // Verify it was saved
                   const verifyPanel = panelManager.getPanel(panelId);
-                  const verifyCustomState = verifyPanel?.state?.customState as any;
+                  const verifyCustomState = verifyPanel?.state?.customState as CodexPanelState;
                   const savedSessionId = verifyCustomState?.agentSessionId || verifyCustomState?.codexSessionId;
                   if (savedSessionId === sessionId) {
                     this.logger?.info(`[session-id-debug] ✅ FALLBACK: Verified session ID was stored correctly: ${savedSessionId}`);
@@ -900,7 +934,7 @@ export class CodexManager extends AbstractCliManager {
     sessionId: string,
     worktreePath: string,
     prompt: string,
-    conversationHistory: any[],
+    conversationHistory: ConversationMessage[],
     model?: string,
     modelProvider?: string,
     thinkingLevel?: 'low' | 'medium' | 'high',
@@ -923,7 +957,7 @@ export class CodexManager extends AbstractCliManager {
     // Try to get the session ID from the panel's custom state
     let codexSessionId = null;
     if (this.sessionManager) {
-      const db = (this.sessionManager as any).db;
+      const db = (this.sessionManager as { db?: { getPanel: (id: string) => { state?: { customState?: CodexPanelState } } | null } }).db;
       if (db) {
         const panel = db.getPanel(panelId);
         if (panel) {
@@ -1036,7 +1070,7 @@ export class CodexManager extends AbstractCliManager {
     sessionId: string,
     worktreePath: string,
     initialPrompt: string,
-    conversationHistory: string[]
+    conversationHistory: ConversationMessage[]
   ): Promise<void> {
     // Kill existing process if it exists
     await this.killProcess(panelId);
@@ -1115,7 +1149,7 @@ export class CodexManager extends AbstractCliManager {
   /**
    * Get debug state information for a panel
    */
-  async getDebugState(panelId: string): Promise<any> {
+  async getDebugState(panelId: string): Promise<CodexDebugState> {
     this.logger?.info(`[codex] Getting debug state for panel ${panelId}`);
     
     const cliProcess = this.processes.get(panelId);
@@ -1146,7 +1180,7 @@ export class CodexManager extends AbstractCliManager {
     }
     
     // Get panel state for additional info
-    const panelState = panel?.state?.customState as any;
+    const panelState = panel?.state?.customState as CodexPanelState;
     
     // Get Codex session ID for resume capability
     let codexSessionId = null;
@@ -1157,7 +1191,7 @@ export class CodexManager extends AbstractCliManager {
       this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from panel state: ${codexSessionId}`);
     } else if (this.sessionManager) {
       // Fallback to trying to get from sessionManager/db directly
-      const db = (this.sessionManager as any).db;
+      const db = (this.sessionManager as { db?: { getPanel: (id: string) => { state?: { customState?: CodexPanelState } } | null } }).db;
       if (db) {
         const dbPanel = db.getPanel(panelId);
         if (dbPanel?.state?.customState?.agentSessionId || dbPanel?.state?.customState?.codexSessionId) {
@@ -1181,7 +1215,7 @@ export class CodexManager extends AbstractCliManager {
     // Get message statistics
     const outputs = this.sessionManager.getSessionOutputsForPanel(panelId);
     const messageStats = {
-      totalMessagesReceived: outputs.filter((o: any) => o.type === 'json').length,
+      totalMessagesReceived: outputs.filter((o: { type?: string }) => o.type === 'json').length,
       totalMessagesSent: 0, // Interactive mode doesn't track sent messages the same way
     };
     

@@ -3,13 +3,14 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { CodexManager } from './codexManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { ConversationMessage } from '../../../database/models';
 import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig } from '../../../../../shared/types/aiPanelConfig';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
 import type { CodexPanelState } from '../../../../../shared/types/panels';
 
 const SIGNAL_NAME_BY_VALUE: Map<number, string> = (() => {
   const map = new Map<number, string>();
-  const signals = (os.constants as any)?.signals as Record<string, number> | undefined;
+  const signals = (os.constants as { signals?: Record<string, number> })?.signals;
   if (signals) {
     for (const [name, value] of Object.entries(signals)) {
       if (typeof value === 'number') {
@@ -51,7 +52,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    * Extract Codex-specific configuration parameters
    * Codex uses: model, modelProvider, thinkingLevel, approvalPolicy, sandboxMode, webSearch
    */
-  protected extractAgentConfig(config: AIPanelConfig): any[] {
+  protected extractAgentConfig(config: AIPanelConfig): [string, string, string, string, string, boolean] {
     return [
       config.model || DEFAULT_CODEX_MODEL,
       config.modelProvider || 'openai',
@@ -334,7 +335,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     panelId: string, 
     worktreePath: string, 
     prompt: string, 
-    conversationHistory: any[],
+    conversationHistory: ConversationMessage[],
     model?: string,
     modelProvider?: string,
     thinkingLevel?: 'low' | 'medium' | 'high',
@@ -347,7 +348,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     panelIdOrConfig: string | ContinuePanelConfig,
     worktreePath?: string,
     prompt?: string,
-    conversationHistory?: any[],
+    conversationHistory?: ConversationMessage[],
     model?: string,
     modelProvider?: string,
     thinkingLevel?: 'low' | 'medium' | 'high',
@@ -382,7 +383,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     panelId: string,
     worktreePath: string,
     initialPrompt: string,
-    conversationHistory: string[]
+    conversationHistory: ConversationMessage[]
   ): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
     if (!mapping) {

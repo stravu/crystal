@@ -4,11 +4,52 @@ import { usePanelStore } from '../stores/panelStore';
 import type { Session } from '../types/session';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
+// Type definitions for attachments and messages
+interface AttachedText {
+  content: string;
+  [key: string]: unknown;
+}
+
+interface AttachedImage {
+  name: string;
+  dataUrl: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+interface MessageOptions {
+  attachedTexts?: AttachedText[];
+  attachedImages?: AttachedImage[];
+  [key: string]: unknown;
+}
+
+interface ConversationMessage {
+  type: string;
+  content: unknown;
+  [key: string]: unknown;
+}
+
+interface CodexMessage {
+  msg?: {
+    type: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface CodexPanelEventData {
+  panelId: string;
+  type?: string;
+  data?: unknown;
+  msg?: string;
+  [key: string]: unknown;
+}
+
 interface CodexPanelHook {
   activeSession: Session | null;
   isProcessing: boolean;
   isInitialized: boolean;
-  handleSendMessage: (message: string, options?: any) => Promise<void>;
+  handleSendMessage: (message: string, options?: MessageOptions) => Promise<void>;
   handleApproval: (callId: string, decision: 'approved' | 'denied', type: 'exec' | 'patch') => Promise<void>;
   handleInterrupt: () => Promise<void>;
 }
@@ -17,7 +58,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const initializingRef = useRef(false);
-  const conversationHistoryRef = useRef<any[]>([]);
+  const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   // Get session from panel
   const panel = usePanelStore(state => {
@@ -44,32 +85,43 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
 
   // Listen for Codex events
   useEffect(() => {
-    const handleOutput = (data: any) => {
+    const handleOutput = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
 
         const isCancellationMessage =
           data.type === 'json' &&
-          data.data?.type === 'session' &&
-          data.data?.data?.status === 'cancelled';
+          data.data && 
+          typeof data.data === 'object' && 
+          'type' in data.data && 
+          (data.data as { type?: string; data?: { status?: string } }).type === 'session' &&
+          'data' in data.data &&
+          (data.data as { type?: string; data?: { status?: string } }).data?.status === 'cancelled';
 
         if (isCancellationMessage) {
           setIsProcessing(false);
         }
 
         if (data.type === 'json' && data.data && !isCancellationMessage) {
+          const dataObj = data.data as Record<string, unknown>;
           conversationHistoryRef.current.push({
-            type: data.data.type || 'unknown',
+            type: String(dataObj.type || 'unknown'),
             content: data.data,
-            timestamp: data.timestamp || new Date().toISOString()
+            timestamp: String(data.timestamp || new Date().toISOString())
           });
         }
 
-        if (data.type === 'json' && data.data?.msg?.type === 'task_complete') {
-          setIsProcessing(false);
+        if (data.type === 'json' && data.data && typeof data.data === 'object' && 'msg' in data.data) {
+          const codexMessage = data.data as CodexMessage;
+          if (typeof codexMessage.msg === 'object' && codexMessage.msg?.type === 'task_complete') {
+            setIsProcessing(false);
+          }
         }
 
-        if (data.type === 'json' && data.data?.msg?.type === 'agent_message') {
-          setIsProcessing(false);
+        if (data.type === 'json' && data.data && typeof data.data === 'object' && 'msg' in data.data) {
+          const codexMessage = data.data as CodexMessage;
+          if (typeof codexMessage.msg === 'object' && codexMessage.msg?.type === 'agent_message') {
+            setIsProcessing(false);
+          }
         }
 
         // Don't re-dispatch the event - components already listen to IPC events directly
@@ -77,20 +129,20 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       }
     };
 
-    const handleSpawned = (data: any) => {
+    const handleSpawned = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
         setIsInitialized(true);
         setIsProcessing(false);
       }
     };
 
-    const handleExit = (data: any) => {
+    const handleExit = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
         setIsProcessing(false);
       }
     };
 
-    const handleError = (data: any) => {
+    const handleError = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
         console.error('Codex panel error:', data.error);
         setIsProcessing(false);
@@ -131,7 +183,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           const outputs = await window.electron?.invoke('codexPanel:getOutputs', panelId);
           if (outputs && outputs.length > 0) {
             // Rebuild conversation history from outputs
-            const history: any[] = [];
+            const history: ConversationMessage[] = [];
             for (const output of outputs) {
               if (output.type === 'json' && output.data) {
                 history.push({
@@ -159,7 +211,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     }
   };
 
-  const handleSendMessage = useCallback(async (message: string, options?: any) => {
+  const handleSendMessage = useCallback(async (message: string, options?: MessageOptions) => {
     if (!activeSession || !panelId) {
       return;
     }
@@ -188,7 +240,7 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       try {
         const imagePaths = await window.electronAPI.sessions.saveImages(
           activeSession.id,
-          options.attachedImages.map((img: any) => ({
+          options.attachedImages.map((img: AttachedImage) => ({
             name: img.name,
             dataUrl: img.dataUrl,
             type: img.type,

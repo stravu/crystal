@@ -89,6 +89,65 @@ export interface SessionUpdate {
   skip_continue_next?: boolean;
 }
 
+// Claude message content types
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface ToolUseContent {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, any>;
+}
+
+export interface ToolResultContent {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
+export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
+
+// JSON message structure from Claude
+export interface ClaudeJsonMessage {
+  id?: string;
+  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'result' | 'thinking';
+  role?: 'user' | 'assistant' | 'system';
+  content?: string | MessageContent[];
+  message?: { 
+    content?: string | MessageContent[];
+    [key: string]: any;
+  };
+  timestamp: string;
+  name?: string;
+  input?: Record<string, any>;
+  tool_use_id?: string;
+  parent_tool_use_id?: string;
+  session_id?: string;
+  text?: string;
+  subtype?: string;
+  cwd?: string;
+  model?: string;
+  tools?: any[];
+  mcp_servers?: any[];
+  permissionMode?: string;
+  summary?: string;
+  error?: string;
+  details?: string;
+  raw_output?: string;
+  is_error?: boolean;
+  result?: string;
+  duration_ms?: number;
+  total_cost_usd?: number;
+  num_turns?: number;
+  cost_usd?: number;
+  thinking?: string;
+  [key: string]: any;
+}
+
 export interface SessionOutput {
   sessionId: string;
   type: 'stdout' | 'stderr' | 'json' | 'error';

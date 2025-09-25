@@ -1,4 +1,87 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { CreateSessionRequest, Session } from './types/session';
+import type { AppConfig, UpdateConfigRequest } from './types/config';
+import type { CreateProjectRequest, UpdateProjectRequest, Project } from '../../frontend/src/types/project';
+import type { ToolPanel } from '../../shared/types/panels';
+
+interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  source?: string;
+}
+
+interface DialogOptions {
+  title?: string;
+  defaultPath?: string;
+  buttonLabel?: string;
+  filters?: { name: string; extensions: string[] }[];
+  properties?: string[];
+}
+
+interface DashboardUpdateData {
+  type: 'status' | 'session' | 'project';
+  projectId?: number;
+  sessionId?: string;
+  data: unknown;
+}
+
+interface GitStatusUpdateData {
+  sessionId: string;
+  gitStatus: {
+    state: string;
+    ahead?: number;
+    behind?: number;
+    additions?: number;
+    deletions?: number;
+    filesChanged?: number;
+  };
+}
+
+interface SessionOutputData {
+  sessionId: string;
+  type: 'stdout' | 'stderr' | 'json' | 'error';
+  data: unknown;
+  timestamp: string;
+  panelId?: string;
+}
+
+interface Folder {
+  id: string;
+  name: string;
+  project_id: number;
+  parent_folder_id?: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface VersionInfo {
+  current: string;
+  latest: string;
+  hasUpdate: boolean;
+  releaseNotes?: string;
+}
+
+interface UpdaterInfo {
+  version: string;
+  releaseDate?: string;
+  releaseNotes?: string;
+  path?: string;
+  sha512?: string;
+  size?: number;
+}
+
+interface CodexPanelSettings {
+  model?: string;
+  modelProvider?: string;
+  approvalPolicy?: 'auto' | 'manual';
+  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  webSearch?: boolean;
+  thinkingLevel?: 'low' | 'medium' | 'high';
+  lastPrompt?: string;
+  lastActivityTime?: string;
+}
 
 // Increase max listeners for ipcRenderer to prevent warnings when many components listen to events
 ipcRenderer.setMaxListeners(50);
@@ -14,10 +97,10 @@ if (process.env.NODE_ENV !== 'production') {
   };
 
   // Override console methods to capture frontend logs
-  ['log', 'warn', 'error', 'info', 'debug'].forEach(level => {
-    (console as any)[level] = (...args: any[]) => {
+  (['log', 'warn', 'error', 'info', 'debug'] as const).forEach(level => {
+    (console as unknown as Record<string, (...args: unknown[]) => void>)[level] = (...args: unknown[]) => {
       // Call original console first so they still appear in DevTools
-      (originalConsole as any)[level](...args);
+      (originalConsole as unknown as Record<string, (...args: unknown[]) => void>)[level](...args);
       
       // Send to main process for file logging
       try {
@@ -45,7 +128,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Response type for IPC calls
-interface IPCResponse<T = any> {
+interface IPCResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -53,7 +136,7 @@ interface IPCResponse<T = any> {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Generic invoke method for direct IPC calls
-  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+  invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
   
   // Basic app info
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
@@ -80,7 +163,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAllWithProjects: (): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-all-with-projects'),
     getArchivedWithProjects: (): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-archived-with-projects'),
     get: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get', sessionId),
-    create: (request: any): Promise<IPCResponse> => ipcRenderer.invoke('sessions:create', request),
+    create: (request: CreateSessionRequest): Promise<IPCResponse> => ipcRenderer.invoke('sessions:create', request),
     delete: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:delete', sessionId),
     sendInput: (sessionId: string, input: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:input', sessionId, input),
     continue: (sessionId: string, prompt?: string, model?: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:continue', sessionId, prompt, model),
@@ -151,16 +234,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Log operations
     getLogs: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:get-logs', sessionId),
     clearLogs: (sessionId: string): Promise<IPCResponse> => ipcRenderer.invoke('sessions:clear-logs', sessionId),
-    addLog: (sessionId: string, entry: any): Promise<IPCResponse> => ipcRenderer.invoke('sessions:add-log', sessionId, entry),
+    addLog: (sessionId: string, entry: LogEntry): Promise<IPCResponse> => ipcRenderer.invoke('sessions:add-log', sessionId, entry),
   },
 
   // Project management
   projects: {
     getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('projects:get-all'),
     getActive: (): Promise<IPCResponse> => ipcRenderer.invoke('projects:get-active'),
-    create: (projectData: any): Promise<IPCResponse> => ipcRenderer.invoke('projects:create', projectData),
+    create: (projectData: CreateProjectRequest): Promise<IPCResponse> => ipcRenderer.invoke('projects:create', projectData),
     activate: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:activate', projectId),
-    update: (projectId: string, updates: any): Promise<IPCResponse> => ipcRenderer.invoke('projects:update', projectId, updates),
+    update: (projectId: string, updates: UpdateProjectRequest): Promise<IPCResponse> => ipcRenderer.invoke('projects:update', projectId, updates),
     delete: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:delete', projectId),
     detectBranch: (path: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:detect-branch', path),
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>): Promise<IPCResponse> => ipcRenderer.invoke('projects:reorder', projectOrders),
@@ -188,9 +271,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Configuration
   config: {
     get: (): Promise<IPCResponse> => ipcRenderer.invoke('config:get'),
-    update: (updates: any): Promise<IPCResponse> => ipcRenderer.invoke('config:update', updates),
+    update: (updates: UpdateConfigRequest): Promise<IPCResponse> => ipcRenderer.invoke('config:update', updates),
     getSessionPreferences: (): Promise<IPCResponse> => ipcRenderer.invoke('config:get-session-preferences'),
-    updateSessionPreferences: (preferences: any): Promise<IPCResponse> => ipcRenderer.invoke('config:update-session-preferences', preferences),
+    updateSessionPreferences: (preferences: AppConfig['sessionCreationPreferences']): Promise<IPCResponse> => ipcRenderer.invoke('config:update-session-preferences', preferences),
   },
 
   // Prompts
@@ -207,13 +290,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Dialog
   dialog: {
-    openFile: (options?: any): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-file', options),
-    openDirectory: (options?: any): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-directory', options),
+    openFile: (options?: DialogOptions): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-file', options),
+    openDirectory: (options?: DialogOptions): Promise<IPCResponse<string | null>> => ipcRenderer.invoke('dialog:open-directory', options),
   },
 
   // Permissions
   permissions: {
-    respond: (requestId: string, response: any): Promise<IPCResponse> => ipcRenderer.invoke('permission:respond', requestId, response),
+    respond: (requestId: string, response: boolean | { approved: boolean; remember?: boolean }): Promise<IPCResponse> => ipcRenderer.invoke('permission:respond', requestId, response),
     getPending: (): Promise<IPCResponse> => ipcRenderer.invoke('permission:getPending'),
   },
 
@@ -232,13 +315,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dashboard: {
     getProjectStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('dashboard:get-project-status', projectId),
     getProjectStatusProgressive: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('dashboard:get-project-status-progressive', projectId),
-    onUpdate: (callback: (data: any) => void) => {
-      const subscription = (_event: any, data: any) => callback(data);
+    onUpdate: (callback: (data: DashboardUpdateData) => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent, data: DashboardUpdateData) => callback(data);
       ipcRenderer.on('dashboard:update', subscription);
       return () => ipcRenderer.removeListener('dashboard:update', subscription);
     },
-    onSessionUpdate: (callback: (data: any) => void) => {
-      const subscription = (_event: any, data: any) => callback(data);
+    onSessionUpdate: (callback: (data: DashboardUpdateData) => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent, data: DashboardUpdateData) => callback(data);
       ipcRenderer.on('dashboard:session-update', subscription);
       return () => ipcRenderer.removeListener('dashboard:session-update', subscription);
     },
@@ -255,108 +338,108 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Event listeners for real-time updates
   events: {
     // Session events
-    onSessionCreated: (callback: (session: any) => void) => {
-      const wrappedCallback = (_event: any, session: any) => callback(session);
+    onSessionCreated: (callback: (session: Session) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, session: Session) => callback(session);
       ipcRenderer.on('session:created', wrappedCallback);
       return () => ipcRenderer.removeListener('session:created', wrappedCallback);
     },
-    onSessionUpdated: (callback: (session: any) => void) => {
-      const wrappedCallback = (_event: any, session: any) => callback(session);
+    onSessionUpdated: (callback: (session: Session) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, session: Session) => callback(session);
       ipcRenderer.on('session:updated', wrappedCallback);
       return () => ipcRenderer.removeListener('session:updated', wrappedCallback);
     },
-    onSessionDeleted: (callback: (session: any) => void) => {
-      const wrappedCallback = (_event: any, session: any) => callback(session);
+    onSessionDeleted: (callback: (session: Session) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, session: Session) => callback(session);
       ipcRenderer.on('session:deleted', wrappedCallback);
       return () => ipcRenderer.removeListener('session:deleted', wrappedCallback);
     },
-    onSessionsLoaded: (callback: (sessions: any[]) => void) => {
-      const wrappedCallback = (_event: any, sessions: any[]) => callback(sessions);
+    onSessionsLoaded: (callback: (sessions: Session[]) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, sessions: Session[]) => callback(sessions);
       ipcRenderer.on('sessions:loaded', wrappedCallback);
       return () => ipcRenderer.removeListener('sessions:loaded', wrappedCallback);
     },
-    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => {
-      const wrappedCallback = (_event: any, data: { sessionId: string; gitStatus: any }) => callback(data);
+    onGitStatusUpdated: (callback: (data: GitStatusUpdateData) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: GitStatusUpdateData) => callback(data);
       ipcRenderer.on('git-status-updated', wrappedCallback);
       return () => ipcRenderer.removeListener('git-status-updated', wrappedCallback);
     },
     onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => {
-      const wrappedCallback = (_event: any, data: { sessionId: string }) => callback(data);
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: { sessionId: string }) => callback(data);
       ipcRenderer.on('git-status-loading', wrappedCallback);
       return () => ipcRenderer.removeListener('git-status-loading', wrappedCallback);
     },
-    onSessionOutput: (callback: (output: any) => void) => {
-      const wrappedCallback = (_event: any, output: any) => callback(output);
+    onSessionOutput: (callback: (output: SessionOutputData) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, output: SessionOutputData) => callback(output);
       ipcRenderer.on('session:output', wrappedCallback);
       return () => ipcRenderer.removeListener('session:output', wrappedCallback);
     },
-    onSessionLog: (callback: (data: any) => void) => {
-      const wrappedCallback = (_event: any, data: any) => callback(data);
+    onSessionLog: (callback: (data: LogEntry) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: LogEntry) => callback(data);
       ipcRenderer.on('session-log', wrappedCallback);
       return () => ipcRenderer.removeListener('session-log', wrappedCallback);
     },
     onSessionLogsCleared: (callback: (data: { sessionId: string }) => void) => {
-      const wrappedCallback = (_event: any, data: { sessionId: string }) => callback(data);
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: { sessionId: string }) => callback(data);
       ipcRenderer.on('session-logs-cleared', wrappedCallback);
       return () => ipcRenderer.removeListener('session-logs-cleared', wrappedCallback);
     },
-    onSessionOutputAvailable: (callback: (info: any) => void) => {
-      const wrappedCallback = (_event: any, info: any) => callback(info);
+    onSessionOutputAvailable: (callback: (info: { sessionId: string; hasNewOutput: boolean }) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, info: { sessionId: string; hasNewOutput: boolean }) => callback(info);
       ipcRenderer.on('session:output-available', wrappedCallback);
       return () => ipcRenderer.removeListener('session:output-available', wrappedCallback);
     },
     
     // Project events
-    onProjectUpdated: (callback: (project: any) => void) => {
-      const wrappedCallback = (_event: any, project: any) => callback(project);
+    onProjectUpdated: (callback: (project: Project) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, project: Project) => callback(project);
       ipcRenderer.on('project:updated', wrappedCallback);
       return () => ipcRenderer.removeListener('project:updated', wrappedCallback);
     },
     
     // Panel events
-    onPanelCreated: (callback: (panel: any) => void) => {
-      const wrappedCallback = (_event: any, panel: any) => callback(panel);
+    onPanelCreated: (callback: (panel: ToolPanel) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, panel: ToolPanel) => callback(panel);
       ipcRenderer.on('panel:created', wrappedCallback);
       return () => ipcRenderer.removeListener('panel:created', wrappedCallback);
     },
-    onPanelUpdated: (callback: (panel: any) => void) => {
-      const wrappedCallback = (_event: any, panel: any) => callback(panel);
+    onPanelUpdated: (callback: (panel: ToolPanel) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, panel: ToolPanel) => callback(panel);
       ipcRenderer.on('panel:updated', wrappedCallback);
       return () => ipcRenderer.removeListener('panel:updated', wrappedCallback);
     },
     
     // Folder events
-    onFolderCreated: (callback: (folder: any) => void) => {
-      const wrappedCallback = (_event: any, folder: any) => callback(folder);
+    onFolderCreated: (callback: (folder: Folder) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, folder: Folder) => callback(folder);
       ipcRenderer.on('folder:created', wrappedCallback);
       return () => ipcRenderer.removeListener('folder:created', wrappedCallback);
     },
-    onFolderUpdated: (callback: (folder: any) => void) => {
-      const wrappedCallback = (_event: any, folder: any) => callback(folder);
+    onFolderUpdated: (callback: (folder: Folder) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, folder: Folder) => callback(folder);
       ipcRenderer.on('folder:updated', wrappedCallback);
       return () => ipcRenderer.removeListener('folder:updated', wrappedCallback);
     },
     onFolderDeleted: (callback: (folderId: string) => void) => {
-      const wrappedCallback = (_event: any, folderId: string) => callback(folderId);
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, folderId: string) => callback(folderId);
       ipcRenderer.on('folder:deleted', wrappedCallback);
       return () => ipcRenderer.removeListener('folder:deleted', wrappedCallback);
     },
     
     // Panel events
     onPanelPromptAdded: (callback: (data: { panelId: string; content: string }) => void) => {
-      const wrappedCallback = (_event: any, data: { panelId: string; content: string }) => callback(data);
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: { panelId: string; content: string }) => callback(data);
       ipcRenderer.on('panel:prompt-added', wrappedCallback);
       return () => ipcRenderer.removeListener('panel:prompt-added', wrappedCallback);
     },
     
     onPanelResponseAdded: (callback: (data: { panelId: string; content: string }) => void) => {
-      const wrappedCallback = (_event: any, data: { panelId: string; content: string }) => callback(data);
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: { panelId: string; content: string }) => callback(data);
       ipcRenderer.on('panel:response-added', wrappedCallback);
       return () => ipcRenderer.removeListener('panel:response-added', wrappedCallback);
     },
     
-    onTerminalOutput: (callback: (output: any) => void) => {
-      const wrappedCallback = (_event: any, output: any) => callback(output);
+    onTerminalOutput: (callback: (output: SessionOutputData) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, output: SessionOutputData) => callback(output);
       ipcRenderer.on('terminal:output', wrappedCallback);
       return () => ipcRenderer.removeListener('terminal:output', wrappedCallback);
     },
@@ -368,53 +451,53 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // Main process logging
     onMainLog: (callback: (level: string, message: string) => void) => {
-      const wrappedCallback = (_event: any, level: string, message: string) => callback(level, message);
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, level: string, message: string) => callback(level, message);
       ipcRenderer.on('main-log', wrappedCallback);
       return () => ipcRenderer.removeListener('main-log', wrappedCallback);
     },
 
     // Version updates
-    onVersionUpdateAvailable: (callback: (versionInfo: any) => void) => {
-      const wrappedCallback = (_event: any, versionInfo: any) => callback(versionInfo);
+    onVersionUpdateAvailable: (callback: (versionInfo: VersionInfo) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, versionInfo: VersionInfo) => callback(versionInfo);
       ipcRenderer.on('version:update-available', wrappedCallback);
       return () => ipcRenderer.removeListener('version:update-available', wrappedCallback);
     },
     
     // Auto-updater events
     onUpdaterCheckingForUpdate: (callback: () => void) => {
-      const wrappedCallback = (_event: any) => callback();
+      const wrappedCallback = (_event: Electron.IpcRendererEvent) => callback();
       ipcRenderer.on('updater:checking-for-update', wrappedCallback);
       return () => ipcRenderer.removeListener('updater:checking-for-update', wrappedCallback);
     },
-    onUpdaterUpdateAvailable: (callback: (info: any) => void) => {
-      const wrappedCallback = (_event: any, info: any) => callback(info);
+    onUpdaterUpdateAvailable: (callback: (info: UpdaterInfo) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, info: UpdaterInfo) => callback(info);
       ipcRenderer.on('updater:update-available', wrappedCallback);
       return () => ipcRenderer.removeListener('updater:update-available', wrappedCallback);
     },
-    onUpdaterUpdateNotAvailable: (callback: (info: any) => void) => {
-      const wrappedCallback = (_event: any, info: any) => callback(info);
+    onUpdaterUpdateNotAvailable: (callback: (info: UpdaterInfo) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, info: UpdaterInfo) => callback(info);
       ipcRenderer.on('updater:update-not-available', wrappedCallback);
       return () => ipcRenderer.removeListener('updater:update-not-available', wrappedCallback);
     },
-    onUpdaterDownloadProgress: (callback: (progressInfo: any) => void) => {
-      const wrappedCallback = (_event: any, progressInfo: any) => callback(progressInfo);
+    onUpdaterDownloadProgress: (callback: (progressInfo: { percent: number; bytesPerSecond: number; total: number; transferred: number }) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, progressInfo: { percent: number; bytesPerSecond: number; total: number; transferred: number }) => callback(progressInfo);
       ipcRenderer.on('updater:download-progress', wrappedCallback);
       return () => ipcRenderer.removeListener('updater:download-progress', wrappedCallback);
     },
-    onUpdaterUpdateDownloaded: (callback: (info: any) => void) => {
-      const wrappedCallback = (_event: any, info: any) => callback(info);
+    onUpdaterUpdateDownloaded: (callback: (info: UpdaterInfo) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, info: UpdaterInfo) => callback(info);
       ipcRenderer.on('updater:update-downloaded', wrappedCallback);
       return () => ipcRenderer.removeListener('updater:update-downloaded', wrappedCallback);
     },
-    onUpdaterError: (callback: (error: any) => void) => {
-      const wrappedCallback = (_event: any, error: any) => callback(error);
+    onUpdaterError: (callback: (error: Error) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, error: Error) => callback(error);
       ipcRenderer.on('updater:error', wrappedCallback);
       return () => ipcRenderer.removeListener('updater:error', wrappedCallback);
     },
     
     // Process management events
-    onZombieProcessesDetected: (callback: (data: any) => void) => {
-      const wrappedCallback = (_event: any, data: any) => callback(data);
+    onZombieProcessesDetected: (callback: (data: { count: number; processes: string[] }) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: { count: number; processes: string[] }) => callback(data);
       ipcRenderer.on('zombie-processes-detected', wrappedCallback);
       return () => ipcRenderer.removeListener('zombie-processes-detected', wrappedCallback);
     },
@@ -439,7 +522,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Codex panel operations
   codexPanels: {
     getSettings: (panelId: string): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:get-settings', panelId),
-    setSettings: (panelId: string, settings: Record<string, any>): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:set-settings', panelId, settings),
+    setSettings: (panelId: string, settings: CodexPanelSettings): Promise<IPCResponse> => ipcRenderer.invoke('codexPanel:set-settings', panelId, settings),
   },
 
   // Logs panel operations
@@ -458,8 +541,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Expose electron event listeners and utilities for permission requests
 contextBridge.exposeInMainWorld('electron', {
   openExternal: (url: string) => ipcRenderer.invoke('openExternal', url),
-  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
-  on: (channel: string, callback: (...args: any[]) => void) => {
+  invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
+  on: (channel: string, callback: (...args: unknown[]) => void) => {
     const validChannels = [
       'permission:request',
       'codexPanel:output',
@@ -471,7 +554,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on(channel, (_event, ...args) => callback(...args));
     }
   },
-  off: (channel: string, callback: (...args: any[]) => void) => {
+  off: (channel: string, callback: (...args: unknown[]) => void) => {
     const validChannels = [
       'permission:request',
       'codexPanel:output',

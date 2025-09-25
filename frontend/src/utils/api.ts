@@ -1,4 +1,7 @@
 // Utility for making API calls using Electron IPC
+import type { CreateSessionRequest } from '../types/session';
+import type { Project } from '../types/project';
+import type { SessionCreationPreferences } from '../stores/sessionPreferencesStore';
 
 // Type for IPC response
 export interface IPCResponse<T = any> {
@@ -7,6 +10,24 @@ export interface IPCResponse<T = any> {
   error?: string;
   details?: string;
   command?: string;
+}
+
+// Type for Git error response
+export interface GitErrorResponse extends IPCResponse {
+  gitError?: {
+    command?: string;
+    commands?: string[];
+    output?: string;
+    workingDirectory?: string;
+    projectPath?: string;
+    originalError?: string;
+    hasConflicts?: boolean;
+    conflictingFiles?: string[];
+    conflictingCommits?: {
+      ours: any[];
+      theirs: any[];
+    };
+  };
 }
 
 // Check if we're running in Electron
@@ -38,7 +59,7 @@ export class API {
       return window.electronAPI.sessions.get(sessionId);
     },
 
-    async create(request: any) {
+    async create(request: CreateSessionRequest) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.sessions.create(request);
     },
@@ -272,7 +293,7 @@ export class API {
       return window.electronAPI.projects.getActive();
     },
 
-    async create(projectData: any) {
+    async create(projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.projects.create(projectData);
     },
@@ -282,7 +303,7 @@ export class API {
       return window.electronAPI.projects.activate(projectId);
     },
 
-    async update(projectId: string, updates: any) {
+    async update(projectId: string, updates: Partial<Project>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.projects.update(projectId, updates);
     },
@@ -353,7 +374,7 @@ export class API {
       return window.electronAPI.config.get();
     },
 
-    async update(updates: any) {
+    async update(updates: Record<string, unknown>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.config.update(updates);
     },
@@ -363,7 +384,7 @@ export class API {
       return window.electronAPI.config.getSessionPreferences();
     },
 
-    async updateSessionPreferences(preferences: any) {
+    async updateSessionPreferences(preferences: SessionCreationPreferences) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.config.updateSessionPreferences(preferences);
     },
@@ -384,12 +405,12 @@ export class API {
 
   // Dialog
   static dialog = {
-    async openFile(options?: any) {
+    async openFile(options?: Record<string, unknown>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.dialog.openFile(options);
     },
 
-    async openDirectory(options?: any) {
+    async openDirectory(options?: Record<string, unknown>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.dialog.openDirectory(options);
     },
@@ -397,7 +418,7 @@ export class API {
 
   // Permissions
   static permissions = {
-    async respond(requestId: string, response: any) {
+    async respond(requestId: string, response: { allow: boolean; reason?: string }) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.permissions.respond(requestId, response);
     },
@@ -469,12 +490,12 @@ export class API {
       return window.electronAPI.dashboard.getProjectStatusProgressive(projectId);
     },
 
-    onUpdate(callback: (data: any) => void) {
+    onUpdate(callback: (data: Record<string, unknown>) => void) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.dashboard.onUpdate(callback);
     },
 
-    onSessionUpdate(callback: (data: any) => void) {
+    onSessionUpdate(callback: (data: { type: string; projectId?: number; sessionId?: string; data: unknown }) => void) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.dashboard.onSessionUpdate(callback);
     },
@@ -533,7 +554,7 @@ export class API {
       return window.electronAPI.codexPanels.getSettings(panelId);
     },
     
-    async setSettings(panelId: string, settings: Record<string, any>) {
+    async setSettings(panelId: string, settings: Record<string, unknown>) {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.codexPanels.setSettings(panelId, settings);
     },

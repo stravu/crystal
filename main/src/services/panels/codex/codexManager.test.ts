@@ -16,6 +16,9 @@ const testLogger: any = {
 
 // Mock session manager
 const mockSessionManager = {
+  db: {
+    getPanel: (panelId: string) => null
+  },
   getDbSession: (sessionId: string) => ({ id: sessionId }),
   getProjectById: (projectId: string) => null,
   getPanelClaudeSessionId: (panelId: string) => null,
@@ -37,7 +40,7 @@ async function testCodexManager() {
   
   // Create manager instance
   const manager = new CodexManager(
-    mockSessionManager,
+    mockSessionManager as any,
     testLogger,
     mockConfigManager
   );
