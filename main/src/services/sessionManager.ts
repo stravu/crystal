@@ -49,12 +49,7 @@ export class SessionManager extends EventEmitter {
     if (!this.activeProject) {
       this.activeProject = this.db.getActiveProject() || null;
       if (this.activeProject) {
-        console.log(`[SessionManager] Active project loaded from DB:`, {
-          id: this.activeProject.id,
-          name: this.activeProject.name,
-          build_script: this.activeProject.build_script,
-          run_script: this.activeProject.run_script
-        });
+        // Active project loaded successfully
       }
     }
     return this.activeProject;
@@ -67,7 +62,6 @@ export class SessionManager extends EventEmitter {
   getClaudeSessionId(id: string): string | undefined {
     const dbSession = this.db.getSession(id);
     const claudeSessionId = dbSession?.claude_session_id;
-    console.log(`[SessionManager] Getting Claude session ID for Crystal session ${id}: ${claudeSessionId || 'not found'}`);
     return claudeSessionId;
   }
 
@@ -78,7 +72,6 @@ export class SessionManager extends EventEmitter {
       // Check new agentSessionId first, then fall back to legacy claudeSessionId
       const panelState = panel?.state?.customState as BaseAIPanelState | undefined;
       const claudeSessionId = panelState?.agentSessionId || panelState?.claudeSessionId;
-      console.log(`[SessionManager] Getting Claude session ID for panel ${panelId}: ${claudeSessionId || 'not found'}`);
       return claudeSessionId;
     } catch (e) {
       return undefined;
@@ -92,7 +85,6 @@ export class SessionManager extends EventEmitter {
       // Check new agentSessionId first, then fall back to legacy codexSessionId
       const panelState = panel?.state?.customState as BaseAIPanelState | undefined;
       const codexSessionId = panelState?.agentSessionId || panelState?.codexSessionId;
-      console.log(`[SessionManager] Getting Codex session ID for panel ${panelId}: ${codexSessionId || 'not found'}`);
       return codexSessionId;
     } catch (e) {
       return undefined;
@@ -108,7 +100,6 @@ export class SessionManager extends EventEmitter {
       const agentSessionId = customState?.agentSessionId || 
                              customState?.claudeSessionId || 
                              customState?.codexSessionId;
-      console.log(`[SessionManager] Getting agent session ID for panel ${panelId}: ${agentSessionId || 'not found'}`);
       return agentSessionId;
     } catch (e) {
       return undefined;
@@ -279,8 +270,6 @@ export class SessionManager extends EventEmitter {
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
     commitModeSettings?: string
   ): Session {
-    console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
-    
     // Ensure this session ID isn't already being created
     if (this.activeSessions.has(id) || this.db.getSession(id)) {
       throw new Error(`Session with ID ${id} already exists`);
@@ -303,8 +292,6 @@ export class SessionManager extends EventEmitter {
         throw new Error('No project specified and no active project selected');
       }
     }
-    
-    console.log(`[SessionManager] Target project:`, targetProject);
 
     const sessionData: CreateSessionData = {
       id,
@@ -324,14 +311,11 @@ export class SessionManager extends EventEmitter {
       commit_mode: commitMode,
       commit_mode_settings: commitModeSettings
     };
-    console.log(`[SessionManager] Session data:`, sessionData);
 
     const dbSession = this.db.createSession(sessionData);
-    console.log(`[SessionManager] Database session created:`, dbSession);
     
     const session = this.convertDbSessionToSession(dbSession);
     session.toolType = toolType || session.toolType;
-    console.log(`[SessionManager] Converted session:`, session);
     
     this.activeSessions.set(session.id, session);
     // Don't emit the event here - let the caller decide when to emit it

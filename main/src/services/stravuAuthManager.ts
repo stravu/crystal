@@ -60,7 +60,6 @@ export class StravuAuthManager extends EventEmitter {
 
   private setStoreData(data: Record<string, unknown>): void {
     // MCP functionality disabled - no credential storage
-    this.logger.info('MCP credential storage is disabled');
   }
 
   async authenticate(): Promise<AuthResult> {
@@ -68,7 +67,6 @@ export class StravuAuthManager extends EventEmitter {
     this.connectionStatus = 'error';
     this.emit('status-changed', this.getConnectionState());
     const error = new Error('Functionality coming soon');
-    this.logger.info(`MCP authentication: ${error.message}`);
     throw error;
   }
 
@@ -98,7 +96,6 @@ export class StravuAuthManager extends EventEmitter {
         };
 
         this.logger.info('Authentication successful');
-        this.logger.info(`JWT expires at: ${status.expires_at || 'not provided'}`);
 
         await this.storeCredentials(authResult);
         this.connectionStatus = 'connected';
@@ -149,7 +146,6 @@ export class StravuAuthManager extends EventEmitter {
 
   private async loadStoredCredentials(): Promise<void> {
     // MCP functionality disabled - no credential loading
-    this.logger.info('MCP functionality coming soon');
     this.connectionStatus = 'disconnected';
     this.emit('status-changed', this.getConnectionState());
   }
@@ -172,8 +168,6 @@ export class StravuAuthManager extends EventEmitter {
       throw new Error('Not authenticated');
     }
 
-    this.logger.info(`Making authenticated request to: ${STRAVU_API_BASE}${endpoint}`);
-
     const response = await fetch(`${STRAVU_API_BASE}${endpoint}`, {
       ...options,
       headers: {
@@ -182,8 +176,6 @@ export class StravuAuthManager extends EventEmitter {
         ...options.headers
       }
     });
-
-    this.logger.info(`Response status: ${response.status} ${response.statusText}`);
 
     if (response.status === 401) {
       // JWT expired or revoked, trigger re-auth
@@ -242,7 +234,6 @@ export class StravuAuthManager extends EventEmitter {
   // Test connection with a simple ping
   async testConnection(): Promise<boolean> {
     // MCP functionality disabled
-    this.logger.info('MCP functionality coming soon');
     return false;
   }
 }

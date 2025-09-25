@@ -36,7 +36,6 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   // Update checking
   autoUpdater.on('checking-for-update', () => {
-    console.log('[AutoUpdater] Checking for updates...');
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('updater:checking-for-update');
@@ -45,7 +44,6 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   // Update available
   autoUpdater.on('update-available', (info) => {
-    console.log('[AutoUpdater] Update available:', info);
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('updater:update-available', info);
@@ -54,7 +52,6 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   // No update available
   autoUpdater.on('update-not-available', (info) => {
-    console.log('[AutoUpdater] No update available:', info);
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('updater:update-not-available', info);
@@ -63,7 +60,6 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   // Download progress
   autoUpdater.on('download-progress', (progressInfo) => {
-    console.log('[AutoUpdater] Download progress:', progressInfo.percent);
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('updater:download-progress', progressInfo);
@@ -72,7 +68,6 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   // Update downloaded
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[AutoUpdater] Update downloaded:', info);
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('updater:update-downloaded', info);

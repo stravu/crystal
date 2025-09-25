@@ -59,7 +59,6 @@ export class StravuMcpService extends EventEmitter {
   async testConnection(): Promise<boolean> {
     try {
       // Always fail connection test - MCP functionality disabled
-      console.log('[StravuMcpService] MCP functionality is temporarily disabled');
       return false;
     } catch (error) {
       console.error('[StravuMcpService] Connection test failed:', error);

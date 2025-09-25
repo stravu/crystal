@@ -19,13 +19,11 @@ export class SimpleQueue<T, R = unknown> extends EventEmitter {
   constructor(name: string, concurrency = 1) {
     super();
     this.concurrency = concurrency;
-    console.log(`[SimpleQueue] Created queue: ${name} with concurrency: ${concurrency}`);
   }
 
   process(concurrency: number, processor: (job: Job<T, R>) => Promise<R>) {
     this.concurrency = concurrency;
     this.processor = processor;
-    console.log(`[SimpleQueue] Processor registered`);
     this.startProcessing();
   }
 
@@ -39,7 +37,6 @@ export class SimpleQueue<T, R = unknown> extends EventEmitter {
     this.jobs.set(job.id, job);
     this.queue.push(job.id);
     
-    console.log(`[SimpleQueue] Job ${job.id} added to queue`);
     this.emit('waiting', job);
     
     // Start processing if not already running
@@ -70,14 +67,12 @@ export class SimpleQueue<T, R = unknown> extends EventEmitter {
     
     this.activeJobs++;
     job.status = 'active';
-    console.log(`[SimpleQueue] Processing job ${job.id} (active jobs: ${this.activeJobs}/${this.concurrency})`);
     this.emit('active', job);
     
     try {
       const result = await this.processor!(job);
       job.status = 'completed';
       job.result = result;
-      console.log(`[SimpleQueue] Job ${job.id} completed`);
       this.emit('completed', job, result);
     } catch (error) {
       job.status = 'failed';

@@ -730,7 +730,7 @@ export class DatabaseService {
       try {
         // No longer detecting based on model since it's panel-level now
       } catch (error) {
-        console.error('[Database] Failed to backfill tool_type for Codex sessions:', error);
+        // Migration error handling removed - empty try/catch serves no purpose
       }
     }
 

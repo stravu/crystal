@@ -23,15 +23,12 @@ export class TerminalPanelManager {
   
   async initializeTerminal(panel: ToolPanel, cwd: string): Promise<void> {
     if (this.terminals.has(panel.id)) {
-      console.log(`[TerminalPanelManager] Terminal ${panel.id} already initialized`);
       return;
     }
     
-    console.log(`[TerminalPanelManager] Initializing terminal ${panel.id} in ${cwd}`);
     
     // Determine shell based on platform using the detector from the legacy terminal manager
     const shellInfo = ShellDetector.getDefaultShell();
-    console.log(`[TerminalPanelManager] Using shell ${shellInfo.path} (${shellInfo.name})`);
 
     const isLinux = process.platform === 'linux';
     const enhancedPath = isLinux ? (process.env.PATH || '') : getShellPath();
@@ -83,7 +80,6 @@ export class TerminalPanelManager {
     
     await panelManager.updatePanel(panel.id, { state });
     
-    console.log(`[TerminalPanelManager] Terminal ${panel.id} initialized successfully`);
   }
   
   private setupTerminalHandlers(terminal: TerminalProcess): void {
@@ -264,7 +260,6 @@ export class TerminalPanelManager {
     
     await panelManager.updatePanel(panelId, { state });
     
-    console.log(`[TerminalPanelManager] Saved state for terminal ${panelId}`);
   }
   
   private async getProcessCwd(pid: number): Promise<string> {
@@ -284,7 +279,6 @@ export class TerminalPanelManager {
   
   async restoreTerminalState(panel: ToolPanel, state: TerminalPanelState): Promise<void> {
     if (!state.scrollbackBuffer || state.scrollbackBuffer.length === 0) {
-      console.log(`[TerminalPanelManager] No state to restore for terminal ${panel.id}`);
       return;
     }
     
@@ -310,8 +304,6 @@ export class TerminalPanelManager {
         output: restoredOutput + restorationMsg
       });
     }
-    
-    console.log(`[TerminalPanelManager] Restored state for terminal ${panel.id}`);
   }
   
   getTerminalState(panelId: string): TerminalPanelState | null {
@@ -332,7 +324,6 @@ export class TerminalPanelManager {
   destroyTerminal(panelId: string): void {
     const terminal = this.terminals.get(panelId);
     if (!terminal) {
-      console.log(`[TerminalPanelManager] Terminal ${panelId} not found for destruction`);
       return;
     }
     
@@ -348,13 +339,9 @@ export class TerminalPanelManager {
     
     // Remove from map
     this.terminals.delete(panelId);
-    
-    console.log(`[TerminalPanelManager] Destroyed terminal ${panelId}`);
   }
   
   destroyAllTerminals(): void {
-    console.log(`[TerminalPanelManager] Destroying all ${this.terminals.size} terminals...`);
-    
     for (const [panelId, terminal] of this.terminals) {
       try {
         terminal.pty.kill();

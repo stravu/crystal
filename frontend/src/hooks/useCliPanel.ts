@@ -149,7 +149,6 @@ export function useCliPanel(
       setError(null);
       // TODO: Implement proper API when available
       // For now, this is a placeholder for future implementation
-      console.log('Sending input to CLI panel:', panelId, inputOptions);
       
       // Add user input to outputs
       const userOutput: CliOutput = {
@@ -183,7 +182,6 @@ export function useCliPanel(
       setProcessStatus('initializing');
       
       // TODO: Implement proper API when available
-      console.log('Starting CLI process for panel:', panelId, initialPrompt);
       
       // Simulate process start
       setTimeout(() => {
@@ -205,7 +203,6 @@ export function useCliPanel(
     try {
       setError(null);
       // TODO: Implement proper API when available
-      console.log('Stopping CLI process for panel:', panelId);
       
       setProcessStatus('stopped');
     } catch (err) {
@@ -246,7 +243,6 @@ export function useCliPanel(
 
     try {
       // TODO: Implement proper API when available
-      console.log('Exporting conversation for panel:', panelId);
       
       // For now, create a simple text export
       const exportText = outputs.map(o => {
@@ -273,7 +269,6 @@ export function useCliPanel(
    */
   const loadMoreOutputs = useCallback(async () => {
     // TODO: Implement pagination when API is available
-    console.log('Loading more outputs for panel:', panelId);
   }, [panelId]);
 
   /**
@@ -371,7 +366,6 @@ export function useCliPanel(
 
       try {
         // TODO: Implement proper API when available
-        console.log('Loading outputs for panel:', panelId);
         
         // For now, use empty outputs
         const mockOutputs: CliOutput[] = [];

@@ -99,12 +99,9 @@ export function DraggableProjectTreeView() {
     const now = Date.now();
     const timeSinceLastRender = now - lastRenderTimeRef.current;
     
-    // Log if we're getting too many rapid re-renders (only in development)
+    // Monitor rapid re-renders (development debugging removed)
     if (process.env.NODE_ENV === 'development' && timeSinceLastRender < 100) {
-      console.warn('[DraggableProjectTreeView] Rapid re-render detected:', {
-        renderCount: renderCountRef.current,
-        timeSinceLastRender
-      });
+      // Rapid re-render detection - logging removed to reduce noise
     }
     
     lastRenderTimeRef.current = now;
