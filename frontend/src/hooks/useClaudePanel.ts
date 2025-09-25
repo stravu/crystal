@@ -48,7 +48,6 @@ export const useClaudePanel = (
 
   // Force reset stuck state
   const forceResetLoadingState = useCallback(() => {
-    console.log('[forceResetLoadingState] Forcing reset of all loading states for panel:', panelId);
     loadingRef.current = false;
     loadingPanelIdRef.current = null;
     setIsLoadingOutput(false);
@@ -65,7 +64,6 @@ export const useClaudePanel = (
 
   // Load output content for the panel's associated session
   const loadOutputContent = useCallback(async (sessionId: string, retryCount = 0) => {
-    console.log(`[loadOutputContent] Called for panel ${panelId}, session ${sessionId}, retry: ${retryCount}`);
     
     // Cancel any existing load request
     if (abortControllerRef.current) {
@@ -81,14 +79,12 @@ export const useClaudePanel = (
     
     // Check if already loading this session for this panel
     if (loadingRef.current && loadingPanelIdRef.current === panelId) {
-      console.log(`[loadOutputContent] Already loading for panel ${panelId}, skipping`);
       return;
     }
     
     // Check if session is still active
     const currentActiveSession = useSessionStore.getState().getActiveSession();
     if (!currentActiveSession || currentActiveSession.id !== sessionId) {
-      console.log(`[loadOutputContent] Session ${sessionId} not active, skipping`);
       return;
     }
 
@@ -107,7 +103,6 @@ export const useClaudePanel = (
       const response = await API.panels.getOutput(panelId);
       if (!response.success) {
         if (response.error && response.error.includes('not found')) {
-          console.log(`[loadOutputContent] Session ${sessionId} not found (possibly archived), aborting`);
           loadingRef.current = false;
           loadingPanelIdRef.current = null;
           setIsLoadingOutput(false);
@@ -118,12 +113,10 @@ export const useClaudePanel = (
       }
       
       const outputs = response.data || [];
-      console.log(`[loadOutputContent] Received ${outputs.length} outputs for session ${sessionId} (panel ${panelId})`);
       
       // Check if still the active session after async operation
       const stillActiveSession = useSessionStore.getState().getActiveSession();
       if (!stillActiveSession || stillActiveSession.id !== sessionId) {
-        console.log(`[loadOutputContent] Session ${sessionId} no longer active, aborting`);
         loadingRef.current = false;
         loadingPanelIdRef.current = null;
         setIsLoadingOutput(false);
@@ -132,21 +125,18 @@ export const useClaudePanel = (
       }
       
       // Set outputs in the session store
-      console.log(`[loadOutputContent] Setting outputs in store for session ${sessionId} (panel ${panelId})`);
       useSessionStore.getState().setSessionOutputs(sessionId, outputs);
       
       setOutputLoadState('loaded');
       
       // Reset continuing conversation flag after successfully loading output
       if (isContinuingConversationRef.current) {
-        console.log(`[loadOutputContent] Resetting continuing conversation flag after output load`);
         isContinuingConversationRef.current = false;
       }
       
       setLoadError(null);
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`[loadOutputContent] Request aborted for session ${sessionId} (panel ${panelId})`);
         loadingRef.current = false;
         loadingPanelIdRef.current = null;
         setIsLoadingOutput(false);
@@ -163,7 +153,6 @@ export const useClaudePanel = (
       
       if (retryCount < maxRetries) {
         const delay = 1000 * (retryCount + 1);
-        console.log(`[loadOutputContent] Retrying in ${delay}ms for session ${sessionId} (panel ${panelId})`);
         loadingRef.current = false;
         loadingPanelIdRef.current = null;
         setIsLoadingOutput(false);
@@ -255,15 +244,12 @@ export const useClaudePanel = (
   // Load output when panel becomes active and has an associated session
   useEffect(() => {
     if (isActive && activeSession && outputLoadState === 'idle') {
-      console.log(`[useClaudePanel] Panel ${panelId} became active, loading output for session ${activeSession.id}`);
       loadOutputContent(activeSession.id);
     }
   }, [isActive, activeSession?.id, outputLoadState, loadOutputContent, panelId]);
 
   const handleSendInput = async (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => {
-    console.log('[useClaudePanel] handleSendInput called', { input, activeSession: activeSession?.id, hasActiveSession: !!activeSession, panelId });
     if (!input.trim() || !activeSession) {
-      console.log('[useClaudePanel] handleSendInput early return', { inputTrimmed: !input.trim(), noActiveSession: !activeSession });
       return;
     }
     
@@ -271,7 +257,6 @@ export const useClaudePanel = (
     
     // Check if we have compacted context to inject
     if (contextCompacted && compactedContext) {
-      console.log('[Context Compaction] Injecting compacted context into prompt');
       finalInput = `<session_context>\n${compactedContext}\n</session_context>\n\n${finalInput}`;
       
       // Clear the compacted context after using it
@@ -293,7 +278,6 @@ export const useClaudePanel = (
           );
           
           attachmentPaths.push(textFilePath);
-          console.log(`[Attached Text] Saved ${text.size} characters to: ${textFilePath}`);
         }
       } catch (error) {
         console.error('Failed to save attached text to file:', error);
@@ -315,7 +299,6 @@ export const useClaudePanel = (
         );
         
         attachmentPaths.push(...imagePaths);
-        console.log(`[Attached Images] Saved ${imagePaths.length} images`);
       } catch (error) {
         console.error('Failed to save images:', error);
         // Continue without images on error
@@ -349,7 +332,6 @@ export const useClaudePanel = (
     
     // Check if we have compacted context to inject
     if (contextCompacted && compactedContext) {
-      console.log('[Context Compaction] Injecting compacted context into continuation prompt');
       finalInput = `<session_context>\n${compactedContext}\n</session_context>\n\n${finalInput}`;
       
       // Clear the compacted context after using it
@@ -371,7 +353,6 @@ export const useClaudePanel = (
           );
           
           attachmentPaths.push(textFilePath);
-          console.log(`[Attached Text] Saved ${text.size} characters to: ${textFilePath}`);
         }
       } catch (error) {
         console.error('Failed to save attached text to file:', error);
@@ -393,7 +374,6 @@ export const useClaudePanel = (
         );
         
         attachmentPaths.push(...imagePaths);
-        console.log(`[Attached Images] Saved ${imagePaths.length} images`);
       } catch (error) {
         console.error('Failed to save images:', error);
         // Continue without images on error
@@ -433,7 +413,6 @@ export const useClaudePanel = (
     if (!activeSession) return;
     
     try {
-      console.log('[Context Compaction] Starting compaction for session:', activeSession.id);
       
       // Generate the compacted context
       const response = await API.sessions.generateCompactedContext(activeSession.id);
@@ -442,7 +421,6 @@ export const useClaudePanel = (
         const summary = response.data.summary;
         setCompactedContext(summary);
         setContextCompacted(true);
-        console.log('[Context Compaction] Context successfully compacted');
       } else {
         console.error('[Context Compaction] Failed to compact context:', response.error);
       }

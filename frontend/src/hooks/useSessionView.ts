@@ -471,7 +471,7 @@ export const useSessionView = (
     
     // Check for stuck loading state and force reset if needed
     if (loadingRef.current && outputLoadState === 'idle') {
-      console.warn(`[Output Load Effect] Detected stuck loading state, forcing reset`);
+      // Stuck loading state detected - debug logging removed
       forceResetLoadingState();
     }
     
@@ -770,8 +770,7 @@ export const useSessionView = (
       terminalInstance.current.write(newContent);
       lastProcessedOutputLength.current = formattedOutput.length;
     } else if (formattedOutput.length < lastProcessedOutputLength.current) {
-      // This shouldn't happen, but log it if it does
-      console.warn(`[Terminal Write Effect] Formatted output shrank from ${lastProcessedOutputLength.current} to ${formattedOutput.length}`);
+      // This shouldn't happen, debug logging removed
     }
     
     if (formattedOutput.length > 0) {

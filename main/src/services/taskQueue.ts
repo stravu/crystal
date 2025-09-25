@@ -411,7 +411,6 @@ export class TaskQueue {
               }
             } else {
               console.error(`[TaskQueue] No Claude panel found for session ${session.id} after ${maxAttempts} attempts`);
-              console.error(`[TaskQueue] This indicates the panel creation failed in events.ts. Cannot proceed without a real panel.`);
               throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
             }
           } else {

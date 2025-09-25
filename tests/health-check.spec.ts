@@ -12,8 +12,6 @@ test.describe('Health Check', () => {
     const title = await page.title();
     expect(title).toBeTruthy();
     
-    // Log some debug info
-    console.log('App started successfully with title:', title);
     
     // Take a screenshot for debugging
     await page.screenshot({ path: 'test-results/health-check.png' });

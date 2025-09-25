@@ -259,7 +259,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
       
       setEditorHeight(calculatedHeight);
     } catch (error) {
-      console.debug('Error calculating editor height:', error);
+      // Error calculating editor height - debug logging removed
     }
   }, []);
 
