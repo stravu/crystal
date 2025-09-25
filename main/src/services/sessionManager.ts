@@ -351,19 +351,15 @@ export class SessionManager extends EventEmitter {
     this.activeSessions.set(session.id, session);
     // Don't emit the event here - let the caller decide when to emit it
     // this.emit('session-created', session);
-    console.log(`[SessionManager] Session created (event not emitted yet)`);
     
     return session;
   }
 
   async getOrCreateMainRepoSession(projectId: number): Promise<Session> {
     return await withLock(`main-repo-session-${projectId}`, async () => {
-      console.log(`[SessionManager] Getting or creating main repo session for project ${projectId}`);
-      
       // First check if a main repo session already exists
       const existingSession = this.db.getMainRepoSession(projectId);
       if (existingSession) {
-        console.log(`[SessionManager] Found existing main repo session: ${existingSession.id}`);
         const session = this.convertDbSessionToSession(existingSession);
         await panelManager.ensureDiffPanel(session.id);
         return session;
@@ -409,12 +405,10 @@ export class SessionManager extends EventEmitter {
   }
 
   emitSessionCreated(session: Session): void {
-    console.log(`[SessionManager] Emitting session-created event for session ${session.id}`);
     this.emit('session-created', session);
   }
 
   updateSession(id: string, update: SessionUpdate): void {
-    console.log(`[SessionManager] updateSession called for ${id} with update:`, update);
     
     // Add log entry for important status changes
     if (update.status) {
@@ -428,14 +422,12 @@ export class SessionManager extends EventEmitter {
     
     if (update.status !== undefined) {
       dbUpdate.status = this.mapSessionStatusToDbStatus(update.status);
-      console.log(`[SessionManager] Mapping status ${update.status} to DB status ${dbUpdate.status}`);
     }
     
     // Model is now managed at panel level, not session level
     
     if (update.skip_continue_next !== undefined) {
       dbUpdate.skip_continue_next = update.skip_continue_next;
-      console.log(`[SessionManager] Updating skip_continue_next to ${update.skip_continue_next}`);
     }
     
     const updatedDbSession = this.db.updateSession(id, dbUpdate);
@@ -449,7 +441,6 @@ export class SessionManager extends EventEmitter {
     // Don't override the status if convertDbSessionToSession determined it should be completed_unviewed
     // This allows the blue dot indicator to work properly when a session completes
     if (update.status !== undefined && session.status === 'completed_unviewed') {
-      console.log(`[SessionManager] Preserving completed_unviewed status for session ${id}`);
       delete update.status; // Remove status from update to preserve completed_unviewed
     }
     
@@ -457,7 +448,6 @@ export class SessionManager extends EventEmitter {
     Object.assign(session, update);
     
     this.activeSessions.set(id, session);
-    console.log(`[SessionManager] Emitting session-updated event for session ${id} with status ${session.status}, full session:`, JSON.stringify(session));
     this.emit('session-updated', session);
   }
 
@@ -497,14 +487,12 @@ export class SessionManager extends EventEmitter {
     
     // Emit output-available event to notify frontend that new output is available
     // This is used to trigger output panel refresh when new content is added (e.g., after git operations)
-    console.log(`[SessionManager] Output added for session ${id}, emitting output-available event`);
     this.emit('session-output-available', { sessionId: id });
     
     // Check if this is the initial system message with Claude's session ID
     if (output.type === 'json' && isJSONMessage(output.data as Record<string, unknown>, 'system', 'init') && (output.data as GenericMessageData).session_id) {
       // Store Claude's actual session ID
       this.db.updateSession(id, { claude_session_id: (output.data as GenericMessageData).session_id });
-      console.log(`[SessionManager] Captured Claude session ID: ${(output.data as GenericMessageData).session_id} for Crystal session ${id}`);
     }
     
     // Check if this is a system result message indicating Claude has completed
@@ -512,12 +500,10 @@ export class SessionManager extends EventEmitter {
       // Update the completion timestamp for the most recent prompt
       const completionTimestamp = output.timestamp instanceof Date ? output.timestamp.toISOString() : output.timestamp;
       this.db.updatePromptMarkerCompletion(id, completionTimestamp);
-      console.log(`[SessionManager] Marked prompt as complete for session ${id} at ${completionTimestamp}`);
       
       // Mark the session as completed (this will trigger the completed_unviewed logic if not viewed)
       const dbSession = this.db.getSession(id);
       if (dbSession && dbSession.status === 'running') {
-        console.log(`[SessionManager] Claude completed task, marking session ${id} as completed`);
         this.db.updateSession(id, { status: 'completed' });
         
         // Re-convert to get the proper status (completed_unviewed if not viewed)
@@ -525,7 +511,6 @@ export class SessionManager extends EventEmitter {
         if (updatedDbSession) {
           const session = this.convertDbSessionToSession(updatedDbSession);
           this.activeSessions.set(id, session);
-          console.log(`[SessionManager] Session ${id} status after completion: ${session.status}`);
           this.emit('session-updated', session);
         }
       }
@@ -681,7 +666,6 @@ export class SessionManager extends EventEmitter {
           const panel = this.db.getPanel(panelId);
           if (panel?.sessionId) {
             this.db.updateSession(panel.sessionId, { claude_session_id: sessionIdFromMsg });
-            console.log(`[SessionManager] Captured Claude session ID from panel ${panelId}: ${sessionIdFromMsg} for Crystal session ${panel.sessionId}`);
           }
         }
       }
@@ -707,7 +691,6 @@ export class SessionManager extends EventEmitter {
       
       if (assistantText) {
         // Add to panel conversation messages for continuation support
-        console.log('[SessionManager] Adding assistant message to panel:', panelId, 'text length:', assistantText.length);
         // Use the sessionManager method instead of db method directly to ensure event emission
         this.addPanelConversationMessage(panelId, 'assistant', assistantText);
       }

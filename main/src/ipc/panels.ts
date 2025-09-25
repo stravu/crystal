@@ -8,7 +8,6 @@ import type { AppServices } from './types';
 export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   // Panel CRUD operations
   ipcMain.handle('panels:create', async (_, request: CreatePanelRequest) => {
-    console.log('[IPC] Creating panel:', request);
     try {
       const panel = await panelManager.createPanel(request);
 
@@ -48,7 +47,6 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   ipcMain.handle('panels:delete', async (_, panelId: string) => {
-    console.log('[IPC] Deleting panel:', panelId);
     try {
       // Clean up terminal process if it's a terminal panel
       const panel = panelManager.getPanel(panelId);
@@ -95,12 +93,8 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   ipcMain.handle('panels:update', async (_, panelId: string, updates: Partial<ToolPanel>) => {
-    console.log('[IPC] Updating panel:', panelId);
-    console.log('[IPC] Updates:', JSON.stringify(updates, null, 2));
-    
     try {
       const result = await panelManager.updatePanel(panelId, updates);
-      console.log('[IPC] Update result:', result);
       return { success: true, data: result };
     } catch (error) {
       console.error('[IPC] Failed to update panel:', error);
@@ -109,15 +103,8 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   ipcMain.handle('panels:list', async (_, sessionId: string) => {
-    console.log('[IPC] Listing panels for session:', sessionId);
     try {
       const panels = panelManager.getPanelsForSession(sessionId);
-      console.log('[IPC] Found panels:', panels.map(p => ({
-        id: p.id,
-        type: p.type,
-        title: p.title,
-        state: p.state
-      })));
       return { success: true, data: panels };
     } catch (error) {
       console.error('[IPC] Failed to list panels:', error);
@@ -126,7 +113,6 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   ipcMain.handle('panels:set-active', async (_, sessionId: string, panelId: string) => {
-    console.log('[IPC] Setting active panel:', sessionId, panelId);
     try {
       await panelManager.setActivePanel(sessionId, panelId);
       return { success: true };
@@ -137,13 +123,11 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   ipcMain.handle('panels:getActive', async (_, sessionId: string) => {
-    console.log('[IPC] Getting active panel for session:', sessionId);
     return databaseService.getActivePanel(sessionId);
   });
   
   // Panel initialization (lazy loading)
   ipcMain.handle('panels:initialize', async (_, panelId: string, options?: { cwd?: string; sessionId?: string }) => {
-    console.log('[IPC] Initializing panel:', panelId, options);
     
     const panel = panelManager.getPanel(panelId);
     if (!panel) {
@@ -198,7 +182,6 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   
   // Event handlers
   ipcMain.handle('panels:emitEvent', async (_, panelId: string, eventType: PanelEventType, data: unknown) => {
-    console.log('[IPC] Emitting panel event:', panelId, eventType);
     return panelManager.emitPanelEvent(panelId, eventType, data);
   });
   
