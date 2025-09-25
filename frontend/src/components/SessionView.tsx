@@ -61,10 +61,16 @@ export const SessionView = memo(() => {
   useEffect(() => {
     if (activeSession?.id) {
       console.log('[SessionView] Loading panels for session:', activeSession.id);
-      panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
-        console.log('[SessionView] Loaded panels:', loadedPanels);
-        setPanels(activeSession.id, loadedPanels);
-      });
+      
+      // Check if panels are already loaded for this session
+      const existingPanels = panels[activeSession.id] || [];
+      if (existingPanels.length === 0) {
+        // Only load panels if they're not already in the store
+        panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
+          console.log('[SessionView] Loaded panels:', loadedPanels);
+          setPanels(activeSession.id, loadedPanels);
+        });
+      }
       
       panelApi.getActivePanel(activeSession.id).then(activePanel => {
         console.log('[SessionView] Active panel from backend:', activePanel);
@@ -73,7 +79,7 @@ export const SessionView = memo(() => {
         }
       });
     }
-  }, [activeSession?.id, setPanels, setActivePanelInStore]);
+  }, [activeSession?.id, panels, setPanels, setActivePanelInStore]);
   
   // Listen for panel updates from the backend
   useEffect(() => {

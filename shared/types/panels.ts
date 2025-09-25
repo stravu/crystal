@@ -23,7 +23,7 @@ export interface TerminalPanelState {
   shellType?: string;            // bash, zsh, etc.
   
   // Enhanced persistence (can be added incrementally)
-  scrollbackBuffer?: string[];   // Full terminal output history
+  scrollbackBuffer?: string | string[];   // Full terminal output history (string for new format, array for legacy)
   commandHistory?: string[];     // Commands entered by user
   environmentVars?: Record<string, string>; // Modified env vars
   dimensions?: { cols: number; rows: number }; // Terminal size

@@ -27,12 +27,12 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
   }
 
   // Initialize terminal only once when component first mounts
-  // Keep it alive even when switching tabs
+  // Keep it alive even when switching sessions
   useEffect(() => {
     console.log('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
     
-    if (!terminalRef.current || !sessionId || !workingDirectory) {
-      console.log('[TerminalPanel] Missing dependencies, skipping initialization');
+    if (!terminalRef.current) {
+      console.log('[TerminalPanel] Missing terminal ref, skipping initialization');
       return;
     }
 
@@ -51,11 +51,22 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
         if (!initialized) {
           // Initialize backend PTY process
           console.log('[TerminalPanel] Initializing backend PTY process...');
+          // Use workingDirectory and sessionId if available, but don't require them
           await window.electronAPI.invoke('panels:initialize', panel.id, {
-            cwd: workingDirectory,
-            sessionId
+            cwd: workingDirectory || process.cwd(),
+            sessionId: sessionId || panel.sessionId
           });
           console.log('[TerminalPanel] Backend PTY process initialized');
+        } else {
+          // Terminal is already initialized, get its state to restore scrollback
+          console.log('[TerminalPanel] Restoring terminal state from backend...');
+          const terminalState = await window.electronAPI.invoke('terminal:getState', panel.id);
+          if (terminalState && terminalState.scrollbackBuffer) {
+            // We'll restore this to the terminal after it's created
+            console.log('[TerminalPanel] Found scrollback buffer with', terminalState.scrollbackBuffer.length, 'lines');
+            // Store for restoration after terminal is created
+            (window as any).__terminalRestoreState = terminalState;
+          }
         }
 
         // FIX: Check if component was unmounted during async operation
@@ -88,6 +99,28 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
           
           xtermRef.current = terminal;
           fitAddonRef.current = fitAddon;
+          
+          // Restore scrollback if we have saved state
+          const restoreState = (window as any).__terminalRestoreState;
+          if (restoreState && restoreState.scrollbackBuffer) {
+            // Handle both string and array formats
+            let restoredContent: string;
+            if (typeof restoreState.scrollbackBuffer === 'string') {
+              restoredContent = restoreState.scrollbackBuffer;
+              console.log('[TerminalPanel] Restoring', restoredContent.length, 'chars of scrollback');
+            } else if (Array.isArray(restoreState.scrollbackBuffer)) {
+              restoredContent = restoreState.scrollbackBuffer.join('\n');
+              console.log('[TerminalPanel] Restoring', restoreState.scrollbackBuffer.length, 'lines of scrollback');
+            } else {
+              restoredContent = '';
+            }
+            
+            if (restoredContent) {
+              terminal.write(restoredContent);
+            }
+            delete (window as any).__terminalRestoreState;
+          }
+          
           setIsInitialized(true);
           console.log('[TerminalPanel] Terminal initialization complete, isInitialized set to true');
 
@@ -172,7 +205,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
       
       setIsInitialized(false);
     };
-  }, [panel.id, sessionId, workingDirectory]); // Depend on panel.id and session info
+  }, [panel.id]); // Only depend on panel.id to prevent re-initialization on session switch
 
   // Handle visibility changes (resize when becoming visible)
   useEffect(() => {
