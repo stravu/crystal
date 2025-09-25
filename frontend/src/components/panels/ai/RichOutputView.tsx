@@ -293,7 +293,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     const handleOutputAvailable = (event: CustomEvent<{ sessionId?: string; panelId?: string; type?: string }> | { sessionId?: string; panelId?: string; type?: string; detail?: { sessionId?: string; panelId?: string; type?: string } }) => {
       // Handle both CustomEvent and Electron IPC events
       const detail = 'detail' in event ? event.detail : event;
-      if (detail.sessionId === panelId || detail.panelId === panelId) {
+      if (detail && (detail.sessionId === panelId || detail.panelId === panelId)) {
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -767,14 +767,18 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
       const sessionInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
-      const initialPrompt = sessionInfo.initialPrompt || sessionInfo.initial_prompt;
-      const command = sessionInfo.codexCommand || sessionInfo.claudeCommand || sessionInfo.codex_command;
-      const worktreePath = sessionInfo.worktreePath || sessionInfo.worktree_path;
-      const model = sessionInfo.model;
-      const provider = sessionInfo.modelProvider || sessionInfo.model_provider;
-      const approvalPolicy = sessionInfo.approvalPolicy || sessionInfo.approval_policy;
-      const sandboxMode = sessionInfo.sandboxMode || sessionInfo.sandbox_mode;
-      const permissionMode = sessionInfo.permissionMode || sessionInfo.permission_mode;
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const initialPrompt = toString(sessionInfo.initialPrompt || sessionInfo.initial_prompt);
+      const command = toString(sessionInfo.codexCommand || sessionInfo.claudeCommand || sessionInfo.codex_command);
+      const worktreePath = toString(sessionInfo.worktreePath || sessionInfo.worktree_path);
+      const model = toString(sessionInfo.model);
+      const provider = toString(sessionInfo.modelProvider || sessionInfo.model_provider);
+      const approvalPolicy = toString(sessionInfo.approvalPolicy || sessionInfo.approval_policy);
+      const sandboxMode = toString(sessionInfo.sandboxMode || sessionInfo.sandbox_mode);
+      const permissionMode = toString(sessionInfo.permissionMode || sessionInfo.permission_mode);
       const rawResumeSessionId = sessionInfo.resumeSessionId ?? sessionInfo.resume_session_id;
       const resumeSessionId = typeof rawResumeSessionId === 'string' && rawResumeSessionId.trim().length > 0
         ? rawResumeSessionId
@@ -893,12 +897,16 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
       const runtimeInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
-      const provider = runtimeInfo.provider;
-      const sandboxMode = runtimeInfo.sandboxMode;
-      const approvalPolicy = runtimeInfo.approvalPolicy;
-      const reasoningEffort = runtimeInfo.reasoningEffort;
-      const reasoningSummaries = runtimeInfo.reasoningSummaries;
-      const workdir = runtimeInfo.workdir;
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const provider = toString(runtimeInfo.provider);
+      const sandboxMode = toString(runtimeInfo.sandboxMode);
+      const approvalPolicy = toString(runtimeInfo.approvalPolicy);
+      const reasoningEffort = toString(runtimeInfo.reasoningEffort);
+      const reasoningSummaries = toString(runtimeInfo.reasoningSummaries);
+      const workdir = toString(runtimeInfo.workdir);
 
       return (
         <div
@@ -1007,6 +1015,13 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     if (message.metadata?.systemSubtype === 'init') {
       const info = message.segments.find(seg => seg.type === 'system_info');
       if (info?.type === 'system_info') {
+        // Type guard helper to safely convert unknown values to strings
+        const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+        
+        const infoData = info.info || {};
+        const model = toString(infoData.model);
+        const cwd = toString(infoData.cwd);
+        const toolsLength = Array.isArray(infoData.tools) ? infoData.tools.length : 0;
         return (
           <div
             key={message.id}
@@ -1027,10 +1042,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                   </span>
                 </div>
                 <div className="text-sm text-text-secondary space-y-1">
-                  <div>Model: <span className="text-text-primary font-mono">{info.info.model}</span></div>
-                  <div>Working Directory: <span className="text-text-primary font-mono text-xs">{info.info.cwd}</span></div>
+                  <div>Model: <span className="text-text-primary font-mono">{model}</span></div>
+                  <div>Working Directory: <span className="text-text-primary font-mono text-xs">{cwd}</span></div>
                   <div>
-                    Tools: <span className="text-text-tertiary">{info.info.tools?.length || 0} available</span>
+                    Tools: <span className="text-text-tertiary">{toolsLength} available</span>
                   </div>
                 </div>
               </div>
@@ -1039,9 +1054,13 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         );
       }
     } else if (message.metadata?.systemSubtype === 'error') {
-      const errorInfo = message.segments.find(seg => seg.type === 'system_info')?.info;
-      const errorMessage = errorInfo?.message || textContent;
-      const errorTitle = errorInfo?.error || 'Session Error';
+      const errorInfo = message.segments.find(seg => seg.type === 'system_info')?.info || {};
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const errorMessage = toString(errorInfo.message) || textContent;
+      const errorTitle = toString(errorInfo.error) || 'Session Error';
       
       return (
         <div
@@ -1077,7 +1096,12 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       );
     } else if (message.metadata?.systemSubtype === 'context_compacted') {
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
-      const helpMessage = infoSegment?.type === 'system_info' ? infoSegment.info.message : 
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const helpMessage = infoSegment?.type === 'system_info' ? 
+        toString(infoSegment.info?.message) || 'Context has been compacted. You can continue chatting - your next message will automatically include the context summary above.' :
         'Context has been compacted. You can continue chatting - your next message will automatically include the context summary above.';
       
       return (
@@ -1236,6 +1260,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     if (systemInfo?.type === 'system_info' && systemInfo.info) {
       const info = systemInfo.info;
       
+      // Type guard helpers to safely convert unknown values
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      const toNumber = (value: unknown): number => typeof value === 'number' ? value : 0;
+      
       // Handle specific system_info types
       if (info.type === 'session_status') {
         const rawStatus = typeof info.status === 'string' ? info.status : 'unknown';
@@ -1299,6 +1327,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         if (!showSystemMessages && isCodexTransformer) {
           return null;
         }
+        
+        const modelContextWindow = toNumber(info.model_context_window);
+        
         return (
           <div
             key={message.id}
@@ -1311,9 +1342,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             <div className="flex items-center gap-2 text-xs text-interactive">
               <span>📋</span>
               <span>Task started</span>
-              {info.model_context_window && (
+              {modelContextWindow > 0 && (
                 <span className="text-text-tertiary">
-                  • Context: {(info.model_context_window / 1000).toFixed(0)}k tokens
+                  • Context: {(modelContextWindow / 1000).toFixed(0)}k tokens
                 </span>
               )}
             </div>
@@ -1322,6 +1353,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       
       if (info.type === 'task_complete') {
+        const lastMessage = toString(info.last_message);
+        
         return (
           <div
             key={message.id}
@@ -1334,8 +1367,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             <div className="flex items-center gap-2 text-xs text-status-success">
               <span>✅</span>
               <span>Task completed</span>
-              {info.last_message && (
-                <span className="text-text-tertiary">• {info.last_message}</span>
+              {lastMessage && (
+                <span className="text-text-tertiary">• {lastMessage}</span>
               )}
             </div>
           </div>
@@ -1343,6 +1376,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       
       if (info.type === 'token_usage') {
+        const inputTokens = toNumber(info.input_tokens);
+        const outputTokens = toNumber(info.output_tokens);
+        const totalTokens = toNumber(info.total_tokens);
+        const cachedTokens = toNumber(info.cached_tokens);
+        
         return (
           <div
             key={message.id}
@@ -1355,11 +1393,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             <div className="flex items-center gap-3 text-xs text-text-tertiary">
               <span>🔢</span>
               <span>Tokens:</span>
-              {info.input_tokens && <span>In: {info.input_tokens.toLocaleString()}</span>}
-              {info.output_tokens && <span>Out: {info.output_tokens.toLocaleString()}</span>}
-              {info.total_tokens && <span className="text-text-secondary">Total: {info.total_tokens.toLocaleString()}</span>}
-              {info.cached_tokens && info.cached_tokens > 0 && (
-                <span className="text-interactive">Cached: {info.cached_tokens.toLocaleString()}</span>
+              {inputTokens > 0 && <span>In: {inputTokens.toLocaleString()}</span>}
+              {outputTokens > 0 && <span>Out: {outputTokens.toLocaleString()}</span>}
+              {totalTokens > 0 && <span className="text-text-secondary">Total: {totalTokens.toLocaleString()}</span>}
+              {cachedTokens > 0 && (
+                <span className="text-interactive">Cached: {cachedTokens.toLocaleString()}</span>
               )}
             </div>
           </div>
@@ -1502,7 +1540,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                   }
                 }
                 
-                if (todos) {
+                // Type guard to ensure todos is an array
+                const validTodos = Array.isArray(todos) ? todos : [];
+                
+                if (validTodos.length > 0) {
                   // Wrap TodoListDisplay in an assistant message block
                   elements.push(
                     <div
@@ -1530,7 +1571,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                       
                       {/* Todo List Content */}
                       <div className="ml-7">
-                        <TodoListDisplay todos={todos} timestamp={todoMsg.timestamp} />
+                        <TodoListDisplay todos={validTodos} timestamp={todoMsg.timestamp} />
                       </div>
                     </div>
                   );
@@ -1621,11 +1662,15 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
           const lastTodoSegment = todoSegments[todoSegments.length - 1];
           
           if (lastTodoSegment && lastTodoSegment.type === 'tool_call' && lastTodoSegment.tool.input?.todos) {
-            // First add the regular message (with TodoWrite filtered out in renderMessage)
-            elements.push(element);
+            // Type guard to ensure todos is an array
+            const todoList = Array.isArray(lastTodoSegment.tool.input.todos) ? lastTodoSegment.tool.input.todos : [];
             
-            // Then add the TodoWrite display separately, wrapped in an assistant message block
-            const todoElement = (
+            if (todoList.length > 0) {
+              // First add the regular message (with TodoWrite filtered out in renderMessage)
+              elements.push(element);
+              
+              // Then add the TodoWrite display separately, wrapped in an assistant message block
+              const todoElement = (
               <div
                 key={`todo-display-${msg.id}`}
                 className={`
@@ -1651,11 +1696,14 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 
                 {/* Todo List Content */}
                 <div className="ml-7">
-                  <TodoListDisplay todos={lastTodoSegment.tool.input.todos} timestamp={msg.timestamp} />
+                  <TodoListDisplay todos={todoList} timestamp={msg.timestamp} />
                 </div>
               </div>
             );
             elements.push(todoElement);
+            } else {
+              elements.push(element);
+            }
           } else {
             elements.push(element);
           }

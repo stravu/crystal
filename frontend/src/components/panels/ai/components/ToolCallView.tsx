@@ -12,6 +12,141 @@ interface ToolCallViewProps {
   expandedTools?: Set<string>;  // Add this to track expanded state for child tools
 }
 
+// Type guards for tool input types
+interface ReadToolInput extends Record<string, unknown> {
+  file_path: string;
+  offset?: number;
+  limit?: number;
+}
+
+interface EditToolInput extends Record<string, unknown> {
+  file_path: string;
+  old_string?: string;
+  new_string?: string;
+}
+
+interface MultiEditToolInput extends Record<string, unknown> {
+  file_path: string;
+  edits: Array<{ old_string: string; new_string: string }>;
+}
+
+interface WriteToolInput extends Record<string, unknown> {
+  file_path: string;
+  content: string;
+}
+
+interface BashToolInput extends Record<string, unknown> {
+  command: string;
+}
+
+interface GrepToolInput extends Record<string, unknown> {
+  pattern: string;
+  path?: string;
+  glob?: string;
+}
+
+interface GlobToolInput extends Record<string, unknown> {
+  pattern: string;
+  path?: string;
+}
+
+interface WebFetchToolInput extends Record<string, unknown> {
+  url: string;
+  prompt: string;
+}
+
+// Type guards
+const isReadInput = (input: Record<string, unknown>): input is ReadToolInput => {
+  return typeof input.file_path === 'string';
+};
+
+const isEditInput = (input: Record<string, unknown>): input is EditToolInput => {
+  return typeof input.file_path === 'string';
+};
+
+const isMultiEditInput = (input: Record<string, unknown>): input is MultiEditToolInput => {
+  return typeof input.file_path === 'string' && Array.isArray(input.edits);
+};
+
+const isWriteInput = (input: Record<string, unknown>): input is WriteToolInput => {
+  return typeof input.file_path === 'string' && typeof input.content === 'string';
+};
+
+const isBashInput = (input: Record<string, unknown>): input is BashToolInput => {
+  return typeof input.command === 'string';
+};
+
+const isGrepInput = (input: Record<string, unknown>): input is GrepToolInput => {
+  return typeof input.pattern === 'string';
+};
+
+const isGlobInput = (input: Record<string, unknown>): input is GlobToolInput => {
+  return typeof input.pattern === 'string';
+};
+
+const isWebFetchInput = (input: Record<string, unknown>): input is WebFetchToolInput => {
+  return typeof input.url === 'string' && typeof input.prompt === 'string';
+};
+
+interface TaskToolInput extends Record<string, unknown> {
+  description?: string;
+  subagent_type?: string;
+  prompt?: string;
+}
+
+interface TodoWriteToolInput extends Record<string, unknown> {
+  todos: Array<{ status: string; content: string }>;
+}
+
+interface WebSearchToolInput extends Record<string, unknown> {
+  query: string;
+}
+
+const isTaskInput = (input: Record<string, unknown>): input is TaskToolInput => {
+  return typeof input.description === 'string' || typeof input.subagent_type === 'string';
+};
+
+const isTodoWriteInput = (input: Record<string, unknown>): input is TodoWriteToolInput => {
+  return Array.isArray(input.todos);
+};
+
+const isWebSearchInput = (input: Record<string, unknown>): input is WebSearchToolInput => {
+  return typeof input.query === 'string';
+};
+
+interface LSToolInput extends Record<string, unknown> {
+  path: string;
+}
+
+interface NotebookEditToolInput extends Record<string, unknown> {
+  notebook_path: string;
+  edit_mode?: string;
+}
+
+interface BashOutputToolInput extends Record<string, unknown> {
+  bash_id: string;
+}
+
+interface KillBashToolInput extends Record<string, unknown> {
+  shell_id: string;
+}
+
+const isLSInput = (input: Record<string, unknown>): input is LSToolInput => {
+  return typeof input.path === 'string';
+};
+
+const isNotebookEditInput = (input: Record<string, unknown>): input is NotebookEditToolInput => {
+  return typeof input.notebook_path === 'string';
+};
+
+const isBashOutputInput = (input: Record<string, unknown>): input is BashOutputToolInput => {
+  return typeof input.bash_id === 'string';
+};
+
+const isKillBashInput = (input: Record<string, unknown>): input is KillBashToolInput => {
+  return typeof input.shell_id === 'string';
+};
+
 // Get a compact summary for the tool call
 const getCompactToolSummary = (tool: ToolCall): string => {
   const input = tool.input;
@@ -19,7 +154,7 @@ const getCompactToolSummary = (tool: ToolCall): string => {
   
   switch (tool.name) {
     case 'Read':
-      if (input.file_path) {
+      if (isReadInput(input)) {
         const filename = input.file_path.split('/').pop() || input.file_path;
         const lines = input.offset ? ` (lines ${input.offset}-${input.offset + (input.limit || 2000)})` : '';
         return filename + lines;
@@ -27,24 +162,30 @@ const getCompactToolSummary = (tool: ToolCall): string => {
       return '';
     
     case 'Edit':
-    case 'MultiEdit':
-      if (input.file_path) {
+      if (isEditInput(input)) {
         const filename = input.file_path.split('/').pop() || input.file_path;
-        const editsInfo = tool.name === 'MultiEdit' && input.edits ? ` (${input.edits.length} changes)` : '';
+        return filename;
+      }
+      return '';
+      
+    case 'MultiEdit':
+      if (isMultiEditInput(input)) {
+        const filename = input.file_path.split('/').pop() || input.file_path;
+        const editsInfo = ` (${input.edits.length} changes)`;
         return filename + editsInfo;
       }
       return '';
     
     case 'Write':
-      if (input.file_path) {
+      if (isWriteInput(input)) {
         const filename = input.file_path.split('/').pop() || input.file_path;
-        const lines = input.content ? ` (${input.content.split('\n').length} lines)` : '';
+        const lines = ` (${input.content.split('\n').length} lines)`;
         return filename + lines;
       }
       return '';
     
     case 'Bash':
-      if (input.command) {
+      if (isBashInput(input)) {
         // Truncate long commands
         const cmd = input.command.length > 50 ? input.command.substring(0, 50) + '...' : input.command;
         return cmd;
@@ -52,7 +193,7 @@ const getCompactToolSummary = (tool: ToolCall): string => {
       return '';
     
     case 'Grep':
-      if (input.pattern) {
+      if (isGrepInput(input)) {
         const pattern = input.pattern.length > 20 ? input.pattern.substring(0, 20) + '...' : input.pattern;
         const location = input.path ? ` in ${input.path.split('/').pop() || input.path}` : '';
         return `"${pattern}"${location}`;
@@ -60,28 +201,31 @@ const getCompactToolSummary = (tool: ToolCall): string => {
       return '';
     
     case 'Glob':
-      if (input.pattern) {
+      if (isGlobInput(input)) {
         const location = input.path ? ` in ${input.path.split('/').pop() || input.path}` : '';
         return `${input.pattern}${location}`;
       }
       return '';
     
     case 'Task':
-      if (input.description) {
-        return input.description.length > 40 ? input.description.substring(0, 40) + '...' : input.description;
+      if (isTaskInput(input)) {
+        if (input.description) {
+          return input.description.length > 40 ? input.description.substring(0, 40) + '...' : input.description;
+        }
+        return input.subagent_type || '';
       }
-      return input.subagent_type || '';
+      return '';
     
     case 'TodoWrite':
-      if (input.todos && Array.isArray(input.todos)) {
+      if (isTodoWriteInput(input)) {
         const total = input.todos.length;
-        const completed = input.todos.filter((t: { status: string; content: string }) => t.status === 'completed').length;
+        const completed = input.todos.filter(t => t.status === 'completed').length;
         return `${completed}/${total} tasks`;
       }
       return '';
     
     case 'WebFetch':
-      if (input.url) {
+      if (isWebFetchInput(input)) {
         try {
           const url = new URL(input.url);
           return url.hostname;
@@ -92,19 +236,19 @@ const getCompactToolSummary = (tool: ToolCall): string => {
       return '';
     
     case 'WebSearch':
-      if (input.query) {
+      if (isWebSearchInput(input)) {
         return input.query.length > 30 ? input.query.substring(0, 30) + '...' : input.query;
       }
       return '';
     
     case 'LS':
-      if (input.path) {
+      if (isLSInput(input)) {
         return input.path.split('/').pop() || input.path;
       }
       return '';
     
     case 'NotebookEdit':
-      if (input.notebook_path) {
+      if (isNotebookEditInput(input)) {
         const filename = input.notebook_path.split('/').pop() || input.notebook_path;
         const mode = input.edit_mode || 'replace';
         return `${filename} (${mode})`;
@@ -112,13 +256,13 @@ const getCompactToolSummary = (tool: ToolCall): string => {
       return '';
     
     case 'BashOutput':
-      if (input.bash_id) {
+      if (isBashOutputInput(input)) {
         return `shell: ${input.bash_id.substring(0, 8)}...`;
       }
       return '';
     
     case 'KillBash':
-      if (input.shell_id) {
+      if (isKillBashInput(input)) {
         return `kill shell: ${input.shell_id.substring(0, 8)}...`;
       }
       return '';
@@ -130,17 +274,17 @@ const getCompactToolSummary = (tool: ToolCall): string => {
       return 'read task list';
     
     default:
-      // For unknown tools, try to show something meaningful
-      if (input.file_path) {
+      // For unknown tools, try to show something meaningful using type checks
+      if (typeof input.file_path === 'string') {
         return input.file_path.split('/').pop() || input.file_path;
       }
-      if (input.path) {
+      if (typeof input.path === 'string') {
         return input.path.split('/').pop() || input.path;
       }
-      if (input.command) {
+      if (typeof input.command === 'string') {
         return input.command.substring(0, 30) + '...';
       }
-      if (input.name) {
+      if (typeof input.name === 'string') {
         return input.name;
       }
       return '';
@@ -268,92 +412,116 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
 const formatToolInput = (toolName: string, input: Record<string, unknown>): React.ReactNode => {
   switch (toolName) {
     case 'Read':
-      return (
-        <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
-          {input.file_path && (
+      if (isReadInput(input)) {
+        return (
+          <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
             <div className="truncate">
               <span className="text-text-tertiary">file:</span> {input.file_path}
             </div>
-          )}
-          {input.offset && <div>lines: {input.offset}-{input.offset + (input.limit || 2000)}</div>}
-        </div>
-      );
+            {input.offset && <div>lines: {input.offset}-{input.offset + (input.limit || 2000)}</div>}
+          </div>
+        );
+      }
+      break;
     
     case 'Edit':
+      if (isEditInput(input)) {
+        return (
+          <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
+            <div className="truncate"><span className="text-text-tertiary">file:</span> {input.file_path}</div>
+          </div>
+        );
+      }
+      break;
+
     case 'MultiEdit':
-      return (
-        <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
-          {input.file_path && <div className="truncate"><span className="text-text-tertiary">file:</span> {input.file_path}</div>}
-          {toolName === 'MultiEdit' && input.edits && (
-            <div>{input.edits.length} edits</div>
-          )}
-        </div>
-      );
+      if (isMultiEditInput(input)) {
+        return (
+          <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
+            <div className="truncate"><span className="text-text-tertiary">file:</span> {input.file_path}</div>
+            <div>{input.edits.length} change{input.edits.length !== 1 ? 's' : ''}</div>
+          </div>
+        );
+      }
+      break;
     
     case 'Write':
-      return (
-        <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
-          {input.file_path && <div className="truncate"><span className="text-text-tertiary">file:</span> {input.file_path}</div>}
-          {input.content && (
+      if (isWriteInput(input)) {
+        return (
+          <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
+            <div className="truncate"><span className="text-text-tertiary">file:</span> {input.file_path}</div>
             <div>{input.content.split('\n').length} lines</div>
-          )}
-        </div>
-      );
+          </div>
+        );
+      }
+      break;
     
     case 'Bash':
-      return (
-        <div className="font-mono text-[11px] bg-bg-tertiary/50 px-1.5 py-0.5 rounded">
-          <span className="text-status-success">$</span> {input.command}
-        </div>
-      );
+      if (isBashInput(input)) {
+        return (
+          <div className="font-mono text-[11px] bg-bg-tertiary/50 px-1.5 py-0.5 rounded">
+            <span className="text-status-success">$</span> {input.command}
+          </div>
+        );
+      }
+      break;
     
     case 'Grep':
-      return (
-        <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
-          <div><span className="text-text-tertiary">pattern:</span> <span className="text-status-warning">"{input.pattern}"</span></div>
-          {input.path && <div className="truncate"><span className="text-text-tertiary">path:</span> {input.path}</div>}
-          {input.glob && <div><span className="text-text-tertiary">files:</span> {input.glob}</div>}
-        </div>
-      );
+      if (isGrepInput(input)) {
+        return (
+          <div className="font-mono text-[11px] space-y-0.5 text-text-secondary">
+            <div><span className="text-text-tertiary">pattern:</span> <span className="text-status-warning">"{input.pattern}"</span></div>
+            {input.path && <div className="truncate"><span className="text-text-tertiary">path:</span> {input.path}</div>}
+            {input.glob && <div><span className="text-text-tertiary">files:</span> {input.glob}</div>}
+          </div>
+        );
+      }
+      break;
     
     case 'Task':
-      return (
-        <div className="text-[11px] space-y-1">
-          {input.description && (
-            <div className="text-interactive">{input.description}</div>
-          )}
-          {input.subagent_type && (
-            <div className="text-status-warning font-mono">agent: {input.subagent_type}</div>
-          )}
-          {input.prompt && (
-            <details>
-              <summary className="cursor-pointer text-text-tertiary hover:text-text-secondary text-[10px]">
-                view prompt
-              </summary>
-              <div className="mt-0.5 p-1 bg-surface-secondary/50 rounded text-[10px] whitespace-pre-wrap max-h-24 overflow-y-auto">
-                {input.prompt}
-              </div>
-            </details>
-          )}
-        </div>
-      );
+      if (isTaskInput(input)) {
+        return (
+          <div className="text-[11px] space-y-1">
+            {input.description && (
+              <div className="text-interactive">{input.description}</div>
+            )}
+            {input.subagent_type && (
+              <div className="text-status-warning font-mono">agent: {input.subagent_type}</div>
+            )}
+            {input.prompt && (
+              <details>
+                <summary className="cursor-pointer text-text-tertiary hover:text-text-secondary text-[10px]">
+                  view prompt
+                </summary>
+                <div className="mt-0.5 p-1 bg-surface-secondary/50 rounded text-[10px] whitespace-pre-wrap max-h-24 overflow-y-auto">
+                  {input.prompt}
+                </div>
+              </details>
+            )}
+          </div>
+        );
+      }
+      break;
     
     case 'TodoWrite':
-      return (
-        <div className="text-[11px] space-y-0.5">
-          {input.todos && Array.isArray(input.todos) && input.todos.map((todo: { status: string; content: string }, idx: number) => {
-            const icon = todo.status === 'completed' ? '✓' : 
-                        todo.status === 'in_progress' ? '→' : '○';
-            const color = todo.status === 'completed' ? 'text-status-success' : 
-                         todo.status === 'in_progress' ? 'text-status-warning' : 'text-text-tertiary';
-            return (
-              <div key={idx} className={`${color}`}>
-                {icon} {todo.content}
-              </div>
-            );
-          })}
-        </div>
-      );
+      if (isTodoWriteInput(input)) {
+        return (
+          <div className="text-[11px] space-y-0.5">
+            {input.todos.map((todo: { status: string; content: string }, idx: number) => {
+              const icon = todo.status === 'completed' ? '✓' : 
+                          todo.status === 'in_progress' ? '→' : '○';
+              const color = todo.status === 'completed' ? 'text-status-success' : 
+                           todo.status === 'in_progress' ? 'text-status-warning' : 'text-text-tertiary';
+              return (
+                <div key={idx} className={`${color}`}>
+                  {icon} {todo.content}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      break;
     
     default:
       // Compact display for unknown tools

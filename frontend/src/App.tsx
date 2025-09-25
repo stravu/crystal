@@ -21,6 +21,13 @@ import { ContextMenuProvider } from './contexts/ContextMenuContext';
 import { TokenTest } from './components/TokenTest';
 import type { VersionUpdateInfo, PermissionInput } from './types/session';
 
+// Type for IPC response
+interface IPCResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 interface PermissionRequest {
   id: string;
   sessionId: string;
@@ -127,9 +134,9 @@ function App() {
       }
       
       // Get preferences from database
-      const hideWelcomeResult = await window.electron.invoke('preferences:get', 'hide_welcome');
-      const welcomeShownResult = await window.electron.invoke('preferences:get', 'welcome_shown');
-      const hideDiscordResult = await window.electron.invoke('preferences:get', 'hide_discord');
+      const hideWelcomeResult = await window.electron.invoke('preferences:get', 'hide_welcome') as IPCResponse<string>;
+      const welcomeShownResult = await window.electron.invoke('preferences:get', 'welcome_shown') as IPCResponse<string>;
+      const hideDiscordResult = await window.electron.invoke('preferences:get', 'hide_discord') as IPCResponse<string>;
       
       const hideWelcome = hideWelcomeResult?.data === 'true';
       const hasSeenWelcome = welcomeShownResult?.data === 'true';
@@ -193,7 +200,7 @@ function App() {
         
         try {
           // Get the last app open to see if Discord was already shown
-          const result = await window.electron.invoke('app:get-last-open');
+          const result = await window.electron.invoke('app:get-last-open') as IPCResponse<{ discord_shown?: boolean }>;
           console.log('[Discord Debug] Last app open result:', result);
           
           if (result?.success && result.data) {
@@ -227,7 +234,7 @@ function App() {
           await window.electron.invoke('app:record-open', hideWelcome, false);
           
           // If we showed Discord popup and there was no previous app open, update the status
-          const result = await window.electron.invoke('app:get-last-open');
+          const result = await window.electron.invoke('app:get-last-open') as IPCResponse<{ discord_shown?: boolean }>;
           if (!result?.data?.discord_shown && isDiscordOpen) {
             await window.electron.invoke('app:update-discord-shown');
           }
@@ -245,7 +252,8 @@ function App() {
   
   useEffect(() => {
     // Set up permission request listener
-    const handlePermissionRequest = (request: PermissionRequest) => {
+    const handlePermissionRequest = (...args: unknown[]) => {
+      const request = args[0] as PermissionRequest;
       console.log('[App] Received permission request:', request);
       setCurrentPermissionRequest(request);
     };

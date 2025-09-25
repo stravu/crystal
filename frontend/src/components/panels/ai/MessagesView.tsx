@@ -142,9 +142,12 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   // Subscribe to new messages
   useEffect(() => {
-    const handleOutput = (data: CustomEvent<{ panelId?: string; sessionId?: string; type?: string; data?: unknown }> | { panelId?: string; sessionId?: string; type?: string; data?: unknown; detail?: { panelId?: string; sessionId?: string; type?: string; data?: unknown } }) => {
+    const handleOutput = (data: CustomEvent<{ panelId?: string; sessionId?: string; type?: string; data?: unknown; timestamp?: string }> | { panelId?: string; sessionId?: string; type?: string; data?: unknown; timestamp?: string; detail?: { panelId?: string; sessionId?: string; type?: string; data?: unknown; timestamp?: string } }) => {
       const detail = 'detail' in data ? data.detail : data;
-      if ((detail.panelId === panelId || detail.sessionId === panelId) && detail.type === 'json') {
+      if (!detail || (!detail.panelId && !detail.sessionId) || detail.type !== 'json') {
+        return;
+      }
+      if ((detail.panelId === panelId || detail.sessionId === panelId)) {
         try {
           // Check if this is a session_info message
           let parsedData: unknown;
@@ -155,7 +158,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               // If it's not valid JSON, treat as regular message
               setMessages(prev => [...prev, {
                 type: 'json',
-                data: detail.data,
+                data: String(detail.data || ''),
                 timestamp: detail.timestamp || new Date().toISOString()
               }]);
               return;
@@ -179,7 +182,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           } else {
             setMessages(prev => [...prev, {
               type: 'json',
-              data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data),
+              data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data || {}),
               timestamp: detail.timestamp || new Date().toISOString()
             }]);
             

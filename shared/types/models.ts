@@ -64,4 +64,5 @@ export interface CodexInputOptions {
     content: string;
     size: number;
   }>;
+  [key: string]: unknown;
 }
