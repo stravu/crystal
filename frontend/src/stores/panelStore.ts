@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { PanelStore } from '../types/panelStore';
+import { ToolPanel } from '../../../shared/types/panels';
 
 // FIX: Use immer for safe immutable updates
 export const usePanelStore = create<PanelStore>()(
@@ -29,7 +30,7 @@ export const usePanelStore = create<PanelStore>()(
           state.panels[panel.sessionId] = [];
         }
         // Check if panel already exists to prevent duplicates
-        const existing = state.panels[panel.sessionId].find(p => p.id === panel.id);
+        const existing = state.panels[panel.sessionId].find((p: ToolPanel) => p.id === panel.id);
         if (!existing) {
           state.panels[panel.sessionId].push(panel);
           state.activePanels[panel.sessionId] = panel.id;
@@ -40,7 +41,7 @@ export const usePanelStore = create<PanelStore>()(
     removePanel: (sessionId, panelId) => {
       set((state) => {
         if (state.panels[sessionId]) {
-          state.panels[sessionId] = state.panels[sessionId].filter(p => p.id !== panelId);
+          state.panels[sessionId] = state.panels[sessionId].filter((p: ToolPanel) => p.id !== panelId);
         }
         // Clear active panel if it was the removed one
         if (state.activePanels[sessionId] === panelId) {
@@ -53,7 +54,7 @@ export const usePanelStore = create<PanelStore>()(
       set((state) => {
         const sessionPanels = state.panels[panel.sessionId];
         if (sessionPanels) {
-          const index = sessionPanels.findIndex(p => p.id === panel.id);
+          const index = sessionPanels.findIndex((p: ToolPanel) => p.id === panel.id);
           if (index !== -1) {
             sessionPanels[index] = panel;
           }
