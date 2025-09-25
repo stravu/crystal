@@ -14,7 +14,19 @@ export const usePanelStore = create<PanelStore>()(
     // Pure synchronous state updates
     setPanels: (sessionId, panels) => {
       set((state) => {
-        state.panels[sessionId] = panels;
+        // Instead of replacing, merge panels to preserve existing instances
+        const existingPanels = state.panels[sessionId] || [];
+        const mergedPanels = panels.map(newPanel => {
+          // Find existing panel with same ID to preserve its instance
+          const existing = existingPanels.find((p: ToolPanel) => p.id === newPanel.id);
+          if (existing) {
+            // Update existing panel properties but keep the same object reference
+            Object.assign(existing, newPanel);
+            return existing;
+          }
+          return newPanel;
+        });
+        state.panels[sessionId] = mergedPanels;
       });
     },
 
