@@ -30,7 +30,6 @@ class FrontendGitStatusLogger {
 
     // Flush any accumulated updates
     if (this.updateCount > 0) {
-      console.log(`[GitStatus] ${this.updateCount} status updates (throttled)`);
       this.updateCount = 0;
     }
 
@@ -38,30 +37,15 @@ class FrontendGitStatusLogger {
 
     switch (context.operation) {
       case 'poll':
-        if (context.count && context.count > 0) {
-          console.log(`[GitStatus] Polling ${context.count} sessions`);
-        }
         break;
 
       case 'refresh':
-        if (context.count && context.count > 0) {
-          const target = context.projectName ? `project "${context.projectName}"` : 'sessions';
-          console.log(`[GitStatus] Refreshed ${context.count} sessions in ${target}`);
-        }
         break;
 
       case 'update':
-        // Only log non-clean states or in development
-        if (context.state && (context.state !== 'clean' || process.env.NODE_ENV === 'development')) {
-          const shortId = context.sessionId ? context.sessionId.substring(0, 8) : 'unknown';
-          console.log(`[GitStatus] ${shortId} → ${context.state}`);
-        }
         break;
 
       case 'load':
-        if (context.count) {
-          console.log(`[GitStatus] Loaded ${context.count} sessions`);
-        }
         break;
     }
   }

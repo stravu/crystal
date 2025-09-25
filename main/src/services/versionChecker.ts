@@ -47,7 +47,6 @@ export class VersionChecker {
       
       // Skip pre-releases and drafts
       if (release.prerelease || release.draft) {
-        this.logger.info(`[Version Checker] Latest release is pre-release or draft, skipping`);
         return {
           current: currentVersion,
           latest: currentVersion,

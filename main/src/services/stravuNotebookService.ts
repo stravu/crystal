@@ -49,7 +49,6 @@ export class StravuNotebookService {
         this.lastFetch &&
         Date.now() - this.lastFetch < this.CACHE_TTL &&
         this.cache.has('notebooks')) {
-      this.logger.info('Returning cached notebooks');
       return this.cache.get('notebooks') as Notebook[];
     }
 
@@ -87,7 +86,6 @@ export class StravuNotebookService {
     const cacheKey = `notebook_${notebookId}`;
 
     if (this.cache.has(cacheKey)) {
-      this.logger.info(`Returning cached notebook ${notebookId}`);
       return this.cache.get(cacheKey) as Notebook;
     }
 

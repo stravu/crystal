@@ -98,20 +98,21 @@ export const getScriptTerminalTheme = () => {
 export const debugTerminalTheme = () => {
   const isLight = document.documentElement.classList.contains('light');
   const isDark = document.documentElement.classList.contains('dark');
-  console.log('=== Terminal Theme Debug ===');
-  console.log('Classes on root:', document.documentElement.className);
-  console.log('Has light class:', isLight);
-  console.log('Has dark class:', isDark);
   
   // Check actual CSS variable values
   const bgVar = getComputedStyle(document.documentElement).getPropertyValue('--color-terminal-bg').trim();
   const fgVar = getComputedStyle(document.documentElement).getPropertyValue('--color-terminal-fg').trim();
   
-  console.log('CSS Variables:');
-  console.log('  --color-terminal-bg:', bgVar || 'NOT SET');
-  console.log('  --color-terminal-fg:', fgVar || 'NOT SET');
-  
-  console.log('Terminal theme:', getTerminalTheme());
-  console.log('Script terminal theme:', getScriptTerminalTheme());
-  console.log('=========================');
+  // Return debug info instead of logging to console
+  return {
+    classes: document.documentElement.className,
+    isLight,
+    isDark,
+    cssVariables: {
+      '--color-terminal-bg': bgVar || 'NOT SET',
+      '--color-terminal-fg': fgVar || 'NOT SET',
+    },
+    terminalTheme: getTerminalTheme(),
+    scriptTerminalTheme: getScriptTerminalTheme(),
+  };
 };

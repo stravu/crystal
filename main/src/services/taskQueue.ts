@@ -120,13 +120,13 @@ export class TaskQueue {
     // Add event handlers for debugging
     this.sessionQueue.on('active', (...args: unknown[]) => {
       const job = args[0] as { id: string | number };
-      console.log(`[TaskQueue] Job ${job.id} is active`);
+      // Job active tracking removed - verbose debug logging
     });
     
     this.sessionQueue.on('completed', (...args: unknown[]) => {
       const job = args[0] as { id: string | number };
       const result = args[1];
-      console.log(`[TaskQueue] Job ${job.id} completed:`, result);
+      // Job completion tracking removed - verbose debug logging
     });
     
     this.sessionQueue.on('failed', (...args: unknown[]) => {
@@ -154,7 +154,7 @@ export class TaskQueue {
       const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig, claudeConfig } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
-      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
+      // Processing session creation job - verbose debug logging removed
 
       try {
         let targetProject;
@@ -180,17 +180,16 @@ export class TaskQueue {
         if (!worktreeName || worktreeName.trim() === '') {
           // If this is part of a multi-session creation (has index), the base name should have been generated already
           if (index !== undefined && index >= 0) {
-            console.log(`[TaskQueue] Multi-session creation detected (index ${index}), using fallback name`);
+            // Multi-session creation detected - verbose debug logging removed
             worktreeName = 'session';
             sessionName = 'Session';
           } else {
-            console.log(`[TaskQueue] No worktree template provided, generating name from prompt...`);
+            // No worktree template provided - verbose debug logging removed
             // Use the AI-powered name generator to generate a session name with spaces
             sessionName = await this.options.worktreeNameGenerator.generateSessionName(prompt);
             // Convert the session name to a worktree name (spaces to hyphens)
             worktreeName = sessionName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            console.log(`[TaskQueue] Generated session name: ${sessionName}`);
-            console.log(`[TaskQueue] Generated worktree name: ${worktreeName}`);
+            // Generated names - verbose debug logging removed
           }
         } else {
           // If we have a worktree template, use it as the session name as-is

@@ -48,7 +48,6 @@ function setAppTitle() {
     const worktreeName = getCurrentWorktreeName(process.cwd());
     if (worktreeName) {
       const title = `Crystal [${worktreeName}]`;
-      console.log('🎯 [APP TITLE] Setting development title:', title);
       if (mainWindow) {
         mainWindow.setTitle(title);
       }
@@ -117,7 +116,6 @@ for (let i = 0; i < args.length; i++) {
 // Install Devtron in development
 if (isDevelopment) {
   // Devtron can be installed manually in DevTools console with: require('devtron').install()
-  console.log('[Main] Development mode - Devtron can be installed in DevTools console');
 }
 
 async function createWindow() {
@@ -145,18 +143,15 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
     
     // Enable IPC debugging in development
-    console.log('[Main] 🔍 IPC debugging enabled - check DevTools console for IPC call logs');
     
     // Log all IPC calls in main process
     const originalHandle = ipcMain.handle;
     ipcMain.handle = function(channel: string, listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown> | unknown) {
       const wrappedListener = async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
         if (channel.startsWith('stravu:')) {
-          console.log(`[IPC] 📞 ${channel}`, args.length > 0 ? args : '(no args)');
         }
         const result = await listener(event, ...args);
         if (channel.startsWith('stravu:')) {
-          console.log(`[IPC] 📤 ${channel} response:`, result);
         }
         return result;
       };
@@ -217,7 +212,6 @@ async function createWindow() {
       const logMessage = `[${timestamp}] [FRONTEND ${levelName.toUpperCase()}] ${message}`;
       
       // Always log to main console
-      console.log(`[Renderer ${levelName}] ${message} (${sourceId}:${line})`);
       
       // Also write to debug log file for Claude Code to read
       const debugLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
@@ -232,7 +226,6 @@ async function createWindow() {
     } else {
       // In production, only log errors and warnings from renderer
       if (level >= 2) { // 2 = warning, 3 = error
-        console.log(`[Renderer] ${message} (${sourceId}:${line})`);
       }
     }
   });
