@@ -73,7 +73,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = ({ childr
     const handleGlobalClick = (event: MouseEvent) => {
       // Check if the click is on the context menu itself
       const target = event.target as HTMLElement;
-      const isContextMenu = target.closest('.context-menu');
+      const isContextMenu = target?.closest?.('.context-menu');
       
       // If click is outside the context menu, close it
       if (!isContextMenu && menuState.type !== null) {

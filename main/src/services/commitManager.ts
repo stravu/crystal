@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { existsSync } from 'fs';
 import type { Logger } from '../utils/logger';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand } from '../utils/shellEscape';
@@ -279,12 +280,8 @@ export class CommitManager extends EventEmitter {
   }
 
   private async checkPathExists(path: string): Promise<boolean> {
-    try {
-      execSync(`test -e "${path}"`, { encoding: 'utf8' });
-      return true;
-    } catch {
-      return false;
-    }
+    // Use fs.existsSync instead of shell command to avoid unnecessary error logs
+    return existsSync(path);
   }
 }
 

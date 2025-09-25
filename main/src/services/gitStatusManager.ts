@@ -75,6 +75,9 @@ export class GitStatusManager extends EventEmitter {
     private logger?: Logger
   ) {
     super();
+    // Increase max listeners to prevent warnings when many components listen to git status events
+    // This is expected since each SessionListItem listens for git status updates
+    this.setMaxListeners(100);
     this.gitLogger = new GitStatusLogger(logger);
   }
 

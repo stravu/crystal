@@ -210,10 +210,10 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   }, []);
 
   const handleBlur = useCallback((e: React.FocusEvent) => {
-    const toolbar = e.currentTarget.closest('[data-toolbar-container]');
+    const toolbar = e.currentTarget?.closest?.('[data-toolbar-container]');
     const relatedTarget = e.relatedTarget;
     
-    if (!toolbar || !relatedTarget || !toolbar.contains(relatedTarget as Node)) {
+    if (!toolbar || !relatedTarget || !(toolbar instanceof Element) || !toolbar.contains(relatedTarget as Node)) {
       setIsFocused(false);
       setIsToolbarActive(false);
     } else {

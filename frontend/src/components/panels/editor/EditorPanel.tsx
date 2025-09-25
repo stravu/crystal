@@ -51,8 +51,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   // Use ref to store the debounced function so it doesn't get recreated
   const debouncedUpdateRef = useRef<DebouncedFunction<(panelId: string, newState: Partial<EditorPanelState>) => void> | null>(null);
   
-  // Initialize debounced function only once
-  useEffect(() => {
+  // Initialize debounced function immediately to prevent warning
+  if (!debouncedUpdateRef.current) {
     debouncedUpdateRef.current = debounce((panelId: string, newState: Partial<EditorPanelState>) => {
       console.log('[EditorPanel] Saving state to database:', {
         panelId,
@@ -78,8 +78,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         console.error('[EditorPanel] Failed to update editor panel state:', err);
       });
     }, 500);
-    
-    // Cleanup on unmount
+  }
+  
+  // Cleanup effect for debounced function
+  useEffect(() => {
     return () => {
       if (debouncedUpdateRef.current?.cancel) {
         debouncedUpdateRef.current.cancel();
