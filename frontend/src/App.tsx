@@ -124,6 +124,10 @@ function App() {
   useEffect(() => {
     // Show welcome screen and Discord popup intelligently based on user state
     // This should only run once when the app is loaded, not when sessions change
+    if (!isLoaded || hasCheckedWelcome) {
+      return;
+    }
+
     const checkInitialState = async () => {
       if (!window.electron?.invoke) {
         return;
@@ -145,7 +149,7 @@ function App() {
       // If user explicitly said "don't show again", respect that preference
       if (hideWelcome) {
         welcomeScreenShown = false;
-      } else if (isLoaded) {
+      } else {
         try {
           const projectsResponse = await API.projects.getAll();
           const hasProjects = projectsResponse.success && projectsResponse.data && projectsResponse.data.length > 0;
@@ -175,7 +179,7 @@ function App() {
       }
       
       // If welcome screen is not shown and Discord hasn't been hidden, check if we should show Discord popup
-      if (!welcomeScreenShown && !hideDiscord && isLoaded) {
+      if (!welcomeScreenShown && !hideDiscord) {
         
         try {
           // Get the last app open to see if Discord was already shown
@@ -216,11 +220,10 @@ function App() {
       }
     };
     
-    if (isLoaded && !hasCheckedWelcome) {
-      checkInitialState();
-      setHasCheckedWelcome(true);
-    }
-  }, [isLoaded, hasCheckedWelcome]); // Remove sessions.length from dependencies to prevent re-runs
+    // Set the flag first to prevent re-runs
+    setHasCheckedWelcome(true);
+    checkInitialState();
+  }, [isLoaded]); // Only depend on isLoaded, not hasCheckedWelcome to prevent loops
 
   // Discord popup logic is now combined with welcome screen logic above
   
