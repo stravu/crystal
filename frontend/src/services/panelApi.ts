@@ -25,7 +25,7 @@ export const panelApi = {
     return window.electron!.invoke('panels:setActive', sessionId, panelId);
   },
   
-  async emitPanelEvent(panelId: string, eventType: string, data: any): Promise<void> {
+  async emitPanelEvent(panelId: string, eventType: string, data: Record<string, unknown>): Promise<void> {
     return window.electron!.invoke('panels:emitEvent', panelId, eventType, data);
   }
 };

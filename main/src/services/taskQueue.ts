@@ -1,6 +1,6 @@
 import Bull from 'bull';
 import { SimpleQueue } from './simpleTaskQueue';
-import type { SessionManager } from './sessionManager';
+import { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import { WorktreeNameGenerator } from './worktreeNameGenerator';
 import type { AbstractCliManager } from './panels/cli/AbstractCliManager';
@@ -10,6 +10,9 @@ import { formatForDisplay } from '../utils/timestampUtils';
 import * as os from 'os';
 import { panelManager } from './panelManager';
 import { getCodexModelConfig } from '../../../shared/types/models';
+import type { Session } from '../types/session';
+import type { ToolPanel } from '../../../shared/types/panels';
+import type { DatabaseService } from '../database/database';
 
 interface TaskQueueOptions {
   sessionManager: SessionManager;
@@ -114,19 +117,25 @@ export class TaskQueue {
     }
     
     // Add event handlers for debugging
-    this.sessionQueue.on('active', (job: any) => {
+    this.sessionQueue.on('active', (...args: unknown[]) => {
+      const job = args[0] as { id: string | number };
       console.log(`[TaskQueue] Job ${job.id} is active`);
     });
     
-    this.sessionQueue.on('completed', (job: any, result: any) => {
+    this.sessionQueue.on('completed', (...args: unknown[]) => {
+      const job = args[0] as { id: string | number };
+      const result = args[1];
       console.log(`[TaskQueue] Job ${job.id} completed:`, result);
     });
     
-    this.sessionQueue.on('failed', (job: any, err: any) => {
+    this.sessionQueue.on('failed', (...args: unknown[]) => {
+      const job = args[0] as { id: string | number };
+      const err = args[1] as Error;
       console.error(`[TaskQueue] Job ${job.id} failed:`, err);
     });
     
-    this.sessionQueue.on('error', (error: any) => {
+    this.sessionQueue.on('error', (...args: unknown[]) => {
+      const error = args[0] as Error;
       console.error('[TaskQueue] Queue error:', error);
     });
 
@@ -236,12 +245,12 @@ export class TaskQueue {
         
         // Attach codexConfig to the session object for the panel creation in events.ts
         if (codexConfig) {
-          (session as any).codexConfig = codexConfig;
+          (session as Session & { codexConfig?: typeof codexConfig }).codexConfig = codexConfig;
         }
         
         // Attach claudeConfig to the session object for the panel creation in events.ts
         if (claudeConfig) {
-          (session as any).claudeConfig = claudeConfig;
+          (session as Session & { claudeConfig?: typeof claudeConfig }).claudeConfig = claudeConfig;
         }
 
         // Only add prompt-related data if there's actually a prompt
@@ -309,7 +318,7 @@ export class TaskQueue {
               await new Promise(resolve => setTimeout(resolve, 200));
               const { panelManager } = require('./panelManager');
               const existingPanels = panelManager.getPanelsForSession(session.id);
-              codexPanel = existingPanels.find((p: any) => p.type === 'codex');
+              codexPanel = existingPanels.find((p: ToolPanel) => p.type === 'codex');
               attempts++;
             }
 
@@ -363,7 +372,7 @@ export class TaskQueue {
               await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
               const { panelManager } = require('./panelManager');
               const existingPanels = panelManager.getPanelsForSession(session.id);
-              claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+              claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
               attempts++;
             }
             
@@ -425,7 +434,7 @@ export class TaskQueue {
       // Find the Claude panel for this session
       const { panelManager } = require('./panelManager');
       const existingPanels = panelManager.getPanelsForSession(sessionId);
-      const claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+      const claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
       
       if (!claudePanel) {
         throw new Error(`No Claude panel found for session ${sessionId}`);
@@ -453,7 +462,7 @@ export class TaskQueue {
       // Find the Claude panel for this session
       const { panelManager } = require('./panelManager');
       const existingPanels = panelManager.getPanelsForSession(sessionId);
-      const claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+      const claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
       
       if (!claudePanel) {
         throw new Error(`No Claude panel found for session ${sessionId}`);
@@ -475,7 +484,7 @@ export class TaskQueue {
     });
   }
 
-  async createSession(data: CreateSessionJob): Promise<Bull.Job<CreateSessionJob> | any> {
+  async createSession(data: CreateSessionJob): Promise<Bull.Job<CreateSessionJob> | { id: string; data: CreateSessionJob; status: string }> {
     console.log('[TaskQueue] Adding session creation job to queue:', data);
     const job = await this.sessionQueue.add(data);
     console.log('[TaskQueue] Job added successfully with ID:', job.id);
@@ -506,7 +515,7 @@ export class TaskQueue {
       permissionMode?: 'approve' | 'ignore';
       ultrathink?: boolean;
     }
-  ): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
+  ): Promise<(Bull.Job<CreateSessionJob> | { id: string; data: CreateSessionJob; status: string })[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
     
@@ -525,7 +534,7 @@ export class TaskQueue {
     if (count > 1 && projectId) {
       try {
         const { sessionManager } = this.options;
-        const db = (sessionManager as any).db;
+        const db = (sessionManager as any).db as DatabaseService;
         const folderName = worktreeTemplate || generatedBaseName || 'Multi-session prompt';
         
         console.log(`[TaskQueue] Creating folder for multi-session prompt. ProjectId: ${projectId}, type: ${typeof projectId}`);
@@ -568,11 +577,11 @@ export class TaskQueue {
     return Promise.all(jobs);
   }
 
-  async sendInput(sessionId: string, input: string): Promise<Bull.Job<SendInputJob> | any> {
+  async sendInput(sessionId: string, input: string): Promise<Bull.Job<SendInputJob> | { id: string; data: SendInputJob; status: string }> {
     return this.inputQueue.add({ sessionId, input });
   }
 
-  async continueSession(sessionId: string, prompt: string): Promise<Bull.Job<ContinueSessionJob> | any> {
+  async continueSession(sessionId: string, prompt: string): Promise<Bull.Job<ContinueSessionJob> | { id: string; data: ContinueSessionJob; status: string }> {
     return this.continueQueue.add({ sessionId, prompt });
   }
 

@@ -18,8 +18,8 @@ export interface AIPanelConfig {
   webSearch?: boolean;
   thinkingLevel?: 'low' | 'medium' | 'high';
   
-  // Future extensibility
-  [key: string]: any;
+  // Future extensibility - specific config values can be added here
+  [key: string]: string | number | boolean | Array<unknown> | undefined;
 }
 
 /**
@@ -35,7 +35,7 @@ export interface StartPanelConfig extends AIPanelConfig {
  */
 export interface ContinuePanelConfig extends AIPanelConfig {
   panelId: string;
-  conversationHistory: any[];
+  conversationHistory: Array<{message_type: 'user' | 'assistant'; content: string; timestamp?: string}>;
 }
 
 /**

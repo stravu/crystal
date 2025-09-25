@@ -1,19 +1,19 @@
 import { EventEmitter } from 'events';
 
-interface Job<T> {
+interface Job<T, R = unknown> {
   id: string;
   data: T;
   status: 'pending' | 'active' | 'completed' | 'failed';
-  result?: any;
-  error?: any;
+  result?: R;
+  error?: Error;
 }
 
-export class SimpleQueue<T> extends EventEmitter {
-  private jobs: Map<string, Job<T>> = new Map();
+export class SimpleQueue<T, R = unknown> extends EventEmitter {
+  private jobs: Map<string, Job<T, R>> = new Map();
   private queue: string[] = [];
   private processing = false;
   private concurrency: number;
-  private processor?: (job: Job<T>) => Promise<any>;
+  private processor?: (job: Job<T, R>) => Promise<R>;
   private jobIdCounter = 0;
 
   constructor(name: string, concurrency = 1) {
@@ -22,15 +22,15 @@ export class SimpleQueue<T> extends EventEmitter {
     console.log(`[SimpleQueue] Created queue: ${name} with concurrency: ${concurrency}`);
   }
 
-  process(concurrency: number, processor: (job: Job<T>) => Promise<any>) {
+  process(concurrency: number, processor: (job: Job<T, R>) => Promise<R>) {
     this.concurrency = concurrency;
     this.processor = processor;
     console.log(`[SimpleQueue] Processor registered`);
     this.startProcessing();
   }
 
-  async add(data: T): Promise<Job<T>> {
-    const job: Job<T> = {
+  async add(data: T): Promise<Job<T, R>> {
+    const job: Job<T, R> = {
       id: String(++this.jobIdCounter),
       data,
       status: 'pending'
@@ -81,7 +81,7 @@ export class SimpleQueue<T> extends EventEmitter {
       this.emit('completed', job, result);
     } catch (error) {
       job.status = 'failed';
-      job.error = error;
+      job.error = error instanceof Error ? error : new Error(String(error));
       console.error(`[SimpleQueue] Job ${job.id} failed:`, error);
       this.emit('failed', job, error);
     }
@@ -99,7 +99,7 @@ export class SimpleQueue<T> extends EventEmitter {
     }
   }
 
-  on(event: 'active' | 'completed' | 'failed' | 'waiting' | 'error', listener: (...args: any[]) => void): this {
+  on(event: 'active' | 'completed' | 'failed' | 'waiting' | 'error', listener: (...args: unknown[]) => void): this {
     return super.on(event, listener);
   }
 

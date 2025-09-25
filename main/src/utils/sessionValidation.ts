@@ -110,7 +110,7 @@ export function validateSessionIsActive(sessionId: string): ValidationResult {
 /**
  * Validates that an event matches the expected session context
  */
-export function validateEventContext(eventData: any, expectedSessionId?: string): ValidationResult {
+export function validateEventContext(eventData: Record<string, unknown>, expectedSessionId?: string): ValidationResult {
   if (!eventData) {
     return { valid: false, error: 'Event data is required' };
   }
@@ -120,7 +120,7 @@ export function validateEventContext(eventData: any, expectedSessionId?: string)
     if (!eventData.sessionId) {
       return { valid: false, error: 'Event must contain sessionId' };
     }
-    return validateSessionExists(eventData.sessionId);
+    return validateSessionExists(String(eventData.sessionId));
   }
 
   // Validate event session matches expected session
@@ -148,7 +148,7 @@ export function validateEventContext(eventData: any, expectedSessionId?: string)
  * Validates that a panel event matches the expected context
  */
 export function validatePanelEventContext(
-  eventData: any, 
+  eventData: Record<string, unknown>, 
   expectedPanelId?: string, 
   expectedSessionId?: string
 ): ValidationResult {
@@ -192,9 +192,9 @@ export function validatePanelEventContext(
 
   // No specific expectations, just validate event has required data
   if (eventData.panelId) {
-    return validatePanelExists(eventData.panelId);
+    return validatePanelExists(String(eventData.panelId));
   } else if (eventData.sessionId) {
-    return validateSessionExists(eventData.sessionId);
+    return validateSessionExists(String(eventData.sessionId));
   }
 
   return { valid: false, error: 'Event must contain either panelId or sessionId' };

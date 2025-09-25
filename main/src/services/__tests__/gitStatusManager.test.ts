@@ -7,6 +7,18 @@ import type { WorktreeManager } from '../worktreeManager';
 import type { GitDiffManager } from '../gitDiffManager';
 import type { Logger } from '../../utils/logger';
 
+// Type for accessing private methods in tests
+interface GitStatusManagerWithPrivates {
+  executeGitCommand(command: string, cwd: string): { success: boolean; output?: unknown; error?: unknown };
+  getUntrackedFiles(cwd: string): { success: boolean; output?: unknown; error?: unknown };
+  getRevListCount(cwd: string, mainBranch: string): { success: boolean; output?: unknown; error?: unknown };
+  getDiffStats(cwd: string, mainBranch: string): { success: boolean; output?: unknown; error?: unknown };
+  checkMergeConflicts(cwd: string): { success: boolean; output?: unknown; error?: unknown };
+  fetchGitStatus(sessionId: string): Promise<{ state: string; lastChecked: string; [key: string]: unknown } | null>;
+  pollAllSessions(): void;
+  cache: Record<string, { status: { state: string; lastChecked: string; [key: string]: unknown }; lastChecked: number }>;
+}
+
 // Mock the modules
 vi.mock('../../utils/commandExecutor');
 vi.mock('fs');
@@ -26,17 +38,17 @@ describe('GitStatusManager', () => {
     mockSessionManager = {
       getSession: vi.fn(),
       getProjectForSession: vi.fn(),
-    } as any;
+    } as Partial<SessionManager> as SessionManager;
 
     mockWorktreeManager = {
       getProjectMainBranch: vi.fn().mockResolvedValue('main'),
-    } as any;
+    } as Partial<WorktreeManager> as WorktreeManager;
 
     mockGitDiffManager = {
       captureWorkingDirectoryDiff: vi.fn().mockResolvedValue({
         stats: { filesChanged: 0, additions: 0, deletions: 0 },
       }),
-    } as any;
+    } as Partial<GitDiffManager> as GitDiffManager;
 
     mockLogger = {
       info: vi.fn(),
@@ -44,7 +56,7 @@ describe('GitStatusManager', () => {
       warn: vi.fn(),
       debug: vi.fn(),
       verbose: vi.fn(),
-    } as any;
+    } as Partial<Logger> as Logger;
 
     // Create GitStatusManager instance
     gitStatusManager = new GitStatusManager(
@@ -60,7 +72,7 @@ describe('GitStatusManager', () => {
       const mockOutput = 'command output';
       (execSync as Mock).mockReturnValue(Buffer.from(mockOutput));
 
-      const result = (gitStatusManager as any).executeGitCommand('git status', '/test/path');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).executeGitCommand('git status', '/test/path');
 
       expect(result.success).toBe(true);
       expect(result.output).toBe(mockOutput);
@@ -71,7 +83,7 @@ describe('GitStatusManager', () => {
       const error = new Error('Command failed');
       (execSync as Mock).mockImplementation(() => { throw error; });
 
-      const result = (gitStatusManager as any).executeGitCommand('git status', '/test/path');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).executeGitCommand('git status', '/test/path');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe(error);
@@ -82,7 +94,7 @@ describe('GitStatusManager', () => {
     it('should detect untracked files', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('file1.txt\nfile2.js\n'));
 
-      const result = (gitStatusManager as any).getUntrackedFiles('/test/path');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).getUntrackedFiles('/test/path');
 
       expect(result.success).toBe(true);
       expect(result.output).toBe(true); // Has untracked files
@@ -91,7 +103,7 @@ describe('GitStatusManager', () => {
     it('should return false when no untracked files', () => {
       (execSync as Mock).mockReturnValue(Buffer.from(''));
 
-      const result = (gitStatusManager as any).getUntrackedFiles('/test/path');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).getUntrackedFiles('/test/path');
 
       expect(result.success).toBe(true);
       expect(result.output).toBe(false); // No untracked files
@@ -102,7 +114,7 @@ describe('GitStatusManager', () => {
     it('should parse ahead/behind counts correctly', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('3\t5'));
 
-      const result = (gitStatusManager as any).getRevListCount('/test/path', 'main');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).getRevListCount('/test/path', 'main');
 
       expect(result.success).toBe(true);
       expect(result.output).toEqual({ ahead: 5, behind: 3 });
@@ -111,7 +123,7 @@ describe('GitStatusManager', () => {
     it('should handle zero counts', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('0\t0'));
 
-      const result = (gitStatusManager as any).getRevListCount('/test/path', 'main');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).getRevListCount('/test/path', 'main');
 
       expect(result.success).toBe(true);
       expect(result.output).toEqual({ ahead: 0, behind: 0 });
@@ -122,7 +134,7 @@ describe('GitStatusManager', () => {
     it('should parse diff stats correctly', () => {
       (execSync as Mock).mockReturnValue(Buffer.from(' 3 files changed, 10 insertions(+), 5 deletions(-)'));
 
-      const result = (gitStatusManager as any).getDiffStats('/test/path', 'main');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).getDiffStats('/test/path', 'main');
 
       expect(result.success).toBe(true);
       expect(result.output).toEqual({
@@ -135,7 +147,7 @@ describe('GitStatusManager', () => {
     it('should handle single file change', () => {
       (execSync as Mock).mockReturnValue(Buffer.from(' 1 file changed, 2 insertions(+)'));
 
-      const result = (gitStatusManager as any).getDiffStats('/test/path', 'main');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).getDiffStats('/test/path', 'main');
 
       expect(result.success).toBe(true);
       expect(result.output).toEqual({
@@ -150,7 +162,7 @@ describe('GitStatusManager', () => {
     it('should detect merge conflicts', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('UU file1.txt\nAA file2.txt'));
 
-      const result = (gitStatusManager as any).checkMergeConflicts('/test/path');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).checkMergeConflicts('/test/path');
 
       expect(result.success).toBe(true);
       expect(result.output).toBe(true); // Has conflicts
@@ -159,7 +171,7 @@ describe('GitStatusManager', () => {
     it('should return false when no conflicts', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('M  file1.txt\nA  file2.txt'));
 
-      const result = (gitStatusManager as any).checkMergeConflicts('/test/path');
+      const result = (gitStatusManager as unknown as GitStatusManagerWithPrivates).checkMergeConflicts('/test/path');
 
       expect(result.success).toBe(true);
       expect(result.output).toBe(false); // No conflicts
@@ -195,14 +207,14 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('0')); // No total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
       expect(status).toBeTruthy();
-      expect(status.state).toBe('clean');
-      expect(status.ahead).toBeUndefined();
-      expect(status.behind).toBeUndefined();
-      expect(status.additions).toBeUndefined();
-      expect(status.deletions).toBeUndefined();
+      expect(status!.state).toBe('clean');
+      expect(status!.ahead).toBeUndefined();
+      expect(status!.behind).toBeUndefined();
+      expect(status!.additions).toBeUndefined();
+      expect(status!.deletions).toBeUndefined();
     });
 
     it('should return modified status with uncommitted changes', async () => {
@@ -216,13 +228,13 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('0')); // No total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
-      expect(status.state).toBe('modified');
-      expect(status.filesChanged).toBe(3);
-      expect(status.additions).toBe(15);
-      expect(status.deletions).toBe(5);
-      expect(status.hasUncommittedChanges).toBe(true);
+      expect(status!.state).toBe('modified');
+      expect(status!.filesChanged).toBe(3);
+      expect(status!.additions).toBe(15);
+      expect(status!.deletions).toBe(5);
+      expect(status!.hasUncommittedChanges).toBe(true);
     });
 
     it('should return ahead status when commits ahead of main', async () => {
@@ -237,15 +249,15 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('3')); // 3 total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
-      expect(status.state).toBe('ahead');
-      expect(status.ahead).toBe(3);
-      expect(status.totalCommits).toBe(3);
-      expect(status.commitFilesChanged).toBe(5);
-      expect(status.commitAdditions).toBe(20);
-      expect(status.commitDeletions).toBe(10);
-      expect(status.isReadyToMerge).toBe(true);
+      expect(status!.state).toBe('ahead');
+      expect(status!.ahead).toBe(3);
+      expect(status!.totalCommits).toBe(3);
+      expect(status!.commitFilesChanged).toBe(5);
+      expect(status!.commitAdditions).toBe(20);
+      expect(status!.commitDeletions).toBe(10);
+      expect(status!.isReadyToMerge).toBe(true);
     });
 
     it('should return behind status when commits behind main', async () => {
@@ -259,11 +271,11 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('0')); // No total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
-      expect(status.state).toBe('behind');
-      expect(status.behind).toBe(5);
-      expect(status.ahead).toBeUndefined();
+      expect(status!.state).toBe('behind');
+      expect(status!.behind).toBe(5);
+      expect(status!.ahead).toBeUndefined();
     });
 
     it('should return diverged status when both ahead and behind', async () => {
@@ -278,12 +290,12 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('2')); // 2 total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
-      expect(status.state).toBe('diverged');
-      expect(status.ahead).toBe(2);
-      expect(status.behind).toBe(3);
-      expect(status.totalCommits).toBe(2);
+      expect(status!.state).toBe('diverged');
+      expect(status!.ahead).toBe(2);
+      expect(status!.behind).toBe(3);
+      expect(status!.totalCommits).toBe(2);
     });
 
     it('should return conflict status when merge conflicts exist', async () => {
@@ -297,9 +309,9 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('UU conflict.txt')) // Has conflicts
         .mockReturnValueOnce(Buffer.from('0')); // No total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
-      expect(status.state).toBe('conflict');
+      expect(status!.state).toBe('conflict');
       // The hasMergeConflicts property is not exposed in the result,
       // but the state being 'conflict' indicates merge conflicts exist
     });
@@ -315,10 +327,10 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('0')); // No total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
-      expect(status.state).toBe('untracked');
-      expect(status.hasUntrackedFiles).toBe(true);
+      expect(status!.state).toBe('untracked');
+      expect(status!.hasUntrackedFiles).toBe(true);
     });
 
     it('should still fetch status for archived session', async () => {
@@ -337,17 +349,17 @@ describe('GitStatusManager', () => {
         .mockReturnValueOnce(Buffer.from('')) // No merge conflicts
         .mockReturnValueOnce(Buffer.from('0')); // No total commits
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
       // It will still return a status for archived sessions
       expect(status).toBeTruthy();
-      expect(status.state).toBe('untracked');
+      expect(status!.state).toBe('untracked');
     });
 
     it('should return null when session not found', async () => {
       (mockSessionManager.getSession as Mock).mockResolvedValue(null);
 
-      const status = await (gitStatusManager as any).fetchGitStatus('test-session');
+      const status = await (gitStatusManager as unknown as GitStatusManagerWithPrivates).fetchGitStatus('test-session');
 
       expect(status).toBeNull();
     });
@@ -357,7 +369,7 @@ describe('GitStatusManager', () => {
     it('should start polling when startPolling is called', () => {
       vi.useFakeTimers();
       try {
-        const pollSpy = vi.spyOn(gitStatusManager as any, 'pollAllSessions').mockImplementation(() => {});
+        const pollSpy = vi.spyOn(gitStatusManager as unknown as GitStatusManagerWithPrivates, 'pollAllSessions').mockImplementation(() => {});
 
         gitStatusManager.startPolling();
 
@@ -377,7 +389,7 @@ describe('GitStatusManager', () => {
     it('should stop polling when stopPolling is called', () => {
       vi.useFakeTimers();
       try {
-        const pollSpy = vi.spyOn(gitStatusManager as any, 'pollAllSessions').mockImplementation(() => {});
+        const pollSpy = vi.spyOn(gitStatusManager as unknown as GitStatusManagerWithPrivates, 'pollAllSessions').mockImplementation(() => {});
 
         gitStatusManager.startPolling();
         expect(pollSpy).toHaveBeenCalledTimes(1);
@@ -396,12 +408,12 @@ describe('GitStatusManager', () => {
   describe('caching', () => {
     it('should return cached status within TTL', async () => {
       const mockStatus = { state: 'clean' as const, lastChecked: new Date().toISOString() };
-      (gitStatusManager as any).cache['test-session'] = {
+      (gitStatusManager as unknown as GitStatusManagerWithPrivates).cache['test-session'] = {
         status: mockStatus,
         lastChecked: Date.now(),
       };
 
-      const fetchSpy = vi.spyOn(gitStatusManager as any, 'fetchGitStatus');
+      const fetchSpy = vi.spyOn(gitStatusManager as unknown as GitStatusManagerWithPrivates, 'fetchGitStatus');
       
       const status = await gitStatusManager.getGitStatus('test-session');
 
@@ -413,12 +425,12 @@ describe('GitStatusManager', () => {
       const oldStatus = { state: 'clean' as const, lastChecked: new Date().toISOString() };
       const newStatus = { state: 'modified' as const, lastChecked: new Date().toISOString() };
       
-      (gitStatusManager as any).cache['test-session'] = {
+      (gitStatusManager as unknown as GitStatusManagerWithPrivates).cache['test-session'] = {
         status: oldStatus,
         lastChecked: Date.now() - 10000, // Expired
       };
 
-      vi.spyOn(gitStatusManager as any, 'fetchGitStatus').mockResolvedValue(newStatus);
+      vi.spyOn(gitStatusManager as unknown as GitStatusManagerWithPrivates, 'fetchGitStatus').mockResolvedValue(newStatus);
       
       const status = await gitStatusManager.getGitStatus('test-session');
 

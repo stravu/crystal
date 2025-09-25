@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 
 export class PanelEventBus extends EventEmitter {
   private subscriptions = new Map<string, PanelEventSubscription[]>();
-  private panelListenerMap = new Map<string, Map<PanelEventType | string, (...args: any[]) => void>>(); // Track listeners per panel
+  private panelListenerMap = new Map<string, Map<PanelEventType | string, (event: PanelEvent) => void>>(); // Track listeners per panel
   private eventHistory: PanelEvent[] = [];
   private readonly MAX_HISTORY_SIZE = 100;
   

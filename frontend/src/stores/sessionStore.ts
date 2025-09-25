@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, SessionOutput, GitStatus } from '../types/session';
+import type { Session, SessionOutput, GitStatus, ClaudeJsonMessage } from '../types/session';
 import { API } from '../utils/api';
 
 interface CreateSessionRequest {
@@ -272,7 +272,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (output.type === 'json') {
       // Update jsonMessages array with limit
       const currentMessages = session.jsonMessages || [];
-      const newMessage = {...output.data, timestamp: output.timestamp};
+      const newMessage = { ...(output.data as ClaudeJsonMessage), timestamp: output.timestamp };
       const newJsonMessages = currentMessages.length >= MAX_MESSAGES
         ? [...currentMessages.slice(1), newMessage] // Remove oldest when at limit
         : [...currentMessages, newMessage];
@@ -281,8 +281,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Add stdout/stderr to output array with limit
       const currentOutput = session.output || [];
       const newOutput = currentOutput.length >= MAX_OUTPUTS
-        ? [...currentOutput.slice(1), output.data] // Remove oldest when at limit
-        : [...currentOutput, output.data];
+        ? [...currentOutput.slice(1), output.data as string] // Remove oldest when at limit
+        : [...currentOutput, output.data as string];
       sessions[sessionIndex] = { ...session, output: newOutput };
     }
     
@@ -291,7 +291,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === output.sessionId) {
       if (output.type === 'json') {
         const currentMessages = state.activeMainRepoSession.jsonMessages || [];
-        const newMessage = {...output.data, timestamp: output.timestamp};
+        const newMessage = { ...(output.data as ClaudeJsonMessage), timestamp: output.timestamp };
         const newJsonMessages = currentMessages.length >= MAX_MESSAGES
           ? [...currentMessages.slice(1), newMessage]
           : [...currentMessages, newMessage];
@@ -299,8 +299,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       } else {
         const currentOutput = state.activeMainRepoSession.output || [];
         const newOutput = currentOutput.length >= MAX_OUTPUTS
-          ? [...currentOutput.slice(1), output.data]
-          : [...currentOutput, output.data];
+          ? [...currentOutput.slice(1), output.data as string]
+          : [...currentOutput, output.data as string];
         updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: newOutput };
       }
     }
@@ -341,7 +341,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     
     // PERFORMANCE: Process arrays in chunks to avoid V8 optimization bailouts
     const stdOutputs: string[] = [];
-    const jsonMessages: any[] = [];
+    const jsonMessages: ClaudeJsonMessage[] = [];
     
     // Process in smaller batches to avoid long-running loops that trigger V8 deoptimization
     const BATCH_SIZE = 100;
@@ -351,9 +351,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       for (let i = batch; i < batchEnd; i++) {
         const output = outputs[i];
         if (output.type === 'json') {
-          jsonMessages.push({ ...output.data, timestamp: output.timestamp });
+          jsonMessages.push({ ...(output.data as ClaudeJsonMessage), timestamp: output.timestamp });
         } else if (output.type === 'stdout' || output.type === 'stderr') {
-          stdOutputs.push(output.data);
+          stdOutputs.push(output.data as string);
         }
       }
       
