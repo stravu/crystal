@@ -58,8 +58,9 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
           try {
             commandExecutor.execSync('git diff-index --quiet HEAD --', { 
               encoding: 'utf8',
-              cwd: process.cwd()
-            });
+              cwd: process.cwd(),
+              silent: true
+            } as any);
             gitCommit = gitHash;
           } catch {
             // Working directory has uncommitted changes
