@@ -206,6 +206,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     
     // Handle Codex protocol operations (user input)
     if (typeof message === 'object' && message !== null && 'op' in message) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex protocol operations have dynamic structure
       const messageObj = message as { op: any };
       const op = messageObj.op;
       
@@ -235,7 +236,9 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
     
     // Handle session info blocks that provide initial context  
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Session info messages from external CLI have varying structures
     if (typeof message === 'object' && message !== null && 'type' in message && (message as any).type === 'session_info') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Need to access dynamic session info fields
       const sessionInfoMessage = message as any;
       // Capture the original prompt for later use in user input messages
       if (sessionInfoMessage.original_prompt || sessionInfoMessage.initial_prompt) {
@@ -276,6 +279,7 @@ export class CodexMessageTransformer implements MessageTransformer {
 
     // Handle Codex protocol messages (responses)
     if (typeof message === 'object' && message !== null && 'msg' in message) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex response messages have dynamic structure
       const messageObj = message as { msg: any };
       const msg = messageObj.msg;
       
@@ -848,8 +852,11 @@ export class CodexMessageTransformer implements MessageTransformer {
         agent: 'codex',
         raw: true,
         messageType: (typeof message === 'object' && message !== null && 'type' in message) 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Extracting type from dynamic message structure
           ? (message as any).type
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Extracting nested type from Codex protocol message
           : (typeof message === 'object' && message !== null && 'msg' in message && typeof (message as any).msg === 'object' && (message as any).msg !== null && 'type' in (message as any).msg)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Accessing nested message type field
             ? (message as any).msg.type
             : 'unknown'
       }
