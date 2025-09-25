@@ -18,6 +18,7 @@ interface PermissionResponse {
   reason?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter default for flexible API responses
 interface IPCResponse<T = any> {
   success: boolean;
   data?: T;

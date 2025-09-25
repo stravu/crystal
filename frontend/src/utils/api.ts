@@ -4,6 +4,7 @@ import type { Project } from '../types/project';
 import type { SessionCreationPreferences } from '../stores/sessionPreferencesStore';
 
 // Type for IPC response
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter default for flexible API responses
 export interface IPCResponse<T = any> {
   success: boolean;
   data?: T;

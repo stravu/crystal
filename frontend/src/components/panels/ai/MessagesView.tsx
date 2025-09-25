@@ -96,12 +96,15 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               }
               
               // Check if this is a session_info message
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- External protocol message with dynamic structure
               if (msgData && typeof msgData === 'object' && 'type' in msgData && (msgData as any).type === 'session_info') {
                 foundSessionInfo = msgData as SessionInfo;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex protocol messages have varying nested structures
               } else if (msgData && typeof msgData === 'object' && 'msg' in msgData && typeof (msgData as any).msg === 'object' && (msgData as any).msg !== null && 'type' in (msgData as any).msg && (msgData as any).msg.type === 'session_configured') {
                 // Handle Codex session configuration
                 foundSessionInfo = {
                   type: 'session_info',
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic Codex protocol field
                   model: (msgData as any).msg.model || 'default',
                   timestamp: msg.timestamp || new Date().toISOString()
                 };
@@ -161,12 +164,15 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             parsedData = detail.data;
           }
           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- External protocol message with dynamic structure
           if (parsedData && typeof parsedData === 'object' && 'type' in parsedData && (parsedData as any).type === 'session_info') {
             setSessionInfo(parsedData as SessionInfo);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex protocol messages have varying nested structures
           } else if (parsedData && typeof parsedData === 'object' && 'msg' in parsedData && typeof (parsedData as any).msg === 'object' && (parsedData as any).msg !== null && 'type' in (parsedData as any).msg && (parsedData as any).msg.type === 'session_configured') {
             // Handle Codex session configuration
             setSessionInfo({
               type: 'session_info',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic Codex protocol field
               model: (parsedData as any).msg.model || 'default',
               timestamp: detail.timestamp || new Date().toISOString()
             });

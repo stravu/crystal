@@ -790,6 +790,23 @@ In development mode, Crystal automatically captures all frontend console logs an
 
 **Note**: This feature is only active in development mode and will not affect production builds.
 
+## TypeScript Coding Standards
+
+### NO 'ANY' TYPE USAGE
+
+**IMPORTANT**: This codebase enforces a strict no-any policy. The TypeScript 'any' type is NOT allowed.
+
+- ❌ **NEVER use `any` type** - ESLint will error and CI/CD will fail
+- ✅ Use `unknown` when the type is truly unknown (requires type guards before use)
+- ✅ Use specific types or interfaces whenever possible
+- ✅ Use generics with type constraints for flexible but type-safe code
+
+
+**Enforcement**:
+- ESLint rule `@typescript-eslint/no-explicit-any` is set to `'error'`
+- GitHub Actions quality workflow enforces this on all PRs
+- Local development will show errors immediately
+
 ## Disclaimer
 
 Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Claude™ is a trademark of Anthropic, PBC. Crystal is not affiliated with, endorsed by, or sponsored by Anthropic. This tool is designed to work with Claude Code, which must be installed separately.

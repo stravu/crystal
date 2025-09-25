@@ -194,9 +194,8 @@ export interface GitErrorDetails {
 // Import Folder from the proper types file
 import type { Folder } from './folder';
 
-export interface FolderWithProjectId extends Folder {
-  // Already has projectId from base Folder interface
-}
+// FolderWithProjectId is just an alias for Folder since it already has projectId
+export type FolderWithProjectId = Folder;
 
 export type ContextMenuPayload = Session | Folder;
 
