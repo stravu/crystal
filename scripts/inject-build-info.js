@@ -20,7 +20,7 @@ try {
   
   // Check if the working directory is clean (no uncommitted changes)
   try {
-    execSync('git diff-index --quiet HEAD --', { encoding: 'utf8' });
+    execSync('git diff-index --quiet HEAD --', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
     gitCommit = gitHash;
   } catch {
     // Working directory has uncommitted changes
