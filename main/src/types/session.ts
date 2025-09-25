@@ -8,7 +8,7 @@ export interface Session {
   createdAt: Date;
   lastActivity?: Date;
   output: string[];
-  jsonMessages: any[];
+  jsonMessages: unknown[];
   error?: string;
   isRunning?: boolean;
   lastViewedAt?: string;
@@ -92,7 +92,7 @@ export interface SessionUpdate {
 export interface SessionOutput {
   sessionId: string;
   type: 'stdout' | 'stderr' | 'json' | 'error';
-  data: string | any;
+  data: any; // Complex union type - can be string for stdout/stderr, or various JSON object structures
   timestamp: Date;
   panelId?: string;
 }

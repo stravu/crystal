@@ -90,7 +90,7 @@ export class VersionChecker {
       if (versionInfo.hasUpdate) {
         this.logger.info(`[Version Checker] Update available on startup: ${versionInfo.latest}`);
         // Emit event for UI notification
-        (process as any).emit('version-update-available', versionInfo);
+        (process as NodeJS.Process & { emit(event: 'version-update-available', data: VersionInfo): boolean }).emit('version-update-available', versionInfo);
       }
     } catch (error) {
       this.logger.error(`[Version Checker] Startup check failed:`, error as Error);
@@ -136,7 +136,7 @@ export class VersionChecker {
       if (versionInfo.hasUpdate) {
         this.logger.info(`[Version Checker] Update available: ${versionInfo.latest}`);
         // Emit event for UI notification
-        (process as any).emit('version-update-available', versionInfo);
+        (process as NodeJS.Process & { emit(event: 'version-update-available', data: VersionInfo): boolean }).emit('version-update-available', versionInfo);
       }
     } catch (error) {
       this.logger.error(`[Version Checker] Periodic check failed:`, error as Error);

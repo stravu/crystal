@@ -2264,7 +2264,9 @@ export function DraggableProjectTreeView() {
           <button
             onClick={() => {
               closeMenu();
-              handleStartFolderEdit(menuState.payload);
+              if (menuState.payload) {
+                handleStartFolderEdit(menuState.payload as Folder);
+              }
             }}
             className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-hover hover:text-text-primary"
           >
@@ -2275,7 +2277,7 @@ export function DraggableProjectTreeView() {
               closeMenu();
               // Find the project that contains this folder
               const project = projectsWithSessions.find(p => 
-                p.folders?.some(f => f.id === menuState.payload.id)
+                p.folders?.some(f => f.id === menuState.payload?.id)
               );
               if (project) {
                 setSelectedProjectForCreate(project);
@@ -2291,12 +2293,12 @@ export function DraggableProjectTreeView() {
             onClick={() => {
               closeMenu();
               // Find the project that contains this folder or use projectId from payload
-              const projectId = menuState.payload.projectId || 
+              const projectId = (menuState.payload as Folder)?.projectId || 
                 projectsWithSessions.find(p => 
-                  p.folders?.some(f => f.id === menuState.payload.id)
+                  p.folders?.some(f => f.id === menuState.payload?.id)
                 )?.id;
               if (projectId) {
-                handleDeleteFolder(menuState.payload, projectId);
+                handleDeleteFolder(menuState.payload as Folder, projectId);
               }
             }}
             className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-surface-hover hover:text-status-error"

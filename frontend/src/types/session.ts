@@ -1,3 +1,62 @@
+// Claude message content types
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface ToolUseContent {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, any>;
+}
+
+export interface ToolResultContent {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
+export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
+
+// JSON message structure from Claude
+export interface ClaudeJsonMessage {
+  id?: string;
+  type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'result' | 'thinking';
+  role?: 'user' | 'assistant' | 'system';
+  content?: string | MessageContent[];
+  message?: { 
+    content?: string | MessageContent[];
+    [key: string]: any;
+  };
+  timestamp: string;
+  name?: string;
+  input?: Record<string, any>;
+  tool_use_id?: string;
+  parent_tool_use_id?: string;
+  session_id?: string;
+  text?: string;
+  subtype?: string;
+  cwd?: string;
+  model?: string;
+  tools?: any[];
+  mcp_servers?: any[];
+  permissionMode?: string;
+  summary?: string;
+  error?: string;
+  details?: string;
+  raw_output?: string;
+  is_error?: boolean;
+  result?: string;
+  duration_ms?: number;
+  total_cost_usd?: number;
+  num_turns?: number;
+  cost_usd?: number;
+  thinking?: string;
+  [key: string]: any;
+}
+
 export interface Session {
   id: string;
   name: string;
@@ -8,7 +67,7 @@ export interface Session {
   createdAt: string;
   lastActivity?: string;
   output: string[];
-  jsonMessages: any[];
+  jsonMessages: ClaudeJsonMessage[];
   error?: string;
   isRunning?: boolean;
   lastViewedAt?: string;
@@ -81,7 +140,7 @@ export interface CreateSessionRequest {
 export interface SessionOutput {
   sessionId: string;
   type: 'stdout' | 'stderr' | 'json' | 'error';
-  data: string | any;
+  data: string | ClaudeJsonMessage;
   timestamp: string;
 }
 
@@ -112,4 +171,49 @@ export interface GitErrorDetails {
     ours: string[];
     theirs: string[];
   };
+}
+
+// Import Folder from the proper types file
+import type { Folder } from './folder';
+
+export interface FolderWithProjectId extends Folder {
+  // Already has projectId from base Folder interface
+}
+
+export type ContextMenuPayload = Session | Folder;
+
+// Version update info interface
+export interface VersionUpdateInfo {
+  version: string;
+  current: string;
+  latest: string;
+  hasUpdate: boolean;
+  releaseUrl?: string;
+  releaseNotes?: string;
+  downloadUrl?: string;
+  mandatory?: boolean;
+}
+
+// Permission request input types  
+export interface PermissionInput {
+  tool_name?: string;
+  args?: Record<string, any>;
+  [key: string]: any;
+}
+
+// Attachment types for Claude Code config
+export interface AttachedImage {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  dataUrl: string;
+}
+
+export interface AttachedText {
+  id: string;
+  name: string;
+  content: string;
+  size: number;
+  path?: string;
 }

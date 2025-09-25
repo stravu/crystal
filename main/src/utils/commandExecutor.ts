@@ -26,7 +26,7 @@ class CommandExecutor {
     };
 
     try {
-      const result = nodeExecSync(command, enhancedOptions as any);
+      const result = nodeExecSync(command, enhancedOptions as ExecSyncOptions);
       
       // Log success with a preview of the result
       if (result) {

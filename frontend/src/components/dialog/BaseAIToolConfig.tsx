@@ -1,12 +1,13 @@
 import React from 'react';
 import { Card } from '../ui/Card';
 import { Sparkles } from 'lucide-react';
+import type { AttachedImage, AttachedText } from '../../types/session';
 
 export interface BaseAIToolConfig {
   prompt?: string;
   model?: string;
-  attachedImages?: any[];
-  attachedTexts?: any[];
+  attachedImages?: AttachedImage[];
+  attachedTexts?: AttachedText[];
   ultrathink?: boolean;
 }
 

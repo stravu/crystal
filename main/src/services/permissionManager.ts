@@ -5,13 +5,13 @@ export interface PermissionRequest {
   id: string;
   sessionId: string;
   toolName: string;
-  input: any;
+  input: Record<string, unknown>;
   timestamp: number;
 }
 
 export interface PermissionResponse {
   behavior: 'allow' | 'deny';
-  updatedInput?: any;
+  updatedInput?: Record<string, unknown>;
   message?: string;
 }
 
@@ -48,7 +48,7 @@ export class PermissionManager extends EventEmitter {
     });
   }
 
-  async requestPermission(sessionId: string, toolName: string, input: any): Promise<PermissionResponse> {
+  async requestPermission(sessionId: string, toolName: string, input: Record<string, unknown>): Promise<PermissionResponse> {
     const request: PermissionRequest = {
       id: `${sessionId}-${Date.now()}-${Math.random()}`,
       sessionId,

@@ -19,12 +19,13 @@ import { useConfigStore } from './stores/configStore';
 import { API } from './utils/api';
 import { ContextMenuProvider } from './contexts/ContextMenuContext';
 import { TokenTest } from './components/TokenTest';
+import type { VersionUpdateInfo, PermissionInput } from './types/session';
 
 interface PermissionRequest {
   id: string;
   sessionId: string;
   toolName: string;
-  input: any;
+  input: PermissionInput;
   timestamp: number;
 }
 
@@ -33,7 +34,7 @@ function App() {
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
-  const [updateVersionInfo, setUpdateVersionInfo] = useState<any>(null);
+  const [updateVersionInfo, setUpdateVersionInfo] = useState<VersionUpdateInfo | null>(null);
   const [currentPermissionRequest, setCurrentPermissionRequest] = useState<PermissionRequest | null>(null);
   const [isDiscordOpen, setIsDiscordOpen] = useState(false);
   const [hasCheckedWelcome, setHasCheckedWelcome] = useState(false);
@@ -260,7 +261,7 @@ function App() {
     // Set up version update listener
     if (!window.electronAPI?.events) return;
     
-    const handleVersionUpdate = (versionInfo: any) => {
+    const handleVersionUpdate = (versionInfo: VersionUpdateInfo) => {
       console.log('[App] Version update available:', versionInfo);
       setUpdateVersionInfo(versionInfo);
       setIsUpdateDialogOpen(true);
@@ -297,7 +298,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
   
-  const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: any, message?: string) => {
+  const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: PermissionInput, message?: string) => {
     try {
       await API.permissions.respond(requestId, {
         behavior,
@@ -334,7 +335,7 @@ function App() {
         <UpdateDialog 
           isOpen={isUpdateDialogOpen} 
           onClose={() => setIsUpdateDialogOpen(false)}
-          versionInfo={updateVersionInfo}
+          versionInfo={updateVersionInfo || undefined}
         />
         <ErrorDialog 
           isOpen={!!currentError}

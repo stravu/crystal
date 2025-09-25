@@ -4,15 +4,30 @@ import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 import { panelManager } from '../services/panelManager';
 import { panelEventBus } from '../services/panelEventBus';
-import { PanelEventType } from '../../../shared/types/panels';
+import { PanelEventType, ToolPanelType, PanelEvent } from '../../../shared/types/panels';
 import type { Session } from '../types/session';
 import type { GitCommit } from '../services/gitDiffManager';
+
+// Extended type for git system virtual panels
+type SystemPanelType = ToolPanelType | 'git';
+
+// Interface for raw commit data from worktreeManager
+interface RawCommitData {
+  hash: string;
+  message: string;
+  date: string | Date;
+  author?: string;
+  additions?: number;
+  deletions?: number;
+  filesChanged?: number;
+}
+
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService } = services;
 
   // Helper function to emit git operation events to all sessions in a project
-  const emitGitOperationToProject = (sessionId: string, eventType: PanelEventType, message: string, details?: any) => {
+  const emitGitOperationToProject = (sessionId: string, eventType: PanelEventType, message: string, details?: Record<string, unknown>) => {
     try {
       const session = sessionManager.getSession(sessionId);
       if (!session) return;
@@ -27,7 +42,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         type: eventType,
         source: {
           panelId: 'git-system', // Special panel ID for git operations
-          panelType: 'git' as any, // Virtual panel type
+          panelType: 'git' as SystemPanelType, // Virtual panel type
           sessionId: sessionId // The session that triggered the operation
         },
         data: {
@@ -44,7 +59,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       
       // Emit the event once to the panel event bus
       // All Claude panels that have subscribed will receive it
-      panelEventBus.emitPanelEvent(event);
+      panelEventBus.emitPanelEvent(event as PanelEvent);
     } catch (error) {
       console.error('[Git] Failed to emit git operation event:', error);
     }
@@ -132,7 +147,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
     if (useFallback) {
       const fallbackLimit = limit;
       const fallbackCommits = await worktreeManager.getLastCommits(session.worktreePath, fallbackLimit);
-      commits = fallbackCommits.map((commit: any) => ({
+      commits = fallbackCommits.map((commit: RawCommitData) => ({
         hash: commit.hash,
         message: commit.message,
         date: new Date(commit.date),

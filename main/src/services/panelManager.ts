@@ -277,7 +277,7 @@ export class PanelManager {
     return panels.filter(p => p.type === type);
   }
   
-  async emitPanelEvent(panelId: string, eventType: PanelEventType, data: any): Promise<void> {
+  async emitPanelEvent(panelId: string, eventType: PanelEventType, data: unknown): Promise<void> {
     const panel = this.getPanel(panelId);
     if (!panel) {
       console.warn(`[PanelManager] Panel ${panelId} not found for event emission`);

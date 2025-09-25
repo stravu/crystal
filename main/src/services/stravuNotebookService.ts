@@ -21,9 +21,19 @@ interface NotebookSearchResult {
   similarity?: number;
 }
 
+interface NotebooksApiResponse {
+  notebooks: NotebookSearchResult[];
+}
+
+interface SearchApiResponse {
+  results: NotebookSearchResult[];
+}
+
+type CacheValue = Notebook | Notebook[];
+
 export class StravuNotebookService {
   private authManager: StravuAuthManager;
-  private cache = new Map<string, any>();
+  private cache = new Map<string, CacheValue>();
   private lastFetch: number | null = null;
   private readonly CACHE_TTL = 300000; // 5 minutes
   private logger: Logger;
@@ -40,7 +50,7 @@ export class StravuNotebookService {
         Date.now() - this.lastFetch < this.CACHE_TTL &&
         this.cache.has('notebooks')) {
       this.logger.info('Returning cached notebooks');
-      return this.cache.get('notebooks');
+      return this.cache.get('notebooks') as Notebook[];
     }
 
     try {
@@ -50,16 +60,16 @@ export class StravuNotebookService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data: any = await response.json();
+      const data: NotebooksApiResponse = await response.json();
 
-      const notebooks: Notebook[] = data.notebooks.map((nb: any) => ({
+      const notebooks: Notebook[] = data.notebooks.map((nb: NotebookSearchResult) => ({
         id: nb.id,
         title: nb.title,
-        content: nb.content,
-        excerpt: this.createExcerpt(nb.content),
+        content: nb.content || '',
+        excerpt: this.createExcerpt(nb.content || ''),
         lastModified: nb.updated_at,
         tags: nb.tags || [],
-        wordCount: this.countWords(nb.content)
+        wordCount: this.countWords(nb.content || '')
       }));
 
       this.cache.set('notebooks', notebooks);
@@ -78,7 +88,7 @@ export class StravuNotebookService {
 
     if (this.cache.has(cacheKey)) {
       this.logger.info(`Returning cached notebook ${notebookId}`);
-      return this.cache.get(cacheKey);
+      return this.cache.get(cacheKey) as Notebook;
     }
 
     try {
@@ -90,16 +100,16 @@ export class StravuNotebookService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const notebook: any = await response.json();
+      const notebook: NotebookSearchResult = await response.json();
 
       const formattedNotebook: Notebook = {
         id: notebook.id,
         title: notebook.title,
-        content: notebook.content,
-        excerpt: this.createExcerpt(notebook.content),
+        content: notebook.content || '',
+        excerpt: this.createExcerpt(notebook.content || ''),
         lastModified: notebook.updated_at,
         tags: notebook.tags || [],
-        wordCount: this.countWords(notebook.content)
+        wordCount: this.countWords(notebook.content || '')
       };
 
       this.cache.set(cacheKey, formattedNotebook);
@@ -121,7 +131,7 @@ export class StravuNotebookService {
       });
 
       if (response.ok) {
-        const data: any = await response.json();
+        const data: SearchApiResponse = await response.json();
         const results: Notebook[] = data.results.map((result: NotebookSearchResult) => ({
           id: result.id,
           title: result.title,

@@ -56,7 +56,7 @@ export class MCPPermissionServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (request.params.name === 'approve_permission') {
-        const { tool_name, input } = request.params.arguments as { tool_name: string; input: any };
+        const { tool_name, input } = request.params.arguments as { tool_name: string; input: Record<string, unknown> };
         
         try {
           const response = await permissionManager.requestPermission(

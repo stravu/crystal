@@ -71,10 +71,28 @@ export class DatabaseService {
 
   private runMigrations(): void {
     // Check if archived column exists
-    const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
-    const hasInitialPromptColumn = tableInfo.some((col: any) => col.name === 'initial_prompt');
-    const hasLastViewedAtColumn = tableInfo.some((col: any) => col.name === 'last_viewed_at');
+    interface SqliteTableInfo {
+      cid: number;
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: unknown;
+      pk: number;
+    }
+    
+    // Legacy project_folders table structure for migration
+    interface LegacyProjectFolder {
+      id: number;
+      name: string;
+      project_id: number;
+      display_order?: number;
+      created_at?: string;
+      updated_at?: string;
+    }
+    const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasArchivedColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'archived');
+    const hasInitialPromptColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'initial_prompt');
+    const hasLastViewedAtColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'last_viewed_at');
     
     if (!hasArchivedColumn) {
       // Run migration to add archived column
@@ -84,7 +102,7 @@ export class DatabaseService {
 
     // Check if we need to rename prompt to initial_prompt
     if (!hasInitialPromptColumn) {
-      const hasPromptColumn = tableInfo.some((col: any) => col.name === 'prompt');
+      const hasPromptColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'prompt');
       if (hasPromptColumn) {
         this.db.prepare("ALTER TABLE sessions RENAME COLUMN prompt TO initial_prompt").run();
       }
@@ -125,9 +143,9 @@ export class DatabaseService {
       this.db.prepare("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)").run();
     } else {
       // Check if the table has the correct column name
-      const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
-      const hasOutputLineColumn = promptMarkersInfo.some((col: any) => col.name === 'output_line');
-      const hasTerminalLineColumn = promptMarkersInfo.some((col: any) => col.name === 'terminal_line');
+      const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+      const hasOutputLineColumn = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'output_line');
+      const hasTerminalLineColumn = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'terminal_line');
       
       if (hasTerminalLineColumn && !hasOutputLineColumn) {
         // Rename the column from terminal_line to output_line
@@ -170,15 +188,15 @@ export class DatabaseService {
     }
 
     // Add commit_message column to execution_diffs if it doesn't exist
-    const executionDiffsTableInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all();
-    const hasCommitMessageColumn = executionDiffsTableInfo.some((col: any) => col.name === 'commit_message');
+    const executionDiffsTableInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all() as SqliteTableInfo[];
+    const hasCommitMessageColumn = executionDiffsTableInfo.some((col: SqliteTableInfo) => col.name === 'commit_message');
     if (!hasCommitMessageColumn) {
       this.db.prepare("ALTER TABLE execution_diffs ADD COLUMN commit_message TEXT").run();
     }
 
     // Check if claude_session_id column exists
-    const sessionTableInfoClaude = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasClaudeSessionIdColumn = sessionTableInfoClaude.some((col: any) => col.name === 'claude_session_id');
+    const sessionTableInfoClaude = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasClaudeSessionIdColumn = sessionTableInfoClaude.some((col: SqliteTableInfo) => col.name === 'claude_session_id');
     
     if (!hasClaudeSessionIdColumn) {
       // Add claude_session_id column to store Claude's actual session ID
@@ -186,7 +204,7 @@ export class DatabaseService {
     }
 
     // Check if permission_mode column exists
-    const hasPermissionModeColumn = sessionTableInfoClaude.some((col: any) => col.name === 'permission_mode');
+    const hasPermissionModeColumn = sessionTableInfoClaude.some((col: SqliteTableInfo) => col.name === 'permission_mode');
     
     if (!hasPermissionModeColumn) {
       // Add permission_mode column to sessions table
@@ -212,8 +230,8 @@ export class DatabaseService {
         `).run();
         
         // Add project_id to sessions table
-        const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all();
-        const hasProjectIdColumn = sessionsTableInfoProjects.some((col: any) => col.name === 'project_id');
+        const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+        const hasProjectIdColumn = sessionsTableInfoProjects.some((col: SqliteTableInfo) => col.name === 'project_id');
         
         if (!hasProjectIdColumn) {
           this.db.prepare("ALTER TABLE sessions ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE").run();
@@ -249,8 +267,8 @@ export class DatabaseService {
     }
 
     // Add is_main_repo column to sessions table if it doesn't exist
-    const sessionTableInfoForMainRepo = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasIsMainRepoColumn = sessionTableInfoForMainRepo.some((col: any) => col.name === 'is_main_repo');
+    const sessionTableInfoForMainRepo = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasIsMainRepoColumn = sessionTableInfoForMainRepo.some((col: SqliteTableInfo) => col.name === 'is_main_repo');
     
     if (!hasIsMainRepoColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN is_main_repo BOOLEAN DEFAULT 0").run();
@@ -258,29 +276,29 @@ export class DatabaseService {
     }
 
     // Add main_branch column to projects table if it doesn't exist
-    const projectsTableInfo = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasMainBranchColumn = projectsTableInfo.some((col: any) => col.name === 'main_branch');
+    const projectsTableInfo = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasMainBranchColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'main_branch');
     
     if (!hasMainBranchColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN main_branch TEXT").run();
     }
 
     // Add build_script column to projects table if it doesn't exist
-    const hasBuildScriptColumn = projectsTableInfo.some((col: any) => col.name === 'build_script');
+    const hasBuildScriptColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'build_script');
     
     if (!hasBuildScriptColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN build_script TEXT").run();
     }
 
     // Add default_permission_mode column to projects table if it doesn't exist
-    const hasDefaultPermissionModeColumn = projectsTableInfo.some((col: any) => col.name === 'default_permission_mode');
+    const hasDefaultPermissionModeColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'default_permission_mode');
     
     if (!hasDefaultPermissionModeColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN default_permission_mode TEXT DEFAULT 'ignore' CHECK(default_permission_mode IN ('approve', 'ignore'))").run();
     }
 
     // Add open_ide_command column to projects table if it doesn't exist
-    const hasOpenIdeCommandColumn = projectsTableInfo.some((col: any) => col.name === 'open_ide_command');
+    const hasOpenIdeCommandColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'open_ide_command');
     
     if (!hasOpenIdeCommandColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN open_ide_command TEXT").run();
@@ -315,10 +333,10 @@ export class DatabaseService {
     }
     
     // Check if display_order columns exist
-    const projectsTableInfo2 = this.db.prepare("PRAGMA table_info(projects)").all();
-    const sessionsTableInfo2 = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasProjectsDisplayOrder = projectsTableInfo2.some((col: any) => col.name === 'display_order');
-    const hasSessionsDisplayOrder = sessionsTableInfo2.some((col: any) => col.name === 'display_order');
+    const projectsTableInfo2 = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const sessionsTableInfo2 = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasProjectsDisplayOrder = projectsTableInfo2.some((col: SqliteTableInfo) => col.name === 'display_order');
+    const hasSessionsDisplayOrder = sessionsTableInfo2.some((col: SqliteTableInfo) => col.name === 'display_order');
     
     if (!hasProjectsDisplayOrder) {
       // Add display_order to projects
@@ -359,19 +377,19 @@ export class DatabaseService {
     
     // Normalize timestamp fields migration
     // Check if last_viewed_at is still TEXT type
-    const sessionTableInfoTimestamp = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const lastViewedAtColumn = sessionTableInfoTimestamp.find((col: any) => col.name === 'last_viewed_at') as any;
+    const sessionTableInfoTimestamp = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const lastViewedAtColumn = sessionTableInfoTimestamp.find((col: SqliteTableInfo) => col.name === 'last_viewed_at');
     
     // Skip this migration if last_viewed_at_new already exists (migration partially completed)
-    const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'last_viewed_at_new');
+    const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: SqliteTableInfo) => col.name === 'last_viewed_at_new');
     
     if (lastViewedAtColumn && lastViewedAtColumn.type === 'TEXT' && !hasLastViewedAtNew) {
       console.log('[Database] Running timestamp normalization migration...');
       
       try {
         // Check if the new columns already exist (from a previous failed migration)
-        const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'last_viewed_at_new');
-        const hasRunStartedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'run_started_at_new');
+        const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: SqliteTableInfo) => col.name === 'last_viewed_at_new');
+        const hasRunStartedAtNew = sessionTableInfoTimestamp.some((col: SqliteTableInfo) => col.name === 'run_started_at_new');
         
         // Create new temporary columns with DATETIME type if they don't exist
         if (!hasLastViewedAtNew) {
@@ -438,16 +456,16 @@ export class DatabaseService {
     }
     
     // Add missing completion_timestamp to prompt_markers if it doesn't exist
-    const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
-    const hasCompletionTimestamp = promptMarkersInfo.some((col: any) => col.name === 'completion_timestamp');
+    const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+    const hasCompletionTimestamp = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'completion_timestamp');
     
     if (!hasCompletionTimestamp) {
       this.db.prepare("ALTER TABLE prompt_markers ADD COLUMN completion_timestamp DATETIME").run();
     }
     
     // Add is_favorite column to sessions table if it doesn't exist
-    const sessionTableInfoFavorite = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasIsFavoriteColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'is_favorite');
+    const sessionTableInfoFavorite = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasIsFavoriteColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'is_favorite');
     
     if (!hasIsFavoriteColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN is_favorite BOOLEAN DEFAULT 0").run();
@@ -455,7 +473,7 @@ export class DatabaseService {
     }
 
     // Add auto_commit column to sessions table if it doesn't exist
-    const hasAutoCommitColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'auto_commit');
+    const hasAutoCommitColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'auto_commit');
     
     if (!hasAutoCommitColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN auto_commit BOOLEAN DEFAULT 1").run();
@@ -463,7 +481,7 @@ export class DatabaseService {
     }
 
     // Add skip_continue_next column to sessions table if it doesn't exist
-    const hasSkipContinueNextColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'skip_continue_next');
+    const hasSkipContinueNextColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'skip_continue_next');
     
     if (!hasSkipContinueNextColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN skip_continue_next BOOLEAN DEFAULT 0").run();
@@ -480,8 +498,8 @@ export class DatabaseService {
       
       // Check if the old folders table has INTEGER id
       if (foldersExists) {
-        const foldersInfo = this.db.prepare("PRAGMA table_info(folders)").all();
-        const idColumn = foldersInfo.find((col: any) => col.name === 'id') as any;
+        const foldersInfo = this.db.prepare("PRAGMA table_info(folders)").all() as SqliteTableInfo[];
+        const idColumn = foldersInfo.find((col: SqliteTableInfo) => col.name === 'id');
         
         if (idColumn && idColumn.type === 'INTEGER') {
           // Old folders table with INTEGER id exists, drop it
@@ -504,7 +522,7 @@ export class DatabaseService {
       `).run();
       
       // Migrate data from project_folders to folders
-      const projectFolders = this.db.prepare('SELECT * FROM project_folders').all() as any[];
+      const projectFolders = this.db.prepare('SELECT * FROM project_folders').all() as LegacyProjectFolder[];
       console.log(`[Database] Migrating ${projectFolders.length} folders from project_folders to folders table...`);
       
       for (const folder of projectFolders) {
@@ -527,8 +545,8 @@ export class DatabaseService {
       console.log('[Database] Dropped legacy project_folders table');
       
       // Update sessions table folder_id column type if needed
-      const sessionTableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
-      const folderIdColumn = sessionTableInfo.find((col: any) => col.name === 'folder_id') as any;
+      const sessionTableInfo = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+      const folderIdColumn = sessionTableInfo.find((col: SqliteTableInfo) => col.name === 'folder_id');
       
       if (folderIdColumn && folderIdColumn.type === 'INTEGER') {
         console.log('[Database] Converting sessions.folder_id from INTEGER to TEXT...');
@@ -608,7 +626,7 @@ export class DatabaseService {
     `).run();
 
     // Add folder_id column to sessions table if it doesn't exist
-    const hasFolderIdColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'folder_id');
+    const hasFolderIdColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'folder_id');
     
     if (!hasFolderIdColumn) {
       this.db.prepare('ALTER TABLE sessions ADD COLUMN folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL').run();
@@ -622,8 +640,8 @@ export class DatabaseService {
     }
 
     // Add parent_folder_id column to folders table for nested folders support
-    const foldersTableInfo = this.db.prepare("PRAGMA table_info(folders)").all();
-    const hasParentFolderIdColumn = foldersTableInfo.some((col: any) => col.name === 'parent_folder_id');
+    const foldersTableInfo = this.db.prepare("PRAGMA table_info(folders)").all() as SqliteTableInfo[];
+    const hasParentFolderIdColumn = foldersTableInfo.some((col: SqliteTableInfo) => col.name === 'parent_folder_id');
     
     if (!hasParentFolderIdColumn) {
       this.db.prepare('ALTER TABLE folders ADD COLUMN parent_folder_id TEXT REFERENCES folders(id) ON DELETE CASCADE').run();
@@ -667,8 +685,8 @@ export class DatabaseService {
     }
 
     // Remove model column from sessions table if it exists (moved to panel level)
-    const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasModelColumn = sessionTableInfoModel.some((col: any) => col.name === 'model');
+    const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasModelColumn = sessionTableInfoModel.some((col: SqliteTableInfo) => col.name === 'model');
     
     if (hasModelColumn) {
       // Note: SQLite doesn't support DROP COLUMN in older versions
@@ -677,8 +695,8 @@ export class DatabaseService {
     }
 
     // Add tool_type column to sessions table if it doesn't exist
-    const sessionTableInfoToolType = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasToolTypeColumn = sessionTableInfoToolType.some((col: any) => col.name === 'tool_type');
+    const sessionTableInfoToolType = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasToolTypeColumn = sessionTableInfoToolType.some((col: SqliteTableInfo) => col.name === 'tool_type');
 
     if (!hasToolTypeColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN tool_type TEXT DEFAULT 'claude'").run();
@@ -732,8 +750,8 @@ export class DatabaseService {
     }
 
     // Add worktree_folder column to projects table if it doesn't exist
-    const projectsTableInfoWorktree = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasWorktreeFolderColumn = projectsTableInfoWorktree.some((col: any) => col.name === 'worktree_folder');
+    const projectsTableInfoWorktree = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasWorktreeFolderColumn = projectsTableInfoWorktree.some((col: SqliteTableInfo) => col.name === 'worktree_folder');
     
     if (!hasWorktreeFolderColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
@@ -741,8 +759,8 @@ export class DatabaseService {
     }
 
     // Add lastUsedModel column to projects table if it doesn't exist
-    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
+    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: SqliteTableInfo) => col.name === 'lastUsedModel');
     
     if (!hasLastUsedModelColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'sonnet'").run();
@@ -750,9 +768,9 @@ export class DatabaseService {
     }
 
     // Add base_commit and base_branch columns to sessions table if they don't exist
-    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_commit');
-    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_branch');
+    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: SqliteTableInfo) => col.name === 'base_commit');
+    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: SqliteTableInfo) => col.name === 'base_branch');
     
     if (!hasBaseCommitColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN base_commit TEXT").run();
@@ -765,10 +783,10 @@ export class DatabaseService {
     }
 
     // Add commit mode settings columns to projects table if they don't exist
-    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasCommitModeColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
-    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_structured_prompt_template');
-    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_checkpoint_prefix');
+    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasCommitModeColumn = projectsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_mode');
+    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_structured_prompt_template');
+    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_checkpoint_prefix');
     
     if (!hasCommitModeColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN commit_mode TEXT DEFAULT 'checkpoint'").run();
@@ -786,9 +804,9 @@ export class DatabaseService {
     }
 
     // Add commit mode settings columns to sessions table if they don't exist
-    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
-    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode_settings');
+    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_mode');
+    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_mode_settings');
     
     if (!hasSessionCommitModeColumn) {
       try {
@@ -850,8 +868,8 @@ export class DatabaseService {
     }
 
     // Add active_panel_id column to sessions table if it doesn't exist
-    const sessionsTableInfoPanel = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasActivePanelIdColumn = sessionsTableInfoPanel.some((col: any) => col.name === 'active_panel_id');
+    const sessionsTableInfoPanel = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasActivePanelIdColumn = sessionsTableInfoPanel.some((col: SqliteTableInfo) => col.name === 'active_panel_id');
     
     if (!hasActivePanelIdColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN active_panel_id TEXT").run();
@@ -865,15 +883,15 @@ export class DatabaseService {
       
       try {
         // Step 1: Add panel_id columns to Claude tables if they don't exist
-        const sessionOutputsInfo = this.db.prepare("PRAGMA table_info(session_outputs)").all();
-        const conversationMessagesInfo = this.db.prepare("PRAGMA table_info(conversation_messages)").all();
-        const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
-        const executionDiffsInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all();
+        const sessionOutputsInfo = this.db.prepare("PRAGMA table_info(session_outputs)").all() as SqliteTableInfo[];
+        const conversationMessagesInfo = this.db.prepare("PRAGMA table_info(conversation_messages)").all() as SqliteTableInfo[];
+        const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+        const executionDiffsInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all() as SqliteTableInfo[];
 
-        const hasSessionOutputsPanelId = sessionOutputsInfo.some((col: any) => col.name === 'panel_id');
-        const hasConversationMessagesPanelId = conversationMessagesInfo.some((col: any) => col.name === 'panel_id');
-        const hasPromptMarkersPanelId = promptMarkersInfo.some((col: any) => col.name === 'panel_id');
-        const hasExecutionDiffsPanelId = executionDiffsInfo.some((col: any) => col.name === 'panel_id');
+        const hasSessionOutputsPanelId = sessionOutputsInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
+        const hasConversationMessagesPanelId = conversationMessagesInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
+        const hasPromptMarkersPanelId = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
+        const hasExecutionDiffsPanelId = executionDiffsInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
 
         if (!hasSessionOutputsPanelId) {
           this.db.prepare("ALTER TABLE session_outputs ADD COLUMN panel_id TEXT").run();
@@ -1066,8 +1084,8 @@ export class DatabaseService {
       
       try {
         // Step 1: Add settings column to tool_panels if it doesn't exist
-        const toolPanelsInfo = this.db.prepare("PRAGMA table_info(tool_panels)").all();
-        const hasSettingsColumn = toolPanelsInfo.some((col: any) => col.name === 'settings');
+        const toolPanelsInfo = this.db.prepare("PRAGMA table_info(tool_panels)").all() as SqliteTableInfo[];
+        const hasSettingsColumn = toolPanelsInfo.some((col: SqliteTableInfo) => col.name === 'settings');
         
         if (!hasSettingsColumn) {
           this.db.prepare("ALTER TABLE tool_panels ADD COLUMN settings TEXT DEFAULT '{}'").run();

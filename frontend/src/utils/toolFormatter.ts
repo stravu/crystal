@@ -1,5 +1,7 @@
+import type { ClaudeJsonMessage } from '../types/session';
+
 // Simple fallback formatter for unknown message types
-function formatJsonForOutput(jsonMessage: any): string {
+function formatJsonForOutput(jsonMessage: ClaudeJsonMessage): string {
   const timestamp = jsonMessage.timestamp || new Date().toISOString();
   const time = new Date(timestamp).toLocaleTimeString();
   
@@ -151,7 +153,7 @@ export function formatToolInteraction(
       output += `\x1b[90m│  $ ${toolCall.input.command}\x1b[0m\r\n`;
     } else if (toolCall.name === 'TodoWrite' && toolCall.input.todos) {
       output += `\x1b[90m│  Tasks updated:\x1b[0m\r\n`;
-      toolCall.input.todos.forEach((todo: any) => {
+      toolCall.input.todos.forEach((todo: { status: string; content: string }) => {
         const status = todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '→' : '○';
         const statusColor = todo.status === 'completed' ? '\x1b[32m' : todo.status === 'in_progress' ? '\x1b[33m' : '\x1b[90m';
         output += `\x1b[90m│    ${statusColor}${status}\x1b[0m ${todo.content}\x1b[0m\r\n`;
@@ -359,7 +361,7 @@ export function formatToolInteraction(
 /**
  * Enhanced JSON to output formatter that unifies tool calls and responses
  */
-export function formatJsonForOutputEnhanced(jsonMessage: any): string {
+export function formatJsonForOutputEnhanced(jsonMessage: ClaudeJsonMessage): string {
   const timestamp = jsonMessage.timestamp || new Date().toISOString();
   
   // Handle tool calls from assistant
@@ -367,7 +369,7 @@ export function formatJsonForOutputEnhanced(jsonMessage: any): string {
     const content = jsonMessage.message.content;
     
     if (Array.isArray(content)) {
-      const toolUses = content.filter((item: any) => item.type === 'tool_use');
+      const toolUses = content.filter((item: any) => item.type === 'tool_use') as ToolCall[];
       
       if (toolUses.length > 0) {
         // Store tool calls for later matching
@@ -405,7 +407,7 @@ export function formatJsonForOutputEnhanced(jsonMessage: any): string {
     const content = jsonMessage.message.content;
     
     if (Array.isArray(content)) {
-      const toolResults = content.filter((item: any) => item.type === 'tool_result');
+      const toolResults = content.filter((item: any) => item.type === 'tool_result') as ToolResult[];
       
       if (toolResults.length > 0) {
         // Match results with pending calls and format them

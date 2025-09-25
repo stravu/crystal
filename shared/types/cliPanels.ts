@@ -56,7 +56,7 @@ export interface CliPanelCustomState {
   permissionMode?: 'approve' | 'ignore';
   
   /** Configuration specific to the CLI tool */
-  toolConfig?: Record<string, any>;
+  toolConfig?: Record<string, unknown>;
   
   /** Feature flags for what this CLI instance supports */
   capabilities?: CliToolCapabilities;
@@ -176,7 +176,7 @@ export interface CliInputOptions {
   systemPrompt?: string;
   
   /** Tool-specific options */
-  toolOptions?: Record<string, any>;
+  toolOptions?: Record<string, unknown>;
   
   /** Output format preference */
   outputFormat?: string;
@@ -239,7 +239,7 @@ export interface CliOutput {
   source?: string;
   
   /** Additional metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -285,7 +285,7 @@ export interface CliPanelSettings {
   maxOutputLines?: number;
   
   /** Tool-specific settings */
-  toolSettings?: Record<string, any>;
+  toolSettings?: Record<string, unknown>;
 }
 
 /**
@@ -302,7 +302,7 @@ export interface CliPanelEvent {
   cliToolId: string;
   
   /** Event data */
-  data: any;
+  data: unknown;
   
   /** Timestamp */
   timestamp: string;

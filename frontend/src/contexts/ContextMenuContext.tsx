@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import type { ContextMenuPayload } from '../types/session';
 
 interface ContextMenuPosition {
   x: number;
@@ -8,12 +9,12 @@ interface ContextMenuPosition {
 interface ContextMenuState {
   type: 'session' | 'folder' | null;
   position: ContextMenuPosition | null;
-  payload: any;
+  payload: ContextMenuPayload | null;
 }
 
 interface ContextMenuContextType {
   menuState: ContextMenuState;
-  openMenu: (type: 'session' | 'folder', payload: any, position: ContextMenuPosition) => void;
+  openMenu: (type: 'session' | 'folder', payload: ContextMenuPayload, position: ContextMenuPosition) => void;
   closeMenu: () => void;
   isMenuOpen: (type: 'session' | 'folder', id?: string) => boolean;
 }
@@ -39,7 +40,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = ({ childr
     payload: null,
   });
 
-  const openMenu = useCallback((type: 'session' | 'folder', payload: any, position: ContextMenuPosition) => {
+  const openMenu = useCallback((type: 'session' | 'folder', payload: ContextMenuPayload, position: ContextMenuPosition) => {
     // Close any existing menu before opening a new one
     setMenuState({
       type,

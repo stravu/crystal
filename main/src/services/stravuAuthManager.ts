@@ -53,12 +53,12 @@ export class StravuAuthManager extends EventEmitter {
     // Don't load any stored credentials
   }
 
-  private getStoreData(): any {
+  private getStoreData(): Record<string, unknown> {
     // MCP functionality disabled - no credential storage
     return {};
   }
 
-  private setStoreData(data: any): void {
+  private setStoreData(data: Record<string, unknown>): void {
     // MCP functionality disabled - no credential storage
     this.logger.info('MCP credential storage is disabled');
   }
@@ -80,14 +80,21 @@ export class StravuAuthManager extends EventEmitter {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const status: any = await response.json();
+      const status: {
+        status: string;
+        jwt_token?: string;
+        member_id?: string;
+        org_slug?: string;
+        scopes?: string[];
+        expires_at?: string;
+      } = await response.json();
 
       if (status.status === 'completed') {
         const authResult: AuthResult = {
-          jwt: status.jwt_token,
-          memberId: status.member_id,
-          orgSlug: status.org_slug,
-          scopes: status.scopes
+          jwt: status.jwt_token || '',
+          memberId: status.member_id || '',
+          orgSlug: status.org_slug || '',
+          scopes: status.scopes || []
         };
 
         this.logger.info('Authentication successful');
