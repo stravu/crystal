@@ -34,7 +34,7 @@ function validateEventSession(eventData: ValidatedEventData, activeSessionId?: s
 
 
 // Throttle utility function  
-function throttle<T extends (...args: any[]) => void>(
+function throttle<T extends (...args: never[]) => void>(
   func: T,
   delay: number
 ): (...args: Parameters<T>) => void {

@@ -376,7 +376,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     panelId: string; 
     sessionId: string; 
     type: 'json' | 'stdout' | 'stderr'; 
-    data: any; 
+    data: unknown; 
     timestamp: Date 
   }) => {
     // Validate the output has valid context
@@ -392,6 +392,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     // Persist output: let ClaudePanelManager handle panel-based storage to avoid duplicates
     if (!output.panelId) {
       console.log(`[Events] Saving Claude output for session ${output.sessionId} (legacy mode)`);
+      
       sessionManager.addSessionOutput(output.sessionId, {
         type: output.type,
         data: output.data,
@@ -400,13 +401,13 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
 
     // Check if Claude is waiting for user input
-    if (output.type === 'json' && output.data.type === 'prompt') {
+    if (output.type === 'json' && typeof output.data === 'object' && output.data && 'type' in output.data && output.data.type === 'prompt') {
       console.log(`[Main] Claude is waiting for user input in session ${output.sessionId}`);
       await sessionManager.updateSession(output.sessionId, { status: 'waiting' });
     }
 
     // Check if Claude has completed (when it sends a result message)
-    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'result') {
+    if (output.type === 'json' && typeof output.data === 'object' && output.data && 'type' in output.data && output.data.type === 'system' && 'subtype' in output.data && output.data.subtype === 'result') {
       console.log(`[Main] Claude completed task in session ${output.sessionId}`);
       // Don't update status here - let the exit handler determine if it should be completed_unviewed
     }

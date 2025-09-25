@@ -16,7 +16,22 @@ interface GenericMessageData {
   subtype?: string;
   session_id?: string;
   message_id?: string;
+  message?: {
+    content?: unknown;
+    [key: string]: unknown;
+  };
+  data?: Record<string, unknown>;
+  delta?: string;
   [key: string]: unknown;
+}
+
+// Helper function to check if data is a JSON message object with specific properties
+function isJSONMessage(data: Record<string, unknown>, requiredType?: string, requiredSubtype?: string): data is GenericMessageData {
+  if (typeof data.type !== 'string') return false;
+  if (requiredType && data.type !== requiredType) return false;
+  if (requiredSubtype && typeof data.subtype !== 'string') return false;
+  if (requiredSubtype && data.subtype !== requiredSubtype) return false;
+  return true;
 }
 
 // Interface for panel state with custom state that can hold any AI-specific data
@@ -469,7 +484,7 @@ export class SessionManager extends EventEmitter {
     const isFirstOutput = existingOutputs.length === 0;
     
     // Store in database (stringify JSON objects and error objects)
-    const dataToStore = (output.type === 'json' || output.type === 'error') ? JSON.stringify(output.data) : output.data;
+    const dataToStore = (output.type === 'json' || output.type === 'error') ? JSON.stringify(output.data) : String(output.data);
     this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Emit the output so it shows immediately in the UI
@@ -485,14 +500,14 @@ export class SessionManager extends EventEmitter {
     this.emit('session-output-available', { sessionId: id });
     
     // Check if this is the initial system message with Claude's session ID
-    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'init' && output.data.session_id) {
+    if (output.type === 'json' && isJSONMessage(output.data as Record<string, unknown>, 'system', 'init') && (output.data as GenericMessageData).session_id) {
       // Store Claude's actual session ID
-      this.db.updateSession(id, { claude_session_id: output.data.session_id });
-      console.log(`[SessionManager] Captured Claude session ID: ${output.data.session_id} for Crystal session ${id}`);
+      this.db.updateSession(id, { claude_session_id: (output.data as GenericMessageData).session_id });
+      console.log(`[SessionManager] Captured Claude session ID: ${(output.data as GenericMessageData).session_id} for Crystal session ${id}`);
     }
     
     // Check if this is a system result message indicating Claude has completed
-    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'result') {
+    if (output.type === 'json' && isJSONMessage(output.data as Record<string, unknown>, 'system', 'result')) {
       // Update the completion timestamp for the most recent prompt
       const completionTimestamp = output.timestamp instanceof Date ? output.timestamp.toISOString() : output.timestamp;
       this.db.updatePromptMarkerCompletion(id, completionTimestamp);
@@ -516,9 +531,9 @@ export class SessionManager extends EventEmitter {
     }
     
     // Check if this is a user message in JSON format to track prompts
-    if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'user' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from user messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let promptText = '';
       
       if (Array.isArray(content)) {
@@ -541,9 +556,9 @@ export class SessionManager extends EventEmitter {
     }
     
     // Check if this is an assistant message to track for conversation history
-    if (output.type === 'json' && output.data.type === 'assistant' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'assistant' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from assistant messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let assistantText = '';
       
       if (Array.isArray(content)) {
@@ -568,7 +583,7 @@ export class SessionManager extends EventEmitter {
       if (output.type === 'json') {
         session.jsonMessages.push(output.data);
       } else {
-        session.output.push(output.data);
+        session.output.push(String(output.data));
       }
       session.lastActivity = new Date();
     }
@@ -674,9 +689,9 @@ export class SessionManager extends EventEmitter {
     }
 
     // Handle assistant conversation message extraction for Claude panels (same logic as sessions)
-    if (output.type === 'json' && output.data.type === 'assistant' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'assistant' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from assistant messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let assistantText = '';
       
       if (Array.isArray(content)) {
@@ -698,17 +713,17 @@ export class SessionManager extends EventEmitter {
     }
     
     // Handle Codex session completion message to stop prompt timing
-    if (output.type === 'json' && output.data.type === 'session' && output.data.data?.status === 'completed') {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'session' && (output.data as GenericMessageData).data?.status === 'completed') {
       console.log('[SessionManager] Detected Codex session completion for panel:', panelId);
       // Add a completion message to trigger panel-response-added event which stops the timer
-      const completionMessage = output.data.data.message || 'Session completed';
+      const completionMessage = String((output.data as GenericMessageData).data?.message || 'Session completed');
       this.addPanelConversationMessage(panelId, 'assistant', completionMessage);
     }
     
     // Handle Codex agent messages (similar to Claude's assistant messages)
-    if (output.type === 'json' && (output.data.type === 'agent_message' || output.data.type === 'agent_message_delta')) {
-      const agentText = output.data.message || output.data.delta || '';
-      if (agentText && output.data.type === 'agent_message') {
+    if (output.type === 'json' && ((output.data as GenericMessageData).type === 'agent_message' || (output.data as GenericMessageData).type === 'agent_message_delta')) {
+      const agentText = String((output.data as GenericMessageData).message || (output.data as GenericMessageData).delta || '');
+      if (agentText && (output.data as GenericMessageData).type === 'agent_message') {
         console.log('[SessionManager] Adding Codex agent message to panel:', panelId, 'text length:', agentText.length);
         // Only add complete messages, not deltas
         this.addPanelConversationMessage(panelId, 'assistant', agentText);
@@ -716,9 +731,9 @@ export class SessionManager extends EventEmitter {
     }
     
     // Handle user conversation message extraction for Claude panels (same logic as sessions)
-    if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'user' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from user messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let promptText = '';
       
       if (Array.isArray(content)) {

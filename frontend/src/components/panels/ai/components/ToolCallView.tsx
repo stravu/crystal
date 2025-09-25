@@ -265,7 +265,7 @@ export const ToolCallView: React.FC<ToolCallViewProps> = ({
 };
 
 // Format tool input for display - compact version
-const formatToolInput = (toolName: string, input: Record<string, any>): React.ReactNode => {
+const formatToolInput = (toolName: string, input: Record<string, unknown>): React.ReactNode => {
   switch (toolName) {
     case 'Read':
       return (

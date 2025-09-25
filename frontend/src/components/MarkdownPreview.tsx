@@ -4,10 +4,10 @@ import remarkGfm from 'remark-gfm';
 import { MermaidRenderer } from './MermaidRenderer';
 
 interface CodeComponentProps {
-  node?: any;
+  node?: unknown;
   className?: string;
   children?: React.ReactNode;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface MarkdownPreviewProps {

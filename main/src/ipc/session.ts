@@ -839,7 +839,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         const transformedBatch = batch.map(output => {
           if (output.type === 'json') {
             // Generate formatted output from JSON
-            const outputText = formatJsonForOutputEnhanced(output.data);
+            const outputText = formatJsonForOutputEnhanced(output.data as Record<string, unknown>);
             if (outputText) {
               // Return as stdout for the Output view
               return {
@@ -1355,22 +1355,23 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         .filter(output => 
           output.type === 'json' || 
           output.type === 'error' ||
-          ((output.type === 'stdout' || output.type === 'stderr') && isGitOperation(output.data))
+          ((output.type === 'stdout' || output.type === 'stderr') && isGitOperation(output.data as string))
         )
         .map(output => {
           if (output.type === 'error') {
             // Transform error outputs to a format that RichOutputView can handle
+            const errorData = output.data as Record<string, unknown>;
             return {
               type: 'system',
               subtype: 'error',
               timestamp: output.timestamp.toISOString(),
-              error: output.data.error,
-              details: output.data.details,
-              message: `${output.data.error}${output.data.details ? '\n\n' + output.data.details : ''}`
+              error: errorData.error,
+              details: errorData.details,
+              message: `${errorData.error}${errorData.details ? '\n\n' + errorData.details : ''}`
             };
           } else if (output.type === 'stdout' || output.type === 'stderr') {
             // Transform git operation stdout/stderr to system messages that RichOutputView can display
-            const isError = output.type === 'stderr' || output.data.includes('failed:') || output.data.includes('✗');
+            const isError = output.type === 'stderr' || (output.data as string).includes('failed:') || (output.data as string).includes('✗');
             return {
               type: 'system',
               subtype: isError ? 'git_error' : 'git_operation',
@@ -1380,11 +1381,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               raw_output: output.data
             };
           } else {
-            // Regular JSON messages
+            // Regular JSON messages - safe to spread since we know it's a Record
+            const jsonData = output.data as Record<string, unknown>;
             return {
-              ...output.data,
+              ...jsonData,
               timestamp: output.timestamp.toISOString()
-            };
+            } as Record<string, unknown>;
           }
         });
       
