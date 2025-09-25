@@ -169,7 +169,7 @@ export interface ClaudeJsonMessage {
 export interface SessionOutput {
   sessionId: string;
   type: 'stdout' | 'stderr' | 'json' | 'error';
-  data: any; // Complex union type - can be string for stdout/stderr, or various JSON object structures with different schemas
+  data: unknown; // Can be string for stdout/stderr, or JSON object for json/error types
   timestamp: Date;
   panelId?: string;
 }

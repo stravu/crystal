@@ -290,9 +290,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
     
-    const handleOutputAvailable = (event: any) => {
+    const handleOutputAvailable = (event: CustomEvent<{ sessionId?: string; panelId?: string; type?: string }> | { sessionId?: string; panelId?: string; type?: string; detail?: { sessionId?: string; panelId?: string; type?: string } }) => {
       // Handle both CustomEvent and Electron IPC events
-      const detail = event.detail || event;
+      const detail = 'detail' in event ? event.detail : event;
       if (detail.sessionId === panelId || detail.panelId === panelId) {
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);

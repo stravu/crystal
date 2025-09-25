@@ -48,7 +48,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   useEffect(() => {
     const loadMessages = async () => {
       try {
-        let response: any;
+        let response: { success: boolean; data?: JSONMessage[] };
         
         // Use appropriate method based on agent type
         if (getMessagesHandler && window.electron) {
@@ -72,10 +72,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           const regularMessages: JSONMessage[] = [];
           let foundSessionInfo: SessionInfo | null = null;
           
-          response.data.forEach((msg: any) => {
+          response.data.forEach((msg: JSONMessage) => {
             try {
               // Try to parse the message data to check its type
-              let msgData: any;
+              let msgData: unknown;
               if (typeof msg === 'string') {
                 try {
                   msgData = JSON.parse(msg);
@@ -96,13 +96,13 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               }
               
               // Check if this is a session_info message
-              if (msgData && msgData.type === 'session_info') {
+              if (msgData && typeof msgData === 'object' && 'type' in msgData && (msgData as any).type === 'session_info') {
                 foundSessionInfo = msgData as SessionInfo;
-              } else if (msgData && msgData.msg && msgData.msg.type === 'session_configured') {
+              } else if (msgData && typeof msgData === 'object' && 'msg' in msgData && typeof (msgData as any).msg === 'object' && (msgData as any).msg !== null && 'type' in (msgData as any).msg && (msgData as any).msg.type === 'session_configured') {
                 // Handle Codex session configuration
                 foundSessionInfo = {
                   type: 'session_info',
-                  model: msgData.msg.model || 'default',
+                  model: (msgData as any).msg.model || 'default',
                   timestamp: msg.timestamp || new Date().toISOString()
                 };
               } else {
@@ -139,12 +139,12 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   // Subscribe to new messages
   useEffect(() => {
-    const handleOutput = (data: any) => {
-      const detail = data.detail || data;
+    const handleOutput = (data: CustomEvent<{ panelId?: string; sessionId?: string; type?: string; data?: unknown }> | { panelId?: string; sessionId?: string; type?: string; data?: unknown; detail?: { panelId?: string; sessionId?: string; type?: string; data?: unknown } }) => {
+      const detail = 'detail' in data ? data.detail : data;
       if ((detail.panelId === panelId || detail.sessionId === panelId) && detail.type === 'json') {
         try {
           // Check if this is a session_info message
-          let parsedData: any;
+          let parsedData: unknown;
           if (typeof detail.data === 'string') {
             try {
               parsedData = JSON.parse(detail.data);
@@ -161,13 +161,13 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             parsedData = detail.data;
           }
           
-          if (parsedData && parsedData.type === 'session_info') {
+          if (parsedData && typeof parsedData === 'object' && 'type' in parsedData && (parsedData as any).type === 'session_info') {
             setSessionInfo(parsedData as SessionInfo);
-          } else if (parsedData && parsedData.msg && parsedData.msg.type === 'session_configured') {
+          } else if (parsedData && typeof parsedData === 'object' && 'msg' in parsedData && typeof (parsedData as any).msg === 'object' && (parsedData as any).msg !== null && 'type' in (parsedData as any).msg && (parsedData as any).msg.type === 'session_configured') {
             // Handle Codex session configuration
             setSessionInfo({
               type: 'session_info',
-              model: parsedData.msg.model || 'default',
+              model: (parsedData as any).msg.model || 'default',
               timestamp: detail.timestamp || new Date().toISOString()
             });
           } else {

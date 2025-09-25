@@ -33,7 +33,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return `tool_${this.toolCallIdCounter}`;
   }
 
-  private registerToolCall(providedId: string | undefined, name: string, input: any): ToolCall {
+  private registerToolCall(providedId: string | undefined, name: string, input: Record<string, unknown>): ToolCall {
     const id = providedId || this.createToolCallId();
     let toolCall = this.toolCalls.get(id);
 
@@ -144,7 +144,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return messages;
   }
 
-  private parseOutput(output: any): UnifiedMessage | null {
+  private parseOutput(output: CodexRawOutput): UnifiedMessage | null {
     // Data should already be parsed when coming from database
     // Only parse if it's still a string (shouldn't happen with current setup)
     let parsedData = output.data;
@@ -202,11 +202,12 @@ export class CodexMessageTransformer implements MessageTransformer {
     return null;
   }
 
-  private parseJsonMessage(message: any, timestamp?: string | Date): UnifiedMessage | null {
+  private parseJsonMessage(message: unknown, timestamp?: string | Date): UnifiedMessage | null {
     
     // Handle Codex protocol operations (user input)
-    if (message.op) {
-      const op = message.op;
+    if (typeof message === 'object' && message !== null && 'op' in message) {
+      const messageObj = message as { op: any };
+      const op = messageObj.op;
       
       if (op.type === 'user_input' && op.items) {
         // Extract text from items array
@@ -233,26 +234,27 @@ export class CodexMessageTransformer implements MessageTransformer {
       }
     }
     
-    // Handle session info blocks that provide initial context
-    if (message.type === 'session_info') {
+    // Handle session info blocks that provide initial context  
+    if (typeof message === 'object' && message !== null && 'type' in message && (message as any).type === 'session_info') {
+      const sessionInfoMessage = message as any;
       // Capture the original prompt for later use in user input messages
-      if (message.original_prompt || message.initial_prompt) {
-        this.originalPrompt = message.original_prompt || message.initial_prompt;
+      if (sessionInfoMessage.original_prompt || sessionInfoMessage.initial_prompt) {
+        this.originalPrompt = sessionInfoMessage.original_prompt || sessionInfoMessage.initial_prompt;
       }
       
       const sessionInfo = {
         type: 'session_info',
-        initialPrompt: message.initial_prompt,
-        codexCommand: message.codex_command,
-        claudeCommand: message.claude_command,
-        worktreePath: message.worktree_path,
-        model: message.model,
-        modelProvider: message.model_provider,
-        approvalPolicy: message.approval_policy ?? message.approval,
-        sandboxMode: message.sandbox_mode ?? message.sandbox,
-        permissionMode: message.permission_mode,
-        resumeSessionId: message.resume_session_id ?? message.resumeSessionId,
-        isResume: message.is_resume ?? message.isResume,
+        initialPrompt: sessionInfoMessage.initial_prompt,
+        codexCommand: sessionInfoMessage.codex_command,
+        claudeCommand: sessionInfoMessage.claude_command,
+        worktreePath: sessionInfoMessage.worktree_path,
+        model: sessionInfoMessage.model,
+        modelProvider: sessionInfoMessage.model_provider,
+        approvalPolicy: sessionInfoMessage.approval_policy ?? sessionInfoMessage.approval,
+        sandboxMode: sessionInfoMessage.sandbox_mode ?? sessionInfoMessage.sandbox,
+        permissionMode: sessionInfoMessage.permission_mode,
+        resumeSessionId: sessionInfoMessage.resume_session_id ?? sessionInfoMessage.resumeSessionId,
+        isResume: sessionInfoMessage.is_resume ?? sessionInfoMessage.isResume,
         timestamp: this.normalizeTimestamp(timestamp)
       };
 
@@ -273,8 +275,9 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     // Handle Codex protocol messages (responses)
-    if (message.msg) {
-      const msg = message.msg;
+    if (typeof message === 'object' && message !== null && 'msg' in message) {
+      const messageObj = message as { msg: any };
+      const msg = messageObj.msg;
       
       // Filter out delta messages (streaming updates)
       if (msg.type === 'agent_reasoning_delta' || msg.type === 'agent_message_delta') {
@@ -844,13 +847,17 @@ export class CodexMessageTransformer implements MessageTransformer {
       metadata: {
         agent: 'codex',
         raw: true,
-        messageType: message.type || message.msg?.type || 'unknown'
+        messageType: (typeof message === 'object' && message !== null && 'type' in message) 
+          ? (message as any).type
+          : (typeof message === 'object' && message !== null && 'msg' in message && typeof (message as any).msg === 'object' && (message as any).msg !== null && 'type' in (message as any).msg)
+            ? (message as any).msg.type
+            : 'unknown'
       }
     };
   }
 
-  parseMessage(raw: any): UnifiedMessage | null {
-    return this.parseOutput(raw);
+  parseMessage(raw: unknown): UnifiedMessage | null {
+    return this.parseOutput(raw as CodexRawOutput);
   }
 
   supportsStreaming(): boolean {

@@ -13,13 +13,13 @@ export interface SessionInfoData {
   resumeSessionId?: string;
   isResume?: boolean;
   timestamp?: string;
-  [key: string]: any; // Allow any additional properties
+  [key: string]: unknown; // Allow any additional properties
 }
 
 // Generic system info that can contain various types
 export type SystemInfoData = SessionInfoData | {
   type?: string;
-  [key: string]: any; // Allow any additional properties
+  [key: string]: unknown; // Allow any additional properties
 };
 
 // Unified message structure that all agents transform to
@@ -36,7 +36,7 @@ export interface UnifiedMessage {
     cost?: number;
     systemSubtype?: string;
     sessionInfo?: SessionInfoData;
-    [key: string]: any; // Allow any additional metadata
+    [key: string]: unknown; // Allow any additional metadata
   };
 }
 
@@ -52,7 +52,7 @@ export type MessageSegment =
 export interface ToolCall {
   id: string;
   name: string;
-  input?: any; // Tool inputs can have various shapes
+  input?: Record<string, unknown>; // Tool inputs can have various shapes
   result?: ToolResult;
   status: 'pending' | 'success' | 'error';
   isSubAgent?: boolean;
@@ -67,17 +67,17 @@ export interface ToolResult {
   metadata?: {
     exitCode?: number;
     duration?: number;
-    [key: string]: any; // Tool result metadata can have various shapes
+    [key: string]: unknown; // Tool result metadata can have various shapes
   };
 }
 
 // Message transformer interface for converting agent-specific formats to unified format
 export interface MessageTransformer {
   // Transform raw agent messages to unified format
-  transform(rawMessages: any[]): UnifiedMessage[];
+  transform(rawMessages: unknown[]): UnifiedMessage[];
   
   // Parse a single message
-  parseMessage(raw: any): UnifiedMessage | null;
+  parseMessage(raw: unknown): UnifiedMessage | null;
   
   // Agent-specific capabilities
   supportsStreaming(): boolean;

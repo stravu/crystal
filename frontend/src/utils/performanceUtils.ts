@@ -10,7 +10,7 @@ export const isDocumentVisible = () => {
 /**
  * Creates a throttled version of a function that only executes at most once per interval
  */
-export const throttle = <T extends (...args: any[]) => any>(
+export const throttle = <T extends (...args: never[]) => unknown>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
@@ -38,7 +38,7 @@ export const throttle = <T extends (...args: any[]) => any>(
 /**
  * Creates a debounced version of a function
  */
-export const debounce = <T extends (...args: any[]) => any>(
+export const debounce = <T extends (...args: never[]) => unknown>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {

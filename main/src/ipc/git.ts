@@ -21,6 +21,23 @@ interface GitError extends Error {
   originalError?: Error;
 }
 
+// Interface for process errors that have stdout/stderr properties
+interface ProcessError {
+  stdout?: string;
+  stderr?: string;
+  message?: string;
+}
+
+// Interface for generic error objects with git-related properties
+interface ErrorWithGitContext {
+  gitCommand?: string;
+  gitCommands?: string[];
+  gitOutput?: string;
+  workingDirectory?: string;
+  originalError?: Error;
+  [key: string]: unknown;
+}
+
 // Interface for raw commit data from worktreeManager
 interface RawCommitData {
   hash: string;
@@ -305,14 +322,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         return { success: true };
       } catch (commitError: unknown) {
         // Check if it's a pre-commit hook failure
-        if ((commitError && typeof commitError === 'object' && 'stdout' in commitError && (commitError as any).stdout?.includes('pre-commit')) || (commitError && typeof commitError === 'object' && 'stderr' in commitError && (commitError as any).stderr?.includes('pre-commit'))) {
+        if ((commitError && typeof commitError === 'object' && 'stdout' in commitError && (commitError as ProcessError).stdout?.includes('pre-commit')) || (commitError && typeof commitError === 'object' && 'stderr' in commitError && (commitError as ProcessError).stderr?.includes('pre-commit'))) {
           return { success: false, error: 'Pre-commit hooks failed. Please fix the issues and try again.' };
         }
         throw commitError;
       }
     } catch (error: unknown) {
       console.error('Failed to commit changes:', error);
-      const errorMessage = (error instanceof Error ? error.message : '') || (error && typeof error === 'object' && 'stderr' in error ? (error as any).stderr : '') || 'Failed to commit changes';
+      const errorMessage = (error instanceof Error ? error.message : '') || (error && typeof error === 'object' && 'stderr' in error ? (error as ProcessError).stderr : '') || 'Failed to commit changes';
       return { success: false, error: errorMessage };
     }
   });
@@ -775,14 +792,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
       // Emit git operation failed event
       const errorMessage = `✗ Rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
-                          (error && typeof error === 'object' && 'gitOutput' in error && (error as any).gitOutput ? `\n\nGit output:\n${(error as any).gitOutput}` : '');
+                          (error && typeof error === 'object' && 'gitOutput' in error && (error as GitError).gitOutput ? `\n\nGit output:\n${(error as GitError).gitOutput}` : '');
       
       // Don't let this block the error response either
       try {
         emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
           operation: 'rebase_from_main',
           error: error instanceof Error ? error.message : String(error),
-          gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as any).gitOutput : undefined
+          gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as GitError).gitOutput : undefined
         });
       } catch (outputError) {
         console.error(`[IPC:git] Failed to emit git error event for session ${sessionId}:`, outputError);
@@ -793,10 +810,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         success: false,
         error: error instanceof Error ? error.message : 'Failed to rebase main into worktree',
         gitError: {
-          command: error && typeof error === 'object' && 'gitCommand' in error ? (error as any).gitCommand : undefined,
-          output: error && typeof error === 'object' && 'gitOutput' in error ? (error as any).gitOutput : (error instanceof Error ? error.message : String(error)),
-          workingDirectory: error && typeof error === 'object' && 'workingDirectory' in error ? (error as any).workingDirectory : undefined,
-          originalError: error && typeof error === 'object' && 'originalError' in error ? (error as any).originalError?.message : undefined
+          command: error && typeof error === 'object' && 'gitCommand' in error ? (error as ErrorWithGitContext).gitCommand : undefined,
+          output: error && typeof error === 'object' && 'gitOutput' in error ? (error as ErrorWithGitContext).gitOutput : (error instanceof Error ? error.message : String(error)),
+          workingDirectory: error && typeof error === 'object' && 'workingDirectory' in error ? (error as ErrorWithGitContext).workingDirectory : undefined,
+          originalError: error && typeof error === 'object' && 'originalError' in error ? (error as ErrorWithGitContext).originalError?.message : undefined
         }
       };
     }
@@ -990,14 +1007,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
       // Emit git operation failed event
       const errorMessage = `✗ Squash and rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
-                          (error && typeof error === 'object' && 'gitOutput' in error && (error as any).gitOutput ? `\n\nGit output:\n${(error as any).gitOutput}` : '');
+                          (error && typeof error === 'object' && 'gitOutput' in error && (error as GitError).gitOutput ? `\n\nGit output:\n${(error as GitError).gitOutput}` : '');
       
       // Don't let this block the error response either
       try {
         emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
           operation: 'squash_and_rebase',
           error: error instanceof Error ? error.message : String(error),
-          gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as any).gitOutput : undefined
+          gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as GitError).gitOutput : undefined
         });
       } catch (outputError) {
         console.error(`[IPC:git] Failed to emit git error event for session ${sessionId}:`, outputError);
