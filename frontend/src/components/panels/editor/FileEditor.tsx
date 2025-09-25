@@ -585,6 +585,7 @@ export function FileEditor({
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const editorRef = useRef<unknown>(null);
+  const monacoRef = useRef<unknown>(null);
 
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
@@ -646,8 +647,9 @@ export function FileEditor({
   }, [sessionId, onFileChange]);
 
 
-  const handleEditorMount = (editor: unknown) => {
+  const handleEditorMount = (editor: unknown, monaco: unknown) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
   };
 
   const handleEditorChange = (value: string | undefined) => {
@@ -730,6 +732,26 @@ export function FileEditor({
       console.log('[FileEditor] No onStateChange callback');
     }
   }, [onStateChange]);
+  
+  // Cleanup effect for Monaco editor models
+  useEffect(() => {
+    return () => {
+      // Cleanup Monaco editor models when component unmounts or file changes
+      try {
+        if (editorRef.current && typeof editorRef.current === 'object' && editorRef.current !== null && 'getModel' in editorRef.current) {
+          const editor = editorRef.current as { getModel: () => unknown, dispose?: () => void };
+          const model = editor.getModel();
+          if (model && typeof model === 'object' && model !== null && 'dispose' in model) {
+            const typedModel = model as { dispose: () => void };
+            console.log('[FileEditor] Disposing Monaco model');
+            typedModel.dispose();
+          }
+        }
+      } catch (error) {
+        console.warn('[FileEditor] Error during Monaco cleanup:', error);
+      }
+    };
+  }, [selectedFile?.path]); // Run cleanup when file changes
 
   return (
     <div className="h-full flex">

@@ -342,22 +342,6 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     onFocus?.();
   }, [onFocus]);
 
-  const handleBlur = useCallback((e: React.FocusEvent) => {
-    // Check if the blur is due to clicking within the toolbar
-    const toolbar = e.currentTarget.closest('[data-toolbar-container]');
-    const relatedTarget = e.relatedTarget;
-    
-    // Only remove focus if we're actually leaving the toolbar area
-    if (!toolbar || !relatedTarget || !toolbar.contains(relatedTarget as Node)) {
-      setIsFocused(false);
-      setIsToolbarActive(false);
-      onBlur?.();
-    } else {
-      // Keep toolbar active if staying within toolbar
-      setIsFocused(false); // Input not focused, but toolbar still active
-      setIsToolbarActive(true);
-    }
-  }, [onBlur]);
 
 
   return (
@@ -520,7 +504,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
                 onFocus={handleFocus}
-                onBlur={() => handleBlur({} as React.FocusEvent)}
+                onBlur={() => {
+                  // Simple blur handling without toolbar check
+                  setIsFocused(false);
+                  setIsToolbarActive(false);
+                  onBlur?.();
+                }}
                 style={{ 
                   height: `${textareaHeight}px`,
                   minHeight: '52px', 

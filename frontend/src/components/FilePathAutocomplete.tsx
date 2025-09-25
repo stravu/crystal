@@ -318,9 +318,9 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (dropdownRef.current && event.target && event.target instanceof Node && !dropdownRef.current.contains(event.target)) {
         const element = getInputElement();
-        if (element && !element.contains(event.target as Node)) {
+        if (element && event.target && event.target instanceof Node && !element.contains(event.target)) {
           setShowSuggestions(false);
         }
       }
