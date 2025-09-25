@@ -7,7 +7,7 @@ import type { DatabaseService } from '../database/database';
 import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, Project } from '../database/models';
 import { getShellPath } from '../utils/shellPath';
 import { TerminalSessionManager } from './terminalSessionManager';
-import type { BaseAIPanelState, ToolPanelState } from '../../../shared/types/panels';
+import type { BaseAIPanelState, ToolPanelState, ToolPanel } from '../../../shared/types/panels';
 import { formatForDisplay } from '../utils/timestampUtils';
 
 // Interface for generic JSON message data that can contain various properties
@@ -611,6 +611,43 @@ export class SessionManager extends EventEmitter {
     const success = this.db.archiveSession(id);
     if (!success) {
       throw new Error(`Session ${id} not found`);
+    }
+
+    // Stop all AI panel processes (Claude, Codex, etc.) for this session
+    try {
+      // Get all panels for this session
+      const { panelManager } = require('./panelManager');
+      const panels: ToolPanel[] = panelManager.getPanelsForSession(id);
+      
+      // Stop Claude panels
+      const claudePanels = panels.filter(p => p.type === 'claude');
+      if (claudePanels.length > 0) {
+        try {
+          const { claudePanelManager } = require('../ipc/claudePanel');
+          for (const panel of claudePanels) {
+            console.log(`[SessionManager] Stopping Claude panel ${panel.id} for archived session ${id}`);
+            await claudePanelManager.unregisterPanel(panel.id);
+          }
+        } catch (error) {
+          console.error(`[SessionManager] Failed to stop Claude panels for session ${id}:`, error);
+        }
+      }
+      
+      // Stop Codex panels
+      const codexPanels = panels.filter(p => p.type === 'codex');
+      if (codexPanels.length > 0) {
+        try {
+          const { codexPanelManager } = require('../ipc/codexPanel');
+          for (const panel of codexPanels) {
+            console.log(`[SessionManager] Stopping Codex panel ${panel.id} for archived session ${id}`);
+            await codexPanelManager.unregisterPanel(panel.id);
+          }
+        } catch (error) {
+          console.error(`[SessionManager] Failed to stop Codex panels for session ${id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`[SessionManager] Error stopping AI panels for session ${id}:`, error);
     }
 
     // Close terminal session if it exists
