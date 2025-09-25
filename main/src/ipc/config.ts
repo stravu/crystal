@@ -12,7 +12,7 @@ export function registerConfigHandlers(ipcMain: IpcMain, { configManager, claude
     }
   });
 
-  ipcMain.handle('config:update', async (_event, updates: any) => {
+  ipcMain.handle('config:update', async (_event, updates: import('../types/config').UpdateConfigRequest) => {
     try {
       // Check if Claude path is being updated
       const oldConfig = configManager.getConfig();
@@ -44,7 +44,7 @@ export function registerConfigHandlers(ipcMain: IpcMain, { configManager, claude
     }
   });
 
-  ipcMain.handle('config:update-session-preferences', async (_event, preferences: any) => {
+  ipcMain.handle('config:update-session-preferences', async (_event, preferences: NonNullable<import('../types/config').AppConfig['sessionCreationPreferences']>) => {
     try {
       await configManager.updateConfig({ sessionCreationPreferences: preferences });
       return { success: true };

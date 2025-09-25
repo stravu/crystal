@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import type { Logger } from '../utils/logger';
 import type { SessionManager } from './sessionManager';
 import { GitDiffManager, type GitDiffResult } from './gitDiffManager';
-import type { CreateExecutionDiffData } from '../database/models';
+import type { CreateExecutionDiffData, ExecutionDiff } from '../database/models';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand } from '../utils/shellEscape';
 import { formatForDisplay } from '../utils/timestampUtils';
@@ -22,7 +22,7 @@ export class ExecutionTracker extends EventEmitter {
   private activeExecutions: Map<string, ExecutionContext> = new Map();
 
   constructor(
-    private sessionManager: any,
+    private sessionManager: import('./sessionManager').SessionManager,
     private gitDiffManager: GitDiffManager,
     private logger?: Logger
   ) {
@@ -281,13 +281,13 @@ export class ExecutionTracker extends EventEmitter {
     
     let filteredExecutions = executions;
     if (executionIds && executionIds.length > 0) {
-      filteredExecutions = executions.filter((exec: any) => executionIds.includes(exec.id));
+      filteredExecutions = executions.filter((exec: ExecutionDiff) => executionIds.includes(exec.id));
       // console.log(`[ExecutionTracker] Filtered to ${filteredExecutions.length} executions`);
     }
     
     const diffs: GitDiffResult[] = filteredExecutions
-      .filter((exec: any) => exec.git_diff) // Only include executions with actual diffs
-      .map((exec: any) => ({
+      .filter((exec: ExecutionDiff) => exec.git_diff) // Only include executions with actual diffs
+      .map((exec: ExecutionDiff) => ({
         diff: exec.git_diff!,
         stats: {
           additions: exec.stats_additions,
@@ -304,7 +304,7 @@ export class ExecutionTracker extends EventEmitter {
     return this.gitDiffManager.combineDiffs(diffs);
   }
 
-  async getExecutionDiffs(sessionId: string): Promise<any[]> {
+  async getExecutionDiffs(sessionId: string): Promise<ExecutionDiff[]> {
     const diffs = await this.sessionManager.getExecutionDiffs(sessionId);
     // Commented out verbose logging
     // console.log(`[ExecutionTracker] getExecutionDiffs returned ${diffs.length} diffs for session ${sessionId}`);

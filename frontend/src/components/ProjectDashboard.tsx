@@ -134,8 +134,11 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = React.memo(({ p
             return { ...prevData, ...event.data };
           } else if (event.data) {
             // Full update
-            dashboardCache.set(projectId, event.data);
-            return event.data as ProjectDashboardData;
+            const data = event.data as ProjectDashboardData;
+            if (data.projectId && data.projectName && data.sessionBranches) {
+              dashboardCache.set(projectId, data);
+            }
+            return data;
           }
           return prevData;
         });
@@ -150,9 +153,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = React.memo(({ p
 
     // Handle individual session updates with debouncing
     const unsubscribeSession = API.dashboard.onSessionUpdate((event) => {
-      if (event.projectId === projectId && event.session) {
+      if (event.projectId === projectId && event.data && event.sessionId) {
+        const sessionData = event.data as any; // We don't have strong typing for session update data
         // Add to pending updates
-        pendingSessionUpdatesRef.current.set(event.session.sessionId, event.session);
+        pendingSessionUpdatesRef.current.set(event.sessionId, sessionData);
         // Trigger debounced update
         applyPendingSessionUpdates();
       }

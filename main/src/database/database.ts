@@ -2,7 +2,31 @@ import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, CreatePanelExecutionDiffData } from './models';
-import type { ToolPanel } from '../../../shared/types/panels';
+import type { ToolPanel, ToolPanelType, ToolPanelState, ToolPanelMetadata } from '../../../shared/types/panels';
+
+// Interface for legacy claude_panel_settings during migration
+interface ClaudePanelSetting {
+  id: number;
+  panel_id: string;
+  model?: string;
+  commit_mode?: boolean;
+  system_prompt?: string;
+  max_tokens?: number;
+  temperature?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Interface for tool panel database rows
+interface ToolPanelRow {
+  id: string;
+  session_id: string;
+  type: string;
+  title: string;
+  state: string | null;
+  metadata: string | null;
+  created_at: string;
+}
 
 export class DatabaseService {
   private db: Database.Database;
@@ -1099,7 +1123,7 @@ export class DatabaseService {
 
         if (claudePanelSettingsExists) {
           // Migrate data from claude_panel_settings to unified settings
-          const claudeSettings = this.db.prepare("SELECT * FROM claude_panel_settings").all() as any[];
+          const claudeSettings = this.db.prepare("SELECT * FROM claude_panel_settings").all() as ClaudePanelSetting[];
           
           for (const setting of claudeSettings) {
             const unifiedSettings = {
@@ -1186,7 +1210,7 @@ export class DatabaseService {
 
   updateProject(id: number, updates: Partial<Omit<Project, 'id' | 'created_at'>>): Project | undefined {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
 
     if (updates.name !== undefined) {
       fields.push('name = ?');
@@ -1350,7 +1374,7 @@ export class DatabaseService {
 
   updateFolder(id: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }): void {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
     
     if (updates.name !== undefined) {
       fields.push('name = ?');
@@ -1484,7 +1508,7 @@ export class DatabaseService {
 
   updateRunCommand(id: number, updates: { command?: string; display_name?: string; order_index?: number }): ProjectRunCommand | undefined {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
 
     if (updates.command !== undefined) {
       fields.push('command = ?');
@@ -1604,7 +1628,7 @@ export class DatabaseService {
     console.log(`[Database] Updating session ${id} with data:`, data);
     
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -2402,7 +2426,7 @@ export class DatabaseService {
     
     this.transaction(() => {
       const setClauses: string[] = [];
-      const values: any[] = [];
+      const values: (string | number | boolean | null)[] = [];
       
       if (updates.title !== undefined) {
         setClauses.push('title = ?');
@@ -2487,28 +2511,28 @@ export class DatabaseService {
   }
 
   getPanelsForSession(sessionId: string): ToolPanel[] {
-    const rows = this.db.prepare('SELECT * FROM tool_panels WHERE session_id = ? ORDER BY created_at').all(sessionId) as any[];
+    const rows = this.db.prepare('SELECT * FROM tool_panels WHERE session_id = ? ORDER BY created_at').all(sessionId) as ToolPanelRow[];
     
     return rows.map(row => ({
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     }));
   }
 
   getAllPanels(): ToolPanel[] {
-    const rows = this.db.prepare('SELECT * FROM tool_panels ORDER BY created_at').all() as any[];
+    const rows = this.db.prepare('SELECT * FROM tool_panels ORDER BY created_at').all() as ToolPanelRow[];
     
     return rows.map(row => ({
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     }));
   }
 
@@ -2518,15 +2542,15 @@ export class DatabaseService {
       JOIN sessions s ON tp.session_id = s.id
       WHERE s.archived = 0 OR s.archived IS NULL
       ORDER BY tp.created_at
-    `).all() as any[];
+    `).all() as ToolPanelRow[];
     
     return rows.map(row => ({
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     }));
   }
 
@@ -2565,10 +2589,10 @@ export class DatabaseService {
    * Get panel settings from the unified JSON storage
    * Returns the parsed settings object or an empty object if none exist
    */
-  getPanelSettings(panelId: string): Record<string, any> {
+  getPanelSettings(panelId: string): Record<string, unknown> {
     const row = this.db.prepare(`
       SELECT settings FROM tool_panels WHERE id = ?
-    `).get(panelId) as any;
+    `).get(panelId) as { settings?: string } | undefined;
 
     if (!row || !row.settings) {
       return {};
@@ -2586,7 +2610,7 @@ export class DatabaseService {
    * Update panel settings in the unified JSON storage
    * Merges the provided settings with existing ones
    */
-  updatePanelSettings(panelId: string, settings: Record<string, any>): void {
+  updatePanelSettings(panelId: string, settings: Record<string, unknown>): void {
     // Get existing settings
     const existingSettings = this.getPanelSettings(panelId);
     
@@ -2608,7 +2632,7 @@ export class DatabaseService {
   /**
    * Set panel settings (replaces all existing settings)
    */
-  setPanelSettings(panelId: string, settings: Record<string, any>): void {
+  setPanelSettings(panelId: string, settings: Record<string, unknown>): void {
     const settingsWithTimestamp = {
       ...settings,
       updatedAt: new Date().toISOString()
@@ -2658,15 +2682,16 @@ export class DatabaseService {
     }
 
     // Convert from new format to old format for compatibility
+    const s = settings as Record<string, unknown>;
     return {
       panel_id: panelId,
-      model: settings.model || 'auto',
-      commit_mode: settings.commitMode || false,
-      system_prompt: settings.systemPrompt || null,
-      max_tokens: settings.maxTokens || 4096,
-      temperature: settings.temperature || 0.7,
-      created_at: settings.createdAt || new Date().toISOString(),
-      updated_at: settings.updatedAt || new Date().toISOString()
+      model: (typeof s.model === 'string' ? s.model : null) || 'auto',
+      commit_mode: (typeof s.commitMode === 'boolean' ? s.commitMode : null) || false,
+      system_prompt: (typeof s.systemPrompt === 'string' ? s.systemPrompt : null) || null,
+      max_tokens: (typeof s.maxTokens === 'number' ? s.maxTokens : null) || 4096,
+      temperature: (typeof s.temperature === 'number' ? s.temperature : null) || 0.7,
+      created_at: (typeof s.createdAt === 'string' ? s.createdAt : null) || new Date().toISOString(),
+      updated_at: (typeof s.updatedAt === 'string' ? s.updatedAt : null) || new Date().toISOString()
     };
   }
 
@@ -2677,7 +2702,7 @@ export class DatabaseService {
     max_tokens?: number;
     temperature?: number;
   }): void {
-    const updateObj: Record<string, any> = {};
+    const updateObj: Record<string, unknown> = {};
     
     if (settings.model !== undefined) updateObj.model = settings.model;
     if (settings.commit_mode !== undefined) updateObj.commitMode = settings.commit_mode;

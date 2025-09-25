@@ -6,6 +6,7 @@ import { panelManager } from '../services/panelManager';
 import type { AppServices } from './types';
 import type { CodexPanelState } from '../../../shared/types/panels';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
+import type { ConversationMessage } from '../database/models';
 
 // Singleton instances will be created in the register function
 export let codexManager: CodexManager;
@@ -34,7 +35,7 @@ class CodexPanelHandler extends BaseAIPanelHandler {
   /**
    * Apply Codex-specific default settings
    */
-  protected applySettingsDefaults(settings: Record<string, any>): Record<string, any> {
+  protected applySettingsDefaults(settings: Record<string, unknown>): Record<string, unknown> {
     return {
       model: settings.model || DEFAULT_CODEX_MODEL,
       modelProvider: settings.modelProvider || 'openai',
@@ -162,7 +163,7 @@ class CodexPanelHandler extends BaseAIPanelHandler {
     });
 
     // Override continue handler for Codex-specific behavior
-    this.ipcMain.handle('codexPanel:continue', async (_, panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], options?: {
+    this.ipcMain.handle('codexPanel:continue', async (_, panelId: string, worktreePath: string, prompt: string, conversationHistory: ConversationMessage[], options?: {
       model?: string;
       modelProvider?: string;
       thinkingLevel?: 'low' | 'medium' | 'high';
@@ -192,7 +193,7 @@ class CodexPanelHandler extends BaseAIPanelHandler {
         const existingSettings = databaseService.getPanelSettings(panelId);
         
         // Build updated settings with only changed values
-        const settingsToUpdate: Record<string, any> = {
+        const settingsToUpdate: Record<string, unknown> = {
           lastPrompt: prompt,
           lastActivityTime: new Date().toISOString()
         };
@@ -224,16 +225,16 @@ class CodexPanelHandler extends BaseAIPanelHandler {
           const updatedState: CodexPanelState = {
             ...currentCustomState,
             lastPrompt: prompt,
-            lastActivityTime: settingsToUpdate.lastActivityTime,
-            model: settingsToUpdate.model || currentCustomState?.model || DEFAULT_CODEX_MODEL,
-            modelProvider: settingsToUpdate.modelProvider || currentCustomState?.modelProvider || 'openai',
-            sandboxMode: settingsToUpdate.sandboxMode || currentCustomState?.sandboxMode || 'workspace-write',
-            webSearch: settingsToUpdate.webSearch ?? currentCustomState?.webSearch ?? false,
+            lastActivityTime: typeof settingsToUpdate.lastActivityTime === 'string' ? settingsToUpdate.lastActivityTime : currentCustomState?.lastActivityTime || new Date().toISOString(),
+            model: (typeof settingsToUpdate.model === 'string' ? settingsToUpdate.model : null) || currentCustomState?.model || DEFAULT_CODEX_MODEL,
+            modelProvider: (typeof settingsToUpdate.modelProvider === 'string' ? settingsToUpdate.modelProvider : null) || currentCustomState?.modelProvider || 'openai',
+            sandboxMode: (typeof settingsToUpdate.sandboxMode === 'string' ? settingsToUpdate.sandboxMode as 'read-only' | 'workspace-write' | 'danger-full-access' : null) || currentCustomState?.sandboxMode || 'workspace-write',
+            webSearch: (typeof settingsToUpdate.webSearch === 'boolean' ? settingsToUpdate.webSearch : null) ?? currentCustomState?.webSearch ?? false,
             codexConfig: {
-              model: settingsToUpdate.model || currentCustomState?.model || DEFAULT_CODEX_MODEL,
-              thinkingLevel: settingsToUpdate.thinkingLevel || currentCustomState?.codexConfig?.thinkingLevel || 'medium',
-              sandboxMode: settingsToUpdate.sandboxMode || currentCustomState?.sandboxMode || 'workspace-write',
-              webSearch: settingsToUpdate.webSearch ?? currentCustomState?.webSearch ?? false
+              model: (typeof settingsToUpdate.model === 'string' ? settingsToUpdate.model : null) || currentCustomState?.model || DEFAULT_CODEX_MODEL,
+              thinkingLevel: (typeof settingsToUpdate.thinkingLevel === 'string' ? settingsToUpdate.thinkingLevel as 'low' | 'medium' | 'high' : null) || currentCustomState?.codexConfig?.thinkingLevel || 'medium',
+              sandboxMode: (typeof settingsToUpdate.sandboxMode === 'string' ? settingsToUpdate.sandboxMode as 'read-only' | 'workspace-write' | 'danger-full-access' : null) || currentCustomState?.sandboxMode || 'workspace-write',
+              webSearch: (typeof settingsToUpdate.webSearch === 'boolean' ? settingsToUpdate.webSearch : null) ?? currentCustomState?.webSearch ?? false
             }
           };
           
@@ -416,7 +417,7 @@ class CodexPanelHandler extends BaseAIPanelHandler {
     });
 
     // Register alias for camelCase compatibility
-    this.ipcMain.handle('codexPanel:setSettings', async (_event, panelId: string, settings: Record<string, any>) => {
+    this.ipcMain.handle('codexPanel:setSettings', async (_event, panelId: string, settings: Record<string, unknown>) => {
       // Delegate to the base class implementation
       databaseService.updatePanelSettings(panelId, settings);
       return { success: true };

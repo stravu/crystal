@@ -311,7 +311,7 @@ export class LogsManager {
         for (const targetPid of allPids) {
           try {
             process.kill(targetPid, 'SIGKILL');
-          } catch (error: any) {
+          } catch (error: unknown) {
             // Process might already be dead or inaccessible
           }
         }

@@ -197,7 +197,7 @@ export function useIPCEvents() {
       // Just emit custom event to notify that new output is available
       // Include panelId (if present) so panel-based views can react precisely
       window.dispatchEvent(new CustomEvent('session-output-available', {
-        detail: { sessionId: output.sessionId, panelId: (output as any).panelId }
+        detail: { sessionId: output.sessionId, panelId: output.panelId }
       }));
     });
     unsubscribeFunctions.push(unsubscribeSessionOutput);

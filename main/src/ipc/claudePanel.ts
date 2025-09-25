@@ -4,6 +4,7 @@ import { BaseAIPanelHandler } from './baseAIPanelHandler';
 import { ClaudePanelManager } from '../services/panels/claude/claudePanelManager';
 import { panelManager } from '../services/panelManager';
 import { ClaudePanelState } from '../../../shared/types/panels';
+import type { SessionOutput } from '../database/models';
 
 let claudePanelManager: ClaudePanelManager;
 
@@ -23,7 +24,7 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
   /**
    * Apply Claude-specific default settings
    */
-  protected applySettingsDefaults(settings: Record<string, any>): Record<string, any> {
+  protected applySettingsDefaults(settings: Record<string, unknown>): Record<string, unknown> {
     const { configManager } = this.services;
     return {
       model: settings.model || configManager.getDefaultModel() || 'auto',
@@ -59,7 +60,7 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
         let modelToUse = model;
         if (!modelToUse) {
           const settings = databaseService.getPanelSettings(panelId);
-          modelToUse = settings?.model || configManager.getDefaultModel() || 'auto';
+          modelToUse = (typeof settings?.model === 'string' ? settings.model : null) || configManager.getDefaultModel() || 'auto';
         }
 
         // Start Claude via the panel manager
@@ -200,7 +201,7 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
           conversationMessages,
           promptMarkers,
           executionDiffs,
-          sessionOutputs: sessionOutputs as any // Type conversion needed
+          sessionOutputs: sessionOutputs
         });
         
         // Set flag to skip --resume on the next execution

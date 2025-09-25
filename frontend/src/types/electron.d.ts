@@ -4,7 +4,7 @@ import type { Project } from './project';
 import type { Folder } from './folder';
 import type { SessionCreationPreferences } from '../stores/sessionPreferencesStore';
 import type { ToolPanel } from '../../../shared/types/panels';
-import type { CreateSessionData } from '../../../main/src/database/models';
+import type { CreateSessionRequest } from './session';
 
 interface LogEntry {
   timestamp: string;
@@ -55,7 +55,7 @@ interface ElectronAPI {
     getAllWithProjects: () => Promise<IPCResponse>;
     getArchivedWithProjects: () => Promise<IPCResponse>;
     get: (sessionId: string) => Promise<IPCResponse>;
-    create: (request: CreateSessionData) => Promise<IPCResponse>;
+    create: (request: CreateSessionRequest) => Promise<IPCResponse>;
     delete: (sessionId: string) => Promise<IPCResponse>;
     sendInput: (sessionId: string, input: string) => Promise<IPCResponse>;
     continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
@@ -209,7 +209,7 @@ interface ElectronAPI {
     getProjectStatus: (projectId: number) => Promise<IPCResponse>;
     getProjectStatusProgressive: (projectId: number) => Promise<IPCResponse>;
     onUpdate: (callback: (data: Record<string, any>) => void) => () => void;
-    onSessionUpdate: (callback: (data: Session) => void) => () => void;
+    onSessionUpdate: (callback: (data: { type: string; projectId?: number; sessionId?: string; data: unknown }) => void) => () => void;
   };
 
   // UI State management
@@ -270,7 +270,7 @@ interface ElectronAPI {
   // Panel operations
   panels: {
     getSessionPanels: (sessionId: string) => Promise<IPCResponse>;
-    createPanel: (sessionId: string, type: string, name: string, config?: Record<string, any>) => Promise<IPCResponse>;
+    createPanel: (sessionId: string, type: string, name: string, config?: Record<string, unknown>) => Promise<IPCResponse>;
     deletePanel: (panelId: string) => Promise<IPCResponse>;
     renamePanel: (panelId: string, name: string) => Promise<IPCResponse>;
     setActivePanel: (sessionId: string, panelId: string) => Promise<IPCResponse>;
@@ -294,7 +294,7 @@ interface ElectronAPI {
   // Codex panel operations
   codexPanels: {
     getSettings: (panelId: string) => Promise<IPCResponse>;
-    setSettings: (panelId: string, settings: Record<string, any>) => Promise<IPCResponse>;
+    setSettings: (panelId: string, settings: Record<string, unknown>) => Promise<IPCResponse>;
   };
 
   // Logs panel operations

@@ -15,7 +15,7 @@ export class PromptEnhancer {
    * @param dbSession The database session object
    * @returns The enhanced prompt with structured commit instructions if applicable
    */
-  enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
+  enhancePromptForStructuredCommit(prompt: string, dbSession: { id: string; commit_mode?: string; commit_mode_settings?: string }): string {
     // Check if session has structured commit mode
     if (dbSession?.commit_mode === 'structured') {
       this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
@@ -64,7 +64,7 @@ export function getPromptEnhancer(logger?: Logger): PromptEnhancer {
  * @param logger Optional logger
  * @returns The enhanced prompt
  */
-export function enhancePromptForStructuredCommit(prompt: string, dbSession: any, logger?: Logger): string {
+export function enhancePromptForStructuredCommit(prompt: string, dbSession: { id: string; commit_mode?: string; commit_mode_settings?: string }, logger?: Logger): string {
   const enhancer = getPromptEnhancer(logger);
   return enhancer.enhancePromptForStructuredCommit(prompt, dbSession);
 }

@@ -6,6 +6,7 @@ import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { ConversationMessage } from '../../../database/models';
 import { getShellPath, findExecutableInPath } from '../../../utils/shellPath';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 
@@ -317,13 +318,13 @@ export abstract class AbstractCliManager extends EventEmitter {
    * Start a CLI panel with the given options
    * This should be implemented by each CLI tool manager
    */
-  abstract startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, ...args: any[]): Promise<void>;
+  abstract startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, ...args: unknown[]): Promise<void>;
 
   /**
    * Continue a CLI panel with conversation history
    * This should be implemented by each CLI tool manager
    */
-  abstract continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], ...args: any[]): Promise<void>;
+  abstract continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: ConversationMessage[], ...args: unknown[]): Promise<void>;
 
   /**
    * Stop a CLI panel
@@ -335,7 +336,7 @@ export abstract class AbstractCliManager extends EventEmitter {
    * Restart a panel with conversation history
    * This should be implemented by each CLI tool manager
    */
-  abstract restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: any[]): Promise<void>;
+  abstract restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: ConversationMessage[]): Promise<void>;
 
   // Legacy session-based methods for backward compatibility
   // These provide default implementations that map to panel-based methods
@@ -343,7 +344,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   /**
    * @deprecated Use startPanel with real panel IDs instead
    */
-  async startSession(sessionId: string, worktreePath: string, prompt: string, ...args: any[]): Promise<void> {
+  async startSession(sessionId: string, worktreePath: string, prompt: string, ...args: unknown[]): Promise<void> {
     console.warn(`[${this.getCliToolName()}Manager] DEPRECATED: startSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
     const virtualPanelId = `session-${sessionId}`;
     return this.startPanel(virtualPanelId, sessionId, worktreePath, prompt, ...args);
@@ -352,7 +353,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   /**
    * @deprecated Use continuePanel with real panel IDs instead
    */
-  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], ...args: any[]): Promise<void> {
+  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: ConversationMessage[], ...args: unknown[]): Promise<void> {
     console.warn(`[${this.getCliToolName()}Manager] DEPRECATED: continueSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
     const virtualPanelId = `session-${sessionId}`;
     return this.continuePanel(virtualPanelId, sessionId, worktreePath, prompt, conversationHistory, ...args);
@@ -417,28 +418,23 @@ export abstract class AbstractCliManager extends EventEmitter {
         
         // Store the session ID in the panel's custom state
         if (this.sessionManager) {
-          const db = (this.sessionManager as any).db;
-          if (db) {
-            const panel = db.getPanel(panelId);
-            if (panel) {
-              const currentState = panel.state || {};
-              const customState = currentState.customState || {};
+          // Use panelManager instead of direct database access
+          const { panelManager } = await import('../../panelManager');
+          const panel = await panelManager.getPanel(panelId);
+          if (panel) {
+            const currentState = panel.state || {};
+            const customState = (currentState.customState as Record<string, any>) || {};
+            
+            // Only update if we don't already have a session ID
+            const toolSessionKey = `${this.getCliToolName().toLowerCase()}SessionId`;
+            if (!customState[toolSessionKey]) {
+              const updatedState = {
+                ...currentState,
+                customState: { ...customState, [toolSessionKey]: sessionId }
+              };
               
-              // Only update if we don't already have a session ID
-              const toolSessionKey = `${this.getCliToolName().toLowerCase()}SessionId`;
-              if (!customState[toolSessionKey]) {
-                const updatedState = {
-                  ...currentState,
-                  customState: { ...customState, [toolSessionKey]: sessionId }
-                };
-                
-                // Use dynamic import to avoid circular dependency
-                const { panelManager } = await import('../../panelManager');
-                await panelManager.updatePanel(panelId, { state: updatedState });
-                this.logger?.info(`[${this.getCliToolName()}] Stored session ID for panel ${panelId}: ${sessionId}`);
-              } else {
-                this.logger?.verbose(`[${this.getCliToolName()}] Panel ${panelId} already has a session ID, skipping update`);
-              }
+              await panelManager.updatePanel(panelId, { state: updatedState });
+              this.logger?.verbose(`[${this.getCliToolName()}] Stored session ID in panel ${panelId}: ${sessionId}`);
             }
           }
         }
@@ -581,7 +577,7 @@ export abstract class AbstractCliManager extends EventEmitter {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        if (spawnAttempt === 0 && !(global as any)[needsNodeFallbackKey]) {
+        if (spawnAttempt === 0 && !(global as typeof global & Record<string, boolean>)[needsNodeFallbackKey]) {
           // First attempt: normal spawn
           ptyProcess = pty.spawn(command, args, {
             name: 'xterm-color',
@@ -636,7 +632,7 @@ export abstract class AbstractCliManager extends EventEmitter {
         lastError = spawnError;
         spawnAttempt++;
 
-        if (spawnAttempt === 1 && !(global as any)[needsNodeFallbackKey]) {
+        if (spawnAttempt === 1 && !(global as typeof global & Record<string, boolean>)[needsNodeFallbackKey]) {
           const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
           this.logger?.error(`First ${this.getCliToolName()} spawn attempt failed: ${errorMsg}`);
 
@@ -646,7 +642,7 @@ export abstract class AbstractCliManager extends EventEmitter {
               errorMsg.includes('is not recognized') ||
               errorMsg.includes('ENOENT')) {
             this.logger?.verbose(`Error suggests shebang issue, will try Node.js fallback`);
-            (global as any)[needsNodeFallbackKey] = true;
+            (global as typeof global & Record<string, boolean>)[needsNodeFallbackKey] = true;
             continue;
           }
         }

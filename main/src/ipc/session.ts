@@ -209,7 +209,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         errorDetails = error.stack || error.toString();
 
         // Check if it's a git command error
-        const gitError = error as any;
+        const gitError = error as Error & { gitCommand?: string; cmd?: string; gitOutput?: string; stderr?: string };
         if (gitError.gitCommand) {
           command = gitError.gitCommand;
         } else if (gitError.cmd) {
@@ -428,7 +428,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           const panelTitle = sessionToolType === 'codex' ? 'Codex' : 'Claude';
           await panelManager.createPanel({
             sessionId: sessionId,
-            type: sessionToolType as any,
+            type: sessionToolType as 'claude' | 'codex',
             title: panelTitle
           });
           console.log(`[IPC] Created ${sessionToolType} panel for session ${sessionId}`);
@@ -1278,7 +1278,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         conversationMessages,
         promptMarkers,
         executionDiffs,
-        sessionOutputs: sessionOutputs as any // Type conversion needed
+        sessionOutputs: sessionOutputs
       });
       
       // Set flag to skip --resume on the next execution

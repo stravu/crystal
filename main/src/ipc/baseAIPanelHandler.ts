@@ -215,7 +215,7 @@ export abstract class BaseAIPanelHandler {
     });
 
     // Generic set settings handler
-    this.ipcMain.handle(`${this.config.ipcPrefix}:set-settings`, async (_event, panelId: string, settings: Record<string, any>) => {
+    this.ipcMain.handle(`${this.config.ipcPrefix}:set-settings`, async (_event, panelId: string, settings: Record<string, unknown>) => {
       const { databaseService } = this.services;
       try {
         logger?.info(`[IPC] ${this.config.ipcPrefix}:set-settings called for panelId: ${panelId}`);
@@ -303,7 +303,7 @@ export abstract class BaseAIPanelHandler {
    * Apply default settings for the panel type
    * Override this in derived classes to provide panel-specific defaults
    */
-  protected applySettingsDefaults(settings: Record<string, any>): Record<string, any> {
+  protected applySettingsDefaults(settings: Record<string, unknown>): Record<string, unknown> {
     // Base implementation just returns settings as-is
     // Derived classes can override to add their defaults
     return settings;
@@ -315,7 +315,7 @@ export abstract class BaseAIPanelHandler {
   protected async handlePanelStart(
     panelId: string, 
     prompt: string, 
-    additionalState?: any
+    additionalState?: unknown
   ): Promise<void> {
     const { sessionManager } = this.services;
     
@@ -330,7 +330,7 @@ export abstract class BaseAIPanelHandler {
         isInitialized: true,
         lastPrompt: prompt,
         lastActivityTime: new Date().toISOString(),
-        ...additionalState
+        ...(additionalState && typeof additionalState === 'object' ? additionalState as Record<string, unknown> : {})
       };
 
       await panelManager.updatePanel(panelId, {
@@ -348,7 +348,7 @@ export abstract class BaseAIPanelHandler {
   protected async handlePanelContinue(
     panelId: string, 
     prompt?: string, 
-    additionalState?: any
+    additionalState?: unknown
   ): Promise<void> {
     const { sessionManager } = this.services;
     
@@ -360,11 +360,11 @@ export abstract class BaseAIPanelHandler {
     // Update panel state
     const panel = panelManager.getPanel(panelId);
     if (panel) {
-      const updatedState: any = {
+      const updatedState: Record<string, unknown> = {
         ...(panel.state.customState || {}),
         isInitialized: true,
         lastActivityTime: new Date().toISOString(),
-        ...additionalState
+        ...(additionalState && typeof additionalState === 'object' ? additionalState as Record<string, unknown> : {})
       };
       
       if (prompt) {

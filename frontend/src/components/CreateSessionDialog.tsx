@@ -640,7 +640,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         prompt: finalPrompt || '(no prompt)'
       });
       const response = await API.sessions.create({
-        prompt: finalPrompt || undefined,
+        prompt: finalPrompt || '',
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming
         count: sessionCount,
         // Model is now managed at panel level, not session level

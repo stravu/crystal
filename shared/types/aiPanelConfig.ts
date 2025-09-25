@@ -35,7 +35,7 @@ export interface StartPanelConfig extends AIPanelConfig {
  */
 export interface ContinuePanelConfig extends AIPanelConfig {
   panelId: string;
-  conversationHistory: Array<{message_type: 'user' | 'assistant'; content: string; timestamp?: string}>;
+  conversationHistory: Array<{id?: number; session_id?: string; message_type: 'user' | 'assistant'; content: string; timestamp?: string}>;
 }
 
 /**

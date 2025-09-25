@@ -1,5 +1,13 @@
 import { MessageTransformer, UnifiedMessage, ToolCall, ToolResult } from './MessageTransformer';
 
+// Interface for raw outputs from Codex (typically from database)
+interface CodexRawOutput {
+  type: 'json' | 'stdout' | 'stderr';
+  data: string | any;
+  timestamp?: string;
+  [key: string]: any;
+}
+
 export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
   private toolCalls = new Map<string, ToolCall>();
@@ -114,7 +122,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return false;
   }
 
-  transform(rawOutputs: any[]): UnifiedMessage[] {
+  transform(rawOutputs: CodexRawOutput[]): UnifiedMessage[] {
     const messages: UnifiedMessage[] = [];
     this.resetToolCallState();
 

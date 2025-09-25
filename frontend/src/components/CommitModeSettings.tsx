@@ -47,7 +47,7 @@ export function CommitModeSettings({
             onChange(chars.suggestedMode, newSettings);
           }
         })
-        .catch((error: any) => {
+        .catch((error: unknown) => {
           console.error('Failed to detect project characteristics:', error);
         })
         .finally(() => {
@@ -63,7 +63,7 @@ export function CommitModeSettings({
         .then((result: { shouldWarn: boolean; reason?: string }) => {
           setShowWarning(result.shouldWarn);
         })
-        .catch((error: any) => {
+        .catch((error: unknown) => {
           console.error('Failed to check checkpoint warning:', error);
         });
     } else {

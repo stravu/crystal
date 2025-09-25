@@ -298,12 +298,11 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
   
-  const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', updatedInput?: PermissionInput, message?: string) => {
+  const handlePermissionResponse = async (requestId: string, behavior: 'allow' | 'deny', _updatedInput?: PermissionInput, message?: string) => {
     try {
       await API.permissions.respond(requestId, {
-        behavior,
-        updatedInput,
-        message
+        allow: behavior === 'allow',
+        reason: message
       });
       setCurrentPermissionRequest(null);
     } catch (error) {

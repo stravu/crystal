@@ -154,12 +154,12 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
     }
     
     if (panel.type === 'claude') {
-      const customState = panel.state.customState as any;
+      const customState = panel.state.customState as { isInitialized?: boolean } | undefined;
       return customState?.isInitialized || false;
     }
     
     if (panel.type === 'codex') {
-      const customState = panel.state.customState as any;
+      const customState = panel.state.customState as { isInitialized?: boolean } | undefined;
       return customState?.isInitialized || false;
     }
     

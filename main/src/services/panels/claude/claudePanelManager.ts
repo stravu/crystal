@@ -2,6 +2,7 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { ConversationMessage } from '../../../database/models';
 import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig } from '../../../../../shared/types/aiPanelConfig';
 import { ClaudePanelState } from '../../../../../shared/types/panels';
 
@@ -31,7 +32,7 @@ export class ClaudePanelManager extends AbstractAIPanelManager {
    * Extract Claude-specific configuration parameters
    * Claude uses: permissionMode, model
    */
-  protected extractAgentConfig(config: AIPanelConfig): any[] {
+  protected extractAgentConfig(config: AIPanelConfig): [string | undefined, string | undefined] {
     return [
       config.permissionMode, // 'approve' | 'ignore' | undefined
       config.model          // model string
@@ -70,13 +71,13 @@ export class ClaudePanelManager extends AbstractAIPanelManager {
    * Claude-specific panel continue method for backward compatibility
    * Delegates to the base class continuePanel with unified config
    */
-  async continuePanel(panelId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void>;
+  async continuePanel(panelId: string, worktreePath: string, prompt: string, conversationHistory: ConversationMessage[], model?: string): Promise<void>;
   async continuePanel(config: ContinuePanelConfig): Promise<void>;
   async continuePanel(
     panelIdOrConfig: string | ContinuePanelConfig,
     worktreePath?: string,
     prompt?: string,
-    conversationHistory?: any[],
+    conversationHistory?: ConversationMessage[],
     model?: string
   ): Promise<void> {
     // Handle both signatures for backward compatibility

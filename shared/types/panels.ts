@@ -13,7 +13,7 @@ export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState;
+  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | Record<string, unknown>;
 }
 
 export interface TerminalPanelState {
@@ -128,7 +128,7 @@ export interface DashboardPanelState {
   lastRefresh?: string;           // Last time dashboard was refreshed
   filterType?: 'all' | 'stale' | 'changes' | 'pr'; // Current filter
   isRefreshing?: boolean;          // Whether dashboard is currently refreshing
-  cachedData?: any;                // Cached dashboard data
+  cachedData?: Record<string, unknown>;                // Cached dashboard data
 }
 
 export interface ToolPanelMetadata {
@@ -142,7 +142,7 @@ export interface CreatePanelRequest {
   sessionId: string;
   type: ToolPanelType;
   title?: string;                // Optional custom title
-  initialState?: any;
+  initialState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | { customState?: unknown };
   metadata?: Partial<ToolPanelMetadata>; // Optional metadata overrides
 }
 
@@ -159,7 +159,7 @@ export interface PanelEvent {
     panelType: ToolPanelType;
     sessionId: string;
   };
-  data: any;
+  data: unknown;
   timestamp: string;
 }
 

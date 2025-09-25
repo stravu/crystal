@@ -48,11 +48,10 @@ export function CreateSessionButton() {
       const toolType = getCodexModelConfig(lastModel) ? 'codex' : 'claude';
 
       const response = await API.sessions.create({
-        prompt: undefined, // No initial prompt
+        prompt: '', // No initial prompt
         worktreeTemplate: 'untitled', // Simple name - backend will make it unique
         count: 1,
         permissionMode: 'ignore', // Use default permission mode
-        model: lastModel, // Use last used model or auto
         toolType,
         projectId: activeProject.id,
         autoCommit: true,

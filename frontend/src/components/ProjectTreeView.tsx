@@ -10,7 +10,7 @@ import { EmptyState } from './EmptyState';
 import { LoadingSpinner } from './LoadingSpinner';
 import { API } from '../utils/api';
 import type { Session } from '../types/session';
-import type { Project } from '../types/project';
+import type { Project, CreateProjectRequest } from '../types/project';
 
 interface ProjectWithSessions extends Project {
   sessions: Session[];
@@ -26,7 +26,7 @@ export function ProjectTreeView() {
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [newProject, setNewProject] = useState<CreateProjectRequest>({ name: '', path: '', buildScript: '', runScript: '' });
   const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
@@ -284,7 +284,7 @@ export function ProjectTreeView() {
     if (!newProject.name || !newProject.path) return;
 
     try {
-      const response = await API.projects.create(newProject);
+      const response = await API.projects.create({ ...newProject, active: false });
 
       if (!response.success) {
         showError({

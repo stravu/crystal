@@ -123,7 +123,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         errorDetails = error.stack || error.toString();
 
         // Check if it's a command error
-        const cmdError = error as any;
+        const cmdError = error as Error & { cmd?: string; stderr?: string; stdout?: string };
         if (cmdError.cmd) {
           command = cmdError.cmd;
         }
