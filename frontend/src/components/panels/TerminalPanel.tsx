@@ -5,6 +5,19 @@ import { useSession } from '../../contexts/SessionContext';
 import { TerminalPanelProps } from '../../types/panelComponents';
 import '@xterm/xterm/css/xterm.css';
 
+// Define window extensions for terminal state restoration
+interface TerminalRestoreState {
+  scrollbackBuffer: string | string[];
+  cursorX?: number;
+  cursorY?: number;
+}
+
+declare global {
+  interface Window {
+    __terminalRestoreState?: TerminalRestoreState;
+  }
+}
+
 export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive }) => {
   console.log('[TerminalPanel] Component rendering, panel:', panel.id, 'isActive:', isActive);
   
@@ -65,7 +78,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
             // We'll restore this to the terminal after it's created
             console.log('[TerminalPanel] Found scrollback buffer with', terminalState.scrollbackBuffer.length, 'lines');
             // Store for restoration after terminal is created
-            (window as any).__terminalRestoreState = terminalState;
+            window.__terminalRestoreState = terminalState;
           }
         }
 
@@ -101,7 +114,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
           fitAddonRef.current = fitAddon;
           
           // Restore scrollback if we have saved state
-          const restoreState = (window as any).__terminalRestoreState;
+          const restoreState = window.__terminalRestoreState;
           if (restoreState && restoreState.scrollbackBuffer) {
             // Handle both string and array formats
             let restoredContent: string;
@@ -118,7 +131,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
             if (restoredContent) {
               terminal.write(restoredContent);
             }
-            delete (window as any).__terminalRestoreState;
+            delete window.__terminalRestoreState;
           }
           
           setIsInitialized(true);
