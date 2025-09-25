@@ -2,7 +2,7 @@ import React, { useState, KeyboardEvent, useEffect, useCallback, memo } from 're
 import { Send, X, Paperclip, FileText, Square, ChevronRight, Zap, Target, Brain, CheckCircle, Gauge } from 'lucide-react';
 import type { Session, GitCommands } from '../../../types/session';
 import type { ToolPanel } from '../../../../../shared/types/panels';
-import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
+import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel, type CodexInputOptions } from '../../../../../shared/types/models';
 import { useAIInputPanel } from '../../../hooks/useAIInputPanel';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
@@ -16,7 +16,7 @@ interface CodexInputPanelStyledProps {
   session: Session;
   panelId: string;
   panel?: ToolPanel;
-  onSendMessage: (message: string, options?: any) => Promise<void>;
+  onSendMessage: (message: string, options?: CodexInputOptions) => Promise<void>;
   disabled?: boolean;
   initialModel?: string;
   onCancel?: () => void;
@@ -67,7 +67,7 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
       // The hook (useCodexPanel) will handle saving attachments and formatting
       const options = {
         model: selectedModel,
-        modelProvider: 'openai',
+        modelProvider: 'openai' as const,
         sandboxMode,
         webSearch,
         thinkingLevel,
@@ -132,7 +132,14 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
   
   // Update model and thinking level when panel changes (e.g., when switching sessions)
   useEffect(() => {
-    const customState = panel?.state?.customState as any;
+    const customState = panel?.state?.customState as {
+      codexConfig?: {
+        model?: string;
+        thinkingLevel?: 'low' | 'medium' | 'high';
+        sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+        webSearch?: boolean;
+      };
+    } | undefined;
     
     // Update model
     if (customState?.codexConfig?.model) {
@@ -377,7 +384,7 @@ export const CodexInputPanelStyled: React.FC<CodexInputPanelStyledProps> = memo(
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onFocus={handleFocus}
-                onBlur={handleBlur as any}
+                onBlur={() => handleBlur({} as React.FocusEvent)}
                 style={{ 
                   height: `${textareaHeight}px`,
                   minHeight: '52px', 
@@ -650,7 +657,7 @@ const SandboxSelector: React.FC<SandboxSelectorProps> = ({
     id: mode,
     label: config.label,
     description: config.description,
-    onClick: () => setSandboxMode(mode as any),
+    onClick: () => setSandboxMode(mode as 'read-only' | 'workspace-write' | 'danger-full-access'),
   }));
 
   const getTooltipText = () => {

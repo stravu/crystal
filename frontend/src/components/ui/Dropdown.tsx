@@ -329,8 +329,7 @@ export function DropdownMenuItem({
   label: ReactNode;
   onClick?: () => void;
   className?: string;
-  [key: string]: any;
-}) {
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       onClick={onClick}

@@ -62,6 +62,7 @@ interface CodexSpawnOptions {
   webSearch?: boolean;
   isResume?: boolean;
   resumeSessionId?: string;
+  [key: string]: unknown; // Allow CLI-specific options
 }
 
 interface CodexProcess {
@@ -133,9 +134,10 @@ export class CodexManager extends AbstractCliManager {
           version,
           path: command
         };
-      } catch (directError: any) {
+      } catch (directError: unknown) {
         // Check if it's a shebang/node error
-        const errorMsg = directError.message || String(directError);
+        const error = directError as { message?: string };
+        const errorMsg = error.message || String(directError);
         const isShebangError = errorMsg.includes('env: node:') || 
                                errorMsg.includes('No such file or directory') ||
                                errorMsg.includes('is not recognized') ||
@@ -168,8 +170,9 @@ export class CodexManager extends AbstractCliManager {
               version,
               path: command
             };
-          } catch (nodeError: any) {
-            const nodeErrorMsg = nodeError.message || String(nodeError);
+          } catch (nodeError: unknown) {
+            const nodeErr = nodeError as { message?: string };
+            const nodeErrorMsg = nodeErr.message || String(nodeError);
             this.logger?.error(`[codex] Node.js fallback also failed: ${nodeErrorMsg}`);
             throw new Error(`Codex execution failed. Original error: ${errorMsg}. Node.js fallback error: ${nodeErrorMsg}`);
           }
@@ -213,7 +216,7 @@ export class CodexManager extends AbstractCliManager {
     const dbSession = this.sessionManager.getDbSession(options.sessionId);
     
     // Enhance prompt for structured commit mode if needed
-    const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession, this.logger);
+    const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: options.sessionId }, this.logger);
 
     const args: string[] = ['exec', '--json'];
 
@@ -354,14 +357,14 @@ export class CodexManager extends AbstractCliManager {
     panelId: string;
     sessionId: string;
     type: 'json' | 'stdout' | 'stderr';
-    data: any;
+    data: unknown;
     timestamp: Date;
   }> {
     const events: Array<{
       panelId: string;
       sessionId: string;
       type: 'json' | 'stdout' | 'stderr';
-      data: any;
+      data: unknown;
       timestamp: Date;
     }> = [];
 
@@ -392,7 +395,8 @@ export class CodexManager extends AbstractCliManager {
             const db = this.sessionManager.db;
             if (db) {
               const panel = db.getPanel(panelId);
-              existingSessionId = panel?.state?.customState?.agentSessionId || panel?.state?.customState?.codexSessionId;
+              const customState = panel?.state?.customState as Record<string, unknown> | undefined;
+              existingSessionId = (customState?.agentSessionId as string) || (customState?.codexSessionId as string);
             }
           }
           
@@ -438,7 +442,7 @@ export class CodexManager extends AbstractCliManager {
               if (panel) {
                 // Check if we already have a session ID stored
                 const currentState = panel.state || {};
-                const customState = currentState.customState || {};
+                const customState = (currentState.customState as Record<string, unknown>) || {};
                 
                 // Only update if we don't have one - never overwrite existing session IDs
                 if (!customState.agentSessionId && !customState.codexSessionId) {
@@ -804,8 +808,8 @@ export class CodexManager extends AbstractCliManager {
                 const panel = db.getPanel(panelId);
                 if (panel) {
                   const currentState = panel.state || {};
-                  const customState = currentState.customState || {};
-                  const existingSessionId = customState.agentSessionId || customState.codexSessionId;
+                  const customState = (currentState.customState as Record<string, unknown>) || {};
+                  const existingSessionId = (customState.agentSessionId as string) || (customState.codexSessionId as string);
                   
                   if (existingSessionId) {
                     this.logger?.warn(`[session-id-debug] WARNING: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
@@ -882,10 +886,10 @@ export class CodexManager extends AbstractCliManager {
                 const panel = db.getPanel(panelId);
                 if (panel) {
                   const currentState = panel.state || {};
-                  const customState = currentState.customState || {};
+                  const customState = (currentState.customState as Record<string, unknown>) || {};
                   
                   // Check if session ID already exists
-                  const existingSessionId = customState.agentSessionId || customState.codexSessionId;
+                  const existingSessionId = (customState.agentSessionId as string) || (customState.codexSessionId as string);
                   if (existingSessionId) {
                     this.logger?.warn(`[session-id-debug] FALLBACK: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
                     return; // Don't overwrite existing session ID
@@ -962,7 +966,8 @@ export class CodexManager extends AbstractCliManager {
         const panel = db.getPanel(panelId);
         if (panel) {
           panelState = panel.state?.customState as CodexPanelState | undefined;
-          codexSessionId = panelState?.agentSessionId || panelState?.codexSessionId;
+          const customStateGeneric = panel.state?.customState as Record<string, unknown> | undefined;
+          codexSessionId = (customStateGeneric?.agentSessionId as string) || (customStateGeneric?.codexSessionId as string);
           this.logger?.info(`[session-id-debug] Retrieved from panel state: ${codexSessionId || 'null'}`);
           this.logger?.info(`[session-id-debug] Full panel state: ${JSON.stringify(panel.state)}`);
         } else {
@@ -1183,19 +1188,21 @@ export class CodexManager extends AbstractCliManager {
     const panelState = panel?.state?.customState as CodexPanelState;
     
     // Get Codex session ID for resume capability
-    let codexSessionId = null;
+    let codexSessionId: string | undefined = undefined;
     
     // Try to get from panel's custom state first
-    if (panel?.state?.customState?.agentSessionId || panel?.state?.customState?.codexSessionId) {
-      codexSessionId = panel.state.customState.agentSessionId || panel.state.customState.codexSessionId;
+    const panelCustomState = panel?.state?.customState as Record<string, unknown> | undefined;
+    if (panelCustomState?.agentSessionId || panelCustomState?.codexSessionId) {
+      codexSessionId = (panelCustomState.agentSessionId as string) || (panelCustomState.codexSessionId as string);
       this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from panel state: ${codexSessionId}`);
     } else if (this.sessionManager) {
       // Fallback to trying to get from sessionManager/db directly
       const db = (this.sessionManager as { db?: { getPanel: (id: string) => { state?: { customState?: CodexPanelState } } | null } }).db;
       if (db) {
         const dbPanel = db.getPanel(panelId);
-        if (dbPanel?.state?.customState?.agentSessionId || dbPanel?.state?.customState?.codexSessionId) {
-          codexSessionId = dbPanel.state.customState.agentSessionId || dbPanel.state.customState.codexSessionId;
+        const dbPanelCustomState = dbPanel?.state?.customState as Record<string, unknown> | undefined;
+        if (dbPanelCustomState?.agentSessionId || dbPanelCustomState?.codexSessionId) {
+          codexSessionId = (dbPanelCustomState.agentSessionId as string) || (dbPanelCustomState.codexSessionId as string);
           this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from DB: ${codexSessionId}`);
         } else {
           this.logger?.info(`[session-id-debug] Debug state: No session ID found in DB for panel ${panelId}`);

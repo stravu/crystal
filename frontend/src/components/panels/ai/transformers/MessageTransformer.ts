@@ -1,3 +1,27 @@
+// Session information interface
+export interface SessionInfoData {
+  type?: string; // Make type optional for flexibility
+  initialPrompt?: string;
+  codexCommand?: string;
+  claudeCommand?: string;
+  worktreePath?: string;
+  model?: string;
+  modelProvider?: string;
+  approvalPolicy?: string;
+  sandboxMode?: boolean | string;
+  permissionMode?: string;
+  resumeSessionId?: string;
+  isResume?: boolean;
+  timestamp?: string;
+  [key: string]: any; // Allow any additional properties
+}
+
+// Generic system info that can contain various types
+export type SystemInfoData = SessionInfoData | {
+  type?: string;
+  [key: string]: any; // Allow any additional properties
+};
+
 // Unified message structure that all agents transform to
 export interface UnifiedMessage {
   id: string;
@@ -11,8 +35,8 @@ export interface UnifiedMessage {
     tokens?: number;
     cost?: number;
     systemSubtype?: string;
-    sessionInfo?: any;
-    [key: string]: any;
+    sessionInfo?: SessionInfoData;
+    [key: string]: any; // Allow any additional metadata
   };
 }
 
@@ -20,7 +44,7 @@ export type MessageSegment =
   | { type: 'text'; content: string }
   | { type: 'tool_call'; tool: ToolCall }
   | { type: 'tool_result'; result: ToolResult & { toolCallId: string } }
-  | { type: 'system_info'; info: any }
+  | { type: 'system_info'; info: SystemInfoData }
   | { type: 'thinking'; content: string }
   | { type: 'diff'; diff: string }
   | { type: 'error'; error: { message: string; details?: string } };
@@ -28,7 +52,7 @@ export type MessageSegment =
 export interface ToolCall {
   id: string;
   name: string;
-  input?: any;
+  input?: any; // Tool inputs can have various shapes
   result?: ToolResult;
   status: 'pending' | 'success' | 'error';
   isSubAgent?: boolean;
@@ -40,7 +64,11 @@ export interface ToolCall {
 export interface ToolResult {
   content: string;
   isError?: boolean;
-  metadata?: any;
+  metadata?: {
+    exitCode?: number;
+    duration?: number;
+    [key: string]: any; // Tool result metadata can have various shapes
+  };
 }
 
 // Message transformer interface for converting agent-specific formats to unified format

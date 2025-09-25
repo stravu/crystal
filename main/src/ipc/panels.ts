@@ -2,7 +2,7 @@ import { IpcMain } from 'electron';
 import { panelManager } from '../services/panelManager';
 import { terminalPanelManager } from '../services/terminalPanelManager';
 import { databaseService } from '../services/database';
-import { CreatePanelRequest, PanelEventType } from '../../../shared/types/panels';
+import { CreatePanelRequest, PanelEventType, ToolPanel } from '../../../shared/types/panels';
 import type { AppServices } from './types';
 
 export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
@@ -84,7 +84,7 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
     return panelManager.deletePanel(panelId);
   });
   
-  ipcMain.handle('panels:update', async (_, panelId: string, updates: any) => {
+  ipcMain.handle('panels:update', async (_, panelId: string, updates: Partial<ToolPanel>) => {
     console.log('[IPC] Updating panel:', panelId);
     console.log('[IPC] Updates:', JSON.stringify(updates, null, 2));
     
@@ -117,7 +117,7 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   // Panel initialization (lazy loading)
-  ipcMain.handle('panels:initialize', async (_, panelId: string, options?: any) => {
+  ipcMain.handle('panels:initialize', async (_, panelId: string, options?: { cwd?: string; sessionId?: string }) => {
     console.log('[IPC] Initializing panel:', panelId, options);
     
     const panel = panelManager.getPanel(panelId);
@@ -172,7 +172,7 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   });
   
   // Event handlers
-  ipcMain.handle('panels:emitEvent', async (_, panelId: string, eventType: PanelEventType, data: any) => {
+  ipcMain.handle('panels:emitEvent', async (_, panelId: string, eventType: PanelEventType, data: unknown) => {
     console.log('[IPC] Emitting panel event:', panelId, eventType);
     return panelManager.emitPanelEvent(panelId, eventType, data);
   });

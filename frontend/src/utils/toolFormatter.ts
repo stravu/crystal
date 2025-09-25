@@ -1,4 +1,4 @@
-import type { ClaudeJsonMessage } from '../types/session';
+import type { ClaudeJsonMessage, MessageContent, TextContent } from '../types/session';
 
 // Simple fallback formatter for unknown message types
 function formatJsonForOutput(jsonMessage: ClaudeJsonMessage): string {
@@ -25,7 +25,7 @@ interface ToolCall {
   type: 'tool_use';
   id: string;
   name: string;
-  input: any;
+  input: Record<string, unknown>;
 }
 
 interface ToolResult {
@@ -45,7 +45,7 @@ const pendingToolCalls = new Map<string, PendingToolCall>();
 /**
  * Recursively filter out base64 data from any object structure
  */
-function filterBase64Data(obj: any): any {
+function filterBase64Data(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -56,21 +56,27 @@ function filterBase64Data(obj: any): any {
   }
 
   // Handle objects
-  if (typeof obj === 'object') {
-    const filtered: any = {};
+  if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+    const filtered: Record<string, unknown> = {};
+    const objRecord = obj as Record<string, unknown>;
     
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+    for (const key in objRecord) {
+      if (Object.prototype.hasOwnProperty.call(objRecord, key)) {
         // Check if this is a base64 source object
-        if (key === 'source' && obj[key]?.type === 'base64' && obj[key]?.data) {
+        const sourceObj = objRecord[key] as Record<string, unknown>;
+        if (key === 'source' && 
+            sourceObj && 
+            typeof sourceObj === 'object' && 
+            sourceObj.type === 'base64' && 
+            sourceObj.data) {
           // Replace base64 data with placeholder
           filtered[key] = {
-            ...obj[key],
+            ...sourceObj,
             data: '[Base64 data filtered]'
           };
         } else {
           // Recursively filter nested objects
-          filtered[key] = filterBase64Data(obj[key]);
+          filtered[key] = filterBase64Data(objRecord[key]);
         }
       }
     }
@@ -85,20 +91,23 @@ function filterBase64Data(obj: any): any {
 /**
  * Convert absolute file paths to relative paths
  */
-function makePathsRelative(content: any): string {
+function makePathsRelative(content: unknown): string {
   // Handle non-string content
+  let stringContent: string;
   if (typeof content !== 'string') {
     if (content === null || content === undefined) {
       return '';
     }
     // Convert to string if it's an object or array
-    content = typeof content === 'object' ? JSON.stringify(content, null, 2) : String(content);
+    stringContent = typeof content === 'object' ? JSON.stringify(content, null, 2) : String(content);
+  } else {
+    stringContent = content;
   }
   
   // Match common file path patterns
   const pathRegex = /([\\/](?:Users|home|var|tmp|mnt|opt)[\\/][^\\s\\n]+)/g;
   
-  return content.replace(pathRegex, (match: string) => {
+  return stringContent.replace(pathRegex, (match: string) => {
     try {
       // Find the worktree path in the match
       const worktreeMatch = match.match(/worktrees[\\/][^\\/]+/);
@@ -113,6 +122,30 @@ function makePathsRelative(content: any): string {
       return match;
     }
   });
+}
+
+/**
+ * Helper to safely get string property from tool input
+ */
+function getStringProp(input: Record<string, unknown>, key: string): string | undefined {
+  const value = input[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Helper to safely get number property from tool input
+ */
+function getNumberProp(input: Record<string, unknown>, key: string): number | undefined {
+  const value = input[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+/**
+ * Helper to safely get array property from tool input
+ */
+function getArrayProp(input: Record<string, unknown>, key: string): unknown[] | undefined {
+  const value = input[key];
+  return Array.isArray(value) ? value : undefined;
 }
 
 /**
@@ -134,51 +167,93 @@ export function formatToolInteraction(
     output += `\x1b[90m┌─ Parameters:\x1b[0m\r\n`;
     
     // Special formatting for common tools
-    if (toolCall.name === 'Grep' && toolCall.input.pattern) {
-      output += `\x1b[90m│  Pattern: "${toolCall.input.pattern}"\x1b[0m\r\n`;
-      if (toolCall.input.path) {
-        output += `\x1b[90m│  Path: ${makePathsRelative(toolCall.input.path)}\x1b[0m\r\n`;
+    const pattern = getStringProp(toolCall.input, 'pattern');
+    if (toolCall.name === 'Grep' && pattern) {
+      output += `\x1b[90m│  Pattern: "${pattern}"\x1b[0m\r\n`;
+      const path = getStringProp(toolCall.input, 'path');
+      if (path) {
+        output += `\x1b[90m│  Path: ${makePathsRelative(path)}\x1b[0m\r\n`;
       }
-      if (toolCall.input.include) {
-        output += `\x1b[90m│  Include: ${toolCall.input.include}\x1b[0m\r\n`;
+      const include = getStringProp(toolCall.input, 'include');
+      if (include) {
+        output += `\x1b[90m│  Include: ${include}\x1b[0m\r\n`;
       }
-    } else if (toolCall.name === 'Read' && toolCall.input.file_path) {
-      output += `\x1b[90m│  File: ${makePathsRelative(toolCall.input.file_path)}\x1b[0m\r\n`;
-      if (toolCall.input.offset) {
-        output += `\x1b[90m│  Lines: ${toolCall.input.offset}-${toolCall.input.offset + (toolCall.input.limit || 2000)}\x1b[0m\r\n`;
+    } else if (toolCall.name === 'Read') {
+      const filePath = getStringProp(toolCall.input, 'file_path');
+      if (filePath) {
+        output += `\x1b[90m│  File: ${makePathsRelative(filePath)}\x1b[0m\r\n`;
+        const offset = getNumberProp(toolCall.input, 'offset');
+        if (offset) {
+          const limit = getNumberProp(toolCall.input, 'limit') || 2000;
+          output += `\x1b[90m│  Lines: ${offset}-${offset + limit}\x1b[0m\r\n`;
+        }
       }
-    } else if (toolCall.name === 'Edit' && toolCall.input.file_path) {
-      output += `\x1b[90m│  File: ${makePathsRelative(toolCall.input.file_path)}\x1b[0m\r\n`;
-    } else if (toolCall.name === 'Bash' && toolCall.input.command) {
-      output += `\x1b[90m│  $ ${toolCall.input.command}\x1b[0m\r\n`;
-    } else if (toolCall.name === 'TodoWrite' && toolCall.input.todos) {
-      output += `\x1b[90m│  Tasks updated:\x1b[0m\r\n`;
-      toolCall.input.todos.forEach((todo: { status: string; content: string }) => {
-        const status = todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '→' : '○';
-        const statusColor = todo.status === 'completed' ? '\x1b[32m' : todo.status === 'in_progress' ? '\x1b[33m' : '\x1b[90m';
-        output += `\x1b[90m│    ${statusColor}${status}\x1b[0m ${todo.content}\x1b[0m\r\n`;
-      });
-    } else if (toolCall.name === 'Write' && toolCall.input.file_path) {
-      output += `\x1b[90m│  File: ${makePathsRelative(toolCall.input.file_path)}\x1b[0m\r\n`;
-      const lines = toolCall.input.content?.split('\n') || [];
-      output += `\x1b[90m│  Size: ${lines.length} lines\x1b[0m\r\n`;
-    } else if (toolCall.name === 'Glob' && toolCall.input.pattern) {
-      output += `\x1b[90m│  Pattern: ${toolCall.input.pattern}\x1b[0m\r\n`;
-      if (toolCall.input.path) {
-        output += `\x1b[90m│  Path: ${makePathsRelative(toolCall.input.path)}\x1b[0m\r\n`;
+    } else if (toolCall.name === 'Edit') {
+      const filePath = getStringProp(toolCall.input, 'file_path');
+      if (filePath) {
+        output += `\x1b[90m│  File: ${makePathsRelative(filePath)}\x1b[0m\r\n`;
       }
-    } else if (toolCall.name === 'MultiEdit' && toolCall.input.file_path) {
-      output += `\x1b[90m│  File: ${makePathsRelative(toolCall.input.file_path)}\x1b[0m\r\n`;
-      output += `\x1b[90m│  Edits: ${toolCall.input.edits?.length || 0} changes\x1b[0m\r\n`;
-    } else if (toolCall.name === 'Task' && toolCall.input.prompt) {
-      const prompt = toolCall.input.prompt;
-      const truncated = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
-      output += `\x1b[90m│  Description: ${toolCall.input.description || 'Task'}\x1b[0m\r\n`;
-      output += `\x1b[90m│  Prompt: ${truncated}\x1b[0m\r\n`;
-    } else if (toolCall.name === 'LS' && toolCall.input.path) {
-      output += `\x1b[90m│  Path: ${makePathsRelative(toolCall.input.path)}\x1b[0m\r\n`;
-      if (toolCall.input.ignore?.length) {
-        output += `\x1b[90m│  Ignoring: ${toolCall.input.ignore.join(', ')}\x1b[0m\r\n`;
+    } else if (toolCall.name === 'Bash') {
+      const command = getStringProp(toolCall.input, 'command');
+      if (command) {
+        output += `\x1b[90m│  $ ${command}\x1b[0m\r\n`;
+      }
+    } else if (toolCall.name === 'TodoWrite') {
+      const todos = getArrayProp(toolCall.input, 'todos');
+      if (todos) {
+        output += `\x1b[90m│  Tasks updated:\x1b[0m\r\n`;
+        todos.forEach((todo) => {
+          if (todo && typeof todo === 'object') {
+            const todoObj = todo as { status?: string; content?: string };
+            const status = todoObj.status === 'completed' ? '✓' : todoObj.status === 'in_progress' ? '→' : '○';
+            const statusColor = todoObj.status === 'completed' ? '\x1b[32m' : todoObj.status === 'in_progress' ? '\x1b[33m' : '\x1b[90m';
+            output += `\x1b[90m│    ${statusColor}${status}\x1b[0m ${todoObj.content || ''}\x1b[0m\r\n`;
+          }
+        });
+      }
+    } else if (toolCall.name === 'Write') {
+      const filePath = getStringProp(toolCall.input, 'file_path');
+      if (filePath) {
+        output += `\x1b[90m│  File: ${makePathsRelative(filePath)}\x1b[0m\r\n`;
+        const content = getStringProp(toolCall.input, 'content');
+        const lines = content ? content.split('\n') : [];
+        output += `\x1b[90m│  Size: ${lines.length} lines\x1b[0m\r\n`;
+      }
+    } else if (toolCall.name === 'Glob') {
+      const pattern = getStringProp(toolCall.input, 'pattern');
+      if (pattern) {
+        output += `\x1b[90m│  Pattern: ${pattern}\x1b[0m\r\n`;
+        const path = getStringProp(toolCall.input, 'path');
+        if (path) {
+          output += `\x1b[90m│  Path: ${makePathsRelative(path)}\x1b[0m\r\n`;
+        }
+      }
+    } else if (toolCall.name === 'MultiEdit') {
+      const filePath = getStringProp(toolCall.input, 'file_path');
+      if (filePath) {
+        output += `\x1b[90m│  File: ${makePathsRelative(filePath)}\x1b[0m\r\n`;
+        const edits = getArrayProp(toolCall.input, 'edits');
+        output += `\x1b[90m│  Edits: ${edits?.length || 0} changes\x1b[0m\r\n`;
+      }
+    } else if (toolCall.name === 'Task') {
+      const prompt = getStringProp(toolCall.input, 'prompt');
+      if (prompt) {
+        const truncated = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+        const description = getStringProp(toolCall.input, 'description') || 'Task';
+        output += `\x1b[90m│  Description: ${description}\x1b[0m\r\n`;
+        output += `\x1b[90m│  Prompt: ${truncated}\x1b[0m\r\n`;
+      }
+    } else if (toolCall.name === 'LS') {
+      const path = getStringProp(toolCall.input, 'path');
+      if (path) {
+        output += `\x1b[90m│  Path: ${makePathsRelative(path)}\x1b[0m\r\n`;
+        const ignore = getArrayProp(toolCall.input, 'ignore');
+        if (ignore && ignore.length > 0) {
+          const ignoreStrings = ignore.filter(item => typeof item === 'string') as string[];
+          if (ignoreStrings.length > 0) {
+            output += `\x1b[90m│  Ignoring: ${ignoreStrings.join(', ')}\x1b[0m\r\n`;
+          }
+        }
       }
     } else if (toolCall.name === 'TodoRead') {
       output += `\x1b[90m│  Reading current task list...\x1b[0m\r\n`;
@@ -369,7 +444,7 @@ export function formatJsonForOutputEnhanced(jsonMessage: ClaudeJsonMessage): str
     const content = jsonMessage.message.content;
     
     if (Array.isArray(content)) {
-      const toolUses = content.filter((item: any) => item.type === 'tool_use') as ToolCall[];
+      const toolUses = content.filter((item: MessageContent) => item.type === 'tool_use') as ToolCall[];
       
       if (toolUses.length > 0) {
         // Store tool calls for later matching
@@ -390,8 +465,8 @@ export function formatJsonForOutputEnhanced(jsonMessage: ClaudeJsonMessage): str
       
       // Handle regular text content
       const textContent = content
-        .filter((item: any) => item.type === 'text')
-        .map((item: any) => item.text)
+        .filter((item: MessageContent) => item.type === 'text')
+        .map((item: TextContent) => item.text)
         .join('\n\n');
       
       if (textContent) {
@@ -407,7 +482,7 @@ export function formatJsonForOutputEnhanced(jsonMessage: ClaudeJsonMessage): str
     const content = jsonMessage.message.content;
     
     if (Array.isArray(content)) {
-      const toolResults = content.filter((item: any) => item.type === 'tool_result') as ToolResult[];
+      const toolResults = content.filter((item: MessageContent) => item.type === 'tool_result') as ToolResult[];
       
       if (toolResults.length > 0) {
         // Match results with pending calls and format them
@@ -451,8 +526,8 @@ export function formatJsonForOutputEnhanced(jsonMessage: ClaudeJsonMessage): str
       
       // Handle regular text content from user
       const textContent = content
-        .filter((item: any) => item.type === 'text')
-        .map((item: any) => item.text)
+        .filter((item: MessageContent) => item.type === 'text')
+        .map((item: TextContent) => item.text)
         .join(' ');
       
       if (textContent) {

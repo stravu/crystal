@@ -4,8 +4,20 @@ import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
 import type { Session, SessionOutput, GitStatus } from '../types/session';
 
+interface SessionEventData {
+  sessionId: string;
+  [key: string]: unknown;
+}
+
+type ValidatedEventData = SessionEventData | SessionOutput;
+
+interface SessionDeletedEventData {
+  id?: string;
+  sessionId?: string;
+}
+
 // Frontend validation helpers
-function validateEventSession(eventData: any, activeSessionId?: string): boolean {
+function validateEventSession(eventData: ValidatedEventData, activeSessionId?: string): boolean {
   if (!eventData || !eventData.sessionId) {
     console.warn('[useIPCEvents] Event missing sessionId:', eventData);
     return false;
@@ -21,8 +33,8 @@ function validateEventSession(eventData: any, activeSessionId?: string): boolean
 }
 
 
-// Throttle utility function
-function throttle<T extends (...args: any[]) => any>(
+// Throttle utility function  
+function throttle<T extends (...args: any[]) => void>(
   func: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -35,7 +47,9 @@ function throttle<T extends (...args: any[]) => any>(
     const timeSinceLastCall = now - lastCall;
     
     // Store the latest args for this session
-    const key = args[0]?.sessionId || args[0]?.id || 'default';
+    const firstArg = args[0] as Record<string, unknown> | undefined;
+    const rawKey = firstArg?.sessionId || firstArg?.id || 'default';
+    const key = String(rawKey);
     pendingCalls.set(key, args);
 
     if (timeSinceLastCall >= delay) {
@@ -147,10 +161,10 @@ export function useIPCEvents() {
     });
     unsubscribeFunctions.push(unsubscribeSessionUpdated);
 
-    const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((sessionData: any) => {
+    const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((sessionData: SessionDeletedEventData | string) => {
       console.log('[useIPCEvents] Session deleted:', sessionData);
       // The backend sends just { id } for deleted sessions
-      const sessionId = sessionData.id || sessionData;
+      const sessionId = typeof sessionData === 'string' ? sessionData : sessionData.id || sessionData.sessionId;
       
       // Dispatch a custom event for other components to listen to
       window.dispatchEvent(new CustomEvent('session-deleted', {

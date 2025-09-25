@@ -9,7 +9,7 @@ import { CodexStatsView } from './CodexStatsView';
 import { CodexDebugStateView } from './CodexDebugStateView';
 import { CodexInputPanelStyled } from './CodexInputPanelStyled';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
-import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
+import { DEFAULT_CODEX_MODEL, type CodexInputOptions } from '../../../../../shared/types/models';
 import { useConfigStore } from '../../../stores/configStore';
 
 interface CodexPanelProps {
@@ -35,7 +35,12 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
   });
   
   // Get the model from panel state
-  const codexState = panel.state?.customState as any;
+  const codexState = panel.state?.customState as {
+    model?: string;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
+  } | undefined;
   const model = codexState?.model || DEFAULT_CODEX_MODEL;
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
@@ -215,7 +220,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
           session={activeSession}
           panelId={panel.id}
           panel={panel}
-          onSendMessage={hook.handleSendMessage}
+          onSendMessage={hook.handleSendMessage as (message: string, options?: CodexInputOptions) => Promise<void>}
           disabled={hook.isProcessing}
           initialModel={model}
           onCancel={hook.handleInterrupt}

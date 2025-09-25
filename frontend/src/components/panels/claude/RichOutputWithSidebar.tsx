@@ -52,7 +52,7 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
   }, [isCollapsed, sidebarCollapsedKey]);
   
   // Override the navigation handler to scroll within rich output
-  const handleNavigateToPrompt = useCallback((marker: any) => {
+  const handleNavigateToPrompt = useCallback((marker: { id: number }) => {
     // Use the prompt index to scroll to the right message
     if (richOutputRef.current && marker) {
       const promptIndex = marker.id - 1; // Prompt IDs start at 1

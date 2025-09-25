@@ -115,12 +115,14 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
       } else {
         fetchProjects();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create project:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while creating the project.';
+      const errorDetails = error instanceof Error ? error.stack : String(error);
       showError({
         title: 'Failed to Create Project',
-        error: error.message || 'An error occurred while creating the project.',
-        details: error.stack || error.toString()
+        error: errorMessage,
+        details: errorDetails || ''
       });
     }
   };

@@ -375,7 +375,8 @@ export class CliToolRegistry extends EventEmitter {
     try {
       // Create a temporary manager instance to test availability
       const tempManager = tool.managerFactory(null, this.logger, this.configManager);
-      const result = await (tempManager as any).testCliAvailability();
+      // Access the protected method via type assertion as a temporary workaround
+      const result = await (tempManager as AbstractCliManager & { getCachedAvailability(): Promise<ToolAvailabilityResult> }).getCachedAvailability();
 
       // Cache the result
       this.availabilityCache.set(toolId, {

@@ -2,7 +2,7 @@ import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
 import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical, BarChart3, Code2, Edit2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
-import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES } from '../../../../shared/types/panels';
+import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES, LogsPanelState } from '../../../../shared/types/panels';
 import { Button } from '../ui/Button';
 import { Dropdown } from '../ui/Dropdown';
 import { useSession } from '../../contexts/SessionContext';
@@ -33,7 +33,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     
     // Prevent closing logs panel while it's running
     if (panel.type === 'logs') {
-      const logsState = panel.state?.customState as any;
+      const logsState = panel.state?.customState as LogsPanelState;
       if (logsState?.isRunning) {
         alert('Cannot close logs panel while process is running. Please stop the process first.');
         return;

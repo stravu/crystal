@@ -2,7 +2,7 @@ import { IpcMain } from 'electron';
 import { AbstractAIPanelManager } from '../services/panels/ai/AbstractAIPanelManager';
 import { panelManager } from '../services/panelManager';
 import type { AppServices } from './types';
-import type { ToolPanelType } from '../../../shared/types/panels';
+import type { ToolPanelType, ToolPanel, BaseAIPanelState } from '../../../shared/types/panels';
 
 export interface AIPanelHandlerConfig {
   panelType: ToolPanelType;
@@ -43,14 +43,15 @@ export abstract class BaseAIPanelHandler {
   /**
    * Get initial state for a new panel
    */
-  protected abstract getInitialPanelState(): any;
+  protected abstract getInitialPanelState(): BaseAIPanelState;
 
   /**
    * Transform panel state if needed (for tool-specific fields)
    */
-  protected transformPanelState(panel: any): any {
+  protected transformPanelState(panel: ToolPanel): BaseAIPanelState {
     // Default implementation - can be overridden
-    return panel.state.customState || {};
+    // Cast to BaseAIPanelState since this is for AI panels
+    return (panel.state.customState as BaseAIPanelState) || {};
   }
 
   /**

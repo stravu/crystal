@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { API } from '../utils/api';
 import type { CreateSessionRequest } from '../types/session';
+import type { Project } from '../types/project';
 import { useErrorStore } from '../stores/errorStore';
 import { Sparkles, GitBranch, ChevronRight, ChevronDown, Brain, X, FileText, Paperclip, Code2, Settings2 } from 'lucide-react';
 import FilePathAutocomplete from './FilePathAutocomplete';
@@ -14,6 +15,13 @@ import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/Claud
 import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
 import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
 import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
+
+// Interface for branch information
+interface BranchInfo {
+  name: string;
+  isCurrent: boolean;
+  hasWorktree: boolean;
+}
 
 const LARGE_TEXT_THRESHOLD = 5000;
 const TEXT_FILE_EXTENSIONS = /\.(?:txt|md|markdown|log|json|js|jsx|ts|tsx|py|rb|go|java|cs|c|cpp|h|hpp|rs|yml|yaml|sh|bash|zsh|html|css|scss|less|xml|csv)$/i;
@@ -261,7 +269,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           // Check if API key exists
           setHasApiKey(!!response.data?.anthropicApiKey);
         }
-      }).catch((err: any) => {
+      }).catch((err: Error) => {
         console.error('Failed to fetch config:', err);
       });
       
@@ -273,7 +281,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           if (!projectsResponse.success || !projectsResponse.data) {
             throw new Error('Failed to fetch projects');
           }
-          const project = projectsResponse.data.find((p: any) => p.id === projectId);
+          const project = projectsResponse.data.find((p: Project) => p.id === projectId);
           if (!project) {
             throw new Error('Project not found');
           }
@@ -287,7 +295,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           if (branchesResponse.success && branchesResponse.data) {
             setBranches(branchesResponse.data);
             // Set the current branch as default if available
-            const currentBranch = branchesResponse.data.find((b: any) => b.isCurrent);
+            const currentBranch = branchesResponse.data.find((b: BranchInfo) => b.isCurrent);
             if (currentBranch && !formData.baseBranch) {
               setFormData(prev => ({ ...prev, baseBranch: currentBranch.name }));
             }
@@ -296,7 +304,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           if (mainBranchResponse.success && mainBranchResponse.data) {
             // Main branch detected but not currently used in UI
           }
-        }).catch((err: any) => {
+        }).catch((err: Error) => {
           console.error('Failed to fetch branches:', err);
         }).finally(() => {
           setIsLoadingBranches(false);
@@ -680,12 +688,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       onClose();
       // Reset form - name and prompt are cleared, but other settings are preserved from preferences
       // This will be handled by the useEffect when the dialog opens again
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating session:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while creating the session.';
+      const errorDetails = error instanceof Error ? (error.stack || error.toString()) : String(error);
       showError({
         title: 'Failed to Create Session',
-        error: error.message || 'An error occurred while creating the session.',
-        details: error.stack || error.toString()
+        error: errorMessage,
+        details: errorDetails
       });
     } finally {
       setIsSubmitting(false);

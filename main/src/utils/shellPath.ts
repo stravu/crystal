@@ -5,11 +5,12 @@ import * as fs from 'fs';
 import { ShellDetector } from './shellDetector';
 
 // Try to import app from electron (might not be available in all contexts)
-let app: any;
+let app: typeof import('electron').app | undefined;
 try {
   app = require('electron').app;
 } catch {
   // Electron not available (e.g., in worker threads)
+  app = undefined;
 }
 
 // Try to get config manager for additional paths

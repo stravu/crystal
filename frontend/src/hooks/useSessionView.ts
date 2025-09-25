@@ -9,6 +9,17 @@ import { Session, GitCommands, GitErrorDetails, AttachedImage, AttachedText } fr
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
 
+interface PromptMarker {
+  id: number;
+  session_id?: string;
+  panel_id?: string;
+  prompt_text: string;
+  output_index: number;
+  output_line?: number;
+  timestamp: string;
+  completion_timestamp?: string;
+}
+
 
 export const useSessionView = (
   activeSession: Session | undefined,
@@ -214,8 +225,8 @@ export const useSessionView = (
       }
       
       setLoadError(null);
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log(`[loadOutputContent] Request aborted for session ${sessionId}`);
         // CRITICAL: Reset loading state before returning
         loadingRef.current = false;
@@ -248,7 +259,7 @@ export const useSessionView = (
       } else {
         setLoadError(error instanceof Error ? error.message : 'Failed to load output content');
         if (terminalInstance.current && lastProcessedOutputLength.current === 0) {
-          terminalInstance.current.writeln(`\r\n❌ Error loading output: ${error.message || 'Unknown error'}\r\n`);
+          terminalInstance.current.writeln(`\r\n❌ Error loading output: ${error instanceof Error ? error.message : 'Unknown error'}\r\n`);
         }
       }
     } finally {
@@ -1025,13 +1036,13 @@ export const useSessionView = (
     previousStatusRef.current = status;
   }, [activeSession?.status, activeSessionId]);
   
-  const handleNavigateToPrompt = useCallback((marker: any) => {
+  const handleNavigateToPrompt = useCallback((marker: PromptMarker) => {
     if (!terminalInstance.current) return;
     // Output view removed - always navigate directly
     navigateToPromptInTerminal(marker);
   }, []);
 
-  const navigateToPromptInTerminal = (marker: any) => {
+  const navigateToPromptInTerminal = (marker: PromptMarker) => {
     if (!terminalInstance.current || !activeSession) return;
     const { prompt_text, output_line } = marker;
     if (!prompt_text) return;
@@ -1393,7 +1404,7 @@ export const useSessionView = (
     try {
       const promptsResponse = await API.sessions.getPrompts(activeSession.id);
       if (promptsResponse.success && promptsResponse.data?.length > 0) {
-        return promptsResponse.data.map((p: any) => p.prompt_text || p.content).filter(Boolean).join('\n\n');
+        return promptsResponse.data.map((p: PromptMarker) => p.prompt_text).filter(Boolean).join('\n\n');
       }
     } catch (error) {
       console.error('Error generating default commit message:', error);
@@ -1479,8 +1490,8 @@ export const useSessionView = (
     }
   };
   
-  const handleStravuFileSelect = (file: any, content: string) => {
-    const formattedContent = `\n\n## File: ${file.name}\n\`\`\`${file.type}\n${content}\n\`\`\`\n\n`;
+  const handleStravuFileSelect = (notebook: { id: string; title: string; excerpt?: string }, content: string) => {
+    const formattedContent = `\n\n## Notebook: ${notebook.title}\n\`\`\`\n${content}\n\`\`\`\n\n`;
     setInput(prev => prev + formattedContent);
   };
 

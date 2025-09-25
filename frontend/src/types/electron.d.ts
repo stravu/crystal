@@ -164,7 +164,7 @@ interface ElectronAPI {
   // Configuration
   config: {
     get: () => Promise<IPCResponse>;
-    update: (updates: Record<string, any>) => Promise<IPCResponse>;
+    update: (updates: Record<string, unknown>) => Promise<IPCResponse>;
     getSessionPreferences: () => Promise<IPCResponse>;
     updateSessionPreferences: (preferences: SessionCreationPreferences) => Promise<IPCResponse>;
   };
@@ -208,7 +208,7 @@ interface ElectronAPI {
   dashboard: {
     getProjectStatus: (projectId: number) => Promise<IPCResponse>;
     getProjectStatusProgressive: (projectId: number) => Promise<IPCResponse>;
-    onUpdate: (callback: (data: Record<string, any>) => void) => () => void;
+    onUpdate: (callback: (data: Record<string, unknown>) => void) => () => void;
     onSessionUpdate: (callback: (data: { type: string; projectId?: number; sessionId?: string; data: unknown }) => void) => () => void;
   };
 

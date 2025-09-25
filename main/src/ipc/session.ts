@@ -15,6 +15,7 @@ import {
   logValidationFailure,
   createValidationError
 } from '../utils/sessionValidation';
+import type { SerializedArchiveTask } from '../services/archiveProgressManager';
 
 export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices): void {
   const {
@@ -1715,7 +1716,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       }
       
       const tasks = archiveProgressManager.getActiveTasks();
-      const activeCount = tasks.filter((t: any) => 
+      const activeCount = tasks.filter((t: SerializedArchiveTask) => 
         t.status !== 'completed' && t.status !== 'failed'
       ).length;
       

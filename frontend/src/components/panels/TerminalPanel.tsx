@@ -92,13 +92,14 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
           console.log('[TerminalPanel] Terminal initialization complete, isInitialized set to true');
 
           // Set up IPC communication for terminal I/O
-          const outputHandler = (data: any) => {
+          const outputHandler = (data: { panelId?: string; sessionId?: string; output?: string } | unknown) => {
             // Check if this is panel terminal output (has panelId) vs session terminal output (has sessionId)
-            if ('panelId' in data && data.panelId && 'output' in data) {
-              console.log('[TerminalPanel] Received panel output for:', data.panelId, 'Current panel:', panel.id);
-              if (data.panelId === panel.id && terminal && !disposed) {
-                console.log('[TerminalPanel] Writing to terminal:', data.output.substring(0, 50) + '...');
-                terminal.write(data.output);
+            if (data && typeof data === 'object' && 'panelId' in data && data.panelId && 'output' in data) {
+              const typedData = data as { panelId: string; output: string };
+              console.log('[TerminalPanel] Received panel output for:', typedData.panelId, 'Current panel:', panel.id);
+              if (typedData.panelId === panel.id && terminal && !disposed) {
+                console.log('[TerminalPanel] Writing to terminal:', typedData.output.substring(0, 50) + '...');
+                terminal.write(typedData.output);
               }
             }
             // Ignore session terminal output (has sessionId instead of panelId)

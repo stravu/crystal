@@ -154,7 +154,8 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = React.memo(({ p
     // Handle individual session updates with debouncing
     const unsubscribeSession = API.dashboard.onSessionUpdate((event) => {
       if (event.projectId === projectId && event.data && event.sessionId) {
-        const sessionData = event.data as any; // We don't have strong typing for session update data
+        // Cast to SessionBranchInfo since we know this is the expected shape from dashboard updates
+        const sessionData = event.data as SessionBranchInfo;
         // Add to pending updates
         pendingSessionUpdatesRef.current.set(event.sessionId, sessionData);
         // Trigger debounced update

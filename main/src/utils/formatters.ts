@@ -1,6 +1,7 @@
 import { formatForDisplay, isValidTimestamp } from './timestampUtils';
+import type { ClaudeJsonMessage, MessageContent } from '../types/session';
 
-export function formatJsonForOutput(jsonMessage: any): string {
+export function formatJsonForOutput(jsonMessage: ClaudeJsonMessage): string {
   // Safely parse timestamp
   let timestamp: string;
   try {
@@ -37,7 +38,8 @@ export function formatJsonForOutput(jsonMessage: any): string {
     if (jsonMessage.message?.content) {
       if (Array.isArray(jsonMessage.message.content)) {
         content = jsonMessage.message.content
-          .map((item: any) => {
+          .map((item: MessageContent | string) => {
+            if (typeof item === 'string') return item;
             if (item.type === 'text') return item.text;
             if (item.type === 'tool_result') {
               // Limit tool results to 10 lines
@@ -70,7 +72,8 @@ export function formatJsonForOutput(jsonMessage: any): string {
     if (jsonMessage.message?.content) {
       if (Array.isArray(jsonMessage.message.content)) {
         content = jsonMessage.message.content
-          .map((item: any) => {
+          .map((item: MessageContent | string) => {
+            if (typeof item === 'string') return item;
             if (item.type === 'text') {
               // Don't truncate text content
               return item.text;

@@ -251,11 +251,11 @@ export function ProjectTreeView() {
           error: response.error || 'Unknown error occurred'
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error handling project click:', error);
       showError({
         title: 'Failed to open main repository session',
-        error: error.message || 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     }
   };
@@ -301,12 +301,12 @@ export function ProjectTreeView() {
       
       // Just reload the projects list
       loadProjectsWithSessions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create project:', error);
       showError({
         title: 'Failed to Create Project',
-        error: error.message || 'An error occurred while creating the project.',
-        details: error.stack || error.toString()
+        error: error instanceof Error ? error.message : 'An error occurred while creating the project.',
+        details: error instanceof Error && error.stack ? error.stack : String(error)
       });
     }
   };

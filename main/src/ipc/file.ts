@@ -256,9 +256,9 @@ EOF
         }
 
         return { success: true };
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Check if it's a pre-commit hook failure
-        if (error.message?.includes('pre-commit hook')) {
+        if (error instanceof Error && error.message.includes('pre-commit hook')) {
           // Try to commit again in case the pre-commit hook made changes
           try {
             await execAsync('git add -A', { cwd: session.worktreePath });
@@ -281,11 +281,11 @@ EOF
             }
             
             return { success: true };
-          } catch (retryError: any) {
-            throw new Error(`Git commit failed: ${retryError.message || retryError}`);
+          } catch (retryError: unknown) {
+            throw new Error(`Git commit failed: ${retryError instanceof Error ? retryError.message : retryError}`);
           }
         }
-        throw new Error(`Git commit failed: ${error.message || error}`);
+        throw new Error(`Git commit failed: ${error instanceof Error ? error.message : error}`);
       }
     } catch (error) {
       console.error('Error committing changes:', error);
@@ -318,8 +318,8 @@ EOF
         await execAsync(command, { cwd: session.worktreePath });
 
         return { success: true };
-      } catch (error: any) {
-        throw new Error(`Git revert failed: ${error.message || error}`);
+      } catch (error: unknown) {
+        throw new Error(`Git revert failed: ${error instanceof Error ? error.message : error}`);
       }
     } catch (error) {
       console.error('Error reverting commit:', error);
@@ -350,8 +350,8 @@ EOF
         await execAsync('git clean -fd', { cwd: session.worktreePath });
 
         return { success: true };
-      } catch (error: any) {
-        throw new Error(`Git restore failed: ${error.message || error}`);
+      } catch (error: unknown) {
+        throw new Error(`Git restore failed: ${error instanceof Error ? error.message : error}`);
       }
     } catch (error) {
       console.error('Error restoring changes:', error);
@@ -395,12 +395,12 @@ EOF
         );
 
         return { success: true, content: stdout };
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If file doesn't exist at that revision, return empty content
-        if (error.message?.includes('does not exist') || error.message?.includes('bad file')) {
+        if (error instanceof Error && (error.message.includes('does not exist') || error.message.includes('bad file'))) {
           return { success: true, content: '' };
         }
-        throw new Error(`Failed to read file at revision: ${error.message || error}`);
+        throw new Error(`Failed to read file at revision: ${error instanceof Error ? error.message : error}`);
       }
     } catch (error) {
       console.error('Error reading file at revision:', error);

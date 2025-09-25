@@ -24,8 +24,8 @@ export interface GitErrorResponse extends IPCResponse {
     hasConflicts?: boolean;
     conflictingFiles?: string[];
     conflictingCommits?: {
-      ours: any[];
-      theirs: any[];
+      ours: string[];
+      theirs: string[];
     };
   };
 }

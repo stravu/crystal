@@ -76,7 +76,16 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
         console.log('[Version Debug] Worktree name:', worktreeName);
       }
 
-      const responseData: any = {
+      const responseData: {
+        current: string;
+        name: string;
+        workingDirectory: string;
+        crystalDirectory: string;
+        buildDate?: string;
+        gitCommit?: string;
+        buildTimestamp?: number;
+        worktreeName?: string;
+      } = {
         current: app.getVersion(),
         name: app.getName(),
         workingDirectory: process.cwd(),
