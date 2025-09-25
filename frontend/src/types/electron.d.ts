@@ -29,7 +29,8 @@ interface IPCResponse<T = any> {
 
 interface ElectronAPI {
   // Generic invoke method for direct IPC calls
-  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC bridge that returns different types based on channel
+  invoke: (channel: string, ...args: unknown[]) => Promise<any>;
   
   // Basic app info
   getAppVersion: () => Promise<string>;
@@ -338,9 +339,12 @@ interface ElectronAPI {
 // Additional electron interface for IPC event listeners
 interface ElectronInterface {
   openExternal: (url: string) => Promise<void>;
-  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
-  on: (channel: string, callback: (...args: unknown[]) => void) => void;
-  off: (channel: string, callback: (...args: unknown[]) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC bridge that returns different types based on channel
+  invoke: (channel: string, ...args: unknown[]) => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC event callback that receives different argument types
+  on: (channel: string, callback: (...args: any[]) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC event callback that receives different argument types
+  off: (channel: string, callback: (...args: any[]) => void) => void;
 }
 
 declare global {

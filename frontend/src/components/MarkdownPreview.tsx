@@ -3,11 +3,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MermaidRenderer } from './MermaidRenderer';
 
-interface CodeComponentProps {
+interface CodeComponentProps extends React.HTMLAttributes<HTMLElement> {
   node?: unknown;
   className?: string;
   children?: React.ReactNode;
-  [key: string]: unknown;
 }
 
 interface MarkdownPreviewProps {
