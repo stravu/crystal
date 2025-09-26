@@ -18,31 +18,6 @@ interface GitStatusCache {
   };
 }
 
-/**
- * Result of a git command execution
- */
-interface GitCommandResult<T = string> {
-  success: boolean;
-  output?: T;
-  error?: Error;
-}
-
-/**
- * Git diff statistics
- */
-interface GitDiffStats {
-  filesChanged: number;
-  additions: number;
-  deletions: number;
-}
-
-/**
- * Git rev-list count result
- */
-interface RevListCount {
-  ahead: number;
-  behind: number;
-}
 
 export class GitStatusManager extends EventEmitter {
   private cache: GitStatusCache = {};
@@ -71,12 +46,9 @@ export class GitStatusManager extends EventEmitter {
   private initialLoadQueue: string[] = [];
   private readonly INITIAL_LOAD_DELAY_MS = 200; // Increased to 200ms for better staggering
   
-  // Smart polling for active/visible sessions only
+  // Track active session and window visibility for optimized refreshes
   private activeSessionId: string | null = null;
-  private visibilityAwareInterval: (() => void) | null = null;
   private isWindowVisible = true;
-  private readonly ACTIVE_SESSION_POLL_MS = 10000; // 10 seconds for active session
-  private readonly BACKGROUND_SESSION_POLL_MS = 60000; // 60 seconds for background sessions
 
   constructor(
     private sessionManager: SessionManager,
@@ -101,129 +73,6 @@ export class GitStatusManager extends EventEmitter {
     });
   }
 
-  /**
-   * Execute a git command with proper error handling
-   * @param command The git command to execute
-   * @param cwd The working directory
-   * @returns GitCommandResult with success status and output
-   */
-  private executeGitCommand(command: string, cwd: string): GitCommandResult<string> {
-    try {
-      const output = execSync(command, { cwd });
-      return {
-        success: true,
-        output: output.toString().trim()
-      };
-    } catch (error) {
-      // Log unexpected errors (non-git command failures)
-      if (error instanceof Error && !error.message.includes('Command failed')) {
-        this.logger?.error(`[GitStatus] Unexpected error executing git command: ${command}`, error);
-      }
-      return {
-        success: false,
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Get untracked files in the repository
-   */
-  private getUntrackedFiles(cwd: string): GitCommandResult<boolean> {
-    const result = this.executeGitCommand('git ls-files --others --exclude-standard', cwd);
-    return {
-      success: result.success,
-      output: result.success && result.output ? result.output.length > 0 : false,
-      error: result.error
-    };
-  }
-
-  /**
-   * Get ahead/behind count compared to a branch
-   */
-  private getRevListCount(cwd: string, baseBranch: string): GitCommandResult<RevListCount> {
-    const result = this.executeGitCommand(`git rev-list --left-right --count ${baseBranch}...HEAD`, cwd);
-    if (result.success && result.output) {
-      const [behind, ahead] = result.output.split('\t').map(n => parseInt(n, 10));
-      return {
-        success: true,
-        output: {
-          ahead: ahead || 0,
-          behind: behind || 0
-        }
-      };
-    }
-    return {
-      success: false,
-      error: result.error
-    };
-  }
-
-  /**
-   * Get diff statistics between branches
-   */
-  private getDiffStats(cwd: string, baseBranch: string): GitCommandResult<GitDiffStats> {
-    const result = this.executeGitCommand(`git diff --shortstat ${baseBranch}...HEAD`, cwd);
-    if (result.success && result.output) {
-      const statLine = result.output;
-      
-      // Parse the stat line: "X files changed, Y insertions(+), Z deletions(-)"
-      const filesMatch = statLine.match(/(\d+) files? changed/);
-      const additionsMatch = statLine.match(/(\d+) insertions?\(\+\)/);
-      const deletionsMatch = statLine.match(/(\d+) deletions?\(-\)/);
-      
-      return {
-        success: true,
-        output: {
-          filesChanged: filesMatch ? parseInt(filesMatch[1], 10) : 0,
-          additions: additionsMatch ? parseInt(additionsMatch[1], 10) : 0,
-          deletions: deletionsMatch ? parseInt(deletionsMatch[1], 10) : 0
-        }
-      };
-    }
-    return {
-      success: false,
-      error: result.error
-    };
-  }
-
-  /**
-   * Check for merge conflicts in the repository
-   */
-  private checkMergeConflicts(cwd: string): GitCommandResult<boolean> {
-    const result = this.executeGitCommand('git status --porcelain=v1', cwd);
-    if (result.success && result.output) {
-      const hasConflicts = result.output.includes('UU ') || result.output.includes('AA ') || 
-                          result.output.includes('DD ') || result.output.includes('AU ') || 
-                          result.output.includes('UA ') || result.output.includes('UD ') || 
-                          result.output.includes('DU ');
-      return {
-        success: true,
-        output: hasConflicts
-      };
-    }
-    return {
-      success: false,
-      error: result.error
-    };
-  }
-
-  /**
-   * Get total commit count ahead of a branch
-   */
-  private getTotalCommitCount(cwd: string, baseBranch: string): GitCommandResult<number> {
-    const result = this.executeGitCommand(`git rev-list --count ${baseBranch}..HEAD`, cwd);
-    if (result.success && result.output) {
-      return {
-        success: true,
-        output: parseInt(result.output, 10)
-      };
-    }
-    return {
-      success: false,
-      error: result.error
-    };
-  }
 
   /**
    * Set the currently active session for smart polling
@@ -278,33 +127,18 @@ export class GitStatusManager extends EventEmitter {
   }
   
   /**
-   * Start smart git status polling (only for active session when visible)
+   * Start git status manager (initializes file watching)
    */
   startPolling(): void {
-    // Start visibility-aware polling for active session only
-    if (this.visibilityAwareInterval) {
-      this.visibilityAwareInterval(); // Clean up existing interval
-    }
-    
-    this.visibilityAwareInterval = this.createVisibilityAwareInterval(
-      () => this.pollActiveSession(),
-      this.ACTIVE_SESSION_POLL_MS,
-      this.BACKGROUND_SESSION_POLL_MS
-    );
-    
-    this.gitLogger.logPollStart(1); // Log that we're polling 1 session (active)
+    // File watching is started per-session in setActiveSession
+    // This method is kept for backward compatibility
+    this.gitLogger.logPollStart(1);
   }
 
   /**
    * Stop git status manager
    */
   stopPolling(): void {
-    // Stop visibility-aware polling
-    if (this.visibilityAwareInterval) {
-      this.visibilityAwareInterval();
-      this.visibilityAwareInterval = null;
-    }
-    
     // Stop all file watchers
     this.fileWatcher.stopAll();
     
@@ -653,11 +487,20 @@ export class GitStatusManager extends EventEmitter {
       let totalCommitDeletions = 0;
       let totalCommitFilesChanged = 0;
       if (ahead > 0) {
-        const diffStatsResult = this.getDiffStats(session.worktreePath, mainBranch);
-        if (diffStatsResult.success && diffStatsResult.output) {
-          totalCommitFilesChanged = diffStatsResult.output.filesChanged;
-          totalCommitAdditions = diffStatsResult.output.additions;
-          totalCommitDeletions = diffStatsResult.output.deletions;
+        // Use git diff --shortstat for commit statistics
+        try {
+          const statLine = execSync(`git diff --shortstat ${mainBranch}...HEAD`, { cwd: session.worktreePath }).toString().trim();
+          if (statLine) {
+            const filesMatch = statLine.match(/(\d+) files? changed/);
+            const additionsMatch = statLine.match(/(\d+) insertions?\(\+\)/);
+            const deletionsMatch = statLine.match(/(\d+) deletions?\(-\)/);
+            
+            totalCommitFilesChanged = filesMatch ? parseInt(filesMatch[1], 10) : 0;
+            totalCommitAdditions = additionsMatch ? parseInt(additionsMatch[1], 10) : 0;
+            totalCommitDeletions = deletionsMatch ? parseInt(deletionsMatch[1], 10) : 0;
+          }
+        } catch {
+          // Keep defaults of 0 if command fails
         }
       }
 
@@ -700,8 +543,13 @@ export class GitStatusManager extends EventEmitter {
       const isReadyToMerge = ahead > 0 && !hasUncommittedChanges && !hasUntrackedFiles && behind === 0;
 
       // Get total number of commits in the branch
-      const commitCountResult = this.getTotalCommitCount(session.worktreePath, mainBranch);
-      const totalCommits = commitCountResult.success ? commitCountResult.output! : ahead;
+      let totalCommits = ahead;
+      try {
+        const countStr = execSync(`git rev-list --count ${mainBranch}..HEAD`, { cwd: session.worktreePath }).toString().trim();
+        totalCommits = parseInt(countStr, 10) || ahead;
+      } catch {
+        // Keep default of ahead if command fails
+      }
 
       const result = {
         state,
@@ -851,50 +699,5 @@ export class GitStatusManager extends EventEmitter {
         }
       }
     }
-  }
-  
-  /**
-   * Poll only the active session (smart polling)
-   */
-  private async pollActiveSession(): Promise<void> {
-    if (!this.activeSessionId || !this.isWindowVisible) {
-      return;
-    }
-    
-    try {
-      await this.refreshSessionGitStatus(this.activeSessionId, false);
-    } catch (error) {
-      console.warn(`[GitStatus] Failed to poll active session ${this.activeSessionId}:`, error);
-    }
-  }
-  
-  /**
-   * Creates a visibility-aware interval that polls less frequently when window is not visible
-   */
-  private createVisibilityAwareInterval(
-    callback: () => void,
-    activeInterval: number,
-    inactiveInterval: number
-  ): () => void {
-    let intervalId: NodeJS.Timeout | null = null;
-    
-    const updateInterval = () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-      
-      const interval = this.isWindowVisible ? activeInterval : inactiveInterval;
-      intervalId = setInterval(callback, interval);
-    };
-    
-    // Initial setup
-    updateInterval();
-    
-    // Return cleanup function
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
   }
 }
