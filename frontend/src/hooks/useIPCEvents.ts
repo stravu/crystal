@@ -103,7 +103,14 @@ export function useIPCEvents() {
       if (data.gitStatus.state !== 'clean' || process.env.NODE_ENV === 'development') {
         console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
       }
+      
+      // Update the store
       useSessionStore.getState().updateSessionGitStatus(data.sessionId, data.gitStatus);
+      
+      // Also emit a custom event for individual components to listen to
+      window.dispatchEvent(new CustomEvent('git-status-updated', {
+        detail: { sessionId: data.sessionId, gitStatus: data.gitStatus }
+      }));
     }, 100)
   ).current;
   

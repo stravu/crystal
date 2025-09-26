@@ -51,25 +51,23 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
 
     checkRunScript();
 
-    // Listen for project updates
-    let unsubscribe: (() => void) | undefined;
-    
-    if (window.electronAPI?.events?.onProjectUpdated) {
-      unsubscribe = window.electronAPI.events.onProjectUpdated((project) => {
-        // Check if this session belongs to the updated project
-        if (session.projectId === project.id) {
-          // Re-check if the run script exists for this session
-          checkRunScript();
-        }
-      });
-    }
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
+    // Listen for custom project update events from the global useIPCEvents hook  
+    const handleProjectUpdate = (event: CustomEvent) => {
+      const project = event.detail;
+      // Check if this session belongs to the updated project
+      if (session.projectId === project.id) {
+        // Re-check if the run script exists for this session
+        checkRunScript();
       }
     };
-  }, [session.id, session.projectId]);
+    
+    window.addEventListener('project-updated', handleProjectUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('project-updated', handleProjectUpdate as EventListener);
+    };
+    // Only re-run when the actual session ID changes to prevent memory leaks
+  }, [session.id]);
 
   // Combine script-related effects
   useEffect(() => {
@@ -132,24 +130,22 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       fetchGitStatus(true); // Pass true for initial load
     }
 
-    // Listen for git status updates
-    let unsubscribeGitStatus: (() => void) | undefined;
-    
-    if (window.electronAPI?.events?.onGitStatusUpdated) {
-      unsubscribeGitStatus = window.electronAPI.events.onGitStatusUpdated((data) => {
-        if (data.sessionId === session.id) {
-          setGitStatus(data.gitStatus);
-          setGitStatusLoading(false);
-        }
-      });
-    }
-
-    return () => {
-      if (unsubscribeGitStatus) {
-        unsubscribeGitStatus();
+    // Listen for custom git status events from the global useIPCEvents hook
+    const handleGitStatusUpdate = (event: CustomEvent) => {
+      const { sessionId, gitStatus } = event.detail;
+      if (sessionId === session.id) {
+        setGitStatus(gitStatus);
+        setGitStatusLoading(false);
       }
     };
-  }, [session.id, session.archived, session.status, gitStatus]);
+    
+    window.addEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
+    };
+    // Only re-run when essential props change to prevent memory leaks
+  }, [session.id, session.archived, session.status]);
 
   const handleRunScript = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();

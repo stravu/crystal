@@ -362,7 +362,6 @@ export function DraggableProjectTreeView() {
       
       // Listen for project updates
       const unsubscribeProjectUpdated = window.electronAPI.events.onProjectUpdated((updatedProject: Project) => {
-        
         // Update the project in our state
         setProjectsWithSessions(prevProjects => 
           prevProjects.map(project => {
@@ -378,6 +377,11 @@ export function DraggableProjectTreeView() {
             return project;
           })
         );
+        
+        // Emit a custom event for other components to listen to
+        window.dispatchEvent(new CustomEvent('project-updated', {
+          detail: updatedProject
+        }));
       });
       
       return () => {
@@ -394,6 +398,7 @@ export function DraggableProjectTreeView() {
         }
       };
     }
+    // Empty dependency array means this effect only runs once on mount
   }, []);
 
   // Add keyboard shortcut for quick session creation
