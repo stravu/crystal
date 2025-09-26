@@ -56,11 +56,16 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
           
           // Check if the working directory is clean (no uncommitted changes)
           try {
+            interface ExtendedExecOptions {
+              encoding: 'utf8';
+              cwd: string;
+              silent?: boolean;
+            }
             commandExecutor.execSync('git diff-index --quiet HEAD --', { 
               encoding: 'utf8',
               cwd: process.cwd(),
               silent: true
-            } as any);
+            } as ExtendedExecOptions);
             gitCommit = gitHash;
           } catch {
             // Working directory has uncommitted changes

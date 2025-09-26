@@ -10,7 +10,12 @@ class CommandExecutor {
   execSync(command: string, options?: ExecSyncOptions): string | Buffer {
     // Log the command being executed (unless silent mode requested)
     const cwd = options?.cwd || process.cwd();
-    const silentMode = (options as any)?.silent === true;
+    
+    interface ExtendedOptions extends ExecSyncOptions {
+      silent?: boolean;
+    }
+    const extendedOptions = options as ExtendedOptions;
+    const silentMode = extendedOptions?.silent === true;
     
     if (!silentMode) {
       console.log(`[CommandExecutor] Executing: ${command} in ${cwd}`);
@@ -20,7 +25,7 @@ class CommandExecutor {
     const shellPath = getShellPath();
     
     // Merge enhanced PATH into options (but remove our custom silent flag)
-    const { silent, ...cleanOptions } = options as any || {};
+    const { silent: _silent, ...cleanOptions } = extendedOptions || {};
     const enhancedOptions = {
       ...cleanOptions,
       env: {
