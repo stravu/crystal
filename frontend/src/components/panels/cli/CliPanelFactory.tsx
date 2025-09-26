@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useMemo } from 'react';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { CliPanel } from '../../../../../shared/types/cliPanels';
 import { PanelLoadingFallback } from '../PanelLoadingFallback';

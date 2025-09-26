@@ -1858,4 +1858,16 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  // Set active session for smart git status polling
+  ipcMain.handle('sessions:set-active-session', async (event, sessionId: string | null) => {
+    try {
+      // Notify GitStatusManager about the active session change
+      gitStatusManager.setActiveSession(sessionId);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set active session:', error);
+      return { success: false, error: 'Failed to set active session' };
+    }
+  });
+
 } 
