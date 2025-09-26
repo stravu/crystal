@@ -37,6 +37,12 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   // The component already receives the session as a prop, which will cause re-render when it changes
   // No need for an additional store subscription that runs for every session item on every store change
   
+  // Sync git status loading state from store
+  useEffect(() => {
+    const loading = useSessionStore.getState().isGitStatusLoading(session.id);
+    setGitStatusLoading(loading);
+  }, [session.id]);
+  
   useEffect(() => {
     // Check if this session's project has a run script
     const checkRunScript = () => {
@@ -135,10 +141,20 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       }
     };
     
+    // Listen for git status loading events to show immediate feedback
+    const handleGitStatusLoading = (event: CustomEvent) => {
+      const { sessionId } = event.detail;
+      if (sessionId === session.id) {
+        setGitStatusLoading(true);
+      }
+    };
+    
     window.addEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
+    window.addEventListener('git-status-loading', handleGitStatusLoading as EventListener);
 
     return () => {
       window.removeEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
+      window.removeEventListener('git-status-loading', handleGitStatusLoading as EventListener);
     };
     // Reduced dependency array to prevent excessive re-runs
   }, [session.id, session.archived, session.status, session.gitStatus]);
