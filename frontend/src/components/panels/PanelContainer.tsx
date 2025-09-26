@@ -2,6 +2,8 @@ import React, { Suspense, lazy, useMemo } from 'react';
 import { PanelContainerProps } from '../../types/panelComponents';
 import { ErrorBoundary } from 'react-error-boundary';
 import { CliPanelFactory } from './cli/CliPanelFactory';
+import { PanelLoadingFallback } from './PanelLoadingFallback';
+import { renderLog } from '../../utils/console';
 
 // Lazy load panel components for better performance
 const TerminalPanel = lazy(() => import('./TerminalPanel'));
@@ -26,19 +28,19 @@ const PanelErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => voi
   </div>
 );
 
-export const PanelContainer: React.FC<PanelContainerProps> = ({
+export const PanelContainer: React.FC<PanelContainerProps> = React.memo(({
   panel,
   isActive,
   isMainRepo = false
 }) => {
-  console.log('[PanelContainer] Rendering panel:', panel.id, 'Type:', panel.type, 'Active:', isActive);
+  renderLog('[PanelContainer] Rendering panel:', panel.id, 'Type:', panel.type, 'Active:', isActive);
   
   // FIX: Use stable panel rendering without forcing remounts
   // Each panel type maintains its own state internally
   // The isActive prop controls whether it should render its content
   
   const panelComponent = useMemo(() => {
-    console.log('[PanelContainer] Creating component for panel type:', panel.type);
+    renderLog('[PanelContainer] Creating component for panel type:', panel.type);
     
     // CLI panel types (including Claude and Codex) use the CLI panel factory
     const cliPanelTypes = ['claude', 'codex', 'aider', 'continue', 'cursor', 'generic-cli'];
@@ -83,12 +85,15 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
       resetKeys={[panel.id]} // Only reset when panel changes
     >
       <Suspense fallback={
-        <div className="flex items-center justify-center h-full text-gray-500">
-          Loading panel...
-        </div>
+        <PanelLoadingFallback 
+          panelType={panel.type}
+          message={`Loading ${panel.type} panel...`}
+        />
       }>
         {panelComponent}
       </Suspense>
     </ErrorBoundary>
   );
-};
+});
+
+PanelContainer.displayName = 'PanelContainer';

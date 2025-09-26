@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useMemo } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { CliPanel } from '../../../../../shared/types/cliPanels';
+import { PanelLoadingFallback } from '../PanelLoadingFallback';
 
 /**
  * Props for the CLI panel factory
@@ -65,18 +66,16 @@ class CliPanelErrorBoundary extends React.Component<
 }
 
 /**
- * Loading fallback component
+ * Loading fallback component - memoized for better performance
  */
-const LoadingFallback: React.FC<{ cliToolId: string }> = ({ cliToolId }) => (
-  <div className="h-full w-full flex items-center justify-center">
-    <div className="text-center">
-      <RefreshCw className="w-8 h-8 text-text-secondary animate-spin mx-auto mb-2" />
-      <p className="text-sm text-text-secondary">
-        Loading {cliToolId} panel...
-      </p>
-    </div>
-  </div>
-);
+const LoadingFallback: React.FC<{ cliToolId: string }> = React.memo(({ cliToolId }) => (
+  <PanelLoadingFallback 
+    panelType={cliToolId}
+    message={`Loading ${cliToolId} panel...`}
+  />
+));
+
+LoadingFallback.displayName = 'CliLoadingFallback';
 
 // Lazy-loaded CLI panel components
 const ClaudePanel = lazy(() => import('../claude/ClaudePanel'));
@@ -88,7 +87,7 @@ const CodexPanel = lazy(() => import('../codex/CodexPanel'));
  * This component examines the panel type to determine which
  * specific CLI panel component to render. Currently only supports Claude.
  */
-export const CliPanelFactory: React.FC<CliPanelFactoryProps> = ({ panel, isActive }) => {
+export const CliPanelFactory: React.FC<CliPanelFactoryProps> = React.memo(({ panel, isActive }) => {
   // Determine CLI tool ID from panel
   const cliToolId = useMemo(() => {
     if (panel.type === 'claude') return 'claude';
@@ -139,7 +138,9 @@ export const CliPanelFactory: React.FC<CliPanelFactoryProps> = ({ panel, isActiv
       {renderPanel()}
     </CliPanelErrorBoundary>
   );
-};
+});
+
+CliPanelFactory.displayName = 'CliPanelFactory';
 
 /**
  * Hook to determine if a CLI tool is supported
