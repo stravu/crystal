@@ -8,6 +8,8 @@ import type { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import type { GitDiffManager } from './gitDiffManager';
 import { GitStatusLogger } from './gitStatusLogger';
+import { GitFileWatcher } from './gitFileWatcher';
+import { fastCheckWorkingDirectory, fastGetAheadBehind, fastGetDiffStats } from './gitPlumbingCommands';
 
 interface GitStatusCache {
   [sessionId: string]: {
@@ -49,6 +51,7 @@ export class GitStatusManager extends EventEmitter {
   private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly DEBOUNCE_MS = 5000; // Increased to 5 seconds minimum interval between requests
   private gitLogger: GitStatusLogger;
+  private fileWatcher: GitFileWatcher;
   
   // Throttling for UI events
   private eventThrottleTimer: NodeJS.Timeout | null = null;
@@ -86,6 +89,16 @@ export class GitStatusManager extends EventEmitter {
     // This is expected since each SessionListItem listens for git status updates
     this.setMaxListeners(100);
     this.gitLogger = new GitStatusLogger(logger);
+    
+    // Initialize file watcher for smart refresh detection
+    this.fileWatcher = new GitFileWatcher(logger);
+    this.fileWatcher.on('needs-refresh', (sessionId: string) => {
+      // File watcher detected changes, refresh git status
+      this.logger?.info(`[GitStatus] File watcher triggered refresh for session ${sessionId}`);
+      this.refreshSessionGitStatus(sessionId, false).catch(error => {
+        this.logger?.error(`[GitStatus] Failed to refresh after file change for session ${sessionId}:`, error);
+      });
+    });
   }
 
   /**
@@ -222,13 +235,46 @@ export class GitStatusManager extends EventEmitter {
     if (previousActive !== sessionId) {
       console.log(`[GitStatus] Active session changed from ${previousActive} to ${sessionId}`);
       
-      // If we have an active session, start smart polling for it
-      if (sessionId && this.isWindowVisible) {
-        this.refreshSessionGitStatus(sessionId, false).catch(error => {
-          console.warn(`[GitStatus] Failed to refresh active session ${sessionId}:`, error);
-        });
+      // Start watching the active session's files if we have one
+      if (sessionId) {
+        this.startWatchingSession(sessionId);
+        
+        // If window is visible, also refresh immediately
+        if (this.isWindowVisible) {
+          this.refreshSessionGitStatus(sessionId, false).catch(error => {
+            console.warn(`[GitStatus] Failed to refresh active session ${sessionId}:`, error);
+          });
+        }
+      }
+      
+      // Stop watching the previous active session if it exists
+      if (previousActive) {
+        this.stopWatchingSession(previousActive);
       }
     }
+  }
+  
+  /**
+   * Start file watching for a session
+   */
+  private async startWatchingSession(sessionId: string): Promise<void> {
+    try {
+      const session = await this.sessionManager.getSession(sessionId);
+      if (session?.worktreePath) {
+        this.fileWatcher.startWatching(sessionId, session.worktreePath);
+        this.logger?.info(`[GitStatus] Started file watching for session ${sessionId}`);
+      }
+    } catch (error) {
+      this.logger?.error(`[GitStatus] Failed to start file watching for session ${sessionId}:`, error as Error);
+    }
+  }
+  
+  /**
+   * Stop file watching for a session
+   */
+  private stopWatchingSession(sessionId: string): void {
+    this.fileWatcher.stopWatching(sessionId);
+    this.logger?.info(`[GitStatus] Stopped file watching for session ${sessionId}`);
   }
   
   /**
@@ -258,6 +304,9 @@ export class GitStatusManager extends EventEmitter {
       this.visibilityAwareInterval();
       this.visibilityAwareInterval = null;
     }
+    
+    // Stop all file watchers
+    this.fileWatcher.stopAll();
     
     this.gitLogger.logSummary();
 
@@ -336,6 +385,17 @@ export class GitStatusManager extends EventEmitter {
       const timer = setTimeout(async () => {
         this.refreshDebounceTimers.delete(sessionId);
         this.gitLogger.logDebounce(sessionId, 'complete');
+        
+        // Fast path: check if git status actually changed before doing expensive operations
+        const session = await this.sessionManager.getSession(sessionId);
+        if (session?.worktreePath) {
+          const hasChanged = await this.hasGitStatusChanged(sessionId, session.worktreePath);
+          if (!hasChanged) {
+            this.logger?.info(`[GitStatus] Quick check: no changes for session ${sessionId}, skipping refresh`);
+            resolve(this.cache[sessionId]?.status || null);
+            return;
+          }
+        }
         
         // Only emit loading event for user-initiated refreshes
         if (isUserInitiated) {
@@ -496,6 +556,47 @@ export class GitStatusManager extends EventEmitter {
   }
 
   /**
+   * Quick check if git status actually changed using fast plumbing commands
+   * Returns true if status is different from cached, false if unchanged
+   */
+  private async hasGitStatusChanged(sessionId: string, worktreePath: string): Promise<boolean> {
+    const cached = this.cache[sessionId];
+    if (!cached) return true;
+    
+    try {
+      // Quick check using plumbing commands
+      const quickStatus = fastCheckWorkingDirectory(worktreePath);
+      
+      // Compare with cached status
+      const cachedHasChanges = cached.status.hasUncommittedChanges || cached.status.hasUntrackedFiles;
+      const currentHasChanges = quickStatus.hasModified || quickStatus.hasStaged || quickStatus.hasUntracked;
+      
+      // If the basic state differs, we need to refresh
+      if (cachedHasChanges !== currentHasChanges) {
+        return true;
+      }
+      
+      // If both have no changes, check if ahead/behind changed
+      if (!currentHasChanges) {
+        const project = this.sessionManager.getProjectForSession(sessionId);
+        if (project?.path) {
+          const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
+          const { ahead, behind } = fastGetAheadBehind(worktreePath, mainBranch);
+          
+          if ((cached.status.ahead || 0) !== ahead || (cached.status.behind || 0) !== behind) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    } catch {
+      // On any error, assume we need to refresh
+      return true;
+    }
+  }
+
+  /**
    * Fetch git status for a session
    */
   private async fetchGitStatus(sessionId: string): Promise<GitStatus | null> {
@@ -523,20 +624,29 @@ export class GitStatusManager extends EventEmitter {
         return null;
       }
 
-      // Get uncommitted changes
-      const uncommittedDiff = await this.gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
-      const hasUncommittedChanges = uncommittedDiff.stats.filesChanged > 0;
+      // Use fast plumbing commands for initial checks
+      const quickStatus = fastCheckWorkingDirectory(session.worktreePath);
+      const hasUncommittedChanges = quickStatus.hasModified || quickStatus.hasStaged;
+      const hasUntrackedFiles = quickStatus.hasUntracked;
+      const hasMergeConflicts = quickStatus.hasConflicts;
       
-      // Check for untracked files
-      const untrackedResult = this.getUntrackedFiles(session.worktreePath);
-      const hasUntrackedFiles = untrackedResult.success ? untrackedResult.output! : false;
+      // Get uncommitted changes details only if needed
+      let uncommittedDiff = { stats: { filesChanged: 0, additions: 0, deletions: 0 } };
+      if (hasUncommittedChanges) {
+        // Use fast diff stats instead of full diff capture when possible
+        const quickStats = fastGetDiffStats(session.worktreePath);
+        uncommittedDiff = {
+          stats: {
+            filesChanged: quickStats.filesChanged,
+            additions: quickStats.additions,
+            deletions: quickStats.deletions
+          }
+        };
+      }
       
-      // Get ahead/behind status
+      // Get ahead/behind status using fast plumbing command
       const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
-      
-      const revListResult = this.getRevListCount(session.worktreePath, mainBranch);
-      const ahead = revListResult.success ? revListResult.output!.ahead : 0;
-      const behind = revListResult.success ? revListResult.output!.behind : 0;
+      const { ahead, behind } = fastGetAheadBehind(session.worktreePath, mainBranch);
 
       // Get total additions/deletions for all commits in the branch (compared to main)
       let totalCommitAdditions = 0;
@@ -551,10 +661,8 @@ export class GitStatusManager extends EventEmitter {
         }
       }
 
-      // Check for rebase or merge conflicts
+      // Check for rebase in progress
       let isRebasing = false;
-      const conflictResult = this.checkMergeConflicts(session.worktreePath);
-      const hasMergeConflicts = conflictResult.success ? conflictResult.output! : false;
       
       // Check for rebase in progress using filesystem APIs
       const rebaseMergeExists = existsSync(join(session.worktreePath, '.git', 'rebase-merge'));
