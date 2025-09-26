@@ -128,6 +128,7 @@ export class TerminalPanelManager {
       // Send output to frontend
       if (mainWindow) {
         mainWindow.webContents.send('terminal:output', {
+          sessionId: terminal.sessionId,
           panelId: terminal.panelId,
           output: data
         });
@@ -155,6 +156,7 @@ export class TerminalPanelManager {
       // Notify frontend
       if (mainWindow) {
         mainWindow.webContents.send('terminal:exited', {
+          sessionId: terminal.sessionId,
           panelId: terminal.panelId,
           exitCode: exitCode.exitCode
         });
@@ -307,6 +309,7 @@ export class TerminalPanelManager {
     // Send scrollback to frontend
     if (mainWindow && state.scrollbackBuffer) {
       mainWindow.webContents.send('terminal:output', {
+        sessionId: panel.sessionId,
         panelId: panel.id,
         output: state.scrollbackBuffer + restorationMsg
       });
