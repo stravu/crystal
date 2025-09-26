@@ -36,7 +36,7 @@ interface ConversationMessage {
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
   compactMode: false,
-  collapseTools: false, // Expand tools by default to show all tool calls
+  collapseTools: true, // Collapse tools by default
   showThinking: true,
   showSessionInit: false, // Hide by default - it's developer info
 };
