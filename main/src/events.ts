@@ -768,6 +768,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   // Listen to gitStatusManager events and broadcast to renderer
+  // Only broadcast for active sessions or recent updates to reduce EventEmitter load
   gitStatusManager.on('git-status-updated', (sessionId: string, gitStatus: GitStatus) => {
     const mw = getMainWindow();
     if (mw && !mw.isDestroyed()) {

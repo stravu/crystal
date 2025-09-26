@@ -44,10 +44,10 @@ interface RevListCount {
 
 export class GitStatusManager extends EventEmitter {
   private cache: GitStatusCache = {};
-  // Removed polling - now event-driven only
+  // Smart visibility-aware polling for active sessions only
   private readonly CACHE_TTL_MS = 5000; // 5 seconds cache
   private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly DEBOUNCE_MS = 500; // 500ms debounce for rapid refresh requests
+  private readonly DEBOUNCE_MS = 5000; // Increased to 5 seconds minimum interval between requests
   private gitLogger: GitStatusLogger;
   
   // Throttling for UI events
@@ -57,7 +57,7 @@ export class GitStatusManager extends EventEmitter {
   
   // Concurrent operation limiting
   private activeOperations = 0;
-  private readonly MAX_CONCURRENT_OPERATIONS = 5; // Increased from 3 for better throughput
+  private readonly MAX_CONCURRENT_OPERATIONS = 3; // Reduced to limit CPU usage
   private operationQueue: Array<() => Promise<void>> = [];
   
   // Cancellation support
@@ -66,7 +66,14 @@ export class GitStatusManager extends EventEmitter {
   // Initial load management
   private isInitialLoadInProgress = false;
   private initialLoadQueue: string[] = [];
-  private readonly INITIAL_LOAD_DELAY_MS = 100; // Stagger initial loads by 100ms
+  private readonly INITIAL_LOAD_DELAY_MS = 200; // Increased to 200ms for better staggering
+  
+  // Smart polling for active/visible sessions only
+  private activeSessionId: string | null = null;
+  private visibilityAwareInterval: (() => void) | null = null;
+  private isWindowVisible = true;
+  private readonly ACTIVE_SESSION_POLL_MS = 10000; // 10 seconds for active session
+  private readonly BACKGROUND_SESSION_POLL_MS = 60000; // 60 seconds for background sessions
 
   constructor(
     private sessionManager: SessionManager,
@@ -206,19 +213,52 @@ export class GitStatusManager extends EventEmitter {
   }
 
   /**
-   * Start git status manager (no longer polls)
+   * Set the currently active session for smart polling
+   */
+  setActiveSession(sessionId: string | null): void {
+    const previousActive = this.activeSessionId;
+    this.activeSessionId = sessionId;
+    
+    if (previousActive !== sessionId) {
+      console.log(`[GitStatus] Active session changed from ${previousActive} to ${sessionId}`);
+      
+      // If we have an active session, start smart polling for it
+      if (sessionId && this.isWindowVisible) {
+        this.refreshSessionGitStatus(sessionId, false).catch(error => {
+          console.warn(`[GitStatus] Failed to refresh active session ${sessionId}:`, error);
+        });
+      }
+    }
+  }
+  
+  /**
+   * Start smart git status polling (only for active session when visible)
    */
   startPolling(): void {
-    // This method is kept for compatibility but no longer polls
-    // Git status updates are now event-driven only
-    this.gitLogger.logPollStart(0); // Log that we're not polling any sessions
+    // Start visibility-aware polling for active session only
+    if (this.visibilityAwareInterval) {
+      this.visibilityAwareInterval(); // Clean up existing interval
+    }
+    
+    this.visibilityAwareInterval = this.createVisibilityAwareInterval(
+      () => this.pollActiveSession(),
+      this.ACTIVE_SESSION_POLL_MS,
+      this.BACKGROUND_SESSION_POLL_MS
+    );
+    
+    this.gitLogger.logPollStart(1); // Log that we're polling 1 session (active)
   }
 
   /**
    * Stop git status manager
    */
   stopPolling(): void {
-    // No polling to stop, but still clean up other resources
+    // Stop visibility-aware polling
+    if (this.visibilityAwareInterval) {
+      this.visibilityAwareInterval();
+      this.visibilityAwareInterval = null;
+    }
+    
     this.gitLogger.logSummary();
 
     // Clear any pending debounce timers
@@ -239,8 +279,15 @@ export class GitStatusManager extends EventEmitter {
 
   // Called when window focus changes
   handleVisibilityChange(isHidden: boolean): void {
+    this.isWindowVisible = !isHidden;
     this.gitLogger.logFocusChange(!isHidden);
-    // No longer polls on visibility change - status updates are event-driven
+    
+    // If window becomes visible and we have an active session, refresh it
+    if (!isHidden && this.activeSessionId) {
+      this.refreshSessionGitStatus(this.activeSessionId, false).catch(error => {
+        console.warn(`[GitStatus] Failed to refresh active session on focus:`, error);
+      });
+    }
   }
 
   /**
@@ -696,5 +743,50 @@ export class GitStatusManager extends EventEmitter {
         }
       }
     }
+  }
+  
+  /**
+   * Poll only the active session (smart polling)
+   */
+  private async pollActiveSession(): Promise<void> {
+    if (!this.activeSessionId || !this.isWindowVisible) {
+      return;
+    }
+    
+    try {
+      await this.refreshSessionGitStatus(this.activeSessionId, false);
+    } catch (error) {
+      console.warn(`[GitStatus] Failed to poll active session ${this.activeSessionId}:`, error);
+    }
+  }
+  
+  /**
+   * Creates a visibility-aware interval that polls less frequently when window is not visible
+   */
+  private createVisibilityAwareInterval(
+    callback: () => void,
+    activeInterval: number,
+    inactiveInterval: number
+  ): () => void {
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    const updateInterval = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      
+      const interval = this.isWindowVisible ? activeInterval : inactiveInterval;
+      intervalId = setInterval(callback, interval);
+    };
+    
+    // Initial setup
+    updateInterval();
+    
+    // Return cleanup function
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }
 }

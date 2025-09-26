@@ -10,6 +10,7 @@ import { EmptyState } from './EmptyState';
 import { LoadingSpinner } from './LoadingSpinner';
 import { API } from '../utils/api';
 import { debounce } from '../utils/debounce';
+import { throttle } from '../utils/performanceUtils';
 import type { Session } from '../types/session';
 import type { Project, CreateProjectRequest } from '../types/project';
 import type { Folder } from '../types/folder';
@@ -786,15 +787,22 @@ export function DraggableProjectTreeView() {
     navigateToProject(project.id);
   };
 
-  const handleRefreshProjectGitStatus = async (project: Project, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    // Add to refreshing set
-    setRefreshingProjects(prev => new Set([...prev, project.id]));
-    
-    try {
-      // Start git status refresh for all sessions in this project (non-blocking)
-      const response = await window.electronAPI.invoke('projects:refresh-git-status', project.id);
+  // Throttled refresh function to prevent excessive git status requests
+  const handleRefreshProjectGitStatus = useCallback(
+    throttle(async (project: Project, e: React.MouseEvent) => {
+      e.stopPropagation();
+      
+      // Prevent multiple refresh operations on same project
+      if (refreshingProjects.has(project.id)) {
+        return;
+      }
+      
+      // Add to refreshing set
+      setRefreshingProjects(prev => new Set([...prev, project.id]));
+      
+      try {
+        // Start git status refresh for all sessions in this project (non-blocking)
+        const response = await window.electronAPI.invoke('projects:refresh-git-status', project.id);
       
       if (!response.success) {
         throw new Error(response.error || 'Failed to refresh git status');
@@ -840,7 +848,9 @@ export function DraggableProjectTreeView() {
         return newSet;
       });
     }
-  };
+  }, 5000), // 5 second throttle
+  [refreshingProjects] // Dependencies for useCallback
+);
   
 
   const handleCreateSession = (project: Project) => {

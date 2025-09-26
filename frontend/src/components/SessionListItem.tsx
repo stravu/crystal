@@ -100,34 +100,30 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   }, [session.id]);
 
   useEffect(() => {
-    // Fetch Git status for this session (non-blocking)
-    const fetchGitStatus = async (isInitialLoad = false) => {
-      try {
-        setGitStatusLoading(true);
-        // Use non-blocking fetch with initial load flag for staggered loading
-        const response = await window.electronAPI.invoke('sessions:get-git-status', session.id, true, isInitialLoad);
-        if (response.success) {
-          // If we got cached status, use it immediately
-          if (response.gitStatus) {
+    // Optimized git status fetching - rely on centralized smart polling instead of individual fetches
+    const fetchGitStatusIfNeeded = async () => {
+      // Only fetch if we don't have git status yet and session is active/viable
+      if (!session.archived && session.status !== 'error' && !gitStatus && !session.gitStatus) {
+        try {
+          setGitStatusLoading(true);
+          // Use queue-based initial load to prevent overwhelming the system
+          const response = await window.electronAPI.invoke('sessions:get-git-status', session.id, false, true);
+          if (response.success && response.gitStatus) {
             setGitStatus(response.gitStatus);
           }
-          // Loading indicator will be cleared when the background refresh completes
-          // via the git-status-updated event
-          if (!response.backgroundRefresh) {
-            setGitStatusLoading(false);
-          }
-        } else {
+          setGitStatusLoading(false);
+        } catch (error) {
+          console.warn('Error fetching initial git status:', error);
           setGitStatusLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching git status:', error);
-        setGitStatusLoading(false);
       }
     };
 
-    // Initial fetch only if we don't already have git status
-    if (!session.archived && session.status !== 'error' && !gitStatus) {
-      fetchGitStatus(true); // Pass true for initial load
+    // Use session.gitStatus if available, or fetch only once if needed
+    if (session.gitStatus) {
+      setGitStatus(session.gitStatus);
+    } else {
+      fetchGitStatusIfNeeded();
     }
 
     // Listen for custom git status events from the global useIPCEvents hook
@@ -144,8 +140,8 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     return () => {
       window.removeEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
     };
-    // Only re-run when essential props change to prevent memory leaks
-  }, [session.id, session.archived, session.status]);
+    // Reduced dependency array to prevent excessive re-runs
+  }, [session.id, session.archived, session.status, session.gitStatus]);
 
   const handleRunScript = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();

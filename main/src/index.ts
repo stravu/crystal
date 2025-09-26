@@ -379,7 +379,7 @@ async function createWindow() {
     console.error('Renderer process crashed:', details);
   });
 
-  // Handle window focus/blur for smart git status polling
+  // Handle window focus/blur/minimize for smart git status polling
   mainWindow.on('focus', () => {
     if (gitStatusManager) {
       gitStatusManager.handleVisibilityChange(false); // false = visible/focused
@@ -389,6 +389,18 @@ async function createWindow() {
   mainWindow.on('blur', () => {
     if (gitStatusManager) {
       gitStatusManager.handleVisibilityChange(true); // true = hidden/blurred
+    }
+  });
+
+  mainWindow.on('minimize', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(true); // true = hidden/minimized
+    }
+  });
+
+  mainWindow.on('restore', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(false); // false = visible/restored
     }
   });
 }
