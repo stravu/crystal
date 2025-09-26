@@ -89,6 +89,11 @@ export function useIPCEvents() {
         return; // Ignore invalid events
       }
       useSessionStore.getState().setGitStatusLoading(data.sessionId, true);
+      
+      // Also emit a custom event for individual components to listen to
+      window.dispatchEvent(new CustomEvent('git-status-loading', {
+        detail: { sessionId: data.sessionId }
+      }));
     }, 100)
   ).current;
   
@@ -104,8 +109,9 @@ export function useIPCEvents() {
         console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
       }
       
-      // Update the store
+      // Update the store and clear loading state
       useSessionStore.getState().updateSessionGitStatus(data.sessionId, data.gitStatus);
+      useSessionStore.getState().setGitStatusLoading(data.sessionId, false);
       
       // Also emit a custom event for individual components to listen to
       window.dispatchEvent(new CustomEvent('git-status-updated', {
@@ -287,6 +293,13 @@ export function useIPCEvents() {
     const unsubscribeGitStatusLoadingBatch = window.electronAPI.events.onGitStatusLoadingBatch?.((sessionIds: string[]) => {
       const updates = sessionIds.map(sessionId => ({ sessionId, loading: true }));
       useSessionStore.getState().setGitStatusLoadingBatch(updates);
+      
+      // Dispatch custom events for each session
+      sessionIds.forEach(sessionId => {
+        window.dispatchEvent(new CustomEvent('git-status-loading', {
+          detail: { sessionId }
+        }));
+      });
     });
     if (unsubscribeGitStatusLoadingBatch) {
       unsubscribeFunctions.push(unsubscribeGitStatusLoadingBatch);
@@ -295,6 +308,13 @@ export function useIPCEvents() {
     const unsubscribeGitStatusUpdatedBatch = window.electronAPI.events.onGitStatusUpdatedBatch?.((updates: Array<{ sessionId: string; status: GitStatus }>) => {
       console.log(`[useIPCEvents] Git status batch update: ${updates.length} sessions`);
       useSessionStore.getState().updateSessionGitStatusBatch(updates);
+      
+      // Dispatch custom events for each session
+      updates.forEach(({ sessionId, status }) => {
+        window.dispatchEvent(new CustomEvent('git-status-updated', {
+          detail: { sessionId, gitStatus: status }
+        }));
+      });
     });
     if (unsubscribeGitStatusUpdatedBatch) {
       unsubscribeFunctions.push(unsubscribeGitStatusUpdatedBatch);

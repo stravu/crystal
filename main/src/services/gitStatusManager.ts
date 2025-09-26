@@ -24,7 +24,7 @@ export class GitStatusManager extends EventEmitter {
   // Smart visibility-aware polling for active sessions only
   private readonly CACHE_TTL_MS = 5000; // 5 seconds cache
   private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly DEBOUNCE_MS = 5000; // Increased to 5 seconds minimum interval between requests
+  private readonly DEBOUNCE_MS = 2000; // 2 seconds debounce to batch rapid changes
   private gitLogger: GitStatusLogger;
   private fileWatcher: GitFileWatcher;
   
@@ -205,6 +205,10 @@ export class GitStatusManager extends EventEmitter {
    * @param isUserInitiated - Whether this refresh was triggered by user action (shows loading spinner)
    */
   async refreshSessionGitStatus(sessionId: string, isUserInitiated = false): Promise<GitStatus | null> {
+    // Immediately emit loading state so user sees refresh is happening
+    // This provides immediate visual feedback
+    this.emitThrottled(sessionId, 'loading');
+    
     // Clear any existing debounce timer for this session
     const existingTimer = this.refreshDebounceTimers.get(sessionId);
     if (existingTimer) {
@@ -226,14 +230,14 @@ export class GitStatusManager extends EventEmitter {
           const hasChanged = await this.hasGitStatusChanged(sessionId, session.worktreePath);
           if (!hasChanged) {
             this.logger?.info(`[GitStatus] Quick check: no changes for session ${sessionId}, skipping refresh`);
-            resolve(this.cache[sessionId]?.status || null);
+            // Still emit updated to clear loading state even if no changes
+            const cached = this.cache[sessionId]?.status || null;
+            if (cached) {
+              this.emitThrottled(sessionId, 'updated', cached);
+            }
+            resolve(cached);
             return;
           }
-        }
-        
-        // Only emit loading event for user-initiated refreshes
-        if (isUserInitiated) {
-          this.emitThrottled(sessionId, 'loading');
         }
         
         const status = await this.fetchGitStatus(sessionId);
@@ -262,6 +266,8 @@ export class GitStatusManager extends EventEmitter {
     // Add to initial load queue if not already there
     if (!this.initialLoadQueue.includes(sessionId)) {
       this.initialLoadQueue.push(sessionId);
+      // Show loading immediately for this session
+      this.emitThrottled(sessionId, 'loading');
     }
 
     // Start processing queue if not already running
@@ -325,6 +331,11 @@ export class GitStatusManager extends EventEmitter {
       );
 
       this.gitLogger.logPollStart(activeSessions.length);
+      
+      // Immediately show loading for all sessions so user sees refresh happening
+      activeSessions.forEach(session => {
+        this.emitThrottled(session.id, 'loading');
+      });
 
       // Process sessions with concurrent limiting
       let successCount = 0;

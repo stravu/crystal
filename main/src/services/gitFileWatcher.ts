@@ -24,7 +24,7 @@ interface WatchedSession {
 export class GitFileWatcher extends EventEmitter {
   private watchedSessions: Map<string, WatchedSession> = new Map();
   private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly DEBOUNCE_MS = 1000; // 1 second debounce for file changes
+  private readonly DEBOUNCE_MS = 1500; // 1.5 second debounce for file changes
   private readonly IGNORE_PATTERNS = [
     '.git/',
     'node_modules/',
