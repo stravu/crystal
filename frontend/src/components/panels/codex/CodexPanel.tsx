@@ -17,7 +17,7 @@ interface CodexPanelProps {
   isActive: boolean;
 }
 
-export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
+export const CodexPanel: React.FC<CodexPanelProps> = React.memo(({ panel, isActive }) => {
   // Panel-specific view mode
   const [viewMode, setViewMode] = useState<AIViewMode>('richOutput');
   
@@ -228,7 +228,9 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
       )}
     </div>
   );
-};
+});
+
+CodexPanel.displayName = 'CodexPanel';
 
 // Default export for lazy loading
 export default CodexPanel;

@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { useSession } from '../../contexts/SessionContext';
 import { TerminalPanelProps } from '../../types/panelComponents';
+import { renderLog, devLog } from '../../utils/console';
 import '@xterm/xterm/css/xterm.css';
 
 // Define window extensions for terminal state restoration
@@ -18,8 +19,8 @@ declare global {
   }
 }
 
-export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive }) => {
-  console.log('[TerminalPanel] Component rendering, panel:', panel.id, 'isActive:', isActive);
+export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, isActive }) => {
+  renderLog('[TerminalPanel] Component rendering, panel:', panel.id, 'isActive:', isActive);
   
   // All hooks must be called at the top level, before any conditional returns
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -34,18 +35,18 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
   const workingDirectory = sessionContext?.workingDirectory;
   
   if (sessionContext) {
-    console.log('[TerminalPanel] Session context:', sessionContext);
+    devLog.debug('[TerminalPanel] Session context:', sessionContext);
   } else {
-    console.error('[TerminalPanel] No session context available');
+    devLog.error('[TerminalPanel] No session context available');
   }
 
   // Initialize terminal only once when component first mounts
   // Keep it alive even when switching sessions
   useEffect(() => {
-    console.log('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
+    devLog.debug('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
     
     if (!terminalRef.current) {
-      console.log('[TerminalPanel] Missing terminal ref, skipping initialization');
+      devLog.debug('[TerminalPanel] Missing terminal ref, skipping initialization');
       return;
     }
 
@@ -55,7 +56,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
 
     const initializeTerminal = async () => {
       try {
-        console.log('[TerminalPanel] Starting initialization for panel:', panel.id);
+        devLog.debug('[TerminalPanel] Starting initialization for panel:', panel.id);
         
         // Check if already initialized on backend
         const initialized = await window.electronAPI.invoke('panels:checkInitialized', panel.id);
@@ -265,6 +266,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
       )}
     </div>
   );
-};
+});
+
+TerminalPanel.displayName = 'TerminalPanel';
 
 export default TerminalPanel;

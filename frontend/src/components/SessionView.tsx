@@ -26,6 +26,7 @@ import { SessionProvider } from '../contexts/SessionContext';
 import { ToolPanel, ToolPanelType } from '../../../shared/types/panels';
 import { Download, Upload, GitMerge, Code2 } from 'lucide-react';
 import type { Project } from '../types/project';
+import { devLog, renderLog } from '../utils/console';
 
 export const SessionView = memo(() => {
   const { activeView, activeProjectId } = useNavigationStore();
@@ -60,14 +61,14 @@ export const SessionView = memo(() => {
   // Load panels when session changes
   useEffect(() => {
     if (activeSession?.id) {
-      console.log('[SessionView] Loading panels for session:', activeSession.id);
+      devLog.debug('[SessionView] Loading panels for session:', activeSession.id);
       
       // Check if panels are already loaded for this session
       const existingPanels = panels[activeSession.id] || [];
       if (existingPanels.length === 0) {
         // Only load panels if they're not already in the store
         panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
-          console.log('[SessionView] Loaded panels:', loadedPanels);
+          devLog.debug('[SessionView] Loaded panels:', loadedPanels);
           setPanels(activeSession.id, loadedPanels);
         });
       }
@@ -142,11 +143,11 @@ export const SessionView = memo(() => {
     [sessionPanels]
   );
   
-  // Debug logging
-  console.log('[SessionView] Session panels:', sessionPanels);
-  console.log('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
-  console.log('[SessionView] Current active panel:', currentActivePanel);
-  console.log('[SessionView] Has Claude panels:', hasClaudePanels);
+  // Debug logging - only in development with verbose enabled
+  renderLog('[SessionView] Session panels:', sessionPanels);
+  renderLog('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
+  renderLog('[SessionView] Current active panel:', currentActivePanel);
+  renderLog('[SessionView] Has Claude panels:', hasClaudePanels);
 
   // FIX: Memoize all callbacks to prevent re-renders
   const handlePanelSelect = useCallback(
@@ -431,27 +432,44 @@ export const SessionView = memo(() => {
       
       <div className="flex-1 flex relative min-h-0">
         <div className="flex-1 relative">
-          {/* Render all panels but only show the active one - keeps terminals alive */}
+          {/* Render panels with smart visibility - keeps critical processes alive */}
           {sessionPanels.length > 0 && currentActivePanel ? (
             <SessionProvider session={activeSession} gitBranchActions={branchActions} isMerging={hook.isMerging}>
-              {sessionPanels.map(panel => (
-                <div 
-                  key={panel.id} 
-                  className="absolute inset-0"
-                  style={{ display: panel.id === currentActivePanel.id ? 'block' : 'none' }}
-                >
-                  <PanelContainer
-                    panel={panel}
-                    isActive={panel.id === currentActivePanel.id}
-                    isMainRepo={!!activeSession.isMainRepo}
-                  />
-                </div>
-              ))}
+              {sessionPanels.map(panel => {
+                const isActive = panel.id === currentActivePanel.id;
+                const shouldKeepAlive = ['terminal', 'claude', 'codex'].includes(panel.type);
+                
+                // Only render if active OR if it's a panel type that needs to stay alive
+                if (!isActive && !shouldKeepAlive) {
+                  return null;
+                }
+                
+                return (
+                  <div 
+                    key={panel.id} 
+                    className="absolute inset-0"
+                    style={{ 
+                      display: isActive ? 'block' : 'none',
+                      pointerEvents: isActive ? 'auto' : 'none'
+                    }}
+                  >
+                    <PanelContainer
+                      panel={panel}
+                      isActive={isActive}
+                      isMainRepo={!!activeSession.isMainRepo}
+                    />
+                  </div>
+                );
+              })}
             </SessionProvider>
           ) : (
-            <>
-              {/* Legacy view content removed - all functionality now in panels */}
-            </>
+            <div className="flex-1 flex items-center justify-center text-text-secondary">
+              <div className="text-center p-8">
+                <div className="text-4xl mb-4">⚡</div>
+                <h2 className="text-xl font-semibold mb-2">No Active Panel</h2>
+                <p className="text-sm">Add a tool panel to get started</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
