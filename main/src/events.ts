@@ -220,6 +220,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
           });
           console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
           
+          // Ensure the panel is set as active
+          await panelManager.setActivePanel(session.id, panel.id);
+          console.log(`[Events] Set ${panelType} panel ${panel.id} as active for session ${session.id}`);
+          
           // For Codex panels, also save the config to the settings column for persistence
           if (panelType === 'codex' && customState && 'codexConfig' in customState && customState.codexConfig) {
             databaseService.updatePanelSettings(panel.id, customState.codexConfig);

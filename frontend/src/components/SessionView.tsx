@@ -205,16 +205,18 @@ export const SessionView = memo(() => {
         };
       }
       
-      await panelApi.createPanel({
+      const newPanel = await panelApi.createPanel({
         sessionId: activeSession.id,
         type,
         initialState
       });
       
-      // Don't add to store here - the panel:created event will handle it
-      // This prevents duplicate panels from appearing
+      // Immediately add the panel and set it as active
+      // The panel:created event will also fire, but addPanel checks for duplicates
+      addPanel(newPanel);
+      setActivePanelInStore(activeSession.id, newPanel.id);
     },
-    [activeSession]
+    [activeSession, addPanel, setActivePanelInStore]
   );
 
   // Load project data for active session

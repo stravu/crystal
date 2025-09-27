@@ -62,6 +62,10 @@ export class PanelManager {
         metadata: panel.metadata
       });
       
+      // Update the panel state to reflect it's now active
+      panel.state.isActive = true;
+      panel.metadata.lastActiveAt = new Date().toISOString();
+      
       // Cache in memory
       this.panels.set(panelId, panel);
       
