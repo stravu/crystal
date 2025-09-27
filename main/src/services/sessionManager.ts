@@ -371,7 +371,6 @@ export class SessionManager extends EventEmitter {
         throw new Error(`Project with ID ${projectId} not found`);
       }
       
-      console.log(`[SessionManager] Creating new main repo session for project: ${project.name}`);
       
       // Create a new main repo session
       const sessionId = randomUUID();
@@ -398,7 +397,6 @@ export class SessionManager extends EventEmitter {
         undefined // commit_mode_settings - let it use project defaults
       );
       
-      console.log(`[SessionManager] Created main repo session: ${session.id}`);
       await panelManager.ensureDiffPanel(session.id);
       return session;
     });
@@ -625,7 +623,6 @@ export class SessionManager extends EventEmitter {
         try {
           const { claudePanelManager } = require('../ipc/claudePanel');
           for (const panel of claudePanels) {
-            console.log(`[SessionManager] Stopping Claude panel ${panel.id} for archived session ${id}`);
             await claudePanelManager.unregisterPanel(panel.id);
           }
         } catch (error) {
@@ -639,7 +636,6 @@ export class SessionManager extends EventEmitter {
         try {
           const { codexPanelManager } = require('../ipc/codexPanel');
           for (const panel of codexPanels) {
-            console.log(`[SessionManager] Stopping Codex panel ${panel.id} for archived session ${id}`);
             await codexPanelManager.unregisterPanel(panel.id);
           }
         } catch (error) {
@@ -735,7 +731,6 @@ export class SessionManager extends EventEmitter {
     
     // Handle Codex session completion message to stop prompt timing
     if (output.type === 'json' && (output.data as GenericMessageData).type === 'session' && (output.data as GenericMessageData).data?.status === 'completed') {
-      console.log('[SessionManager] Detected Codex session completion for panel:', panelId);
       // Add a completion message to trigger panel-response-added event which stops the timer
       const completionMessage = String((output.data as GenericMessageData).data?.message || 'Session completed');
       this.addPanelConversationMessage(panelId, 'assistant', completionMessage);
@@ -745,7 +740,6 @@ export class SessionManager extends EventEmitter {
     if (output.type === 'json' && ((output.data as GenericMessageData).type === 'agent_message' || (output.data as GenericMessageData).type === 'agent_message_delta')) {
       const agentText = String((output.data as GenericMessageData).message || (output.data as GenericMessageData).delta || '');
       if (agentText && (output.data as GenericMessageData).type === 'agent_message') {
-        console.log('[SessionManager] Adding Codex agent message to panel:', panelId, 'text length:', agentText.length);
         // Only add complete messages, not deltas
         this.addPanelConversationMessage(panelId, 'assistant', agentText);
       }
@@ -799,7 +793,6 @@ export class SessionManager extends EventEmitter {
               }
             };
             this.db.updatePanel(panelId, { state: updatedState });
-            console.log(`[SessionManager] Stored Claude session_id for panel ${panelId}: ${sessionIdFromMsg}`);
           }
         }
       }
@@ -823,13 +816,11 @@ export class SessionManager extends EventEmitter {
     
     // Emit event when a user message is added (new prompt)
     if (messageType === 'user') {
-      console.log('[SessionManager] Emitting panel-prompt-added for panel:', panelId);
       this.emit('panel-prompt-added', { panelId, content });
     }
     
     // Emit event when an assistant message is added (response received)
     if (messageType === 'assistant') {
-      console.log('[SessionManager] Emitting panel-response-added for panel:', panelId);
       this.emit('panel-response-added', { panelId, content });
     }
   }
@@ -846,7 +837,6 @@ export class SessionManager extends EventEmitter {
   addPanelInitialPromptMarker(panelId: string, prompt: string): void {
     // Prompt markers are no longer needed for panels - using conversation_messages instead
     // The prompt is already being added to conversation_messages in addPanelConversationMessage
-    console.log('[SessionManager] Skipping prompt marker for panel (using conversation_messages instead):', panelId);
   }
 
   async continueConversation(id: string, userMessage: string): Promise<void> {
@@ -863,13 +853,11 @@ export class SessionManager extends EventEmitter {
         data: userPromptDisplay,
         timestamp: new Date()
       });
-      console.log('[SessionManager] Added continuation prompt to session output');
       
       // Add a prompt marker for this continued conversation
       // Get current output count to use as index
       const outputs = this.db.getSessionOutputs(id);
       this.db.addPromptMarker(id, userMessage, outputs.length);
-      console.log('[SessionManager] Added prompt marker for continued conversation');
       
       // Emit event for the Claude Code manager to handle
       this.emit('conversation-continue', { sessionId: id, message: userMessage });
@@ -930,13 +918,9 @@ export class SessionManager extends EventEmitter {
   }
 
   addInitialPromptMarker(sessionId: string, prompt: string): void {
-    console.log('[SessionManager] Adding initial prompt marker for session:', sessionId);
-    console.log('[SessionManager] Prompt text:', prompt);
-    
     try {
       // Add the initial prompt as the first prompt marker (index 0)
       this.db.addPromptMarker(sessionId, prompt, 0, 0);
-      console.log('[SessionManager] Initial prompt marker added successfully');
     } catch (error) {
       console.error('[SessionManager] Failed to add initial prompt marker:', error);
       throw error;
@@ -1195,7 +1179,6 @@ export class SessionManager extends EventEmitter {
       }
     } catch (error) {
       // Command might fail if no children exist, which is fine
-      console.log(`No child processes found for PID ${parentPid}`);
     }
     
     return descendants;
@@ -1228,11 +1211,8 @@ export class SessionManager extends EventEmitter {
       // Kill the entire process group to ensure all child processes are terminated
       try {
         if (process.pid) {
-          console.log(`Terminating script process ${process.pid} and its children...`);
-          
           // First, get all descendant PIDs before we start killing
           const descendantPids = this.getAllDescendantPids(process.pid);
-          console.log(`Found ${descendantPids.length} descendant processes: ${descendantPids.join(', ')}`);
           
           // Add a simple log entry for stopping the script
           addSessionLog(sessionId, 'info', `Stopping application process...`, 'Application');
@@ -1280,7 +1260,6 @@ export class SessionManager extends EventEmitter {
                   });
                 });
               } else {
-                console.log(`Successfully killed Windows process tree ${process.pid}`);
                 addSessionLog(sessionId, 'info', '[Successfully terminated process tree]', 'System');
                 this.finishStopScript(sessionId);
                 resolve();
@@ -1337,10 +1316,8 @@ export class SessionManager extends EventEmitter {
               descendantPids.forEach(pid => {
                 exec(`kill -9 ${pid}`, (error) => {
                   if (error) {
-                    console.log(`Process ${pid} already terminated`);
                     alreadyDeadCount++;
                   } else {
-                    console.log(`Killed descendant process ${pid}`);
                     killedCount++;
                   }
                   
@@ -1536,7 +1513,6 @@ export class SessionManager extends EventEmitter {
     try {
       // Create terminal session if it doesn't exist
       if (!this.terminalSessionManager.hasSession(sessionId)) {
-        console.log(`[SessionManager] Pre-creating terminal session for ${sessionId}`);
         await this.terminalSessionManager.createTerminalSession(sessionId, worktreePath);
       }
     } catch (error) {

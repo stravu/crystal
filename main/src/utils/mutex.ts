@@ -23,7 +23,6 @@ export class Mutex {
    */
   async acquire(resourceName: string, timeout: number = this.defaultTimeout): Promise<() => void> {
     const startTime = Date.now();
-    logger.debug(`[Mutex] Attempting to acquire lock for: ${resourceName}`);
     
     // If there's already a lock for this resource, wait for it
     while (this.locks.has(resourceName)) {
@@ -45,13 +44,11 @@ export class Mutex {
     this.lockCounts.set(resourceName, (this.lockCounts.get(resourceName) || 0) + 1);
     
     const lockId = this.lockCounts.get(resourceName);
-    logger.debug(`[Mutex] Acquired lock for: ${resourceName} (lock #${lockId})`);
 
     // Return the release function
     return () => {
       if (this.locks.get(resourceName) === lockPromise) {
         this.locks.delete(resourceName);
-        logger.debug(`[Mutex] Released lock for: ${resourceName} (lock #${lockId})`);
       }
       
       if (releaseLock) {

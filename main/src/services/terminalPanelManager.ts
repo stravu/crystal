@@ -137,8 +137,6 @@ export class TerminalPanelManager {
     
     // Handle terminal exit
     terminal.pty.onExit((exitCode: { exitCode: number; signal?: number }) => {
-      console.log(`[TerminalPanelManager] Terminal ${terminal.panelId} exited with code ${exitCode.exitCode}`);
-      
       // Emit exit event
       panelManager.emitPanelEvent(
         terminal.panelId,

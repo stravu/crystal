@@ -211,19 +211,8 @@ export class TaskQueue {
         sessionName = uniqueSessionName;
         worktreeName = uniqueWorktreeName;
         
-        console.log(`[TaskQueue] Creating worktree with name: ${worktreeName}`);
-        console.log(`[TaskQueue] Session display name: ${sessionName}`);
-        console.log(`[TaskQueue] Target project:`, JSON.stringify({
-          id: targetProject.id,
-          name: targetProject.name,
-          build_script: targetProject.build_script,
-          run_script: targetProject.run_script
-        }, null, 2));
 
         const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
-        console.log(`[TaskQueue] Worktree created at: ${worktreePath}`);
-        console.log(`[TaskQueue] Base commit: ${baseCommit}, Base branch: ${actualBaseBranch}`);
-        console.log(`[TaskQueue] Creating session in database`);
         
         const session = await sessionManager.createSession(
           sessionName,
@@ -241,7 +230,6 @@ export class TaskQueue {
           job.data.commitMode,
           job.data.commitModeSettings
         );
-        console.log(`[TaskQueue] Session created with ID: ${session.id}`);
         
         // Attach codexConfig to the session object for the panel creation in events.ts
         if (codexConfig) {
@@ -257,11 +245,9 @@ export class TaskQueue {
         if (prompt && prompt.trim().length > 0) {
           // Add the initial prompt marker
           sessionManager.addInitialPromptMarker(session.id, prompt);
-          console.log(`[TaskQueue] Added initial prompt marker for session ${session.id}`);
 
           // Add the initial prompt to conversation messages for continuation support
           sessionManager.addConversationMessage(session.id, 'user', prompt);
-          console.log(`[TaskQueue] Added initial prompt to conversation messages for session ${session.id}`);
 
           // Add the initial prompt to output so it's visible
           const timestamp = formatForDisplay(new Date());
@@ -272,18 +258,14 @@ export class TaskQueue {
             data: initialPromptDisplay,
             timestamp: new Date()
           });
-          console.log(`[TaskQueue] Added initial prompt to session output for session ${session.id}`);
         } else {
-          console.log(`[TaskQueue] No prompt provided for session ${session.id}, skipping prompt-related initialization`);
         }
         
         // Ensure diff panel exists for this session
         await panelManager.ensureDiffPanel(session.id);
-        console.log(`[TaskQueue] Ensured diff panel exists for session ${session.id}`);
         
         // Emit the session-created event BEFORE running build script so UI shows immediately
         sessionManager.emitSessionCreated(session);
-        console.log(`[TaskQueue] Emitted session-created event for session ${session.id}`);
         
         // Run build script after session is visible in UI
         if (targetProject.build_script) {
@@ -307,8 +289,6 @@ export class TaskQueue {
           const resolvedToolType: 'claude' | 'codex' | 'none' = toolType || 'claude';
 
           if (resolvedToolType === 'codex') {
-            console.log(`[TaskQueue] Starting Codex for session ${session.id}`);
-
             // Wait for the Codex panel to be created by the session-created event handler in events.ts
             let codexPanel = null;
             let attempts = 0;
@@ -323,7 +303,6 @@ export class TaskQueue {
             }
 
             if (codexPanel) {
-              console.log(`[TaskQueue] Found Codex panel ${codexPanel.id} for session ${session.id}, starting Codex via panel`);
               const { codexPanelManager } = require('../ipc/codexPanel');
               if (codexPanelManager) {
                 try {
@@ -334,7 +313,6 @@ export class TaskQueue {
                     console.warn('[TaskQueue] Failed to add initial panel conversation message:', e);
                   }
 
-                  console.log(`[TaskQueue] Starting Codex with prompt length: ${prompt.length} characters`);
                   await codexPanelManager.startPanel(
                     codexPanel.id, 
                     session.worktreePath, 
@@ -346,7 +324,6 @@ export class TaskQueue {
                     codexConfig?.webSearch,
                     codexConfig?.thinkingLevel
                   );
-                  console.log(`[TaskQueue] Codex started successfully via panel manager for panel ${codexPanel.id} (session ${session.id})`);
                 } catch (error) {
                   console.error('[TaskQueue] Failed to start Codex via panel manager:', error);
                   throw new Error(`Failed to start Codex panel: ${error}`);
@@ -361,8 +338,6 @@ export class TaskQueue {
               throw new Error('No Codex panel found - cannot start Codex without a real panel ID');
             }
           } else if (resolvedToolType === 'claude') {
-            console.log(`[TaskQueue] Starting Claude Code for session ${session.id} with permission mode: ${permissionMode}`);
-            
             // Wait for the Claude panel to be created by the session-created event handler in events.ts
             let claudePanel = null;
             let attempts = 0;
@@ -377,8 +352,6 @@ export class TaskQueue {
             }
             
             if (claudePanel) {
-              console.log(`[TaskQueue] Found Claude panel ${claudePanel.id} for session ${session.id}, starting Claude via panel`);
-              
               // Import the claude panel manager to start Claude properly
               const { claudePanelManager } = require('../ipc/claudePanel');
               
@@ -391,16 +364,9 @@ export class TaskQueue {
                     console.warn('[TaskQueue] Failed to add initial panel conversation message:', e);
                   }
 
-                  // Log prompt details for debugging
-                  console.log(`[TaskQueue] Starting Claude with prompt length: ${prompt.length} characters`);
-                  if (prompt.includes('<attachments>')) {
-                    console.log(`[TaskQueue] Prompt contains attachments`);
-                  }
-                  
                   // Use the claude panel manager directly instead of calling IPC handlers
                   // Model is now managed at panel level
                   await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode);
-                  console.log(`[TaskQueue] Claude started successfully via panel manager for panel ${claudePanel.id} (session ${session.id})`);            
                 } catch (error) {
                   console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
                   throw new Error(`Failed to start Claude panel: ${error}`);
@@ -414,10 +380,8 @@ export class TaskQueue {
               throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
             }
           } else {
-            console.log(`[TaskQueue] Tool type '${resolvedToolType}' selected - skipping automatic AI start for session ${session.id}`);
           }
         } else {
-          console.log(`[TaskQueue] No prompt provided for session ${session.id}, skipping AI initialization`);
         }
 
         return { sessionId: session.id };
@@ -484,9 +448,7 @@ export class TaskQueue {
   }
 
   async createSession(data: CreateSessionJob): Promise<Bull.Job<CreateSessionJob> | { id: string; data: CreateSessionJob; status: string }> {
-    console.log('[TaskQueue] Adding session creation job to queue:', data);
     const job = await this.sessionQueue.add(data);
-    console.log('[TaskQueue] Job added successfully with ID:', job.id);
     return job;
   }
 
@@ -522,7 +484,6 @@ export class TaskQueue {
     if (!worktreeTemplate || worktreeTemplate.trim() === '') {
       try {
         generatedBaseName = await this.options.worktreeNameGenerator.generateWorktreeName(prompt);
-        console.log(`[TaskQueue] Generated base name for multi-session: ${generatedBaseName}`);
       } catch (error) {
         console.error('[TaskQueue] Failed to generate worktree name:', error);
         generatedBaseName = 'multi-session';
@@ -536,8 +497,6 @@ export class TaskQueue {
         const db = sessionManager.db as DatabaseService;
         const folderName = worktreeTemplate || generatedBaseName || 'Multi-session prompt';
         
-        console.log(`[TaskQueue] Creating folder for multi-session prompt. ProjectId: ${projectId}, type: ${typeof projectId}`);
-        
         // Ensure projectId is a number
         const numericProjectId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
         if (isNaN(numericProjectId)) {
@@ -546,15 +505,12 @@ export class TaskQueue {
         
         const folder = db.createFolder(folderName, numericProjectId);
         folderId = folder.id;
-        console.log(`[TaskQueue] Created folder "${folderName}" with ID ${folderId} for ${count} sessions`);
         
         // Emit folder created event immediately and wait for it to be processed
         const getMainWindow = this.options.getMainWindow;
         const mainWindow = getMainWindow();
         if (mainWindow && !mainWindow.isDestroyed()) {
-          console.log(`[TaskQueue] Emitting folder:created event for folder ${folder.id}`);
           mainWindow.webContents.send('folder:created', folder);
-          console.log(`[TaskQueue] folder:created event emitted successfully`);
           
           // Wait a bit to ensure the frontend has processed the folder event
           await new Promise(resolve => setTimeout(resolve, 200));
@@ -655,7 +611,6 @@ export class TaskQueue {
         }
       } catch (e) {
         // Ignore filesystem check errors
-        console.log('[TaskQueue] Could not check filesystem for worktree:', e);
       }
       
       // All must be unique (session name, worktree name in DB, and no filesystem conflict)

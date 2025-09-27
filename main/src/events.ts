@@ -63,11 +63,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         return;
       }
 
-      if (panelId) {
-        console.log(`[Main] ${toolLabel} spawned for panel ${panelId} (session ${sessionId}), updating status to 'running'`);
-      } else {
-        console.log(`[Main] ${toolLabel} spawned for session ${sessionId}, updating status to 'running'`);
-      }
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -77,7 +72,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       });
 
       const updatedSession = await sessionManager.getSession(sessionId);
-      console.log(`[Main] Session ${sessionId} status after update: ${updatedSession?.status}`);
 
       try {
         const session = await sessionManager.getSession(sessionId);
@@ -115,11 +109,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       }
 
       const signalText = signal === null || signal === undefined ? 'null' : String(signal);
-      if (panelId) {
-        console.log(`[Main] ${toolLabel} exited for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signalText}`);
-      } else {
-        console.log(`[Main] ${toolLabel} exited for session ${sessionId} with code ${exitCode}, signal ${signalText}`);
-      }
 
       if (exitCode !== null && exitCode !== undefined) {
         await sessionManager.setSessionExitCode(sessionId, exitCode);
@@ -129,14 +118,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       if (session) {
         const dbSession = sessionManager.getDbSession(sessionId);
         if (dbSession && dbSession.status !== 'completed') {
-          console.log(`[Main] Updating session ${sessionId} status to 'stopped'`);
           await sessionManager.updateSession(sessionId, { status: 'stopped' });
-        } else {
-          console.log(`[Main] Session ${sessionId} already marked as completed, preserving status`);
-          const updatedSession = sessionManager.getSession(sessionId);
-          if (updatedSession) {
-            console.log(`[Main] Session ${sessionId} final status: ${updatedSession.status}`);
-          }
         }
       }
 
@@ -171,7 +153,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
     
     // Auto-create AI panel for sessions with prompts
-    console.log(`[Events] Session ${session.id} created with prompt value:`, JSON.stringify(session.prompt), `Type: ${typeof session.prompt}, Length: ${session.prompt ? session.prompt.length : 'N/A'}`);
     if (session.prompt && typeof session.prompt === 'string' && session.prompt.trim().length > 0) {
       // Decide whether to create a Codex or Claude panel based on the explicit tool type when available
       const inferredToolType: 'claude' | 'codex' | 'none' = session.toolType
@@ -179,12 +160,11 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         : (session.model && getCodexModelConfig(session.model)) ? 'codex' : 'claude';
 
       if (inferredToolType === 'none') {
-        console.log(`[Events] Session ${session.id} configured with no default tool. Skipping automatic panel creation.`);
+        // Skip panel creation for sessions with no tool configured
       } else {
         const panelType = inferredToolType === 'codex' ? 'codex' : 'claude';
         const panelTitle = inferredToolType === 'codex' ? 'Codex' : 'Claude';
 
-        console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
         try {
           // Prepare initial custom state for the panel
           let customState: CodexPanelState | ClaudePanelState | undefined = undefined;
@@ -202,14 +182,12 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
               sandboxMode: codexConfig.sandboxMode || 'workspace-write',
               webSearch: codexConfig.webSearch || false
             };
-            console.log(`[Events] Creating Codex panel with customState:`, customState);
           } else if (panelType === 'claude') {
             const claudeConfig = session.claudeConfig || {};
             customState = {
               permissionMode: claudeConfig.permissionMode || 'ignore',
               model: claudeConfig.model || 'auto'
             };
-            console.log(`[Events] Creating Claude panel with customState:`, customState);
           }
           
           const panel = await panelManager.createPanel({
@@ -218,16 +196,13 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
             title: panelTitle,
             initialState: customState
           });
-          console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
           
           // Ensure the panel is set as active
           await panelManager.setActivePanel(session.id, panel.id);
-          console.log(`[Events] Set ${panelType} panel ${panel.id} as active for session ${session.id}`);
           
           // For Codex panels, also save the config to the settings column for persistence
           if (panelType === 'codex' && customState && 'codexConfig' in customState && customState.codexConfig) {
             databaseService.updatePanelSettings(panel.id, customState.codexConfig);
-            console.log(`[Events] Saved Codex panel settings to database for panel ${panel.id}`);
           }
 
           // Register with the appropriate panel manager
@@ -236,7 +211,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
               const { codexPanelManager } = require('./ipc/codexPanel');
               if (codexPanelManager) {
                 codexPanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-                console.log(`[Events] Registered Codex panel ${panel.id} for session ${session.id}`);
               } else {
                 console.warn('[Events] CodexPanelManager not initialized yet; panel will register later');
               }
@@ -244,7 +218,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
               const { claudePanelManager } = require('./ipc/claudePanel');
               if (claudePanelManager) {
                 claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-                console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
               } else {
                 console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
               }
@@ -437,11 +410,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       return; // Don't process invalid events
     }
 
-    if (panelId) {
-      console.log(`[Main] Claude Code spawned for panel ${panelId} (session ${sessionId}), updating status to 'running'`);
-    } else {
-      console.log(`[Main] Claude Code spawned for session ${sessionId}, updating status to 'running'`);
-    }
 
     // Add a small delay to ensure the session is fully initialized
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -453,7 +421,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
     // Verify the update was successful
     const updatedSession = await sessionManager.getSession(sessionId);
-    console.log(`[Main] Session ${sessionId} status after update: ${updatedSession?.status}`);
 
     // Start execution tracking
     try {
@@ -467,7 +434,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         let promptMarkers;
         if (eventsClaudePanels.length > 0 && sessionManager.getPanelPromptMarkers) {
           // Use panel-based method for migrated sessions
-          console.log(`[Events] Using panel-based prompt markers for session ${sessionId} with Claude panel ${eventsClaudePanels[0].id}`);
           promptMarkers = sessionManager.getPanelPromptMarkers(eventsClaudePanels[0].id);
         } else {
           // Use session-based method for non-migrated sessions
@@ -498,11 +464,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       return;
     }
 
-    if (panelId) {
-      console.log(`[Main] Claude Code exit summary triggered for panel ${panelId} (session ${sessionId}) with code ${exitCode}, signal ${signal}`);
-    } else {
-      console.log(`[Main] Claude Code exit summary triggered for session ${sessionId} with code ${exitCode}, signal ${signal}`);
-    }
 
     // Add commit information when session ends
     try {

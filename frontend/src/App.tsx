@@ -231,7 +231,6 @@ function App() {
     // Set up permission request listener
     const handlePermissionRequest = (...args: unknown[]) => {
       const request = args[0] as PermissionRequest;
-      console.log('[App] Received permission request:', request);
       setCurrentPermissionRequest(request);
     };
     

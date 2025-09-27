@@ -62,8 +62,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const project = sessionManager.getProjectForSession(sessionId);
       if (!project) return;
       
-      console.log(`[Git] Emitting git operation for session ${sessionId} (${session.name})`);
-      
       // Create a virtual event as if it came from the git system
       const event = {
         type: eventType,
@@ -81,8 +79,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         },
         timestamp: new Date().toISOString()
       };
-      
-      console.log(`[Git] Event data - triggeringSessionId: ${event.data.triggeringSessionId}, projectId: ${event.data.projectId}`);
       
       // Emit the event once to the panel event bus
       // All Claude panels that have subscribed will receive it
@@ -210,9 +206,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }
 
       const { commits, comparisonBranch, historySource, limitReached } = await getSessionCommitHistory(session, 50);
-
-      console.log(`[IPC:git] Getting git commits for session ${sessionId}`);
-      console.log(`[IPC:git] Found ${commits.length} commits (source: ${historySource}, comparison branch: ${comparisonBranch})`);
 
       // Transform git commits to execution format expected by frontend
       const executions = commits.map((commit, index) => ({
@@ -359,13 +352,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
   });
 
   ipcMain.handle('sessions:get-combined-diff', async (_event, sessionId: string, executionIds?: number[]) => {
-    console.log('[IPC] sessions:get-combined-diff called with:', {
-      sessionId,
-      executionIds,
-      executionIdsLength: executionIds?.length,
-      firstExecutionId: executionIds?.[0]
-    });
-    
     try {
       // Get session to find worktree path
       const session = await sessionManager.getSession(sessionId);
@@ -375,32 +361,21 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
       // Handle uncommitted changes request
       if (executionIds && executionIds.length === 1 && executionIds[0] === 0) {
-        console.log('Handling uncommitted changes request for session:', sessionId);
-        console.log('Session worktree path:', session.worktreePath);
-        
         // Verify the worktree exists and has uncommitted changes
         try {
           const status = execSync('git status --porcelain', { 
             cwd: session.worktreePath, 
             encoding: 'utf8' 
           });
-          console.log('Git status before getting diff:', status || '(no changes)');
         } catch (error) {
           console.error('Error checking git status:', error);
         }
         
         const uncommittedDiff = await gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
-        console.log('Uncommitted diff result:', {
-          hasDiff: !!uncommittedDiff.diff,
-          diffLength: uncommittedDiff.diff?.length,
-          stats: uncommittedDiff.stats,
-          changedFiles: uncommittedDiff.changedFiles
-        });
         return { success: true, data: uncommittedDiff };
       }
 
       const { commits, comparisonBranch, historySource } = await getSessionCommitHistory(session, 50);
-      console.log(`[IPC] Combined diff commit history source: ${historySource}, comparison branch: ${comparisonBranch}, commits: ${commits.length}`);
 
       if (!commits.length) {
         return {
@@ -628,7 +603,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
   // Git rebase operations
   ipcMain.handle('sessions:check-rebase-conflicts', async (_event, sessionId: string) => {
     try {
-      console.log(`[IPC:git] Checking for rebase conflicts for session ${sessionId}`);
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
         return { success: false, error: 'Session not found' };
@@ -664,40 +638,32 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
   });
 
   ipcMain.handle('sessions:rebase-main-into-worktree', async (_event, sessionId: string) => {
-    console.log(`[IPC:git] Starting rebase-main-into-worktree for session ${sessionId}`);
     try {
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
-        console.log(`[IPC:git] Session ${sessionId} not found`);
         return { success: false, error: 'Session not found' };
       }
 
       if (!session.worktreePath) {
-        console.log(`[IPC:git] Session ${sessionId} has no worktree path`);
         return { success: false, error: 'Session has no worktree path' };
       }
 
       // Get the project to find the main branch
       const project = sessionManager.getProjectForSession(sessionId);
       if (!project) {
-        console.log(`[IPC:git] Project not found for session ${sessionId}`);
         return { success: false, error: 'Project not found for session' };
       }
 
-      console.log(`[IPC:git] Getting main branch for project at ${project.path}`);
       // Get the main branch from the project directory's current branch
       const mainBranch = await Promise.race([
         worktreeManager.getProjectMainBranch(project.path),
         new Promise((_, reject) => setTimeout(() => reject(new Error('getProjectMainBranch timeout')), 30000))
       ]) as string;
-      console.log(`[IPC:git] Main branch: ${mainBranch}`);
 
       // Check for conflicts before attempting rebase
-      console.log(`[IPC:git] Checking for potential conflicts before rebase`);
       const conflictCheck = await worktreeManager.checkForRebaseConflicts(session.worktreePath, mainBranch);
       
       if (conflictCheck.hasConflicts) {
-        console.log(`[IPC:git] Conflicts detected, aborting rebase`);
         
         // Build detailed error message
         let errorMessage = `Rebase would result in conflicts. Cannot proceed automatically.\n\n`;
@@ -764,12 +730,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         mainBranch
       });
 
-      console.log(`[IPC:git] Starting rebase operation for session ${sessionId}`);
       await Promise.race([
         worktreeManager.rebaseMainIntoWorktree(session.worktreePath, mainBranch),
         new Promise((_, reject) => setTimeout(() => reject(new Error('rebaseMainIntoWorktree timeout')), 120000))
       ]);
-      console.log(`[IPC:git] Rebase operation completed for session ${sessionId}`);
 
       // Emit git operation completed event to all sessions in project
       const successMessage = `✓ Successfully rebased ${mainBranch} into worktree`;
@@ -778,14 +742,12 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         mainBranch
       });
 
-      console.log(`[IPC:git] Refreshing git status for session ${sessionId}`);
       // Refresh git status for this session after rebasing from main
       // Don't let this block the response - run it in background
       refreshGitStatusForSession(sessionId).catch(error => {
         console.error(`[IPC:git] Failed to refresh git status for session ${sessionId}:`, error);
       });
 
-      console.log(`[IPC:git] Rebase operation successful for session ${sessionId}`);
       return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
     } catch (error: unknown) {
       console.error(`[IPC:git] Failed to rebase main into worktree for session ${sessionId}:`, error);
@@ -821,8 +783,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
   ipcMain.handle('sessions:abort-rebase-and-use-claude', async (_event, sessionId: string) => {
     try {
-      console.log(`[IPC:git] Starting abort-rebase-and-use-claude for session ${sessionId}`);
-      
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
         return { success: false, error: 'Session not found' };
@@ -846,7 +806,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       try {
         const statusOutput = execSync('git status --porcelain=v1', { cwd: session.worktreePath }).toString();
         if (statusOutput.includes('rebase')) {
-          console.log(`[IPC:git] Aborting existing rebase in ${session.worktreePath}`);
           await worktreeManager.abortRebase(session.worktreePath);
           
           // Emit git operation event about aborting the rebase
@@ -854,20 +813,15 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           emitGitOperationToProject(sessionId, 'git:operation_completed', abortMessage, {
             operation: 'abort_rebase'
           });
-        } else {
-          console.log(`[IPC:git] No rebase in progress, proceeding to create Claude panel`);
         }
       } catch (abortError: unknown) {
         // Not in a rebase state or already clean - that's fine
-        console.log('[IPC:git] No rebase to abort or already clean:', abortError instanceof Error ? abortError.message : String(abortError));
       }
 
       // Create a new Claude panel to handle the rebase and conflicts
       const prompt = `Please rebase the local ${mainBranch} branch (not origin/${mainBranch}) into this branch and resolve all conflicts`;
       
       try {
-        console.log(`[IPC:git] Creating new Claude panel for session ${sessionId} to handle rebase`);
-        
         // Create a new Claude panel
         const panel = await panelManager.createPanel({
           sessionId: sessionId,
@@ -875,17 +829,13 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           title: 'Claude - Resolve Conflicts'
         });
         
-        console.log(`[IPC:git] Created Claude panel ${panel.id} for session ${sessionId}`);
-        
         // Get the claudePanelManager from the claudePanel module
         const { claudePanelManager } = require('./claudePanel');
         
         // Register the panel with the Claude panel manager
-        console.log(`[IPC:git] Registering panel ${panel.id} with claudePanelManager`);
         claudePanelManager.registerPanel(panel.id, sessionId, panel.state.customState);
         
         // Start Claude in the new panel with the rebase prompt
-        console.log(`[IPC:git] Starting Claude in panel ${panel.id} with rebase prompt`);
         await claudePanelManager.startPanel(
           panel.id,
           session.worktreePath,
@@ -902,7 +852,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
           timestamp: new Date()
         });
         
-        console.log(`[IPC:git] Successfully created Claude panel to handle rebase`);
         return { 
           success: true, 
           data: { 
@@ -941,33 +890,27 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
   });
 
   ipcMain.handle('sessions:squash-and-rebase-to-main', async (_event, sessionId: string, commitMessage: string) => {
-    console.log(`[IPC:git] Starting squash-and-rebase-to-main for session ${sessionId}`);
     try {
       const session = await sessionManager.getSession(sessionId);
       if (!session) {
-        console.log(`[IPC:git] Session ${sessionId} not found`);
         return { success: false, error: 'Session not found' };
       }
 
       if (!session.worktreePath) {
-        console.log(`[IPC:git] Session ${sessionId} has no worktree path`);
         return { success: false, error: 'Session has no worktree path' };
       }
 
       // Get the project to find the main branch and project path
       const project = sessionManager.getProjectForSession(sessionId);
       if (!project) {
-        console.log(`[IPC:git] Project not found for session ${sessionId}`);
         return { success: false, error: 'Project not found for session' };
       }
 
-      console.log(`[IPC:git] Getting main branch for project at ${project.path}`);
       // Get the effective main branch (override or auto-detected)
       const mainBranch = await Promise.race([
         worktreeManager.getProjectMainBranch(project.path),
         new Promise((_, reject) => setTimeout(() => reject(new Error('getProjectMainBranch timeout')), 30000))
       ]) as string;
-      console.log(`[IPC:git] Main branch: ${mainBranch}`);
 
       // Emit git operation started event to all sessions in project
       const startMessage = `🔄 GIT OPERATION\nSquashing commits and rebasing to ${mainBranch}...\nCommit message: ${commitMessage.split('\n')[0]}${commitMessage.includes('\n') ? '...' : ''}`;
@@ -977,12 +920,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         commitMessage: commitMessage.split('\n')[0]
       });
 
-      console.log(`[IPC:git] Starting squash and rebase operation for session ${sessionId}`);
       await Promise.race([
         worktreeManager.squashAndRebaseWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage),
         new Promise((_, reject) => setTimeout(() => reject(new Error('squashAndRebaseWorktreeToMain timeout')), 180000))
       ]);
-      console.log(`[IPC:git] Squash and rebase operation completed for session ${sessionId}`);
 
       // Emit git operation completed event to all sessions in project
       const successMessage = `✓ Successfully squashed and rebased worktree to ${mainBranch}`;
@@ -991,7 +932,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         mainBranch
       });
 
-      console.log(`[IPC:git] Refreshing git status for project ${session.projectId}`);
       // Refresh git status for ALL sessions in the project since main was updated
       // Don't let this block the response - run it in background
       if (session.projectId !== undefined) {
@@ -1000,7 +940,6 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         });
       }
       
-      console.log(`[IPC:git] Squash and rebase operation successful for session ${sessionId}`);
       return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
     } catch (error: unknown) {
       console.error(`[IPC:git] Failed to squash and rebase worktree to main for session ${sessionId}:`, error);

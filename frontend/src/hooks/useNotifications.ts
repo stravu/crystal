@@ -126,7 +126,6 @@ export function useNotifications() {
     // If this is the initial load (prevSessions is empty and we have sessions),
     // just update the ref without triggering notifications
     if (!initialLoadComplete.current && prevSessions.length === 0 && sessions.length > 0) {
-      console.log('[useNotifications] Initial session load detected, skipping notifications for', sessions.length, 'sessions');
       prevSessionsRef.current = sessions;
       initialLoadComplete.current = true;
       return;
