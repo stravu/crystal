@@ -71,7 +71,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   useEffect(() => {
     if (isVisible && !lastVisibleState) {
       // Tab just became visible - force refresh to get latest git state
-      console.log('Diff panel became visible, forcing refresh of git data...');
+//       console.log('Diff panel became visible, forcing refresh of git data...');
       setForceRefresh(prev => prev + 1); // Increment to trigger reload
       setCombinedDiff(null); // Clear diff data
       setSelectedExecutions([]); // Clear selection to force re-selection
@@ -169,31 +169,31 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
           setLoading(true);
           setError(null);
           
-          console.log('CombinedDiffView loadCombinedDiff called:', {
-            sessionId,
-            selectedExecutions,
-            executionsLength: executions.length
-          });
+          // console.log('CombinedDiffView loadCombinedDiff called:', {
+          //   sessionId,
+          //   selectedExecutions,
+          //   executionsLength: executions.length
+          // });
           
           let response;
           if (selectedExecutions.length === 1) {
             // For single commit selection
             if (selectedExecutions[0] === 0) {
               // Special case for uncommitted changes - pass as single element array
-              console.log('Requesting uncommitted changes for session:', sessionId, 'with executionIds:', [0]);
+//               console.log('Requesting uncommitted changes for session:', sessionId, 'with executionIds:', [0]);
               response = await API.sessions.getCombinedDiff(sessionId, [0]);
             } else {
               // For regular commits, pass it as a range with the same ID
-              console.log('Requesting single commit:', selectedExecutions[0]);
+//               console.log('Requesting single commit:', selectedExecutions[0]);
               response = await API.sessions.getCombinedDiff(sessionId, [selectedExecutions[0], selectedExecutions[0]]);
             }
           } else if (selectedExecutions.length === executions.length) {
             // Get all diffs
-            console.log('Getting all diffs');
+//             console.log('Getting all diffs');
             response = await API.sessions.getCombinedDiff(sessionId);
           } else {
             // Get selected diffs (range)
-            console.log('Requesting range of diffs:', selectedExecutions);
+//             console.log('Requesting range of diffs:', selectedExecutions);
             response = await API.sessions.getCombinedDiff(sessionId, selectedExecutions);
           }
           
@@ -202,12 +202,12 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
           }
           
           const data = response.data;
-          console.log('Received diff data:', {
-            hasDiff: !!data?.diff,
-            diffLength: data?.diff?.length,
-            stats: data?.stats,
-            isUncommitted: selectedExecutions.length === 1 && selectedExecutions[0] === 0
-          });
+          // console.log('Received diff data:', {
+          //   hasDiff: !!data?.diff,
+          //   diffLength: data?.diff?.length,
+          //   stats: data?.stats,
+          //   isUncommitted: selectedExecutions.length === 1 && selectedExecutions[0] === 0
+          // });
           setCombinedDiff(data);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to load combined diff');
@@ -232,7 +232,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   };
 
   const handleManualRefresh = () => {
-    console.log('Manual refresh triggered');
+//     console.log('Manual refresh triggered');
     setForceRefresh(prev => prev + 1);
     setCombinedDiff(null);
     setSelectedExecutions([]);
@@ -248,7 +248,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
     // Refresh executions list to show uncommitted changes
     const refreshExecutions = async () => {
       try {
-        console.log('Refreshing executions after file save');
+//         console.log('Refreshing executions after file save');
         const response = await API.sessions.getExecutions(sessionId);
         if (response.success) {
           setExecutions(response.data);
@@ -264,7 +264,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       // Reload the uncommitted changes diff
       const loadUncommittedDiff = async () => {
         try {
-          console.log('Refreshing uncommitted changes after file save');
+//           console.log('Refreshing uncommitted changes after file save');
           const response = await API.sessions.getCombinedDiff(sessionId, [0]);
           if (response.success) {
             setCombinedDiff(response.data);
@@ -278,7 +278,7 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   }, [sessionId, selectedExecutions]);
 
   const handleCommit = useCallback(async (message: string) => {
-    console.log('Committing with message:', message);
+//     console.log('Committing with message:', message);
     
     const result = await window.electronAPI.invoke('git:commit', {
       sessionId,

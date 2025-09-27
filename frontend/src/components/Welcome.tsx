@@ -17,15 +17,15 @@ export default function Welcome({ isOpen, onClose }: WelcomeProps) {
     const loadPreference = async () => {
       if (window.electron?.invoke) {
         try {
-          console.log('[Welcome] Loading hide_welcome preference...');
+//           console.log('[Welcome] Loading hide_welcome preference...');
           const result = await window.electron.invoke('preferences:get', 'hide_welcome');
-          console.log('[Welcome] Preference result:', result);
+//           console.log('[Welcome] Preference result:', result);
           
           if (result?.success) {
             // Handle null (preference doesn't exist) as false
             const shouldHide = result.data === 'true';
             setDontShowAgain(shouldHide);
-            console.log('[Welcome] Set dontShowAgain to:', shouldHide);
+//             console.log('[Welcome] Set dontShowAgain to:', shouldHide);
           } else {
             console.error('[Welcome] Failed to load preference:', result?.error);
           }
@@ -164,13 +164,13 @@ export default function Welcome({ isOpen, onClose }: WelcomeProps) {
         <Button
           onClick={async () => {
             const newValue = !dontShowAgain;
-            console.log('[Welcome Debug] Don\'t show again clicked:', newValue);
+//             console.log('[Welcome Debug] Don\'t show again clicked:', newValue);
             setDontShowAgain(newValue);
             if (window.electron?.invoke) {
               try {
                 const result = await window.electron.invoke('preferences:set', 'hide_welcome', newValue ? 'true' : 'false');
                 if (result?.success) {
-                  console.log('[Welcome Debug] Successfully set hide_welcome preference to', newValue);
+//                   console.log('[Welcome Debug] Successfully set hide_welcome preference to', newValue);
                 } else {
                   console.error('[Welcome Debug] Failed to set preference:', result?.error);
                 }

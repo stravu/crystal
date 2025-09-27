@@ -21,12 +21,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     [panel.state?.customState]
   );
   
-  console.log('[EditorPanel] Rendering with state:', {
-    panelId: panel.id,
-    isActive,
-    editorState,
-    panelState: panel.state
-  });
+  // console.log('[EditorPanel] Rendering with state:', {
+  //   panelId: panel.id,
+  //   isActive,
+  //   editorState,
+  //   panelState: panel.state
+  // });
   
   // Mark panel as viewed when it becomes active
   useEffect(() => {
@@ -54,10 +54,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   // Initialize debounced function immediately to prevent warning
   if (!debouncedUpdateRef.current) {
     debouncedUpdateRef.current = debounce((panelId: string, newState: Partial<EditorPanelState>) => {
-      console.log('[EditorPanel] Saving state to database:', {
-        panelId,
-        newState
-      });
+      // console.log('[EditorPanel] Saving state to database:', {
+      //   panelId,
+      //   newState
+      // });
       
       // Get the latest panel state from the store when actually saving
       const currentPanel = panel; // This might be stale, but we use panelId
@@ -68,12 +68,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         customState: newState // Just save the new state directly
       };
       
-      console.log('[EditorPanel] Full state being saved:', stateToSave);
+      // console.log('[EditorPanel] Full state being saved:', stateToSave);
       
       panelApi.updatePanel(panelId, {
         state: stateToSave
       }).then(() => {
-        console.log('[EditorPanel] State saved successfully');
+        // console.log('[EditorPanel] State saved successfully');
       }).catch(err => {
         console.error('[EditorPanel] Failed to update editor panel state:', err);
       });
@@ -105,7 +105,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   
   // Save state changes to the panel
   const handleStateChange = useCallback((newState: Partial<EditorPanelState>) => {
-    console.log('[EditorPanel] handleStateChange called with:', newState);
+//     console.log('[EditorPanel] handleStateChange called with:', newState);
     
     // Get the current state directly from panel prop to avoid stale closure
     const currentState = panel.state?.customState as EditorPanelState;
@@ -116,11 +116,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
       ...newState
     };
     
-    console.log('[EditorPanel] Merged state:', mergedState);
+//     console.log('[EditorPanel] Merged state:', mergedState);
     
     // Call debounced update
     if (debouncedUpdateRef.current) {
-      console.log('[EditorPanel] Calling debounced update');
+//       console.log('[EditorPanel] Calling debounced update');
       debouncedUpdateRef.current(panel.id, mergedState);
     } else {
       console.error('[EditorPanel] No debounced update function!');

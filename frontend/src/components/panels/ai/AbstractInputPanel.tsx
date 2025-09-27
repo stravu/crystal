@@ -160,7 +160,7 @@ export abstract class AbstractInputPanel<
       this.setState(prevState => ({
         attachedTexts: [...prevState.attachedTexts, textAttachment]
       }));
-      console.log(`[Input] Automatically attached ${textData.length} characters from paste`);
+//       console.log(`[Input] Automatically attached ${textData.length} characters from paste`);
       return;
     }
 

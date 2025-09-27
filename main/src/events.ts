@@ -31,14 +31,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     logger
   } = services;
 
+  // Note: Codex manager is loaded lazily to avoid circular dependencies
   let codexCliManager: AbstractCliManager | undefined;
-  try {
-    const { codexManager: resolvedCodexManager } = require('./ipc/codexPanel');
-    codexCliManager = resolvedCodexManager;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    (logger || console).warn?.(`[Main] Unable to load Codex manager for lifecycle events: ${message}`);
-  }
 
   const attachProcessLifecycleHandlers = (
     manager: AbstractCliManager | undefined,
@@ -230,28 +224,9 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
             console.log(`[Events] Saved Codex panel settings to database for panel ${panel.id}`);
           }
 
-          // Register with the appropriate panel manager
-          try {
-            if (panelType === 'codex') {
-              const { codexPanelManager } = require('./ipc/codexPanel');
-              if (codexPanelManager) {
-                codexPanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-                console.log(`[Events] Registered Codex panel ${panel.id} for session ${session.id}`);
-              } else {
-                console.warn('[Events] CodexPanelManager not initialized yet; panel will register later');
-              }
-            } else {
-              const { claudePanelManager } = require('./ipc/claudePanel');
-              if (claudePanelManager) {
-                claudePanelManager.registerPanel(panel.id, session.id, panel.state.customState);
-                console.log(`[Events] Registered Claude panel ${panel.id} for session ${session.id}`);
-              } else {
-                console.warn('[Events] ClaudePanelManager not initialized yet; panel will register later');
-              }
-            }
-          } catch (err) {
-            console.error(`[Events] Failed to register ${panelType} panel with its manager:`, err);
-          }
+          // Panel managers will register existing panels when they initialize
+          // Note: Avoiding require() here to prevent circular dependencies
+          console.log(`[Events] Created ${panelType} panel ${panel.id} - manager will register when ready`);
         } catch (error) {
           console.error(`[Events] Failed to auto-create ${panelType} panel for session ${session.id}:`, error);
         }

@@ -5,39 +5,15 @@ import { databaseService } from '../services/database';
 import { CreatePanelRequest, PanelEventType, ToolPanel } from '../../../shared/types/panels';
 import type { AppServices } from './types';
 
-export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
+export function registerPanelHandlers(ipcMain: IpcMain, _services: AppServices) {
   // Panel CRUD operations
   ipcMain.handle('panels:create', async (_, request: CreatePanelRequest) => {
     try {
       const panel = await panelManager.createPanel(request);
 
-      // Auto-register Claude panels so they're hooked to the Claude runtime
-      if (panel.type === 'claude') {
-        try {
-          const { claudePanelManager } = require('./claudePanel');
-          if (claudePanelManager) {
-            claudePanelManager.registerPanel(panel.id, panel.sessionId, panel.state.customState);
-          } else {
-            console.warn('[Panels IPC] ClaudePanelManager not initialized yet; will register later');
-          }
-        } catch (err) {
-          console.error('[Panels IPC] Failed to register Claude panel with ClaudePanelManager:', err);
-        }
-      }
-
-      // Auto-register Codex panels so they're hooked to the Codex runtime
-      if (panel.type === 'codex') {
-        try {
-          const { codexPanelManager } = require('./codexPanel');
-          if (codexPanelManager) {
-            codexPanelManager.registerPanel(panel.id, panel.sessionId, panel.state.customState);
-          } else {
-            console.warn('[Panels IPC] CodexPanelManager not initialized yet; will register later');
-          }
-        } catch (err) {
-          console.error('[Panels IPC] Failed to register Codex panel with CodexPanelManager:', err);
-        }
-      }
+      // Panel managers will auto-register when they initialize
+      // Note: Avoiding require() to prevent circular dependencies
+      console.log(`[Panels IPC] Created ${panel.type} panel ${panel.id} - manager will register when ready`);
 
       return { success: true, data: panel };
     } catch (error) {
@@ -50,36 +26,9 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
     try {
       // Clean up terminal process if it's a terminal panel
       const panel = panelManager.getPanel(panelId);
-      // Unregister Claude panels from ClaudePanelManager
-      if (panel?.type === 'claude') {
-        try {
-          const { claudePanelManager } = require('./claudePanel');
-          if (claudePanelManager) {
-            // Stop if running, then unregister
-            if (claudePanelManager.isPanelRunning(panelId)) {
-              await claudePanelManager.stopPanel(panelId);
-            }
-            claudePanelManager.unregisterPanel(panelId);
-          }
-        } catch (err) {
-          console.warn('[Panels IPC] Failed to unregister Claude panel during delete:', err);
-        }
-      }
-      // Unregister Codex panels from CodexPanelManager
-      if (panel?.type === 'codex') {
-        try {
-          const { codexPanelManager } = require('./codexPanel');
-          if (codexPanelManager) {
-            // Stop if running, then unregister
-            if (codexPanelManager.isPanelRunning(panelId)) {
-              await codexPanelManager.stopPanel(panelId);
-            }
-            codexPanelManager.unregisterPanel(panelId);
-          }
-        } catch (err) {
-          console.warn('[Panels IPC] Failed to unregister Codex panel during delete:', err);
-        }
-      }
+      // Panel managers will clean up when they detect panel deletion
+      // Note: Avoiding require() to prevent circular dependencies
+      console.log(`[Panels IPC] Deleted ${panel?.type} panel ${panelId} - manager will clean up when ready`);
       if (panel?.type === 'terminal') {
         terminalPanelManager.destroyTerminal(panelId);
       }

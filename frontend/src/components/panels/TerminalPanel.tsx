@@ -60,24 +60,24 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
         
         // Check if already initialized on backend
         const initialized = await window.electronAPI.invoke('panels:checkInitialized', panel.id);
-        console.log('[TerminalPanel] Panel already initialized?', initialized);
+//         console.log('[TerminalPanel] Panel already initialized?', initialized);
         
         if (!initialized) {
           // Initialize backend PTY process
-          console.log('[TerminalPanel] Initializing backend PTY process...');
+//           console.log('[TerminalPanel] Initializing backend PTY process...');
           // Use workingDirectory and sessionId if available, but don't require them
           await window.electronAPI.invoke('panels:initialize', panel.id, {
             cwd: workingDirectory || process.cwd(),
             sessionId: sessionId || panel.sessionId
           });
-          console.log('[TerminalPanel] Backend PTY process initialized');
+//           console.log('[TerminalPanel] Backend PTY process initialized');
         } else {
           // Terminal is already initialized, get its state to restore scrollback
-          console.log('[TerminalPanel] Restoring terminal state from backend...');
+//           console.log('[TerminalPanel] Restoring terminal state from backend...');
           const terminalState = await window.electronAPI.invoke('terminal:getState', panel.id);
           if (terminalState && terminalState.scrollbackBuffer) {
             // We'll restore this to the terminal after it's created
-            console.log('[TerminalPanel] Found scrollback buffer with', terminalState.scrollbackBuffer.length, 'lines');
+//             console.log('[TerminalPanel] Found scrollback buffer with', terminalState.scrollbackBuffer.length, 'lines');
             // Store for restoration after terminal is created
             window.__terminalRestoreState = terminalState;
           }
@@ -87,7 +87,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
         if (disposed) return;
 
         // Create XTerm instance
-        console.log('[TerminalPanel] Creating XTerm instance...');
+//         console.log('[TerminalPanel] Creating XTerm instance...');
         terminal = new Terminal({
           fontSize: 14,
           fontFamily: 'Menlo, Monaco, "Courier New", monospace',
@@ -97,19 +97,19 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
           },
           scrollback: 50000
         });
-        console.log('[TerminalPanel] XTerm instance created:', !!terminal);
+//         console.log('[TerminalPanel] XTerm instance created:', !!terminal);
 
         fitAddon = new FitAddon();
         terminal.loadAddon(fitAddon);
-        console.log('[TerminalPanel] FitAddon loaded');
+//         console.log('[TerminalPanel] FitAddon loaded');
         
         // FIX: Additional check before DOM manipulation
         if (terminalRef.current && !disposed) {
-          console.log('[TerminalPanel] Opening terminal in DOM element:', terminalRef.current);
+//           console.log('[TerminalPanel] Opening terminal in DOM element:', terminalRef.current);
           terminal.open(terminalRef.current);
-          console.log('[TerminalPanel] Terminal opened in DOM');
+//           console.log('[TerminalPanel] Terminal opened in DOM');
           fitAddon.fit();
-          console.log('[TerminalPanel] FitAddon fitted');
+//           console.log('[TerminalPanel] FitAddon fitted');
           
           xtermRef.current = terminal;
           fitAddonRef.current = fitAddon;
@@ -121,10 +121,10 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
             let restoredContent: string;
             if (typeof restoreState.scrollbackBuffer === 'string') {
               restoredContent = restoreState.scrollbackBuffer;
-              console.log('[TerminalPanel] Restoring', restoredContent.length, 'chars of scrollback');
+//               console.log('[TerminalPanel] Restoring', restoredContent.length, 'chars of scrollback');
             } else if (Array.isArray(restoreState.scrollbackBuffer)) {
               restoredContent = restoreState.scrollbackBuffer.join('\n');
-              console.log('[TerminalPanel] Restoring', restoreState.scrollbackBuffer.length, 'lines of scrollback');
+//               console.log('[TerminalPanel] Restoring', restoreState.scrollbackBuffer.length, 'lines of scrollback');
             } else {
               restoredContent = '';
             }
@@ -136,16 +136,16 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
           }
           
           setIsInitialized(true);
-          console.log('[TerminalPanel] Terminal initialization complete, isInitialized set to true');
+//           console.log('[TerminalPanel] Terminal initialization complete, isInitialized set to true');
 
           // Set up IPC communication for terminal I/O
           const outputHandler = (data: { panelId?: string; sessionId?: string; output?: string } | unknown) => {
             // Check if this is panel terminal output (has panelId) vs session terminal output (has sessionId)
             if (data && typeof data === 'object' && 'panelId' in data && data.panelId && 'output' in data) {
               const typedData = data as { panelId: string; output: string };
-              console.log('[TerminalPanel] Received panel output for:', typedData.panelId, 'Current panel:', panel.id);
+//               console.log('[TerminalPanel] Received panel output for:', typedData.panelId, 'Current panel:', panel.id);
               if (typedData.panelId === panel.id && terminal && !disposed) {
-                console.log('[TerminalPanel] Writing to terminal:', typedData.output.substring(0, 50) + '...');
+//                 console.log('[TerminalPanel] Writing to terminal:', typedData.output.substring(0, 50) + '...');
                 terminal.write(typedData.output);
               }
             }
@@ -153,7 +153,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
           };
 
           const unsubscribeOutput = window.electronAPI.events.onTerminalOutput(outputHandler);
-          console.log('[TerminalPanel] Subscribed to terminal output events for panel:', panel.id);
+//           console.log('[TerminalPanel] Subscribed to terminal output events for panel:', panel.id);
 
           // Handle terminal input
           const inputDisposable = terminal.onData((data) => {
@@ -200,7 +200,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
       // Dispose XTerm instance only on final unmount
       if (xtermRef.current) {
         try {
-          console.log('[TerminalPanel] Disposing terminal for panel:', panel.id);
+//           console.log('[TerminalPanel] Disposing terminal for panel:', panel.id);
           xtermRef.current.dispose();
         } catch (e) {
           console.warn('Error disposing terminal:', e);
@@ -224,7 +224,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
   // Handle visibility changes (resize when becoming visible)
   useEffect(() => {
     if (isActive && fitAddonRef.current && xtermRef.current) {
-      console.log('[TerminalPanel] Panel became active, fitting terminal');
+//       console.log('[TerminalPanel] Panel became active, fitting terminal');
       // Small delay to ensure DOM is ready
       setTimeout(() => {
         if (fitAddonRef.current) {

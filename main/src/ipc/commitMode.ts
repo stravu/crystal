@@ -8,7 +8,7 @@ import type { Logger } from '../utils/logger';
 import type { SessionManager } from '../services/sessionManager';
 import type { Session } from '../types/session';
 
-export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger, sessionManager?: SessionManager): void {
+export function registerCommitModeHandlers(db: DatabaseService, logger?: Logger, _sessionManager?: SessionManager): void {
   // Get project characteristics for commit mode detection
   ipcMain.handle('commit-mode:get-project-characteristics', async (
     _event: IpcMainInvokeEvent,

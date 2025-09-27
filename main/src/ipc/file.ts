@@ -2,6 +2,8 @@ import { IpcMain } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { AppServices } from './types';
 import type { Session } from '../types/session';
 
@@ -224,8 +226,7 @@ export function registerFileHandlers(ipcMain: IpcMain, services: AppServices): v
         throw new Error('Commit message is required');
       }
 
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
+      // Using imports from top of file
       const execAsync = promisify(exec);
 
       try {
@@ -308,8 +309,7 @@ EOF
         throw new Error('Commit hash is required');
       }
 
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
+      // Using imports from top of file
       const execAsync = promisify(exec);
 
       try {
@@ -338,8 +338,7 @@ EOF
         throw new Error(`Session not found: ${request.sessionId}`);
       }
 
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
+      // Using imports from top of file
       const execAsync = promisify(exec);
 
       try {
@@ -376,8 +375,7 @@ EOF
         throw new Error('Invalid file path');
       }
 
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
+      // Using imports from top of file
       const execAsync = promisify(exec);
 
       try {
@@ -581,8 +579,7 @@ EOF
       }
 
       // Get list of tracked files (not gitignored) using git
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
+      // Using imports from top of file
       const execAsync = promisify(exec);
       
       let gitTrackedFiles = new Set<string>();

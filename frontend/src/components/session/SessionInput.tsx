@@ -40,10 +40,10 @@ export const SessionInput: React.FC<SessionInputProps> = ({
 
   useEffect(() => {
     // Model is now managed at panel level, not session level
-    console.log('[SessionInput] Session changed:', {
-      id: activeSession.id,
-      name: activeSession.name
-    });
+    // console.log('[SessionInput] Session changed:', {
+    //   id: activeSession.id,
+    //   name: activeSession.name
+    // });
     setSelectedModel('auto');
   }, [activeSession.id]); // Only reset when session ID changes
 
@@ -54,7 +54,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
       
       // Prevent duplicate submissions
       if (isSubmitting) {
-        console.log('[SessionInput] Ignoring duplicate submission attempt');
+        // console.log('[SessionInput] Ignoring duplicate submission attempt');
         return;
       }
       
@@ -76,7 +76,7 @@ export const SessionInput: React.FC<SessionInputProps> = ({
   const onClickSend = async () => {
     // Prevent duplicate submissions
     if (isSubmitting) {
-      console.log('[SessionInput] Ignoring duplicate submission attempt');
+      // console.log('[SessionInput] Ignoring duplicate submission attempt');
       return;
     }
     

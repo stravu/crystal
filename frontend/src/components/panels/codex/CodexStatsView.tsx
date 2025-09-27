@@ -38,7 +38,7 @@ export const CodexStatsView: React.FC<CodexStatsViewProps> = ({ sessionId }) => 
   const loadStats = async () => {
     try {
       // TODO: Load actual stats from backend
-      console.log('[CodexStatsView] Loading stats for session:', sessionId);
+//       console.log('[CodexStatsView] Loading stats for session:', sessionId);
       
       // Mock stats for now
       setStats({

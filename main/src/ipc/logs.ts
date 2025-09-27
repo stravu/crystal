@@ -12,7 +12,7 @@ interface LogEntry {
 // Store logs per session in memory
 const sessionLogs = new Map<string, LogEntry[]>();
 
-export function setupLogHandlers(sessionManager: SessionManager) {
+export function setupLogHandlers(_sessionManager: SessionManager) {
   // Get logs for a session
   ipcMain.handle('sessions:get-logs', async (_event, sessionId: string) => {
     try {
