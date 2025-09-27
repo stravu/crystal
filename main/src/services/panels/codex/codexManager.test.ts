@@ -17,12 +17,12 @@ const testLogger = {
 // Mock session manager
 const mockSessionManager = {
   db: {
-    getPanel: (_panelId: string) => null
+    getPanel: (panelId: string) => null
   },
   getDbSession: (sessionId: string) => ({ id: sessionId }),
-  getProjectById: (_projectId: string) => null,
-  getPanelClaudeSessionId: (_panelId: string) => null,
-  updateSession: (_sessionId: string, _updates: Record<string, unknown>) => {}
+  getProjectById: (projectId: string) => null,
+  getPanelClaudeSessionId: (panelId: string) => null,
+  updateSession: (sessionId: string, updates: Record<string, unknown>) => {}
 };
 
 // Mock config manager

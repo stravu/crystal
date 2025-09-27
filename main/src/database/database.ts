@@ -280,10 +280,26 @@ export class DatabaseService {
         }
 
         // Import existing config as default project if it exists
-        // NOTE: Skipping this migration to avoid circular dependency with configManager
-        // This legacy migration is no longer needed as projects are now managed separately
         try {
-          console.log('Skipping legacy project migration to avoid circular dependency');
+          const configManager = require('../services/configManager').configManager;
+          const gitRepoPath = configManager.getGitRepoPath();
+          
+          if (gitRepoPath) {
+            const projectName = gitRepoPath.split('/').pop() || 'Default Project';
+            const result = this.db.prepare(`
+              INSERT INTO projects (name, path, active)
+              VALUES (?, ?, 1)
+            `).run(projectName, gitRepoPath);
+            
+            // Update existing sessions to use this project
+            if (result.lastInsertRowid) {
+              this.db.prepare(`
+                UPDATE sessions 
+                SET project_id = ?
+                WHERE project_id IS NULL
+              `).run(result.lastInsertRowid);
+            }
+          }
         } catch {
           // Config manager not available during initial setup
           console.log('Skipping default project creation during initial setup');
@@ -991,8 +1007,8 @@ export class DatabaseService {
           );
 
           // Create Claude panel settings with default model from config
-          // Use fallback model to avoid circular dependency
-          const defaultModel = 'claude-3-5-sonnet-20241022';
+          const { configManager } = require('../services/configManager');
+          const defaultModel = configManager.getDefaultModel() || 'claude-3-opus-20240229';
           this.db.prepare(`
             INSERT INTO claude_panel_settings (panel_id, model)
             VALUES (?, ?)
@@ -1063,7 +1079,7 @@ export class DatabaseService {
           
           if (!hasDiffPanel) {
             // Create diff panel for this session
-            const panelId = 'diff-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+            const panelId = require('uuid').v4();
             const now = new Date().toISOString();
             
             this.db.prepare(`
@@ -2788,7 +2804,7 @@ export class DatabaseService {
         if (data.cache_creation_input_tokens) {
           totalCacheCreationTokens += data.cache_creation_input_tokens;
         }
-      } catch {
+      } catch (e) {
         // Ignore parse errors
       }
     });
@@ -2878,7 +2894,7 @@ export class DatabaseService {
     let totalToolCalls = 0;
 
     // Process each message
-    toolUseRows.forEach((row: { data: string; timestamp: string }, _index: number) => {
+    toolUseRows.forEach((row: { data: string; timestamp: string }, index: number) => {
       try {
         const data = JSON.parse(row.data);
         
@@ -2963,7 +2979,7 @@ export class DatabaseService {
             }
           });
         }
-      } catch {
+      } catch (e) {
         // Ignore parse errors
       }
     });

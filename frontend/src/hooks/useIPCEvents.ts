@@ -106,7 +106,7 @@ export function useIPCEvents() {
 
       // Only log significant status changes in production
       if (data.gitStatus.state !== 'clean' || process.env.NODE_ENV === 'development') {
-        // console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
+        console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
       }
       
       // Update the store and clear loading state
@@ -132,7 +132,7 @@ export function useIPCEvents() {
 
     // Listen for session events
     const unsubscribeSessionCreated = window.electronAPI.events.onSessionCreated((session: Session) => {
-      // console.log('[useIPCEvents] Session created:', session.id);
+      console.log('[useIPCEvents] Session created:', session.id);
       addSession({...session, output: session.output || [], jsonMessages: session.jsonMessages || []});
       // Set git status as loading for new sessions
       useSessionStore.getState().setGitStatusLoading(session.id, true);
@@ -140,12 +140,12 @@ export function useIPCEvents() {
     unsubscribeFunctions.push(unsubscribeSessionCreated);
 
     const unsubscribeSessionUpdated = window.electronAPI.events.onSessionUpdated((session: Session) => {
-      // console.log('[useIPCEvents] Session updated event received:', {
-      //   id: session.id,
-      //   status: session.status,
-      //   commitMode: session.commitMode,
-      //   commitModeSettings: session.commitModeSettings
-      // });
+      console.log('[useIPCEvents] Session updated event received:', {
+        id: session.id,
+        status: session.status,
+        commitMode: session.commitMode,
+        commitModeSettings: session.commitModeSettings
+      });
       
       // Ensure we have valid session data
       if (!session || !session.id) {
@@ -175,7 +175,7 @@ export function useIPCEvents() {
     unsubscribeFunctions.push(unsubscribeSessionUpdated);
 
     const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((sessionData: SessionDeletedEventData | string) => {
-      // console.log('[useIPCEvents] Session deleted:', sessionData);
+      console.log('[useIPCEvents] Session deleted:', sessionData);
       // The backend sends just { id } for deleted sessions
       const sessionId = typeof sessionData === 'string' ? sessionData : sessionData.id || sessionData.sessionId;
       
@@ -191,12 +191,12 @@ export function useIPCEvents() {
 
     const unsubscribeSessionsLoaded = window.electronAPI.events.onSessionsLoaded((sessions: Session[]) => {
       // Group logging for session loading
-      // const withStatus = sessions.filter(s => s.gitStatus).length;
+      const withStatus = sessions.filter(s => s.gitStatus).length;
       const withoutStatus = sessions.filter(s => !s.gitStatus).length;
       if (withoutStatus > 0) {
-        // console.log(`[useIPCEvents] Sessions: ${sessions.length} total (${withStatus} with status, ${withoutStatus} pending)`);
+        console.log(`[useIPCEvents] Sessions: ${sessions.length} total (${withStatus} with status, ${withoutStatus} pending)`);
       } else {
-        // console.log(`[useIPCEvents] Sessions: ${sessions.length} loaded`);
+        console.log(`[useIPCEvents] Sessions: ${sessions.length} loaded`);
       }
       
       const sessionsWithJsonMessages = sessions.map(session => ({
@@ -219,7 +219,7 @@ export function useIPCEvents() {
         return; // Ignore invalid events
       }
 
-      // console.log(`[useIPCEvents] Received session output for ${output.sessionId}, type: ${output.type}`);
+      console.log(`[useIPCEvents] Received session output for ${output.sessionId}, type: ${output.type}`);
 
       // Just emit custom event to notify that new output is available
       // Include panelId (if present) so panel-based views can react precisely
@@ -235,7 +235,7 @@ export function useIPCEvents() {
         return; // Ignore invalid events
       }
 
-      // console.log(`[useIPCEvents] Received terminal output for ${output.sessionId}`);
+      console.log(`[useIPCEvents] Received terminal output for ${output.sessionId}`);
       // Store terminal output in session store for display
       useSessionStore.getState().addTerminalOutput(output);
     });
@@ -247,7 +247,7 @@ export function useIPCEvents() {
         return; // Ignore invalid events
       }
 
-      // console.log(`[useIPCEvents] Output available notification for session ${info.sessionId}`);
+      console.log(`[useIPCEvents] Output available notification for session ${info.sessionId}`);
       
       // Emit custom event to notify that output is available
       window.dispatchEvent(new CustomEvent('session-output-available', {
@@ -306,7 +306,7 @@ export function useIPCEvents() {
     }
     
     const unsubscribeGitStatusUpdatedBatch = window.electronAPI.events.onGitStatusUpdatedBatch?.((updates: Array<{ sessionId: string; status: GitStatus }>) => {
-      // console.log(`[useIPCEvents] Git status batch update: ${updates.length} sessions`);
+      console.log(`[useIPCEvents] Git status batch update: ${updates.length} sessions`);
       useSessionStore.getState().updateSessionGitStatusBatch(updates);
       
       // Dispatch custom events for each session

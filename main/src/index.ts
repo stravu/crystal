@@ -277,7 +277,7 @@ async function createWindow() {
           }
           try {
             return JSON.stringify(arg, null, 2);
-          } catch {
+          } catch (e) {
             // Handle circular structure
             return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
           }
@@ -299,7 +299,7 @@ async function createWindow() {
           originalError('[Main] Failed to send error to renderer:', e);
         }
       }
-    } catch {
+    } catch (e) {
       // If anything fails in the error handler, fall back to original
       originalError.apply(console, args);
     } finally {
@@ -315,7 +315,7 @@ async function createWindow() {
         }
         try {
           return JSON.stringify(arg, null, 2);
-        } catch {
+        } catch (e) {
           // Handle circular structure
           return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
         }
@@ -350,7 +350,7 @@ async function createWindow() {
         }
         try {
           return JSON.stringify(arg, null, 2);
-        } catch {
+        } catch (e) {
           // Handle circular structure
           return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
         }

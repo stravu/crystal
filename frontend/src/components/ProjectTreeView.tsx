@@ -40,13 +40,13 @@ export function ProjectTreeView() {
     
     // Set up event listeners for session updates
     const handleSessionCreated = (newSession: Session) => {
-//       console.log('[ProjectTreeView] Session created:', newSession.id, 'projectId:', newSession.projectId);
+      console.log('[ProjectTreeView] Session created:', newSession.id, 'projectId:', newSession.projectId);
       
       // Add the new session to the appropriate project without reloading everything
       setProjectsWithSessions(prevProjects => {
         const updatedProjects = prevProjects.map(project => {
           if (project.id === newSession.projectId) {
-//             console.log('[ProjectTreeView] Adding session to project:', project.id, project.name);
+            console.log('[ProjectTreeView] Adding session to project:', project.id, project.name);
             // Add the new session to this project
             return {
               ...project,
@@ -59,7 +59,7 @@ export function ProjectTreeView() {
         // If no project was found, log a warning
         if (!updatedProjects.some(p => p.id === newSession.projectId)) {
           console.warn('[ProjectTreeView] No matching project found for session projectId:', newSession.projectId);
-//           console.log('[ProjectTreeView] Available projects:', prevProjects.map(p => ({ id: p.id, name: p.name })));
+          console.log('[ProjectTreeView] Available projects:', prevProjects.map(p => ({ id: p.id, name: p.name })));
         }
         
         return updatedProjects;
@@ -275,7 +275,7 @@ export function ProjectTreeView() {
         setDetectedBranchForNewProject(response.data);
       }
     } catch (error) {
-//       console.log('Could not detect branch');
+      console.log('Could not detect branch');
       setDetectedBranchForNewProject(null);
     }
   };

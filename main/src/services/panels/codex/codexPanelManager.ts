@@ -229,7 +229,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    * Send approval decision to Codex
    * Note: In interactive mode, approvals are handled differently than in proto mode
    */
-  async sendApproval(panelId: string, callId: string, decision: 'approved' | 'denied', _type: 'exec' | 'patch'): Promise<void> {
+  async sendApproval(panelId: string, callId: string, decision: 'approved' | 'denied', type: 'exec' | 'patch'): Promise<void> {
     const mapping = this.panelMappings.get(panelId);
     if (!mapping) {
       throw new Error(`Panel ${panelId} not registered`);
@@ -290,7 +290,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
    * In interactive mode, each prompt spawns a new process via startPanel or continuePanel
    * @deprecated Use continuePanel instead for subsequent prompts
    */
-  async sendInputToPanel(_panelId: string, _input: string): Promise<void> {
+  async sendInputToPanel(panelId: string, input: string): Promise<void> {
     // This method is no longer used in interactive mode
     // Each user prompt should spawn a new process using continuePanel
     throw new Error('sendInputToPanel is not supported in interactive mode. Use continuePanel instead.');

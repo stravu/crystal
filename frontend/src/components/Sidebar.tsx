@@ -26,24 +26,24 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
     // Fetch version info on component mount
     const fetchVersion = async () => {
       try {
-        // console.log('[Sidebar Debug] Fetching version info...');
+        console.log('[Sidebar Debug] Fetching version info...');
         const result = await window.electronAPI.getVersionInfo();
-        // console.log('[Sidebar Debug] Version info result:', result);
+        console.log('[Sidebar Debug] Version info result:', result);
         if (result.success && result.data) {
-          // console.log('[Sidebar Debug] Version data:', result.data);
+          console.log('[Sidebar Debug] Version data:', result.data);
           if (result.data.current) {
             setVersion(result.data.current);
-            // console.log('[Sidebar Debug] Set version:', result.data.current);
+            console.log('[Sidebar Debug] Set version:', result.data.current);
           }
           if (result.data.gitCommit) {
             setGitCommit(result.data.gitCommit);
-            // console.log('[Sidebar Debug] Set gitCommit:', result.data.gitCommit);
+            console.log('[Sidebar Debug] Set gitCommit:', result.data.gitCommit);
           }
           if (result.data.worktreeName) {
             setWorktreeName(result.data.worktreeName);
-            // console.log('[Sidebar Debug] Set worktreeName:', result.data.worktreeName);
+            console.log('[Sidebar Debug] Set worktreeName:', result.data.worktreeName);
           } else {
-            // console.log('[Sidebar Debug] No worktreeName in response');
+            console.log('[Sidebar Debug] No worktreeName in response');
           }
         }
       } catch (error) {

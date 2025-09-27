@@ -80,7 +80,7 @@ export const SessionView = memo(() => {
       }
       
       panelApi.getActivePanel(activeSession.id).then(activePanel => {
-//         console.log('[SessionView] Active panel from backend:', activePanel);
+        console.log('[SessionView] Active panel from backend:', activePanel);
         if (activePanel) {
           setActivePanelInStore(activeSession.id, activePanel.id);
         }
@@ -94,7 +94,7 @@ export const SessionView = memo(() => {
     
     // Handle panel creation events (for logs panel auto-creation)
     const handlePanelCreated = (panel: ToolPanel) => {
-//       console.log('[SessionView] Received panel:created event:', panel);
+      console.log('[SessionView] Received panel:created event:', panel);
       
       // Only add if it's for the current session
       if (panel.sessionId === activeSession.id) {
@@ -103,20 +103,20 @@ export const SessionView = memo(() => {
         const panelExists = existingPanels.some(p => p.id === panel.id);
         
         if (!panelExists) {
-//           console.log('[SessionView] Adding new panel to store:', panel);
+          console.log('[SessionView] Adding new panel to store:', panel);
           addPanel(panel);
         } else {
-//           console.log('[SessionView] Panel already exists, not adding duplicate:', panel.id);
+          console.log('[SessionView] Panel already exists, not adding duplicate:', panel.id);
         }
       }
     };
     
     const handlePanelUpdated = (updatedPanel: ToolPanel) => {
-//       console.log('[SessionView] Received panel:updated event:', updatedPanel);
+      console.log('[SessionView] Received panel:updated event:', updatedPanel);
       
       // Only update if it's for the current session
       if (updatedPanel.sessionId === activeSession.id) {
-//         console.log('[SessionView] Updating panel in store:', updatedPanel);
+        console.log('[SessionView] Updating panel in store:', updatedPanel);
         updatePanelState(updatedPanel);
       }
     };

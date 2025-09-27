@@ -28,7 +28,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content, class
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ node: _node, className, children, ...props }: CodeComponentProps) {
+          code({ node, className, children, ...props }: CodeComponentProps) {
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : '';
             const codeString = String(children).replace(/\n$/, '');

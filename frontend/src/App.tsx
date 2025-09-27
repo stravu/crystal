@@ -203,7 +203,7 @@ function App() {
             setIsDiscordOpen(true);
             // Will update discord shown status after recording app open
           }
-        } catch {
+        } catch (error) {
           // Error checking Discord popup
         }
         
@@ -231,7 +231,7 @@ function App() {
     // Set up permission request listener
     const handlePermissionRequest = (...args: unknown[]) => {
       const request = args[0] as PermissionRequest;
-      // console.log('[App] Received permission request:', request);
+      console.log('[App] Received permission request:', request);
       setCurrentPermissionRequest(request);
     };
     
@@ -247,7 +247,7 @@ function App() {
     if (!window.electronAPI?.events) return;
     
     const handleVersionUpdate = (versionInfo: VersionUpdateInfo) => {
-      // console.log('[App] Version update available:', versionInfo);
+      console.log('[App] Version update available:', versionInfo);
       setUpdateVersionInfo(versionInfo);
       setIsUpdateDialogOpen(true);
       showNotification(

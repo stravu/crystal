@@ -17,36 +17,6 @@ interface FileItem {
   modified?: Date;
 }
 
-// Monaco Editor type definitions for the parts we use
-interface IMonacoPosition {
-  lineNumber: number;
-  column: number;
-}
-
-interface IMonacoCursorPositionChangedEvent {
-  position: IMonacoPosition;
-}
-
-interface IMonacoScrollChangedEvent {
-  scrollTop?: number;
-}
-
-interface IMonacoEditor {
-  setPosition?: (position: IMonacoPosition) => void;
-  revealPositionInCenter?: (position: IMonacoPosition) => void;
-  setScrollTop?: (scrollTop: number) => void;
-  onDidChangeCursorPosition?: (listener: (e: IMonacoCursorPositionChangedEvent) => void) => void;
-  onDidScrollChange?: (listener: (e: IMonacoScrollChangedEvent) => void) => void;
-  getPosition?: () => IMonacoPosition | null;
-  getScrollTop?: () => number;
-  getValue?: () => string;
-  setValue?: (value: string) => void;
-  onDidChangeModelContent?: (listener: () => void) => void;
-  focus?: () => void;
-  getModel?: () => unknown;
-  updateOptions?: (options: Record<string, unknown>) => void;
-}
-
 interface FileTreeNodeProps {
   file: FileItem;
   level: number;
@@ -213,7 +183,7 @@ function FileTree({
   const toggleDir = useCallback((path: string) => {
     // Prevent double-toggles from React StrictMode
     if (pendingToggleRef.current === path) {
-//       console.log('Ignoring duplicate toggle for:', path);
+      console.log('Ignoring duplicate toggle for:', path);
       return;
     }
     
@@ -225,10 +195,10 @@ function FileTree({
         const next = new Set(prev);
         if (next.has(path)) {
           next.delete(path);
-//           console.log('Collapsed:', path);
+          console.log('Collapsed:', path);
         } else {
           next.add(path);
-//           console.log('Expanded:', path);
+          console.log('Expanded:', path);
           // Load files immediately if needed
           if (!files.has(path)) {
             loadFiles(path);
@@ -421,25 +391,25 @@ function FileTree({
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      // console.log('[FileTree] Skipping initial mount state update');
+      console.log('[FileTree] Skipping initial mount state update');
       return; // Skip the first render
     }
     
-    // console.log('[FileTree] State changed:', {
-    //   expandedDirs: Array.from(expandedDirs),
-    //   searchQuery,
-    //   showSearch
-    // });
+    console.log('[FileTree] State changed:', {
+      expandedDirs: Array.from(expandedDirs),
+      searchQuery,
+      showSearch
+    });
     
     if (onTreeStateChange) {
-      // console.log('[FileTree] Calling onTreeStateChange');
+      console.log('[FileTree] Calling onTreeStateChange');
       onTreeStateChange({
         expandedDirs: Array.from(expandedDirs),
         searchQuery,
         showSearch
       });
     } else {
-      // console.log('[FileTree] No onTreeStateChange callback');
+      console.log('[FileTree] No onTreeStateChange callback');
     }
   }, [expandedDirs, searchQuery, showSearch]); // Remove onTreeStateChange from deps to avoid loops
   
@@ -601,12 +571,12 @@ export function FileEditor({
   onFileChange,
   onStateChange 
 }: FileEditorProps) {
-  // console.log('[FileEditor] Mounting with:', {
-  //   sessionId,
-  //   initialFilePath,
-  //   initialState,
-  //   hasOnStateChange: !!onStateChange
-  // });
+  console.log('[FileEditor] Mounting with:', {
+    sessionId,
+    initialFilePath,
+    initialState,
+    hasOnStateChange: !!onStateChange
+  });
   
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
@@ -623,7 +593,7 @@ export function FileEditor({
   
   // Wrap onResize callback to avoid recreating
   const handleTreeResize = useCallback((width: number) => {
-//     console.log('[FileEditor] Tree resized to:', width);
+    console.log('[FileEditor] Tree resized to:', width);
     if (onStateChange) {
       onStateChange({ fileTreeWidth: width });
     }
@@ -681,17 +651,17 @@ export function FileEditor({
         // The actual restoration happens in handleEditorMount
         // but we need to trigger a re-render with the right state
         if (editorRef.current && initialState?.filePath === file.path) {
-          const monacoEditor = editorRef.current as IMonacoEditor;
+          const monacoEditor = editorRef.current as any;
           
           // Restore cursor position
           if (initialState.cursorPosition && monacoEditor.setPosition) {
             const { line, column } = initialState.cursorPosition;
             setTimeout(() => {
-              monacoEditor.setPosition?.({
+              monacoEditor.setPosition({
                 lineNumber: line,
                 column: column
               });
-              monacoEditor.revealPositionInCenter?.({
+              monacoEditor.revealPositionInCenter({
                 lineNumber: line,
                 column: column
               });
@@ -701,7 +671,7 @@ export function FileEditor({
           // Restore scroll position
           if (initialState.scrollPosition !== undefined && monacoEditor.setScrollTop) {
             setTimeout(() => {
-              monacoEditor.setScrollTop?.(initialState.scrollPosition!);
+              monacoEditor.setScrollTop(initialState.scrollPosition);
             }, 100);
           }
         }
@@ -721,7 +691,7 @@ export function FileEditor({
     monacoRef.current = monaco;
     
     // Type assertions for Monaco editor (we know these types from Monaco's API)
-    const monacoEditor = editor as IMonacoEditor;
+    const monacoEditor = editor as any;
     
     // Track cursor position changes with debouncing
     const saveCursorPosition = debounce((position: { lineNumber: number; column: number }) => {
@@ -745,12 +715,12 @@ export function FileEditor({
     }, 500); // Debounce scroll position saves
     
     // Listen for cursor position changes
-    monacoEditor.onDidChangeCursorPosition?.((e: IMonacoCursorPositionChangedEvent) => {
+    monacoEditor.onDidChangeCursorPosition?.((e: any) => {
       saveCursorPosition(e.position);
     });
     
     // Listen for scroll position changes
-    monacoEditor.onDidScrollChange?.((e: IMonacoScrollChangedEvent) => {
+    monacoEditor.onDidScrollChange?.((e: any) => {
       if (e.scrollTop !== undefined) {
         saveScrollPosition(e.scrollTop);
       }
@@ -760,11 +730,11 @@ export function FileEditor({
     if (initialState?.cursorPosition && monacoEditor.setPosition) {
       const { line, column } = initialState.cursorPosition;
       setTimeout(() => {
-        monacoEditor.setPosition?.({
+        monacoEditor.setPosition({
           lineNumber: line,
           column: column
         });
-        monacoEditor.revealPositionInCenter?.({
+        monacoEditor.revealPositionInCenter({
           lineNumber: line,
           column: column
         });
@@ -774,7 +744,7 @@ export function FileEditor({
     if (initialState?.scrollPosition !== undefined && monacoEditor.setScrollTop) {
       // Delay to ensure editor is fully rendered and content is loaded
       setTimeout(() => {
-        monacoEditor.setScrollTop?.(initialState.scrollPosition!);
+        monacoEditor.setScrollTop(initialState.scrollPosition);
       }, 100);
     }
   };
@@ -847,16 +817,16 @@ export function FileEditor({
 
   // Memoize the tree state change handler to prevent infinite loops
   const handleTreeStateChange = useCallback((treeState: { expandedDirs: string[]; searchQuery: string; showSearch: boolean }) => {
-//     console.log('[FileEditor] handleTreeStateChange called with:', treeState);
+    console.log('[FileEditor] handleTreeStateChange called with:', treeState);
     if (onStateChange) {
-//       console.log('[FileEditor] Calling onStateChange');
+      console.log('[FileEditor] Calling onStateChange');
       onStateChange({
         expandedDirs: treeState.expandedDirs,
         searchQuery: treeState.searchQuery,
         showSearch: treeState.showSearch
       });
     } else {
-//       console.log('[FileEditor] No onStateChange callback');
+      console.log('[FileEditor] No onStateChange callback');
     }
   }, [onStateChange]);
   
@@ -870,7 +840,7 @@ export function FileEditor({
           const model = editor.getModel();
           if (model && typeof model === 'object' && model !== null && 'dispose' in model) {
             const typedModel = model as { dispose: () => void };
-//             console.log('[FileEditor] Disposing Monaco model');
+            console.log('[FileEditor] Disposing Monaco model');
             typedModel.dispose();
           }
         }

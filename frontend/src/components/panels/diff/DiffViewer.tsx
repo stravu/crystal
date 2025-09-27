@@ -10,11 +10,11 @@ const parseUnifiedDiff = (diff: string): FileDiff[] => {
   const files: FileDiff[] = [];
   
   if (!diff || diff.trim().length === 0) {
-//     console.log('parseUnifiedDiff: Empty diff input');
+    console.log('parseUnifiedDiff: Empty diff input');
     return files;
   }
   
-//   console.log('parseUnifiedDiff: Parsing diff of length:', diff.length);
+  console.log('parseUnifiedDiff: Parsing diff of length:', diff.length);
   
   const fileMatches = diff.match(/diff --git[\s\S]*?(?=diff --git|$)/g);
   
@@ -23,7 +23,7 @@ const parseUnifiedDiff = (diff: string): FileDiff[] => {
     return files;
   }
   
-//   console.log('parseUnifiedDiff: Found', fileMatches.length, 'file(s) in diff');
+  console.log('parseUnifiedDiff: Found', fileMatches.length, 'file(s) in diff');
   
   for (const fileContent of fileMatches) {
     // Try multiple patterns to extract file names
@@ -128,7 +128,7 @@ const parseUnifiedDiff = (diff: string): FileDiff[] => {
     files.push(fileDiff);
   }
   
-//   console.log('parseUnifiedDiff: Parsed', files.length, 'files');
+  console.log('parseUnifiedDiff: Parsed', files.length, 'files');
   return files;
 };
 
@@ -176,7 +176,7 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
 
       setLoadingFullContent(true);
       setLoadErrors({}); // Clear previous errors
-//       console.log('Loading full file contents for editing...');
+      console.log('Loading full file contents for editing...');
 
       try {
         const errors: Record<string, string> = {};
@@ -195,7 +195,7 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
               });
 
               if (result.success && result.content !== undefined) {
-//                 console.log(`Loaded full content for ${file.path}: ${result.content.length} characters`);
+                console.log(`Loaded full content for ${file.path}: ${result.content.length} characters`);
                 
                 // For added files, oldValue should remain empty
                 if (file.type === 'added') {
@@ -219,7 +219,7 @@ const DiffViewer = memo(forwardRef<DiffViewerHandle, DiffViewerProps>(({ diff, s
                   });
                   
                   if (headResult.success && headResult.content !== undefined) {
-//                     console.log(`Loaded ${baseRevision} content for ${file.path}: ${headResult.content.length} characters`);
+                    console.log(`Loaded ${baseRevision} content for ${file.path}: ${headResult.content.length} characters`);
                     return {
                       ...file,
                       oldValue: headResult.content,  // File content at base revision

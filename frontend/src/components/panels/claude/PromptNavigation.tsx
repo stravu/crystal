@@ -116,9 +116,9 @@ export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigati
     if (!panelId) return;
     
     const unsubscribe = window.electronAPI?.events?.onPanelResponseAdded?.((data: { panelId: string; content: string }) => {
-//       console.log('[PromptNavigation] Received panel:response-added event for panel:', data.panelId, 'current panel:', panelId);
+      console.log('[PromptNavigation] Received panel:response-added event for panel:', data.panelId, 'current panel:', panelId);
       if (data.panelId === panelId) {
-//         console.log('[PromptNavigation] Refreshing prompts after assistant response');
+        console.log('[PromptNavigation] Refreshing prompts after assistant response');
         // Refresh the prompts list when an assistant response is added
         // This will update completion_timestamps and stop the duration from incrementing
         fetchPrompts();
