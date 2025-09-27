@@ -13,10 +13,10 @@ export function MainProcessLogger() {
           console.warn(prefix, message);
           break;
         case 'info':
-          console.info(prefix, message);
+//           console.info(prefix, message);
           break;
         default:
-          console.log(prefix, message);
+//           console.log(prefix, message);
       }
     });
 

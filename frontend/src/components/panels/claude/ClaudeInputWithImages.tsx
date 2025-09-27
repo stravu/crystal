@@ -159,7 +159,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       };
       
       setAttachedTexts(prev => [...prev, textAttachment]);
-      console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
+//       console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
       return;
     }
 
@@ -231,7 +231,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       
       // Prevent duplicate submissions
       if (isSubmitting) {
-        console.log('[SessionInputWithImages] Ignoring duplicate submission attempt');
+//         console.log('[SessionInputWithImages] Ignoring duplicate submission attempt');
         return;
       }
       
@@ -259,7 +259,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const onClickSend = async () => {
     // Prevent duplicate submissions
     if (isSubmitting) {
-      console.log('[SessionInputWithImages] Ignoring duplicate submission attempt');
+//       console.log('[SessionInputWithImages] Ignoring duplicate submission attempt');
       return;
     }
     

@@ -159,7 +159,7 @@ export const useAIInputPanel = (options: UseAIInputPanelOptions) => {
       };
       
       setAttachedTexts(prev => [...prev, textAttachment]);
-      console.log(`[Input] Automatically attached ${textData.length} characters from paste`);
+      // console.log(`[Input] Automatically attached ${textData.length} characters from paste`);
       return;
     }
 

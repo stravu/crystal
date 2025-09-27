@@ -41,14 +41,14 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   // Load panels when main repo session changes and ensure dashboard panel exists
   useEffect(() => {
     if (mainRepoSessionId) {
-      console.log('[ProjectView] Loading panels for project session:', mainRepoSessionId);
+//       console.log('[ProjectView] Loading panels for project session:', mainRepoSessionId);
       panelApi.loadPanelsForSession(mainRepoSessionId).then(async (loadedPanels) => {
-        console.log('[ProjectView] Loaded panels:', loadedPanels);
+//         console.log('[ProjectView] Loaded panels:', loadedPanels);
         
         // Check if dashboard panel exists, create if not
         const dashboardPanel = loadedPanels.find(p => p.type === 'dashboard');
         if (!dashboardPanel) {
-          console.log('[ProjectView] Creating dashboard panel for project');
+//           console.log('[ProjectView] Creating dashboard panel for project');
           await panelApi.createPanel({
             sessionId: mainRepoSessionId,
             type: 'dashboard',
@@ -108,7 +108,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
       
       // Don't allow closing dashboard panel
       if (panel.type === 'dashboard') {
-        console.log('[ProjectView] Cannot close dashboard panel');
+//         console.log('[ProjectView] Cannot close dashboard panel');
         return;
       }
       
@@ -180,12 +180,12 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
   
   // Debug logging
   useEffect(() => {
-    console.log('[ProjectView] Session state:', { 
-      mainRepoSessionId, 
-      mainRepoSession: mainRepoSession?.id,
-      activePanelType: currentActivePanel?.type,
-      activeSessionInStore: useSessionStore.getState().activeSessionId
-    });
+    // console.log('[ProjectView] Session state:', { 
+    //   mainRepoSessionId, 
+    //   mainRepoSession: mainRepoSession?.id,
+    //   activePanelType: currentActivePanel?.type,
+    //   activeSessionInStore: useSessionStore.getState().activeSessionId
+    // });
   }, [mainRepoSessionId, mainRepoSession, currentActivePanel]);
 
   // Get or create main repo session when panels are needed
@@ -242,7 +242,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     
     // Handle panel creation events (for auto-created panels like logs)
     const handlePanelCreated = (panel: ToolPanel) => {
-      console.log('[ProjectView] Received panel:created event:', panel);
+//       console.log('[ProjectView] Received panel:created event:', panel);
       
       // Only add if it's for the current session
       if (panel.sessionId === mainRepoSessionId) {

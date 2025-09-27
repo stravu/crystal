@@ -81,7 +81,7 @@ export default function ProjectSelector({ onProjectChange }: ProjectSelectorProp
         setDetectedBranch(response.data);
       }
     } catch (error) {
-      console.log('Could not detect branch');
+      // console.log('Could not detect branch');
       setDetectedBranch(null);
     }
   };
