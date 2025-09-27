@@ -2528,12 +2528,20 @@ export class DatabaseService {
     
     if (!row) return null;
     
+    // Check if this panel is the active one for its session
+    const activePanel = this.db.prepare('SELECT active_panel_id FROM sessions WHERE id = ?').get(row.session_id) as { active_panel_id: string | null } | undefined;
+    const isActive = activePanel?.active_panel_id === panelId;
+    
+    const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false };
+    // Update isActive based on whether this panel is the active one
+    state.isActive = isActive;
+    
     return {
       id: row.id,
       sessionId: row.session_id,
       type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      state,
       metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     };
   }
@@ -2541,14 +2549,24 @@ export class DatabaseService {
   getPanelsForSession(sessionId: string): ToolPanel[] {
     const rows = this.db.prepare('SELECT * FROM tool_panels WHERE session_id = ? ORDER BY created_at').all(sessionId) as ToolPanelRow[];
     
-    return rows.map(row => ({
-      id: row.id,
-      sessionId: row.session_id,
-      type: row.type as ToolPanelType,
-      title: row.title,
-      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
-      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
-    }));
+    // Get the active panel ID for this session
+    const activePanel = this.db.prepare('SELECT active_panel_id FROM sessions WHERE id = ?').get(sessionId) as { active_panel_id: string | null } | undefined;
+    const activePanelId = activePanel?.active_panel_id;
+    
+    return rows.map(row => {
+      const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false };
+      // Update isActive based on whether this panel is the active one
+      state.isActive = row.id === activePanelId;
+      
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        type: row.type as ToolPanelType,
+        title: row.title,
+        state,
+        metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
+      };
+    });
   }
 
   getAllPanels(): ToolPanel[] {
@@ -2595,12 +2613,16 @@ export class DatabaseService {
     
     if (!row) return null;
     
+    const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: true, hasBeenViewed: false };
+    // This panel is the active one by definition (we joined on active_panel_id)
+    state.isActive = true;
+    
     return {
       id: row.id,
       sessionId: row.session_id,
       type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      state,
       metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     };
   }
