@@ -2532,7 +2532,7 @@ export class DatabaseService {
     const activePanel = this.db.prepare('SELECT active_panel_id FROM sessions WHERE id = ?').get(row.session_id) as { active_panel_id: string | null } | undefined;
     const isActive = activePanel?.active_panel_id === panelId;
     
-    const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false };
+    const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false, customState: {} };
     // Update isActive based on whether this panel is the active one
     state.isActive = isActive;
     
@@ -2554,7 +2554,7 @@ export class DatabaseService {
     const activePanelId = activePanel?.active_panel_id;
     
     return rows.map(row => {
-      const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false };
+      const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false, customState: {} };
       // Update isActive based on whether this panel is the active one
       state.isActive = row.id === activePanelId;
       

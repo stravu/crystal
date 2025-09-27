@@ -484,11 +484,25 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     };
   }, [currentContent, viewMode, isMarkdownFile]);
 
+  // Also flush pending saves when switching sessions
+  useEffect(() => {
+    const handleSessionSwitch = () => {
+      if (debouncedSaveRef.current?.flush) {
+        debouncedSaveRef.current.flush(); // Save before switching sessions
+      }
+    };
+    
+    window.addEventListener('session-switched', handleSessionSwitch);
+    return () => {
+      window.removeEventListener('session-switched', handleSessionSwitch);
+    };
+  }, []); // Empty deps - only create once
+  
   // Cleanup on unmount or when key props change
   useEffect(() => {
     return () => {
-      // Cancel any pending saves
-      debouncedSaveRef.current?.cancel();
+      // Flush any pending saves before unmount
+      debouncedSaveRef.current?.flush();
       
       // Clear timeout
       if (savedTimeoutRef.current) {

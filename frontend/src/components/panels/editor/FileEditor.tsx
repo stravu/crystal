@@ -636,6 +636,45 @@ export function FileEditor({
         if (onFileChange) {
           onFileChange(file.path, false);
         }
+        
+        // After loading new file, we need to restore its position
+        // This happens in handleEditorMount when editor re-renders
+        // But we also need to tell parent the file path changed
+        if (onStateChange) {
+          onStateChange({ 
+            filePath: file.path,
+            isDirty: false 
+          });
+        }
+        
+        // If we have saved position for this file, restore it
+        // The actual restoration happens in handleEditorMount
+        // but we need to trigger a re-render with the right state
+        if (editorRef.current && initialState?.filePath === file.path) {
+          const monacoEditor = editorRef.current as any;
+          
+          // Restore cursor position
+          if (initialState.cursorPosition && monacoEditor.setPosition) {
+            const { line, column } = initialState.cursorPosition;
+            setTimeout(() => {
+              monacoEditor.setPosition({
+                lineNumber: line,
+                column: column
+              });
+              monacoEditor.revealPositionInCenter({
+                lineNumber: line,
+                column: column
+              });
+            }, 50);
+          }
+          
+          // Restore scroll position
+          if (initialState.scrollPosition !== undefined && monacoEditor.setScrollTop) {
+            setTimeout(() => {
+              monacoEditor.setScrollTop(initialState.scrollPosition);
+            }, 100);
+          }
+        }
       } else {
         setError(result.error);
       }
@@ -644,12 +683,70 @@ export function FileEditor({
     } finally {
       setLoading(false);
     }
-  }, [sessionId, onFileChange]);
+  }, [sessionId, onFileChange, onStateChange, initialState]);
 
 
   const handleEditorMount = (editor: unknown, monaco: unknown) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    
+    // Type assertions for Monaco editor (we know these types from Monaco's API)
+    const monacoEditor = editor as any;
+    
+    // Track cursor position changes with debouncing
+    const saveCursorPosition = debounce((position: { lineNumber: number; column: number }) => {
+      if (onStateChange) {
+        onStateChange({
+          cursorPosition: {
+            line: position.lineNumber,
+            column: position.column
+          }
+        });
+      }
+    }, 500); // Debounce cursor position saves
+    
+    // Track scroll position changes with debouncing
+    const saveScrollPosition = debounce((scrollTop: number) => {
+      if (onStateChange) {
+        onStateChange({
+          scrollPosition: scrollTop
+        });
+      }
+    }, 500); // Debounce scroll position saves
+    
+    // Listen for cursor position changes
+    monacoEditor.onDidChangeCursorPosition?.((e: any) => {
+      saveCursorPosition(e.position);
+    });
+    
+    // Listen for scroll position changes
+    monacoEditor.onDidScrollChange?.((e: any) => {
+      if (e.scrollTop !== undefined) {
+        saveScrollPosition(e.scrollTop);
+      }
+    });
+    
+    // Restore cursor and scroll position if available
+    if (initialState?.cursorPosition && monacoEditor.setPosition) {
+      const { line, column } = initialState.cursorPosition;
+      setTimeout(() => {
+        monacoEditor.setPosition({
+          lineNumber: line,
+          column: column
+        });
+        monacoEditor.revealPositionInCenter({
+          lineNumber: line,
+          column: column
+        });
+      }, 50); // Small delay to ensure editor is ready
+    }
+    
+    if (initialState?.scrollPosition !== undefined && monacoEditor.setScrollTop) {
+      // Delay to ensure editor is fully rendered and content is loaded
+      setTimeout(() => {
+        monacoEditor.setScrollTop(initialState.scrollPosition);
+      }, 100);
+    }
   };
 
   const handleEditorChange = (value: string | undefined) => {
