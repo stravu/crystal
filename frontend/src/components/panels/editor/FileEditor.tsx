@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import Editor from '@monaco-editor/react';
+import type * as monaco from 'monaco-editor';
 import { ChevronRight, ChevronDown, File, Folder, RefreshCw, Plus, Trash2, FolderPlus, Search, X, Eye, Code } from 'lucide-react';
 import { MonacoErrorBoundary } from '../../MonacoErrorBoundary';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -584,8 +585,8 @@ export function FileEditor({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
-  const editorRef = useRef<unknown>(null);
-  const monacoRef = useRef<unknown>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof monaco | null>(null);
 
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
@@ -651,7 +652,7 @@ export function FileEditor({
         // The actual restoration happens in handleEditorMount
         // but we need to trigger a re-render with the right state
         if (editorRef.current && initialState?.filePath === file.path) {
-          const monacoEditor = editorRef.current as any;
+          const monacoEditor = editorRef.current;
           
           // Restore cursor position
           if (initialState.cursorPosition && monacoEditor.setPosition) {
@@ -670,8 +671,9 @@ export function FileEditor({
           
           // Restore scroll position
           if (initialState.scrollPosition !== undefined && monacoEditor.setScrollTop) {
+            const scrollPos = initialState.scrollPosition;
             setTimeout(() => {
-              monacoEditor.setScrollTop(initialState.scrollPosition);
+              monacoEditor.setScrollTop(scrollPos);
             }, 100);
           }
         }
@@ -686,12 +688,12 @@ export function FileEditor({
   }, [sessionId, onFileChange, onStateChange, initialState]);
 
 
-  const handleEditorMount = (editor: unknown, monaco: unknown) => {
+  const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor, monacoInstance: typeof monaco) => {
     editorRef.current = editor;
-    monacoRef.current = monaco;
+    monacoRef.current = monacoInstance;
     
-    // Type assertions for Monaco editor (we know these types from Monaco's API)
-    const monacoEditor = editor as any;
+    // Now we have properly typed Monaco editor
+    const monacoEditor = editor;
     
     // Track cursor position changes with debouncing
     const saveCursorPosition = debounce((position: { lineNumber: number; column: number }) => {
@@ -715,12 +717,12 @@ export function FileEditor({
     }, 500); // Debounce scroll position saves
     
     // Listen for cursor position changes
-    monacoEditor.onDidChangeCursorPosition?.((e: any) => {
+    monacoEditor.onDidChangeCursorPosition?.((e: monaco.editor.ICursorPositionChangedEvent) => {
       saveCursorPosition(e.position);
     });
     
     // Listen for scroll position changes
-    monacoEditor.onDidScrollChange?.((e: any) => {
+    monacoEditor.onDidScrollChange?.((e: { scrollTop?: number; scrollLeft?: number }) => {
       if (e.scrollTop !== undefined) {
         saveScrollPosition(e.scrollTop);
       }
@@ -743,8 +745,9 @@ export function FileEditor({
     
     if (initialState?.scrollPosition !== undefined && monacoEditor.setScrollTop) {
       // Delay to ensure editor is fully rendered and content is loaded
+      const scrollPos = initialState.scrollPosition;
       setTimeout(() => {
-        monacoEditor.setScrollTop(initialState.scrollPosition);
+        monacoEditor.setScrollTop(scrollPos);
       }, 100);
     }
   };
