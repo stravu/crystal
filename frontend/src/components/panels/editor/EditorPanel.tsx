@@ -80,12 +80,26 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     }, 500);
   }
   
-  // Cleanup effect for debounced function
+  // Cleanup effect for debounced function - flush pending saves on unmount
   useEffect(() => {
     return () => {
-      if (debouncedUpdateRef.current?.cancel) {
-        debouncedUpdateRef.current.cancel();
+      if (debouncedUpdateRef.current?.flush) {
+        debouncedUpdateRef.current.flush(); // Save any pending changes before unmount
       }
+    };
+  }, []); // Empty deps - only create once
+  
+  // Also flush pending saves when switching sessions
+  useEffect(() => {
+    const handleSessionSwitch = () => {
+      if (debouncedUpdateRef.current?.flush) {
+        debouncedUpdateRef.current.flush(); // Save before switching sessions
+      }
+    };
+    
+    window.addEventListener('session-switched', handleSessionSwitch);
+    return () => {
+      window.removeEventListener('session-switched', handleSessionSwitch);
     };
   }, []); // Empty deps - only create once
   
