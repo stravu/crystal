@@ -389,7 +389,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       };
       
       addTextAttachment(textAttachment);
-//       console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
+      console.log(`[Large Text] Automatically attached ${textData.length} characters from paste`);
       return;
     }
 
@@ -461,7 +461,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
           size: textData.length,
         };
         addTextAttachment(textAttachment);
-//         console.log(`[Drop Text] Automatically attached ${textData.length} characters from drop`);
+        console.log(`[Drop Text] Automatically attached ${textData.length} characters from drop`);
       }
       return;
     }
@@ -489,7 +489,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             size: content.length,
           };
           addTextAttachment(textAttachment);
-//           console.log(`[Drop Text File] Attached ${file.name} (${content.length} chars)`);
+          console.log(`[Drop Text File] Attached ${file.name} (${content.length} chars)`);
         } catch (error) {
           console.error('Failed to read dropped text file:', error);
         }
@@ -599,13 +599,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         
         for (const text of activeAttachedTexts) {
           try {
-//             console.log(`[Large Text] Saving attached text (${text.size} chars) to temporary file`);
+            console.log(`[Large Text] Saving attached text (${text.size} chars) to temporary file`);
             const textFilePath = await window.electronAPI.sessions.saveLargeText(
               tempId,
               text.content
             );
             attachmentPaths.push(textFilePath);
-//             console.log(`[Large Text] Text saved to: ${textFilePath}`);
+            console.log(`[Large Text] Text saved to: ${textFilePath}`);
           } catch (error) {
             console.error('Failed to save attached text to file:', error);
           }
@@ -617,7 +617,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
         const tempId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         try {
-//           console.log(`[Image] Saving ${activeAttachedImages.length} attached image(s) to temporary files`);
+          console.log(`[Image] Saving ${activeAttachedImages.length} attached image(s) to temporary files`);
           const imagePaths = await window.electronAPI.sessions.saveImages(
             tempId,
             activeAttachedImages.map(img => ({
@@ -627,7 +627,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
             }))
           );
           attachmentPaths.push(...imagePaths);
-//           console.log(`[Image] Images saved to:`, imagePaths);
+          console.log(`[Image] Images saved to:`, imagePaths);
         } catch (error) {
           console.error('Failed to save attached images:', error);
         }
@@ -637,16 +637,16 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       if (attachmentPaths.length > 0) {
         const attachmentsMessage = `\n\n<attachments>\nPlease look at these files which may provide additional instructions or context:\n${attachmentPaths.join('\n')}\n</attachments>`;
         finalPrompt = `${finalPrompt}${attachmentsMessage}`;
-//         console.log('[CreateSessionDialog] Final prompt with attachments:', finalPrompt);
-//         console.log('[CreateSessionDialog] Attachment paths:', attachmentPaths);
+        console.log('[CreateSessionDialog] Final prompt with attachments:', finalPrompt);
+        console.log('[CreateSessionDialog] Attachment paths:', attachmentPaths);
       }
       
-      // console.log('[CreateSessionDialog] Creating session with:', {
-      //   sessionName: sessionName || '(auto-generate)',
-      //   count: sessionCount,
-      //   toolType,
-      //   prompt: finalPrompt || '(no prompt)'
-      // });
+      console.log('[CreateSessionDialog] Creating session with:', {
+        sessionName: sessionName || '(auto-generate)',
+        count: sessionCount,
+        toolType,
+        prompt: finalPrompt || '(no prompt)'
+      });
       const response = await API.sessions.create({
         prompt: finalPrompt || '',
         worktreeTemplate: sessionName || undefined, // Pass undefined if empty for auto-naming

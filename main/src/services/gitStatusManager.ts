@@ -204,7 +204,7 @@ export class GitStatusManager extends EventEmitter {
    * @param sessionId - The session ID to refresh
    * @param isUserInitiated - Whether this refresh was triggered by user action (shows loading spinner)
    */
-  async refreshSessionGitStatus(sessionId: string, _isUserInitiated = false): Promise<GitStatus | null> {
+  async refreshSessionGitStatus(sessionId: string, isUserInitiated = false): Promise<GitStatus | null> {
     // Immediately emit loading state so user sees refresh is happening
     // This provides immediate visual feedback
     this.emitThrottled(sessionId, 'loading');

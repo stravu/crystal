@@ -136,17 +136,17 @@ export function DraggableProjectTreeView() {
         .find(s => s.id === activeSessionId);
       
       if (session) {
-        // console.log('[DraggableProjectTreeView] Active session changed to:', session.id, 'ensuring paths are expanded');
+        console.log('[DraggableProjectTreeView] Active session changed to:', session.id, 'ensuring paths are expanded');
         
         // Ensure project is expanded
         if (session.projectId && !expandedProjects.has(session.projectId)) {
-          // console.log('[DraggableProjectTreeView] Expanding project for active session:', session.projectId);
+          console.log('[DraggableProjectTreeView] Expanding project for active session:', session.projectId);
           setExpandedProjects(prev => new Set([...prev, session.projectId!]));
         }
         
         // Ensure folder is expanded
         if (session.folderId && !expandedFolders.has(session.folderId)) {
-          // console.log('[DraggableProjectTreeView] Expanding folder for active session:', session.folderId);
+          console.log('[DraggableProjectTreeView] Expanding folder for active session:', session.folderId);
           setExpandedFolders(prev => new Set([...prev, session.folderId!]));
         }
       }
@@ -234,47 +234,47 @@ export function DraggableProjectTreeView() {
       
       // Auto-expand the project that contains the new session (immediate for all sessions)
       if (newSession.projectId) {
-        // console.log('[DraggableProjectTreeView] Immediately expanding project:', newSession.projectId);
+        console.log('[DraggableProjectTreeView] Immediately expanding project:', newSession.projectId);
         setExpandedProjects(prev => {
           const newSet = new Set([...prev, newSession.projectId!]);
-          // console.log('[DraggableProjectTreeView] Expanded projects now:', Array.from(newSet));
+          console.log('[DraggableProjectTreeView] Expanded projects now:', Array.from(newSet));
           return newSet;
         });
       }
       
       // If the session has a folderId, auto-expand that folder too (immediate for all sessions)
       if (newSession.folderId) {
-        // console.log('[DraggableProjectTreeView] Immediately expanding folder:', newSession.folderId);
+        console.log('[DraggableProjectTreeView] Immediately expanding folder:', newSession.folderId);
         setExpandedFolders(prev => {
           const newSet = new Set([...prev, newSession.folderId!]);
-          // console.log('[DraggableProjectTreeView] Expanded folders now:', Array.from(newSet));
+          console.log('[DraggableProjectTreeView] Expanded folders now:', Array.from(newSet));
           return newSet;
         });
       }
       
       // Handle auto-selection with delayed logic to handle multiple sessions
       // When multiple sessions are created, only select the last one
-      // console.log('[DraggableProjectTreeView] Session created, handling auto-selection:', newSession.id, newSession.name);
+      console.log('[DraggableProjectTreeView] Session created, handling auto-selection:', newSession.id, newSession.name);
       
       // Cancel any pending auto-selection
       if (pendingAutoSelect) {
         clearTimeout(pendingAutoSelect.timeoutId);
-        // console.log('[DraggableProjectTreeView] Cancelled previous pending auto-selection for:', pendingAutoSelect.sessionId);
+        console.log('[DraggableProjectTreeView] Cancelled previous pending auto-selection for:', pendingAutoSelect.sessionId);
       }
       
       // Set up delayed auto-selection for this session
       const timeoutId = setTimeout(() => {
-        // console.log('[DraggableProjectTreeView] Auto-selecting session after delay:', newSession.id, newSession.name);
+        console.log('[DraggableProjectTreeView] Auto-selecting session after delay:', newSession.id, newSession.name);
         
         // Ensure all necessary paths are expanded when we auto-select
         // This is important for the final session in a batch
         if (newSession.projectId) {
-          // console.log('[DraggableProjectTreeView] Ensuring project is expanded:', newSession.projectId);
+          console.log('[DraggableProjectTreeView] Ensuring project is expanded:', newSession.projectId);
           setExpandedProjects(prev => new Set([...prev, newSession.projectId!]));
         }
         
         if (newSession.folderId) {
-          // console.log('[DraggableProjectTreeView] Ensuring folder is expanded:', newSession.folderId);
+          console.log('[DraggableProjectTreeView] Ensuring folder is expanded:', newSession.folderId);
           setExpandedFolders(prev => new Set([...prev, newSession.folderId!]));
         }
         
@@ -335,7 +335,7 @@ export function DraggableProjectTreeView() {
     
     // Handler for folder updates
     const handleFolderUpdated = (updatedFolder: Folder) => {
-      // console.log('[DraggableProjectTreeView] Folder updated event received:', updatedFolder);
+      console.log('[DraggableProjectTreeView] Folder updated event received:', updatedFolder);
       
       // Update the folder in the appropriate project
       setProjectsWithSessions(prevProjects => 
@@ -695,7 +695,7 @@ export function DraggableProjectTreeView() {
       try {
         // First, delete all sessions in the folder
         if (folderSessions.length > 0) {
-          // console.log(`Deleting ${folderSessions.length} sessions in folder "${folder.name}"`);
+          console.log(`Deleting ${folderSessions.length} sessions in folder "${folder.name}"`);
           
           // Mark all sessions as deleting to prevent individual delete operations
           const sessionIds = folderSessions.map(s => s.id);
@@ -708,7 +708,7 @@ export function DraggableProjectTreeView() {
               if (!sessionResponse.success) {
                 throw new Error(`Failed to delete session "${session.name}": ${sessionResponse.error}`);
               }
-              // console.log(`Deleted session: ${session.name}`);
+              console.log(`Deleted session: ${session.name}`);
             } catch (error: unknown) {
               console.error(`Error deleting session ${session.name}:`, error);
               showError({
@@ -738,7 +738,7 @@ export function DraggableProjectTreeView() {
         }
         
         // Then delete the folder
-        // console.log(`Deleting folder: ${folder.name}`);
+        console.log(`Deleting folder: ${folder.name}`);
         const response = await API.folders.delete(folder.id);
         if (response.success) {
           // Update local state to remove the folder
@@ -757,7 +757,7 @@ export function DraggableProjectTreeView() {
             return newSet;
           });
           
-          // console.log(`Successfully deleted folder "${folder.name}" and ${folderSessions.length} sessions`);
+          console.log(`Successfully deleted folder "${folder.name}" and ${folderSessions.length} sessions`);
           
           // Clear deleting state after successful deletion
           useSessionStore.getState().clearDeletingSessionIds();
@@ -811,9 +811,9 @@ export function DraggableProjectTreeView() {
       // Log summary only if there were sessions to refresh
       if (response.data.count > 0) {
         if (response.data.backgroundRefresh) {
-          // console.log(`[GitStatus] Started background refresh for ${response.data.count} sessions in ${project.name}`);
+          console.log(`[GitStatus] Started background refresh for ${response.data.count} sessions in ${project.name}`);
         } else {
-          // console.log(`[GitStatus] Refreshed ${response.data.count} sessions in ${project.name}`);
+          console.log(`[GitStatus] Refreshed ${response.data.count} sessions in ${project.name}`);
         }
       }
       
@@ -902,7 +902,7 @@ export function DraggableProjectTreeView() {
         setDetectedBranchForNewProject(response.data);
       }
     } catch (error) {
-      // console.log('Could not detect branch');
+      console.log('Could not detect branch');
       setDetectedBranchForNewProject(null);
     }
   };
@@ -948,7 +948,7 @@ export function DraggableProjectTreeView() {
     if (!newFolderName || !selectedProjectForFolder) return;
 
     try {
-      // console.log('[DraggableProjectTreeView] Creating folder:', newFolderName, 'in project:', selectedProjectForFolder.id, 'parent:', parentFolderForCreate?.id);
+      console.log('[DraggableProjectTreeView] Creating folder:', newFolderName, 'in project:', selectedProjectForFolder.id, 'parent:', parentFolderForCreate?.id);
       const response = await API.folders.create(
         newFolderName, 
         selectedProjectForFolder.id,
@@ -1151,11 +1151,11 @@ export function DraggableProjectTreeView() {
     } else if (dragState.type === 'folder' && dragState.folderId) {
       // Move folder to root level (set parent_folder_id to null)
       try {
-        // console.log('[DraggableProjectTreeView] Moving folder', dragState.folderId, 'to root level');
+        console.log('[DraggableProjectTreeView] Moving folder', dragState.folderId, 'to root level');
         const response = await API.folders.move(dragState.folderId, null);
         
         if (response.success) {
-          // console.log('[DraggableProjectTreeView] Folder moved to root successfully');
+          console.log('[DraggableProjectTreeView] Folder moved to root successfully');
           
           // Update local state - update the parent_folder_id of the moved folder
           setProjectsWithSessions(prev => prev.map(project => {
@@ -1305,11 +1305,11 @@ export function DraggableProjectTreeView() {
     } else if (dragState.type === 'folder' && dragState.folderId && dragState.folderId !== folder.id) {
       // Move folder into another folder (nesting)
       try {
-        // console.log('[DraggableProjectTreeView] Moving folder', dragState.folderId, 'into folder', folder.id);
+        console.log('[DraggableProjectTreeView] Moving folder', dragState.folderId, 'into folder', folder.id);
         const response = await API.folders.move(dragState.folderId, folder.id);
         
         if (response.success) {
-          // console.log('[DraggableProjectTreeView] Folder moved successfully');
+          console.log('[DraggableProjectTreeView] Folder moved successfully');
           
           // Update local state - update the parent_folder_id of the moved folder
           setProjectsWithSessions(prev => prev.map(project => {

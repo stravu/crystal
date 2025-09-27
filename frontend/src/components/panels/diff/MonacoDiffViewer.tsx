@@ -53,8 +53,8 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
   }, [file.path]);
 
   // Debug logging
-//   console.log('MonacoDiffViewer - isDarkMode:', isDarkMode);
-//   console.log('MonacoDiffViewer - theme:', isDarkMode ? 'vs-dark' : 'vs');
+  console.log('MonacoDiffViewer - isDarkMode:', isDarkMode);
+  console.log('MonacoDiffViewer - theme:', isDarkMode ? 'vs-dark' : 'vs');
 
   // Delay mounting editor to ensure stability
   useEffect(() => {
@@ -77,7 +77,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     // Check if we have full content by looking for the originalDiffNewValue marker
     const hasFullContent = 'originalDiffNewValue' in file && file.originalDiffNewValue !== undefined && file.newValue !== file.originalDiffNewValue;
     setIsFullContentLoaded(hasFullContent);
-//     console.log('Full content loaded status:', hasFullContent, 'for file:', file.path);
+    console.log('Full content loaded status:', hasFullContent, 'for file:', file.path);
   }, [file]);
 
   // Get file extension for language detection
@@ -127,7 +127,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
   };
 
   const performSave = useCallback(async (content: string) => {
-//     console.log('Saving file:', { file, sessionId, path: file.path, isFullContentLoaded });
+    console.log('Saving file:', { file, sessionId, path: file.path, isFullContentLoaded });
 
     if (!file.path) {
       setSaveError('File path is missing');
@@ -188,12 +188,12 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
     const currentFilePath = file.path;
     
     try {
-      // console.log('Invoking file:write with:', {
-      //   sessionId,
-      //   filePath: currentFilePath,
-      //   contentLength: content.length,
-      //   contentPreview: content.substring(0, 100)
-      // });
+      console.log('Invoking file:write with:', {
+        sessionId,
+        filePath: currentFilePath,
+        contentLength: content.length,
+        contentPreview: content.substring(0, 100)
+      });
       
       const result = await window.electronAPI.invoke('file:write', {
         sessionId,
@@ -349,11 +349,11 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
               // Trigger debounced save
               debouncedSave(newContent);
             } else {
-//               console.log('Auto-save skipped: waiting for full content to load');
+              console.log('Auto-save skipped: waiting for full content to load');
             }
           }
         } catch (error) {
-//           console.debug('Error in content change handler:', error);
+          console.debug('Error in content change handler:', error);
         }
       });
       disposables.push(changeDisposable);
@@ -373,7 +373,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
             debouncedSave.cancel?.();
             performSave(content);
           } catch (error) {
-//             console.debug('Error in save command:', error);
+            console.debug('Error in save command:', error);
           }
         }
       );
@@ -418,7 +418,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
         }
       } catch (error) {
         // Editor might have been disposed, ignore the error
-//         console.debug('Editor update skipped, might be disposed:', error);
+        console.debug('Editor update skipped, might be disposed:', error);
       }
     }
     
@@ -442,7 +442,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
           modifiedEditor.updateOptions({ readOnly: isReadOnly });
         }
       } catch (error) {
-//         console.debug('Error updating editor readOnly option:', error);
+        console.debug('Error updating editor readOnly option:', error);
       }
     }
   }, [isReadOnly, isEditorReady]);
@@ -519,7 +519,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
               try {
                 d.dispose();
               } catch (error) {
-//                 console.debug('Error disposing event handler:', error);
+                console.debug('Error disposing event handler:', error);
               }
             });
             editor.__disposables = [];
@@ -541,7 +541,7 @@ export const MonacoDiffViewer: React.FC<MonacoDiffViewerProps> = ({
           editorRef.current.dispose();
           editorRef.current = null;
         } catch (error) {
-//           console.debug('Error during Monaco editor cleanup:', error);
+          console.debug('Error during Monaco editor cleanup:', error);
         }
       }
     };

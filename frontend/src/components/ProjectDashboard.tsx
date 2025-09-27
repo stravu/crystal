@@ -198,12 +198,12 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = React.memo(({ p
     const staleClass = session.isStale ? 'bg-status-warning/10' : '';
     
     const handleSessionClick = async () => {
-      // console.log('[ProjectDashboard] Session clicked:', session.sessionId, session.sessionName);
+      console.log('[ProjectDashboard] Session clicked:', session.sessionId, session.sessionName);
       try {
         await useSessionStore.getState().setActiveSession(session.sessionId);
-        // console.log('[ProjectDashboard] Session set, now navigating to sessions view');
+        console.log('[ProjectDashboard] Session set, now navigating to sessions view');
         useNavigationStore.getState().navigateToSessions();
-        // console.log('[ProjectDashboard] Navigation completed');
+        console.log('[ProjectDashboard] Navigation completed');
       } catch (error) {
         console.error('[ProjectDashboard] Error in handleSessionClick:', error);
       }
@@ -367,7 +367,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = React.memo(({ p
               mainBranch={dashboardData.mainBranch}
               mainBranchStatus={dashboardData.mainBranchStatus}
               remotes={dashboardData.remotes}
-              onReviewUpdates={() => {/* console.log('Review updates clicked') */}}
+              onReviewUpdates={() => console.log('Review updates clicked')}
             />
           )}
           
