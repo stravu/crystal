@@ -103,8 +103,8 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
     try {
       setError(null);
       await window.electronAPI.updater.checkAndDownload();
-    } catch (err: any) {
-      setError(err.message || 'Failed to check for updates');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to check for updates');
       setUpdateState('error');
     }
   };
@@ -117,8 +117,8 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
     try {
       setError(null);
       await window.electronAPI.updater.downloadUpdate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to download update');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to download update');
       setUpdateState('error');
     }
   };
@@ -131,8 +131,8 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
     try {
       await window.electronAPI.updater.installUpdate();
       // App will restart, so no need to handle response
-    } catch (err: any) {
-      setError(err.message || 'Failed to install update');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to install update');
       setUpdateState('error');
     }
   };

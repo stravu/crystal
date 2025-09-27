@@ -7,7 +7,38 @@ import type { DatabaseService } from '../database/database';
 import type { Session as DbSession, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, Project } from '../database/models';
 import { getShellPath } from '../utils/shellPath';
 import { TerminalSessionManager } from './terminalSessionManager';
+import type { BaseAIPanelState, ToolPanelState, ToolPanel } from '../../../shared/types/panels';
 import { formatForDisplay } from '../utils/timestampUtils';
+
+// Interface for generic JSON message data that can contain various properties
+interface GenericMessageData {
+  type?: string;
+  subtype?: string;
+  session_id?: string;
+  message_id?: string;
+  message?: {
+    content?: unknown;
+    [key: string]: unknown;
+  };
+  data?: Record<string, unknown>;
+  delta?: string;
+  [key: string]: unknown;
+}
+
+// Helper function to check if data is a JSON message object with specific properties
+function isJSONMessage(data: Record<string, unknown>, requiredType?: string, requiredSubtype?: string): data is GenericMessageData {
+  if (typeof data.type !== 'string') return false;
+  if (requiredType && data.type !== requiredType) return false;
+  if (requiredSubtype && typeof data.subtype !== 'string') return false;
+  if (requiredSubtype && data.subtype !== requiredSubtype) return false;
+  return true;
+}
+
+// Interface for panel state with custom state that can hold any AI-specific data
+interface PanelStateWithCustomData extends ToolPanelState {
+  customState?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 import { addSessionLog, cleanupSessionLogs } from '../ipc/logs';
 import { withLock } from '../utils/mutex';
 import * as os from 'os';
@@ -20,10 +51,11 @@ export class SessionManager extends EventEmitter {
   private activeProject: Project | null = null;
   private terminalSessionManager: TerminalSessionManager;
 
-  constructor(private db: DatabaseService) {
+  constructor(public db: DatabaseService) {
     super();
     // Increase max listeners to prevent warnings when many components listen to events
-    this.setMaxListeners(50);
+    // This is expected since multiple SessionListItem components and project tree views listen to events
+    this.setMaxListeners(100);
     this.terminalSessionManager = new TerminalSessionManager();
     
     // Forward terminal output events to the terminal display
@@ -48,12 +80,7 @@ export class SessionManager extends EventEmitter {
     if (!this.activeProject) {
       this.activeProject = this.db.getActiveProject() || null;
       if (this.activeProject) {
-        console.log(`[SessionManager] Active project loaded from DB:`, {
-          id: this.activeProject.id,
-          name: this.activeProject.name,
-          build_script: this.activeProject.build_script,
-          run_script: this.activeProject.run_script
-        });
+        // Active project loaded successfully
       }
     }
     return this.activeProject;
@@ -66,7 +93,6 @@ export class SessionManager extends EventEmitter {
   getClaudeSessionId(id: string): string | undefined {
     const dbSession = this.db.getSession(id);
     const claudeSessionId = dbSession?.claude_session_id;
-    console.log(`[SessionManager] Getting Claude session ID for Crystal session ${id}: ${claudeSessionId || 'not found'}`);
     return claudeSessionId;
   }
 
@@ -74,8 +100,9 @@ export class SessionManager extends EventEmitter {
   getPanelClaudeSessionId(panelId: string): string | undefined {
     try {
       const panel = this.db.getPanel(panelId);
-      const claudeSessionId = (panel as any)?.state?.customState?.claudeSessionId;
-      console.log(`[SessionManager] Getting Claude session ID for panel ${panelId}: ${claudeSessionId || 'not found'}`);
+      // Check new agentSessionId first, then fall back to legacy claudeSessionId
+      const panelState = panel?.state?.customState as BaseAIPanelState | undefined;
+      const claudeSessionId = panelState?.agentSessionId || panelState?.claudeSessionId;
       return claudeSessionId;
     } catch (e) {
       return undefined;
@@ -86,9 +113,25 @@ export class SessionManager extends EventEmitter {
   getPanelCodexSessionId(panelId: string): string | undefined {
     try {
       const panel = this.db.getPanel(panelId);
-      const codexSessionId = (panel as any)?.state?.customState?.codexSessionId;
-      console.log(`[SessionManager] Getting Codex session ID for panel ${panelId}: ${codexSessionId || 'not found'}`);
+      // Check new agentSessionId first, then fall back to legacy codexSessionId
+      const panelState = panel?.state?.customState as BaseAIPanelState | undefined;
+      const codexSessionId = panelState?.agentSessionId || panelState?.codexSessionId;
       return codexSessionId;
+    } catch (e) {
+      return undefined;
+    }
+  }
+  
+  // Generic method for getting agent session ID (works for any AI panel)
+  getPanelAgentSessionId(panelId: string): string | undefined {
+    try {
+      const panel = this.db.getPanel(panelId);
+      const customState = panel?.state?.customState as BaseAIPanelState | undefined;
+      // Check new field first, then fall back to legacy fields based on panel type
+      const agentSessionId = customState?.agentSessionId || 
+                             customState?.claudeSessionId || 
+                             customState?.codexSessionId;
+      return agentSessionId;
     } catch (e) {
       return undefined;
     }
@@ -120,7 +163,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private convertDbSessionToSession(dbSession: DbSession): Session {
-    const toolTypeFromDb = (dbSession as any).tool_type as 'claude' | 'codex' | 'none' | null | undefined;
+    const toolTypeFromDb = (dbSession as DbSession & { tool_type?: string }).tool_type as 'claude' | 'codex' | 'none' | null | undefined;
     const normalizedToolType: 'claude' | 'codex' | 'none' = toolTypeFromDb === 'codex'
       ? 'codex'
       : toolTypeFromDb === 'none'
@@ -258,8 +301,6 @@ export class SessionManager extends EventEmitter {
     commitMode?: 'structured' | 'checkpoint' | 'disabled',
     commitModeSettings?: string
   ): Session {
-    console.log(`[SessionManager] Creating session with ID ${id}: ${name}`);
-    
     // Ensure this session ID isn't already being created
     if (this.activeSessions.has(id) || this.db.getSession(id)) {
       throw new Error(`Session with ID ${id} already exists`);
@@ -282,8 +323,6 @@ export class SessionManager extends EventEmitter {
         throw new Error('No project specified and no active project selected');
       }
     }
-    
-    console.log(`[SessionManager] Target project:`, targetProject);
 
     const sessionData: CreateSessionData = {
       id,
@@ -303,31 +342,24 @@ export class SessionManager extends EventEmitter {
       commit_mode: commitMode,
       commit_mode_settings: commitModeSettings
     };
-    console.log(`[SessionManager] Session data:`, sessionData);
 
     const dbSession = this.db.createSession(sessionData);
-    console.log(`[SessionManager] Database session created:`, dbSession);
     
     const session = this.convertDbSessionToSession(dbSession);
     session.toolType = toolType || session.toolType;
-    console.log(`[SessionManager] Converted session:`, session);
     
     this.activeSessions.set(session.id, session);
     // Don't emit the event here - let the caller decide when to emit it
     // this.emit('session-created', session);
-    console.log(`[SessionManager] Session created (event not emitted yet)`);
     
     return session;
   }
 
   async getOrCreateMainRepoSession(projectId: number): Promise<Session> {
     return await withLock(`main-repo-session-${projectId}`, async () => {
-      console.log(`[SessionManager] Getting or creating main repo session for project ${projectId}`);
-      
       // First check if a main repo session already exists
       const existingSession = this.db.getMainRepoSession(projectId);
       if (existingSession) {
-        console.log(`[SessionManager] Found existing main repo session: ${existingSession.id}`);
         const session = this.convertDbSessionToSession(existingSession);
         await panelManager.ensureDiffPanel(session.id);
         return session;
@@ -373,12 +405,10 @@ export class SessionManager extends EventEmitter {
   }
 
   emitSessionCreated(session: Session): void {
-    console.log(`[SessionManager] Emitting session-created event for session ${session.id}`);
     this.emit('session-created', session);
   }
 
   updateSession(id: string, update: SessionUpdate): void {
-    console.log(`[SessionManager] updateSession called for ${id} with update:`, update);
     
     // Add log entry for important status changes
     if (update.status) {
@@ -392,14 +422,12 @@ export class SessionManager extends EventEmitter {
     
     if (update.status !== undefined) {
       dbUpdate.status = this.mapSessionStatusToDbStatus(update.status);
-      console.log(`[SessionManager] Mapping status ${update.status} to DB status ${dbUpdate.status}`);
     }
     
     // Model is now managed at panel level, not session level
     
     if (update.skip_continue_next !== undefined) {
       dbUpdate.skip_continue_next = update.skip_continue_next;
-      console.log(`[SessionManager] Updating skip_continue_next to ${update.skip_continue_next}`);
     }
     
     const updatedDbSession = this.db.updateSession(id, dbUpdate);
@@ -413,7 +441,6 @@ export class SessionManager extends EventEmitter {
     // Don't override the status if convertDbSessionToSession determined it should be completed_unviewed
     // This allows the blue dot indicator to work properly when a session completes
     if (update.status !== undefined && session.status === 'completed_unviewed') {
-      console.log(`[SessionManager] Preserving completed_unviewed status for session ${id}`);
       delete update.status; // Remove status from update to preserve completed_unviewed
     }
     
@@ -421,7 +448,6 @@ export class SessionManager extends EventEmitter {
     Object.assign(session, update);
     
     this.activeSessions.set(id, session);
-    console.log(`[SessionManager] Emitting session-updated event for session ${id} with status ${session.status}, full session:`, JSON.stringify(session));
     this.emit('session-updated', session);
   }
 
@@ -449,7 +475,7 @@ export class SessionManager extends EventEmitter {
     const isFirstOutput = existingOutputs.length === 0;
     
     // Store in database (stringify JSON objects and error objects)
-    const dataToStore = (output.type === 'json' || output.type === 'error') ? JSON.stringify(output.data) : output.data;
+    const dataToStore = (output.type === 'json' || output.type === 'error') ? JSON.stringify(output.data) : String(output.data);
     this.db.addSessionOutput(id, output.type, dataToStore);
     
     // Emit the output so it shows immediately in the UI
@@ -461,27 +487,23 @@ export class SessionManager extends EventEmitter {
     
     // Emit output-available event to notify frontend that new output is available
     // This is used to trigger output panel refresh when new content is added (e.g., after git operations)
-    console.log(`[SessionManager] Output added for session ${id}, emitting output-available event`);
     this.emit('session-output-available', { sessionId: id });
     
     // Check if this is the initial system message with Claude's session ID
-    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'init' && output.data.session_id) {
+    if (output.type === 'json' && isJSONMessage(output.data as Record<string, unknown>, 'system', 'init') && (output.data as GenericMessageData).session_id) {
       // Store Claude's actual session ID
-      this.db.updateSession(id, { claude_session_id: output.data.session_id });
-      console.log(`[SessionManager] Captured Claude session ID: ${output.data.session_id} for Crystal session ${id}`);
+      this.db.updateSession(id, { claude_session_id: (output.data as GenericMessageData).session_id });
     }
     
     // Check if this is a system result message indicating Claude has completed
-    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'result') {
+    if (output.type === 'json' && isJSONMessage(output.data as Record<string, unknown>, 'system', 'result')) {
       // Update the completion timestamp for the most recent prompt
       const completionTimestamp = output.timestamp instanceof Date ? output.timestamp.toISOString() : output.timestamp;
       this.db.updatePromptMarkerCompletion(id, completionTimestamp);
-      console.log(`[SessionManager] Marked prompt as complete for session ${id} at ${completionTimestamp}`);
       
       // Mark the session as completed (this will trigger the completed_unviewed logic if not viewed)
       const dbSession = this.db.getSession(id);
       if (dbSession && dbSession.status === 'running') {
-        console.log(`[SessionManager] Claude completed task, marking session ${id} as completed`);
         this.db.updateSession(id, { status: 'completed' });
         
         // Re-convert to get the proper status (completed_unviewed if not viewed)
@@ -489,21 +511,20 @@ export class SessionManager extends EventEmitter {
         if (updatedDbSession) {
           const session = this.convertDbSessionToSession(updatedDbSession);
           this.activeSessions.set(id, session);
-          console.log(`[SessionManager] Session ${id} status after completion: ${session.status}`);
           this.emit('session-updated', session);
         }
       }
     }
     
     // Check if this is a user message in JSON format to track prompts
-    if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'user' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from user messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let promptText = '';
       
       if (Array.isArray(content)) {
         // Look for text content in the array
-        const textContent = content.find((item: any) => item.type === 'text');
+        const textContent = content.find((item: { type: string; text?: string }) => item.type === 'text');
         if (textContent?.text) {
           promptText = textContent.text;
         }
@@ -521,16 +542,16 @@ export class SessionManager extends EventEmitter {
     }
     
     // Check if this is an assistant message to track for conversation history
-    if (output.type === 'json' && output.data.type === 'assistant' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'assistant' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from assistant messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let assistantText = '';
       
       if (Array.isArray(content)) {
         // Concatenate all text content from the array
         assistantText = content
-          .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text)
+          .filter((item: { type: string; text?: string }) => item.type === 'text')
+          .map((item: { type: string; text?: string }) => item.text || '')
           .join('\n');
       } else if (typeof content === 'string') {
         assistantText = content;
@@ -548,7 +569,7 @@ export class SessionManager extends EventEmitter {
       if (output.type === 'json') {
         session.jsonMessages.push(output.data);
       } else {
-        session.output.push(output.data);
+        session.output.push(String(output.data));
       }
       session.lastActivity = new Date();
     }
@@ -590,6 +611,43 @@ export class SessionManager extends EventEmitter {
     const success = this.db.archiveSession(id);
     if (!success) {
       throw new Error(`Session ${id} not found`);
+    }
+
+    // Stop all AI panel processes (Claude, Codex, etc.) for this session
+    try {
+      // Get all panels for this session
+      const { panelManager } = require('./panelManager');
+      const panels: ToolPanel[] = panelManager.getPanelsForSession(id);
+      
+      // Stop Claude panels
+      const claudePanels = panels.filter(p => p.type === 'claude');
+      if (claudePanels.length > 0) {
+        try {
+          const { claudePanelManager } = require('../ipc/claudePanel');
+          for (const panel of claudePanels) {
+            console.log(`[SessionManager] Stopping Claude panel ${panel.id} for archived session ${id}`);
+            await claudePanelManager.unregisterPanel(panel.id);
+          }
+        } catch (error) {
+          console.error(`[SessionManager] Failed to stop Claude panels for session ${id}:`, error);
+        }
+      }
+      
+      // Stop Codex panels
+      const codexPanels = panels.filter(p => p.type === 'codex');
+      if (codexPanels.length > 0) {
+        try {
+          const { codexPanelManager } = require('../ipc/codexPanel');
+          for (const panel of codexPanels) {
+            console.log(`[SessionManager] Stopping Codex panel ${panel.id} for archived session ${id}`);
+            await codexPanelManager.unregisterPanel(panel.id);
+          }
+        } catch (error) {
+          console.error(`[SessionManager] Failed to stop Codex panels for session ${id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`[SessionManager] Error stopping AI panels for session ${id}:`, error);
     }
 
     // Close terminal session if it exists
@@ -639,13 +697,12 @@ export class SessionManager extends EventEmitter {
     // Capture Claude's session ID from init/system messages for proper --resume handling
     try {
       if (output.type === 'json' && output.data && typeof output.data === 'object') {
-        const data: any = output.data;
+        const data = output.data as GenericMessageData;
         const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
         if (sessionIdFromMsg) {
           const panel = this.db.getPanel(panelId);
           if (panel?.sessionId) {
             this.db.updateSession(panel.sessionId, { claude_session_id: sessionIdFromMsg });
-            console.log(`[SessionManager] Captured Claude session ID from panel ${panelId}: ${sessionIdFromMsg} for Crystal session ${panel.sessionId}`);
           }
         }
       }
@@ -654,16 +711,16 @@ export class SessionManager extends EventEmitter {
     }
 
     // Handle assistant conversation message extraction for Claude panels (same logic as sessions)
-    if (output.type === 'json' && output.data.type === 'assistant' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'assistant' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from assistant messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let assistantText = '';
       
       if (Array.isArray(content)) {
         // Concatenate all text content from the array
         assistantText = content
-          .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text)
+          .filter((item: { type: string; text?: string }) => item.type === 'text')
+          .map((item: { type: string; text?: string }) => item.text || '')
           .join('\n');
       } else if (typeof content === 'string') {
         assistantText = content;
@@ -671,24 +728,23 @@ export class SessionManager extends EventEmitter {
       
       if (assistantText) {
         // Add to panel conversation messages for continuation support
-        console.log('[SessionManager] Adding assistant message to panel:', panelId, 'text length:', assistantText.length);
         // Use the sessionManager method instead of db method directly to ensure event emission
         this.addPanelConversationMessage(panelId, 'assistant', assistantText);
       }
     }
     
     // Handle Codex session completion message to stop prompt timing
-    if (output.type === 'json' && output.data.type === 'session' && output.data.data?.status === 'completed') {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'session' && (output.data as GenericMessageData).data?.status === 'completed') {
       console.log('[SessionManager] Detected Codex session completion for panel:', panelId);
       // Add a completion message to trigger panel-response-added event which stops the timer
-      const completionMessage = output.data.data.message || 'Session completed';
+      const completionMessage = String((output.data as GenericMessageData).data?.message || 'Session completed');
       this.addPanelConversationMessage(panelId, 'assistant', completionMessage);
     }
     
     // Handle Codex agent messages (similar to Claude's assistant messages)
-    if (output.type === 'json' && (output.data.type === 'agent_message' || output.data.type === 'agent_message_delta')) {
-      const agentText = output.data.message || output.data.delta || '';
-      if (agentText && output.data.type === 'agent_message') {
+    if (output.type === 'json' && ((output.data as GenericMessageData).type === 'agent_message' || (output.data as GenericMessageData).type === 'agent_message_delta')) {
+      const agentText = String((output.data as GenericMessageData).message || (output.data as GenericMessageData).delta || '');
+      if (agentText && (output.data as GenericMessageData).type === 'agent_message') {
         console.log('[SessionManager] Adding Codex agent message to panel:', panelId, 'text length:', agentText.length);
         // Only add complete messages, not deltas
         this.addPanelConversationMessage(panelId, 'assistant', agentText);
@@ -696,14 +752,14 @@ export class SessionManager extends EventEmitter {
     }
     
     // Handle user conversation message extraction for Claude panels (same logic as sessions)
-    if (output.type === 'json' && output.data.type === 'user' && output.data.message?.content) {
+    if (output.type === 'json' && (output.data as GenericMessageData).type === 'user' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from user messages
-      const content = output.data.message.content;
+      const content = (output.data as GenericMessageData).message?.content;
       let promptText = '';
       
       if (Array.isArray(content)) {
         // Look for text content in the array
-        const textContent = content.find((item: any) => item.type === 'text');
+        const textContent = content.find((item: { type: string; text?: string }) => item.type === 'text');
         if (textContent?.text) {
           promptText = textContent.text;
         }
@@ -727,16 +783,20 @@ export class SessionManager extends EventEmitter {
     // Capture Claude session ID per panel for proper --resume usage
     try {
       if (output.type === 'json' && output.data && typeof output.data === 'object') {
-        const data: any = output.data;
+        const data = output.data as GenericMessageData;
         const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
         if (sessionIdFromMsg) {
           const panel = this.db.getPanel(panelId);
           if (panel) {
-            const currentState = (panel as any).state || {};
+            const currentState = panel.state as PanelStateWithCustomData || {};
             const customState = currentState.customState || {};
             const updatedState = {
               ...currentState,
-              customState: { ...customState, claudeSessionId: sessionIdFromMsg }
+              customState: { 
+                ...customState, 
+                agentSessionId: sessionIdFromMsg, // Use new generic field
+                claudeSessionId: sessionIdFromMsg  // Keep legacy field for backward compatibility
+              }
             };
             this.db.updatePanel(panelId, { state: updatedState });
             console.log(`[SessionManager] Stored Claude session_id for panel ${panelId}: ${sessionIdFromMsg}`);
@@ -1045,9 +1105,10 @@ export class SessionManager extends EventEmitter {
               addSessionLog(sessionId, 'warn', line, 'Build');
             });
           }
-        } catch (cmdError: any) {
+        } catch (cmdError: unknown) {
           console.error(`[SessionManager] Build command failed: ${command}`, cmdError);
-          const errorMessage = cmdError.stderr || cmdError.stdout || cmdError.message || String(cmdError);
+          const error = cmdError as { stderr?: string; stdout?: string; message?: string };
+          const errorMessage = error.stderr || error.stdout || error.message || String(cmdError);
           allOutput += errorMessage;
           
           addSessionLog(sessionId, 'error', `Command failed: ${command}`, 'Build');

@@ -134,22 +134,17 @@ export function useCliPanel(
   /**
    * Send input to the CLI process
    */
-  const sendInput = useCallback(async (input: string, options?: Partial<CliInputOptions>) => {
+  const sendInput = useCallback(async (input: string) => {
     if (!panel) {
       setError('Panel not initialized');
       return;
     }
 
-    const inputOptions: CliInputOptions = {
-      text: input,
-      ...options
-    };
 
     try {
       setError(null);
       // TODO: Implement proper API when available
       // For now, this is a placeholder for future implementation
-      console.log('Sending input to CLI panel:', panelId, inputOptions);
       
       // Add user input to outputs
       const userOutput: CliOutput = {
@@ -172,7 +167,7 @@ export function useCliPanel(
   /**
    * Start the CLI process
    */
-  const startProcess = useCallback(async (initialPrompt?: string) => {
+  const startProcess = useCallback(async () => {
     if (!panel) {
       setError('Panel not initialized');
       return;
@@ -183,7 +178,6 @@ export function useCliPanel(
       setProcessStatus('initializing');
       
       // TODO: Implement proper API when available
-      console.log('Starting CLI process for panel:', panelId, initialPrompt);
       
       // Simulate process start
       setTimeout(() => {
@@ -205,7 +199,6 @@ export function useCliPanel(
     try {
       setError(null);
       // TODO: Implement proper API when available
-      console.log('Stopping CLI process for panel:', panelId);
       
       setProcessStatus('stopped');
     } catch (err) {
@@ -246,7 +239,6 @@ export function useCliPanel(
 
     try {
       // TODO: Implement proper API when available
-      console.log('Exporting conversation for panel:', panelId);
       
       // For now, create a simple text export
       const exportText = outputs.map(o => {
@@ -273,7 +265,6 @@ export function useCliPanel(
    */
   const loadMoreOutputs = useCallback(async () => {
     // TODO: Implement pagination when API is available
-    console.log('Loading more outputs for panel:', panelId);
   }, [panelId]);
 
   /**
@@ -371,7 +362,6 @@ export function useCliPanel(
 
       try {
         // TODO: Implement proper API when available
-        console.log('Loading outputs for panel:', panelId);
         
         // For now, use empty outputs
         const mockOutputs: CliOutput[] = [];
@@ -394,7 +384,7 @@ export function useCliPanel(
     /*
     if (!panel || !window.electron) return;
 
-    const handlePanelOutput = (_event: any, data: any) => {
+    const handlePanelOutput = (_event: Electron.IpcRendererEvent, data: { panelId: string; sessionId: string; type: string; data: unknown; timestamp: Date; content?: string; metadata?: unknown }) => {
       if (data.panelId !== panelId) return;
 
       const newOutput: CliOutput = {

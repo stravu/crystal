@@ -37,6 +37,12 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   // The component already receives the session as a prop, which will cause re-render when it changes
   // No need for an additional store subscription that runs for every session item on every store change
   
+  // Sync git status loading state from store
+  useEffect(() => {
+    const loading = useSessionStore.getState().isGitStatusLoading(session.id);
+    setGitStatusLoading(loading);
+  }, [session.id]);
+  
   useEffect(() => {
     // Check if this session's project has a run script
     const checkRunScript = () => {
@@ -51,25 +57,23 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
 
     checkRunScript();
 
-    // Listen for project updates
-    let unsubscribe: (() => void) | undefined;
-    
-    if (window.electronAPI?.events?.onProjectUpdated) {
-      unsubscribe = window.electronAPI.events.onProjectUpdated((project) => {
-        // Check if this session belongs to the updated project
-        if (session.projectId === project.id) {
-          // Re-check if the run script exists for this session
-          checkRunScript();
-        }
-      });
-    }
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
+    // Listen for custom project update events from the global useIPCEvents hook  
+    const handleProjectUpdate = (event: CustomEvent) => {
+      const project = event.detail;
+      // Check if this session belongs to the updated project
+      if (session.projectId === project.id) {
+        // Re-check if the run script exists for this session
+        checkRunScript();
       }
     };
-  }, [session.id, session.projectId]);
+    
+    window.addEventListener('project-updated', handleProjectUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('project-updated', handleProjectUpdate as EventListener);
+    };
+    // Only re-run when the actual session ID changes to prevent memory leaks
+  }, [session.id]);
 
   // Combine script-related effects
   useEffect(() => {
@@ -102,54 +106,58 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   }, [session.id]);
 
   useEffect(() => {
-    // Fetch Git status for this session (non-blocking)
-    const fetchGitStatus = async (isInitialLoad = false) => {
-      try {
-        setGitStatusLoading(true);
-        // Use non-blocking fetch with initial load flag for staggered loading
-        const response = await window.electronAPI.invoke('sessions:get-git-status', session.id, true, isInitialLoad);
-        if (response.success) {
-          // If we got cached status, use it immediately
-          if (response.gitStatus) {
+    // Optimized git status fetching - rely on centralized smart polling instead of individual fetches
+    const fetchGitStatusIfNeeded = async () => {
+      // Only fetch if we don't have git status yet and session is active/viable
+      if (!session.archived && session.status !== 'error' && !gitStatus && !session.gitStatus) {
+        try {
+          setGitStatusLoading(true);
+          // Use queue-based initial load to prevent overwhelming the system
+          const response = await window.electronAPI.invoke('sessions:get-git-status', session.id, false, true);
+          if (response.success && response.gitStatus) {
             setGitStatus(response.gitStatus);
           }
-          // Loading indicator will be cleared when the background refresh completes
-          // via the git-status-updated event
-          if (!response.backgroundRefresh) {
-            setGitStatusLoading(false);
-          }
-        } else {
+          setGitStatusLoading(false);
+        } catch (error) {
+          console.warn('Error fetching initial git status:', error);
           setGitStatusLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching git status:', error);
+      }
+    };
+
+    // Use session.gitStatus if available, or fetch only once if needed
+    if (session.gitStatus) {
+      setGitStatus(session.gitStatus);
+    } else {
+      fetchGitStatusIfNeeded();
+    }
+
+    // Listen for custom git status events from the global useIPCEvents hook
+    const handleGitStatusUpdate = (event: CustomEvent) => {
+      const { sessionId, gitStatus } = event.detail;
+      if (sessionId === session.id) {
+        setGitStatus(gitStatus);
         setGitStatusLoading(false);
       }
     };
-
-    // Initial fetch only if we don't already have git status
-    if (!session.archived && session.status !== 'error' && !gitStatus) {
-      fetchGitStatus(true); // Pass true for initial load
-    }
-
-    // Listen for git status updates
-    let unsubscribeGitStatus: (() => void) | undefined;
     
-    if (window.electronAPI?.events?.onGitStatusUpdated) {
-      unsubscribeGitStatus = window.electronAPI.events.onGitStatusUpdated((data) => {
-        if (data.sessionId === session.id) {
-          setGitStatus(data.gitStatus);
-          setGitStatusLoading(false);
-        }
-      });
-    }
-
-    return () => {
-      if (unsubscribeGitStatus) {
-        unsubscribeGitStatus();
+    // Listen for git status loading events to show immediate feedback
+    const handleGitStatusLoading = (event: CustomEvent) => {
+      const { sessionId } = event.detail;
+      if (sessionId === session.id) {
+        setGitStatusLoading(true);
       }
     };
-  }, [session.id, session.archived, session.status, gitStatus]);
+    
+    window.addEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
+    window.addEventListener('git-status-loading', handleGitStatusLoading as EventListener);
+
+    return () => {
+      window.removeEventListener('git-status-updated', handleGitStatusUpdate as EventListener);
+      window.removeEventListener('git-status-loading', handleGitStatusLoading as EventListener);
+    };
+    // Reduced dependency array to prevent excessive re-runs
+  }, [session.id, session.archived, session.status, session.gitStatus]);
 
   const handleRunScript = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();

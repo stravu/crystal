@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
+import { useSessionHistoryStore } from '../stores/sessionHistoryStore';
 import { EmptyState } from './EmptyState';
 // import CombinedDiffView from './panels/diff/CombinedDiffView'; // Removed - now in panels
 import { StravuFileSearch } from './StravuFileSearch';
@@ -25,13 +26,15 @@ import { PanelContainer } from './panels/PanelContainer';
 import { SessionProvider } from '../contexts/SessionContext';
 import { ToolPanel, ToolPanelType } from '../../../shared/types/panels';
 import { Download, Upload, GitMerge, Code2 } from 'lucide-react';
+import type { Project } from '../types/project';
+import { devLog, renderLog } from '../utils/console';
 
 export const SessionView = memo(() => {
   const { activeView, activeProjectId } = useNavigationStore();
-  const [projectData, setProjectData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<Project | null>(null);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [isMergingProject, setIsMergingProject] = useState(false);
-  const [sessionProject, setSessionProject] = useState<any>(null);
+  const [sessionProject, setSessionProject] = useState<Project | null>(null);
 
   // Get active session by subscribing directly to store state
   // This ensures the component re-renders when git status or other session properties update
@@ -44,6 +47,8 @@ export const SessionView = memo(() => {
     // Otherwise look in regular sessions
     return state.sessions.find(session => session.id === state.activeSessionId);
   });
+  
+  const setActiveSession = useSessionStore(state => state.setActiveSession);
 
   // Panel store state and actions
   const {
@@ -55,15 +60,24 @@ export const SessionView = memo(() => {
     removePanel,
     updatePanelState,
   } = usePanelStore();
+  
+  // History store for navigation
+  const { addToHistory, navigateBack, navigateForward } = useSessionHistoryStore();
 
   // Load panels when session changes
   useEffect(() => {
     if (activeSession?.id) {
-      console.log('[SessionView] Loading panels for session:', activeSession.id);
-      panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
-        console.log('[SessionView] Loaded panels:', loadedPanels);
-        setPanels(activeSession.id, loadedPanels);
-      });
+      devLog.debug('[SessionView] Loading panels for session:', activeSession.id);
+      
+      // Check if panels are already loaded for this session
+      const existingPanels = panels[activeSession.id] || [];
+      if (existingPanels.length === 0) {
+        // Only load panels if they're not already in the store
+        panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
+          devLog.debug('[SessionView] Loaded panels:', loadedPanels);
+          setPanels(activeSession.id, loadedPanels);
+        });
+      }
       
       panelApi.getActivePanel(activeSession.id).then(activePanel => {
         console.log('[SessionView] Active panel from backend:', activePanel);
@@ -72,7 +86,7 @@ export const SessionView = memo(() => {
         }
       });
     }
-  }, [activeSession?.id, setPanels, setActivePanelInStore]);
+  }, [activeSession?.id, panels, setPanels, setActivePanelInStore]);
   
   // Listen for panel updates from the backend
   useEffect(() => {
@@ -135,20 +149,68 @@ export const SessionView = memo(() => {
     [sessionPanels]
   );
   
-  // Debug logging
-  console.log('[SessionView] Session panels:', sessionPanels);
-  console.log('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
-  console.log('[SessionView] Current active panel:', currentActivePanel);
-  console.log('[SessionView] Has Claude panels:', hasClaudePanels);
+  // Track current session/panel in history when they change
+  useEffect(() => {
+    if (activeSession?.id && currentActivePanel?.id) {
+      addToHistory(activeSession.id, currentActivePanel.id);
+    }
+  }, [activeSession?.id, currentActivePanel?.id, addToHistory]);
+  
+  // Keyboard shortcuts for navigating history
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + Option/Alt + Left/Right arrows for navigation
+      if ((e.metaKey || e.ctrlKey) && e.altKey) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const previousEntry = navigateBack();
+          if (previousEntry) {
+            // Navigate to the previous session/panel
+            setActiveSession(previousEntry.sessionId);
+            // Small delay to ensure session is set before panel
+            setTimeout(() => {
+              setActivePanelInStore(previousEntry.sessionId, previousEntry.panelId);
+              panelApi.setActivePanel(previousEntry.sessionId, previousEntry.panelId);
+            }, 50);
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const nextEntry = navigateForward();
+          if (nextEntry) {
+            // Navigate to the next session/panel
+            setActiveSession(nextEntry.sessionId);
+            // Small delay to ensure session is set before panel
+            setTimeout(() => {
+              setActivePanelInStore(nextEntry.sessionId, nextEntry.panelId);
+              panelApi.setActivePanel(nextEntry.sessionId, nextEntry.panelId);
+            }, 50);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigateBack, navigateForward, setActiveSession, setActivePanelInStore]);
+  
+  // Debug logging - only in development with verbose enabled
+  renderLog('[SessionView] Session panels:', sessionPanels);
+  renderLog('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
+  renderLog('[SessionView] Current active panel:', currentActivePanel);
+  renderLog('[SessionView] Has Claude panels:', hasClaudePanels);
 
   // FIX: Memoize all callbacks to prevent re-renders
   const handlePanelSelect = useCallback(
     async (panel: ToolPanel) => {
       if (!activeSession) return;
+      
+      // Add to history when panel is selected
+      addToHistory(activeSession.id, panel.id);
+      
       setActivePanelInStore(activeSession.id, panel.id);
       await panelApi.setActivePanel(activeSession.id, panel.id);
     },
-    [activeSession, setActivePanelInStore]
+    [activeSession, setActivePanelInStore, addToHistory]
   );
 
   const handlePanelClose = useCallback(
@@ -179,7 +241,7 @@ export const SessionView = memo(() => {
       if (!activeSession) return;
       
       // For Codex panels, include the last selected model and thinking level in initial state
-      let initialState: any = undefined;
+      let initialState: { customState?: unknown } | undefined = undefined;
       if (type === 'codex') {
         const savedModel = localStorage.getItem('codex.lastSelectedModel');
         const savedThinkingLevel = localStorage.getItem('codex.lastSelectedThinkingLevel');
@@ -197,16 +259,18 @@ export const SessionView = memo(() => {
         };
       }
       
-      await panelApi.createPanel({
+      const newPanel = await panelApi.createPanel({
         sessionId: activeSession.id,
         type,
         initialState
       });
       
-      // Don't add to store here - the panel:created event will handle it
-      // This prevents duplicate panels from appearing
+      // Immediately add the panel and set it as active
+      // The panel:created event will also fire, but addPanel checks for duplicates
+      addPanel(newPanel);
+      setActivePanelInStore(activeSession.id, newPanel.id);
     },
-    [activeSession]
+    [activeSession, addPanel, setActivePanelInStore]
   );
 
   // Load project data for active session
@@ -216,7 +280,7 @@ export const SessionView = memo(() => {
         try {
           const response = await API.projects.getAll();
           if (response.success && response.data) {
-            const project = response.data.find((p: any) => p.id === activeSession.projectId);
+            const project = response.data.find((p: Project) => p.id === activeSession.projectId);
             if (project) {
               setSessionProject(project);
             }
@@ -240,7 +304,7 @@ export const SessionView = memo(() => {
           // Get all projects and find the one we need
           const response = await API.projects.getAll();
           if (response.success && response.data) {
-            const project = response.data.find((p: any) => p.id === activeProjectId);
+            const project = response.data.find((p: Project) => p.id === activeProjectId);
             if (project) {
               setProjectData(project);
             }
@@ -424,27 +488,44 @@ export const SessionView = memo(() => {
       
       <div className="flex-1 flex relative min-h-0">
         <div className="flex-1 relative">
-          {/* Render all panels but only show the active one - keeps terminals alive */}
+          {/* Render panels with smart visibility - keeps critical processes alive */}
           {sessionPanels.length > 0 && currentActivePanel ? (
             <SessionProvider session={activeSession} gitBranchActions={branchActions} isMerging={hook.isMerging}>
-              {sessionPanels.map(panel => (
-                <div 
-                  key={panel.id} 
-                  className="absolute inset-0"
-                  style={{ display: panel.id === currentActivePanel.id ? 'block' : 'none' }}
-                >
-                  <PanelContainer
-                    panel={panel}
-                    isActive={panel.id === currentActivePanel.id}
-                    isMainRepo={!!activeSession.isMainRepo}
-                  />
-                </div>
-              ))}
+              {sessionPanels.map(panel => {
+                const isActive = panel.id === currentActivePanel.id;
+                const shouldKeepAlive = ['terminal', 'claude', 'codex'].includes(panel.type);
+                
+                // Only render if active OR if it's a panel type that needs to stay alive
+                if (!isActive && !shouldKeepAlive) {
+                  return null;
+                }
+                
+                return (
+                  <div 
+                    key={panel.id} 
+                    className="absolute inset-0"
+                    style={{ 
+                      display: isActive ? 'block' : 'none',
+                      pointerEvents: isActive ? 'auto' : 'none'
+                    }}
+                  >
+                    <PanelContainer
+                      panel={panel}
+                      isActive={isActive}
+                      isMainRepo={!!activeSession.isMainRepo}
+                    />
+                  </div>
+                );
+              })}
             </SessionProvider>
           ) : (
-            <>
-              {/* Legacy view content removed - all functionality now in panels */}
-            </>
+            <div className="flex-1 flex items-center justify-center text-text-secondary">
+              <div className="text-center p-8">
+                <div className="text-4xl mb-4">⚡</div>
+                <h2 className="text-xl font-semibold mb-2">No Active Panel</h2>
+                <p className="text-sm">Add a tool panel to get started</p>
+              </div>
+            </div>
           )}
         </div>
       </div>

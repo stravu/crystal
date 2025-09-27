@@ -3,6 +3,7 @@ import { Card } from '../ui/Card';
 import { Cpu, Paperclip, X, FileText, Brain, Gauge, Zap } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
 import { CODEX_MODELS, type OpenAICodexModel } from '../../../../shared/types/models';
+import type { AttachedImage, AttachedText } from '../../types/session';
 
 export interface CodexConfig {
   prompt?: string;
@@ -12,8 +13,8 @@ export interface CodexConfig {
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   webSearch?: boolean;
   thinkingLevel?: 'low' | 'medium' | 'high';
-  attachedImages?: any[];
-  attachedTexts?: any[];
+  attachedImages?: AttachedImage[];
+  attachedTexts?: AttachedText[];
 }
 
 interface CodexConfigProps {
@@ -37,7 +38,7 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const processFile = async (file: File): Promise<any | null> => {
+  const processFile = async (file: File): Promise<AttachedImage | null> => {
     const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     if (!file.type.startsWith('image/')) {

@@ -5,13 +5,20 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { ConversationMessage } from '../../../database/models';
 import { testClaudeCodeAvailability, testClaudeCodeInDirectory } from '../../../utils/claudeCodeTest';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { PermissionManager } from '../../permissionManager';
-import { findNodeExecutable, findClaudeCodeScript } from '../../../utils/nodeFinder';
+import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
-import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
 import { withLock } from '../../../utils/mutex';
+import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
+
+// Extend global object for MCP configuration storage  
+interface GlobalMcpStorage {
+  [key: string]: string | undefined;
+}
+declare const globalThis: GlobalMcpStorage;
 
 interface ClaudeSpawnOptions {
   panelId: string;
@@ -37,7 +44,7 @@ interface ClaudeCodeProcess {
  */
 export class ClaudeCodeManager extends AbstractCliManager {
   constructor(
-    sessionManager: any,
+    sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
     configManager?: ConfigManager,
     private permissionIpcPath?: string | null
@@ -112,15 +119,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }
       // If a new prompt is provided, add it
       if (prompt && prompt.trim()) {
-        const finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
+        const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
         args.push('-p', finalPrompt);
       }
     } else {
       // Initial prompt for new session
-      let finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
+      let finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
 
       // Add system prompts for new sessions
-      const systemPromptAppend = this.buildSystemPromptAppend(dbSession);
+      const systemPromptAppend = this.buildSystemPromptAppend(dbSession ? { ...dbSession, project_id: dbSession.project_id } : { id: sessionId });
       if (systemPromptAppend) {
         finalPrompt = `${finalPrompt}\n\n${systemPromptAppend}`;
       }
@@ -152,8 +159,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
     }
   }
 
-  protected parseCliOutput(data: string, panelId: string, sessionId: string): Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: any; timestamp: Date }> {
-    const events: Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: any; timestamp: Date }> = [];
+  protected parseCliOutput(data: string, panelId: string, sessionId: string): Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: unknown; timestamp: Date }> {
+    const events: Array<{ panelId: string; sessionId: string; type: 'json' | 'stdout' | 'stderr'; data: unknown; timestamp: Date }> = [];
 
     try {
       const jsonMessage = JSON.parse(data.trim());
@@ -221,7 +228,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
     PermissionManager.getInstance().clearPendingRequests(sessionId);
 
     // Clean up MCP config file if it exists
-    const mcpConfigPath = (global as any)[`mcp_config_${sessionId}`];
+    const mcpConfigPath = globalThis[`mcp_config_${sessionId}`];
     if (mcpConfigPath && fs.existsSync(mcpConfigPath)) {
       setTimeout(() => {
         try {
@@ -229,7 +236,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
             fs.unlinkSync(mcpConfigPath);
             this.logger?.verbose(`[MCP] Cleaned up config file: ${mcpConfigPath}`);
           }
-          delete (global as any)[`mcp_config_${sessionId}`];
+          delete globalThis[`mcp_config_${sessionId}`];
         } catch (error) {
           this.logger?.error(`Failed to delete MCP config file:`, error instanceof Error ? error : undefined);
         }
@@ -237,7 +244,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
     }
 
     // Clean up temporary MCP script file if it exists
-    const mcpScriptPath = (global as any)[`mcp_script_${sessionId}`];
+    const mcpScriptPath = globalThis[`mcp_script_${sessionId}`];
     if (mcpScriptPath && fs.existsSync(mcpScriptPath)) {
       setTimeout(() => {
         try {
@@ -245,7 +252,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
             fs.unlinkSync(mcpScriptPath);
             this.logger?.verbose(`[MCP] Cleaned up script file: ${mcpScriptPath}`);
           }
-          delete (global as any)[`mcp_script_${sessionId}`];
+          delete globalThis[`mcp_script_${sessionId}`];
         } catch (error) {
           this.logger?.error(`Failed to delete temporary MCP script file:`, error instanceof Error ? error : undefined);
         }
@@ -373,94 +380,8 @@ export class ClaudeCodeManager extends AbstractCliManager {
     });
   }
 
-  // Override spawnPtyProcess to add Node.js fallback for Claude
-  protected async spawnPtyProcess(command: string, args: string[], cwd: string, env: { [key: string]: string }): Promise<import('@homebridge/node-pty-prebuilt-multiarch').IPty> {
-    const pty = await import('@homebridge/node-pty-prebuilt-multiarch');
-    
-    if (!pty) {
-      throw new Error('node-pty not available');
-    }
-
-    const fullCommand = `${command} ${args.join(' ')}`;
-    this.logger?.verbose(`Executing Claude Code command: ${fullCommand}`);
-    this.logger?.verbose(`Working directory: ${cwd}`);
-
-    let ptyProcess: import('@homebridge/node-pty-prebuilt-multiarch').IPty;
-    let spawnAttempt = 0;
-    let lastError: any;
-
-    // Try normal spawn first, then fallback to Node.js invocation if it fails
-    while (spawnAttempt < 2) {
-      try {
-        const startTime = Date.now();
-
-        // On Linux, add a small delay before spawning to avoid resource contention
-        if (os.platform() === 'linux' && this.processes.size > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-
-        if (spawnAttempt === 0) {
-          // First attempt: normal spawn
-          ptyProcess = pty.spawn(command, args, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        } else {
-          // Second attempt: use Node.js directly with Claude script
-          this.logger?.verbose(`First spawn failed, trying Node.js direct invocation...`);
-
-          // Find the Claude Code script
-          const claudeScript = findClaudeCodeScript(command);
-          if (!claudeScript) {
-            throw new Error('Could not find Claude Code script for Node.js invocation');
-          }
-
-          const nodePath = await findNodeExecutable();
-          this.logger?.verbose(`Using Node.js: ${nodePath}`);
-          this.logger?.verbose(`Claude script: ${claudeScript}`);
-
-          // Spawn with Node.js directly, bypassing the shebang
-          const nodeArgs = ['--no-warnings', '--enable-source-maps', claudeScript, ...args];
-          ptyProcess = pty.spawn(nodePath, nodeArgs, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        }
-
-        const spawnTime = Date.now() - startTime;
-        this.logger?.verbose(`Claude process spawned successfully in ${spawnTime}ms`);
-        return ptyProcess;
-      } catch (spawnError) {
-        lastError = spawnError;
-        spawnAttempt++;
-
-        if (spawnAttempt === 1) {
-          const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
-          this.logger?.error(`First Claude spawn attempt failed: ${errorMsg}`);
-
-          // Check for typical shebang-related errors
-          if (errorMsg.includes('No such file or directory') ||
-              errorMsg.includes('env: node:') ||
-              errorMsg.includes('ENOENT')) {
-            this.logger?.verbose(`Error suggests shebang issue, will try Node.js fallback`);
-            continue;
-          }
-        }
-        break;
-      }
-    }
-
-    // If we failed after all attempts, handle the error
-    const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
-    this.logger?.error(`Failed to spawn Claude process after ${spawnAttempt} attempts: ${errorMsg}`);
-    throw new Error(`Failed to spawn Claude Code: ${errorMsg}`);
-  }
+  // Claude now uses the base class spawnPtyProcess with Node.js fallback
+  // No override needed - the base class handles everything
 
   // Implementation of abstract methods from AbstractCliManager
 
@@ -477,7 +398,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
     return this.spawnClaudeCode(panelId, sessionId, worktreePath, prompt, undefined, false, permissionMode, model);
   }
 
-  async continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], model?: string): Promise<void> {
+  async continuePanel(
+    panelId: string,
+    sessionId: string,
+    worktreePath: string,
+    prompt: string,
+    conversationHistory: ConversationMessage[],
+    permissionModeOverride?: 'approve' | 'ignore',
+    model?: string
+  ): Promise<void> {
     return await withLock(`claude-continue-${panelId}`, async () => {
       // Validate panel ownership before continuing
       const { validatePanelSessionOwnership, logValidationFailure } = require('../../../utils/sessionValidation');
@@ -503,11 +432,12 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
       // Get the session's permission mode from database
       const dbSession = this.sessionManager.getDbSession(sessionId);
-      const permissionMode = dbSession?.permission_mode;
+      const permissionModeFromDb = dbSession?.permission_mode;
+      const permissionMode = permissionModeOverride ?? permissionModeFromDb;
 
       // Check if we should skip --resume flag this time (after prompt compaction)
       const skipContinueRaw = dbSession?.skip_continue_next;
-      const shouldSkipContinue = skipContinueRaw === 1 || skipContinueRaw === true;
+      const shouldSkipContinue = skipContinueRaw === true || (typeof skipContinueRaw === 'number' && skipContinueRaw === 1);
 
       console.log(`[ClaudeCodeManager] continuePanel called for ${panelId} (session ${sessionId}):`, {
         skip_continue_next_raw: skipContinueRaw,
@@ -534,12 +464,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
     await this.killProcess(panelId);
   }
 
-  async restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: string[]): Promise<void> {
+  async restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: ConversationMessage[]): Promise<void> {
     // Kill existing process if it exists
     await this.killProcess(panelId);
 
+    // Convert ConversationMessage[] to string[] for backward compatibility
+    const historyStrings = conversationHistory.map(msg => msg.content);
+
     // Restart with conversation history
-    await this.spawnClaudeCode(panelId, sessionId, worktreePath, initialPrompt, conversationHistory);
+    await this.spawnClaudeCode(panelId, sessionId, worktreePath, initialPrompt, historyStrings);
   }
 
   // Claude-specific public methods for backward compatibility
@@ -563,7 +496,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
   // Private helper methods
 
-  private buildSystemPromptAppend(dbSession: any): string | undefined {
+  private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }): string | undefined {
     const systemPromptParts: string[] = [];
 
     // Add global system prompt first
@@ -584,31 +517,6 @@ export class ClaudeCodeManager extends AbstractCliManager {
     return systemPromptParts.length > 0 ? systemPromptParts.join('\n\n') : undefined;
   }
 
-  private enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
-    // Check if session has structured commit mode
-    if (dbSession?.commit_mode === 'structured') {
-      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
-
-      let commitModeSettings;
-      if (dbSession.commit_mode_settings) {
-        try {
-          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
-        } catch (e) {
-          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
-        }
-      }
-
-      // Get structured prompt template from settings or use default
-      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
-
-      // Add structured commit instructions to the prompt
-      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
-      this.logger?.verbose(`Added structured commit instructions to prompt`);
-      return enhancedPrompt;
-    }
-
-    return prompt;
-  }
 
   private async setupMcpConfigurationSync(sessionId: string): Promise<string> {
     // Create MCP config for permission approval
@@ -765,17 +673,18 @@ export class ClaudeCodeManager extends AbstractCliManager {
     try {
       const testCmd = `"${nodePath}" "${mcpBridgePath}" --version`;
       execSync(testCmd, { encoding: 'utf8', timeout: 2000 });
-    } catch (testError: any) {
-      if (testError.code === 'EACCES' || testError.message.includes('EACCES')) {
+    } catch (testError: unknown) {
+      const error = testError as { code?: string; message?: string };
+      if (error.code === 'EACCES' || (error.message && error.message.includes('EACCES'))) {
         this.logger?.error(`[MCP] Permission denied executing MCP bridge script`);
         throw new Error('MCP bridge script is not executable');
       }
     }
 
     // Store config path and temp script path for cleanup
-    (global as any)[`mcp_config_${sessionId}`] = mcpConfigPath;
+    globalThis[`mcp_config_${sessionId}`] = mcpConfigPath;
     if (mcpBridgePath.includes(tempDir)) {
-      (global as any)[`mcp_script_${sessionId}`] = mcpBridgePath;
+      globalThis[`mcp_script_${sessionId}`] = mcpBridgePath;
     }
 
     // Add a small delay to ensure file is fully written and accessible

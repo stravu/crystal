@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { existsSync } from 'fs';
 import type { Logger } from '../utils/logger';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand } from '../utils/shellEscape';
@@ -106,9 +107,14 @@ export class CommitManager extends EventEmitter {
       this.emit('commit-created', { sessionId, commitHash, mode: 'checkpoint' });
 
       return { success: true, commitHash };
-    } catch (error: any) {
-      const errorMessage = error.stderr || error.stdout || error.message || 'Unknown error';
-      this.logger?.error(`Failed to create checkpoint commit:`, error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error as { stderr?: string; stdout?: string; message?: string })?.stderr 
+        || (error as { stderr?: string; stdout?: string; message?: string })?.stdout 
+        || (error as { stderr?: string; stdout?: string; message?: string })?.message 
+        || 'Unknown error';
+      this.logger?.error(`Failed to create checkpoint commit:`, error instanceof Error ? error : undefined);
       
       return {
         success: false,
@@ -160,9 +166,9 @@ export class CommitManager extends EventEmitter {
 
           // Continue polling
           setTimeout(checkForCommit, pollInterval);
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.logger?.error(`Error checking for structured commit:`, error instanceof Error ? error : undefined);
-          resolve({ success: false, error: error.message });
+          resolve({ success: false, error: error instanceof Error ? error.message : String(error) });
         }
       };
 
@@ -217,9 +223,14 @@ export class CommitManager extends EventEmitter {
       }
 
       return { success: true };
-    } catch (error: any) {
-      const errorMessage = error.stderr || error.stdout || error.message || 'Unknown error';
-      this.logger?.error(`Failed to finalize session:`, error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error as { stderr?: string; stdout?: string; message?: string })?.stderr 
+        || (error as { stderr?: string; stdout?: string; message?: string })?.stdout 
+        || (error as { stderr?: string; stdout?: string; message?: string })?.message 
+        || 'Unknown error';
+      this.logger?.error(`Failed to finalize session:`, error instanceof Error ? error : undefined);
       
       return {
         success: false,
@@ -269,12 +280,8 @@ export class CommitManager extends EventEmitter {
   }
 
   private async checkPathExists(path: string): Promise<boolean> {
-    try {
-      execSync(`test -e "${path}"`, { encoding: 'utf8' });
-      return true;
-    } catch {
-      return false;
-    }
+    // Use fs.existsSync instead of shell command to avoid unnecessary error logs
+    return existsSync(path);
   }
 }
 

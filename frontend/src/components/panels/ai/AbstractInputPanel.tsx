@@ -24,7 +24,7 @@ export interface InputOptions {
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   webSearch?: boolean;
   ultrathink?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AbstractInputPanelProps {

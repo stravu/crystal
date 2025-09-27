@@ -9,7 +9,7 @@ import { CodexStatsView } from './CodexStatsView';
 import { CodexDebugStateView } from './CodexDebugStateView';
 import { CodexInputPanelStyled } from './CodexInputPanelStyled';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
-import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
+import { DEFAULT_CODEX_MODEL, type CodexInputOptions } from '../../../../../shared/types/models';
 import { useConfigStore } from '../../../stores/configStore';
 
 interface CodexPanelProps {
@@ -17,9 +17,7 @@ interface CodexPanelProps {
   isActive: boolean;
 }
 
-export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
-  console.log(`[codex-debug] CodexPanel rendering: Panel ${panel.id}, Active: ${isActive}`);
-  
+export const CodexPanel: React.FC<CodexPanelProps> = React.memo(({ panel, isActive }) => {
   // Panel-specific view mode
   const [viewMode, setViewMode] = useState<AIViewMode>('richOutput');
   
@@ -30,14 +28,19 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
     return saved ? JSON.parse(saved) : {
       showToolCalls: true,
       compactMode: false,
-      collapseTools: false,
+      collapseTools: true,  // Changed to true for collapsed by default
       showThinking: true,
       showSessionInit: false,
     };
   });
   
   // Get the model from panel state
-  const codexState = panel.state?.customState as any;
+  const codexState = panel.state?.customState as {
+    model?: string;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
+  } | undefined;
   const model = codexState?.model || DEFAULT_CODEX_MODEL;
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
@@ -58,18 +61,11 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
       setViewMode('richOutput');
     }
   }, [devModeEnabled, viewMode]);
-  
-  useEffect(() => {
-    console.log(`[codex-debug] CodexPanel mounted/updated: Panel ${panel.id}, ViewMode: ${viewMode}, Session: ${hook.activeSession?.id || 'none'}`);
-  }, [panel.id, viewMode, hook.activeSession?.id]);
 
   // Get session for CodexInputPanel
   const activeSession = hook.activeSession;
-  
-  console.log(`[codex-debug] CodexPanel state: Panel ${panel.id}, Session: ${activeSession?.id || 'none'}, Processing: ${hook.isProcessing}`);
 
   if (!activeSession) {
-    console.warn(`[codex-debug] No active session for panel ${panel.id}`);
     return (
       <div className="h-full w-full flex items-center justify-center p-8">
         <div className="text-center max-w-md">
@@ -94,10 +90,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
             <span className="text-xs font-medium text-text-tertiary uppercase tracking-wider">View</span>
             <div className="inline-flex rounded-lg bg-surface-secondary p-0.5">
               <button
-              onClick={() => {
-                console.log(`[codex-debug] View mode changed to richOutput for panel ${panel.id}`);
-                setViewMode('richOutput');
-              }}
+              onClick={() => setViewMode('richOutput')}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                 viewMode === 'richOutput'
                   ? 'bg-bg-primary text-text-primary shadow-sm'
@@ -109,10 +102,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
             {devModeEnabled && (
               <>
                 <button
-                  onClick={() => {
-                    console.log(`[codex-debug] View mode changed to messages for panel ${panel.id}`);
-                    setViewMode('messages');
-                  }}
+                  onClick={() => setViewMode('messages')}
                   className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     viewMode === 'messages'
                       ? 'bg-bg-primary text-text-primary shadow-sm'
@@ -122,10 +112,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
                   Messages
                 </button>
                 <button
-                  onClick={() => {
-                    console.log(`[codex-debug] View mode changed to stats for panel ${panel.id}`);
-                    setViewMode('stats');
-                  }}
+                  onClick={() => setViewMode('stats')}
                   className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     viewMode === 'stats'
                       ? 'bg-bg-primary text-text-primary shadow-sm'
@@ -135,10 +122,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
                   Stats
                 </button>
                 <button
-                  onClick={() => {
-                    console.log(`[codex-debug] View mode changed to debugState for panel ${panel.id}`);
-                    setViewMode('debugState');
-                  }}
+                  onClick={() => setViewMode('debugState')}
                   className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     viewMode === 'debugState'
                       ? 'bg-bg-primary text-text-primary shadow-sm'
@@ -160,10 +144,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
             
             {viewMode === 'richOutput' && (
               <button
-                onClick={() => {
-                  console.log(`[codex-debug] Settings toggled for panel ${panel.id}: ${!showRichOutputSettings}`);
-                  setShowRichOutputSettings(!showRichOutputSettings);
-                }}
+                onClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
                 className={`px-2 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 ${
                   showRichOutputSettings
                     ? 'bg-surface-hover text-text-primary'
@@ -187,10 +168,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
               Model: <span className="text-text-secondary font-medium">{model}</span>
             </span>
             <button
-              onClick={() => {
-                console.log(`[codex-debug] Settings toggled for panel ${panel.id}: ${!showRichOutputSettings}`);
-                setShowRichOutputSettings(!showRichOutputSettings);
-              }}
+              onClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
               className="p-1.5 rounded hover:bg-surface-hover transition-colors"
               title="Configure display settings"
               aria-label="Open Codex display settings"
@@ -242,7 +220,7 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
           session={activeSession}
           panelId={panel.id}
           panel={panel}
-          onSendMessage={hook.handleSendMessage}
+          onSendMessage={hook.handleSendMessage as (message: string, options?: CodexInputOptions) => Promise<void>}
           disabled={hook.isProcessing}
           initialModel={model}
           onCancel={hook.handleInterrupt}
@@ -250,7 +228,9 @@ export const CodexPanel: React.FC<CodexPanelProps> = ({ panel, isActive }) => {
       )}
     </div>
   );
-};
+});
+
+CodexPanel.displayName = 'CodexPanel';
 
 // Default export for lazy loading
 export default CodexPanel;

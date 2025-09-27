@@ -5,6 +5,7 @@ import type { VersionInfo } from './services/versionChecker';
 import { addSessionLog } from './ipc/logs';
 import { getCodexModelConfig } from '../../shared/types/models';
 import { panelManager } from './services/panelManager';
+import type { ToolPanel, CodexPanelState, ClaudePanelState } from '../../shared/types/panels';
 import { 
   validateSessionExists, 
   validateEventContext, 
@@ -12,6 +13,9 @@ import {
   logValidationFailure 
 } from './utils/sessionValidation';
 import type { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
+import type { GitCommit } from './services/gitDiffManager';
+import type { Project } from './database/models';
+import type { GitStatus } from './types/session';
 
 export function setupEventListeners(services: AppServices, getMainWindow: () => BrowserWindow | null): void {
   const {
@@ -23,6 +27,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     gitStatusManager,
     worktreeManager,
     archiveProgressManager,
+    databaseService,
     logger
   } = services;
 
@@ -78,7 +83,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         const session = await sessionManager.getSession(sessionId);
         if (session && session.worktreePath) {
           const panels = panelManager.getPanelsForSession(sessionId);
-          const targetPanels = panels.filter((p: any) => p.type === tool);
+          const targetPanels = panels.filter((p: ToolPanel) => p.type === tool);
 
           let promptMarkers;
           if (targetPanels.length > 0 && typeof sessionManager.getPanelPromptMarkers === 'function') {
@@ -182,28 +187,48 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         console.log(`[Events] Session ${session.id} has non-empty prompt, auto-creating ${panelType} panel`);
         try {
           // Prepare initial custom state for the panel
-          let customState: any = undefined;
+          let customState: CodexPanelState | ClaudePanelState | undefined = undefined;
           if (panelType === 'codex') {
-            const codexConfig = (session as any).codexConfig || {};
+            const codexConfig = session.codexConfig || {};
             customState = {
               codexConfig: {
                 model: codexConfig.model || 'auto',
-                modelProvider: codexConfig.modelProvider || 'openai',
                 thinkingLevel: codexConfig.thinkingLevel || 'medium',
                 sandboxMode: codexConfig.sandboxMode || 'workspace-write',
                 webSearch: codexConfig.webSearch || false
-              }
+              },
+              modelProvider: codexConfig.modelProvider || 'openai',
+              approvalPolicy: codexConfig.approvalPolicy || 'auto',
+              sandboxMode: codexConfig.sandboxMode || 'workspace-write',
+              webSearch: codexConfig.webSearch || false
             };
             console.log(`[Events] Creating Codex panel with customState:`, customState);
+          } else if (panelType === 'claude') {
+            const claudeConfig = session.claudeConfig || {};
+            customState = {
+              permissionMode: claudeConfig.permissionMode || 'ignore',
+              model: claudeConfig.model || 'auto'
+            };
+            console.log(`[Events] Creating Claude panel with customState:`, customState);
           }
           
           const panel = await panelManager.createPanel({
             sessionId: session.id,
-            type: panelType as any,
+            type: panelType,
             title: panelTitle,
             initialState: customState
           });
           console.log(`[Events] Auto-created ${panelType} panel for session ${session.id}`);
+          
+          // Ensure the panel is set as active
+          await panelManager.setActivePanel(session.id, panel.id);
+          console.log(`[Events] Set ${panelType} panel ${panel.id} as active for session ${session.id}`);
+          
+          // For Codex panels, also save the config to the settings column for persistence
+          if (panelType === 'codex' && customState && 'codexConfig' in customState && customState.codexConfig) {
+            databaseService.updatePanelSettings(panel.id, customState.codexConfig);
+            console.log(`[Events] Saved Codex panel settings to database for panel ${panel.id}`);
+          }
 
           // Register with the appropriate panel manager
           try {
@@ -342,7 +367,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   // Listen for project update events from sessionManager (since it extends EventEmitter)
-  sessionManager.on('project:updated', (project: any) => {
+  sessionManager.on('project:updated', (project: Project) => {
     console.log(`[Main] Project updated: ${project.id}`);
     const mw = getMainWindow();
     if (mw && !mw.isDestroyed()) {
@@ -351,7 +376,13 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   // Listen to claudeCodeManager events
-  claudeCodeManager.on('output', async (output: any) => {
+  claudeCodeManager.on('output', async (output: { 
+    panelId: string; 
+    sessionId: string; 
+    type: 'json' | 'stdout' | 'stderr'; 
+    data: unknown; 
+    timestamp: Date 
+  }) => {
     // Validate the output has valid context
     const validation = output.panelId 
       ? validatePanelEventContext(output, output.panelId, output.sessionId)
@@ -365,6 +396,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     // Persist output: let ClaudePanelManager handle panel-based storage to avoid duplicates
     if (!output.panelId) {
       console.log(`[Events] Saving Claude output for session ${output.sessionId} (legacy mode)`);
+      
       sessionManager.addSessionOutput(output.sessionId, {
         type: output.type,
         data: output.data,
@@ -373,13 +405,13 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     }
 
     // Check if Claude is waiting for user input
-    if (output.type === 'json' && output.data.type === 'prompt') {
+    if (output.type === 'json' && typeof output.data === 'object' && output.data && 'type' in output.data && output.data.type === 'prompt') {
       console.log(`[Main] Claude is waiting for user input in session ${output.sessionId}`);
       await sessionManager.updateSession(output.sessionId, { status: 'waiting' });
     }
 
     // Check if Claude has completed (when it sends a result message)
-    if (output.type === 'json' && output.data.type === 'system' && output.data.subtype === 'result') {
+    if (output.type === 'json' && typeof output.data === 'object' && output.data && 'type' in output.data && output.data.type === 'system' && 'subtype' in output.data && output.data.subtype === 'result') {
       console.log(`[Main] Claude completed task in session ${output.sessionId}`);
       // Don't update status here - let the exit handler determine if it should be completed_unviewed
     }
@@ -430,7 +462,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         // MIGRATION FIX: Get the latest prompt from prompt markers or use the session prompt
         // Check if session has Claude panels and use appropriate method
         const eventsPanels = panelManager.getPanelsForSession(sessionId);
-        const eventsClaudePanels = eventsPanels.filter((p: any) => p.type === 'claude');
+        const eventsClaudePanels = eventsPanels.filter((p: ToolPanel) => p.type === 'claude');
         
         let promptMarkers;
         if (eventsClaudePanels.length > 0 && sessionManager.getPanelPromptMarkers) {
@@ -512,7 +544,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         
         // Verbose commit logging removed - details are in error cases if needed
         
-        let commits: any[] = [];
+        let commits: GitCommit[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
           // Commit count logging removed - shown in session summary
@@ -639,7 +671,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         
         // Verbose commit logging removed - details are in error cases if needed
         
-        let commits: any[] = [];
+        let commits: GitCommit[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
           // Commit count logging removed - shown in session summary
@@ -740,7 +772,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   });
 
   // Listen to gitStatusManager events and broadcast to renderer
-  gitStatusManager.on('git-status-updated', (sessionId: string, gitStatus: any) => {
+  // Only broadcast for active sessions or recent updates to reduce EventEmitter load
+  gitStatusManager.on('git-status-updated', (sessionId: string, gitStatus: GitStatus) => {
     const mw = getMainWindow();
     if (mw && !mw.isDestroyed()) {
       try {

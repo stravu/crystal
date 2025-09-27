@@ -71,7 +71,7 @@ export function registerEditorPanelHandlers(ipcMain: IpcMain, services: AppServi
       // If no panel specified, find an existing editor panel or create one
       if (!targetPanelId) {
         const panels = panelManager.getPanelsForSession(sessionId);
-        const editorPanel = panels.find((p: any) => p.type === 'editor' && !p.state?.customState?.filePath);
+        const editorPanel = panels.find(p => p.type === 'editor' && !(p.state?.customState as {filePath?: string})?.filePath);
         
         if (editorPanel) {
           targetPanelId = editorPanel.id;
@@ -135,7 +135,7 @@ export function registerEditorPanelHandlers(ipcMain: IpcMain, services: AppServi
   });
   
   // Update editor-specific panel state
-  ipcMain.handle('editor:updatePanelState', async (_, panelId: string, state: any) => {
+  ipcMain.handle('editor:updatePanelState', async (_, panelId: string, state: Record<string, unknown>) => {
     try {
       const panel = panelManager.getPanel(panelId);
       if (!panel) {

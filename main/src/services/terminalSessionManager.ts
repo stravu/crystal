@@ -24,7 +24,6 @@ export class TerminalSessionManager extends EventEmitter {
   async createTerminalSession(sessionId: string, worktreePath: string): Promise<void> {
     // Check if session already exists
     if (this.terminalSessions.has(sessionId)) {
-      console.log(`Terminal session ${sessionId} already exists, skipping creation`);
       return;
     }
 
@@ -106,7 +105,6 @@ export class TerminalSessionManager extends EventEmitter {
     if (session) {
       try {
         const pid = session.pty.pid;
-        console.log(`Closing terminal session ${sessionId} with PID ${pid}`);
         
         // Kill the process tree to ensure all child processes are terminated
         if (pid) {
@@ -206,7 +204,6 @@ export class TerminalSessionManager extends EventEmitter {
     
     // First, get all descendant PIDs before we start killing
     const descendantPids = this.getAllDescendantPids(pid);
-    console.log(`Found ${descendantPids.length} descendant processes for PID ${pid}: ${descendantPids.join(', ')}`);
     
     let success = true;
     
@@ -215,7 +212,6 @@ export class TerminalSessionManager extends EventEmitter {
         // On Windows, use taskkill to terminate the process tree
         try {
           await execAsync(`taskkill /F /T /PID ${pid}`);
-          console.log(`Successfully killed Windows process tree ${pid}`);
         } catch (error) {
           console.warn(`Error killing Windows process tree: ${error}`);
           // Fallback: kill descendants individually
@@ -244,7 +240,6 @@ export class TerminalSessionManager extends EventEmitter {
           const foundPgid = parseInt(pgidResult.stdout.trim());
           if (!isNaN(foundPgid)) {
             pgid = foundPgid;
-            console.log(`Process ${pid} is in process group ${pgid}`);
           }
         } catch (error) {
           // Use original PID as fallback
@@ -252,13 +247,11 @@ export class TerminalSessionManager extends EventEmitter {
         
         try {
           await execAsync(`kill -TERM -${pgid}`);
-          console.log(`Sent SIGTERM to process group ${pgid}`);
         } catch (error) {
           console.warn(`Error sending SIGTERM to process group: ${error}`);
         }
         
         // Give processes 10 seconds to clean up gracefully
-        console.log(`Waiting 10 seconds for graceful shutdown of terminal process ${pid}...`);
         await new Promise(resolve => setTimeout(resolve, 10000));
         
         // Now forcefully kill the main process
@@ -271,7 +264,6 @@ export class TerminalSessionManager extends EventEmitter {
         // Kill the process group with SIGKILL
         try {
           await execAsync(`kill -9 -${pgid}`);
-          console.log(`Sent SIGKILL to process group ${pgid}`);
         } catch (error) {
           console.warn(`Error sending SIGKILL to process group: ${error}`);
         }
@@ -280,9 +272,8 @@ export class TerminalSessionManager extends EventEmitter {
         for (const childPid of descendantPids) {
           try {
             await execAsync(`kill -9 ${childPid}`);
-            console.log(`Killed descendant process ${childPid}`);
           } catch (error) {
-            console.log(`Process ${childPid} already terminated`);
+            // Process already terminated
           }
         }
         

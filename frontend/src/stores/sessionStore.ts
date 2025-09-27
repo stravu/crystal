@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, SessionOutput, GitStatus } from '../types/session';
+import type { Session, SessionOutput, GitStatus, ClaudeJsonMessage } from '../types/session';
 import { API } from '../utils/api';
 
 interface CreateSessionRequest {
@@ -76,7 +76,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   loadSessions: (sessions) => set({ sessions, isLoaded: true }),
   
   addSession: (session) => set((state) => {
-    console.log(`[SessionStore] Adding new session ${session.id} and setting as active`);
     
     // Initialize arrays if they don't exist
     const sessionWithArrays = {
@@ -101,7 +100,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         output: state.activeMainRepoSession.output,
         jsonMessages: state.activeMainRepoSession.jsonMessages
       };
-      console.log(`[SessionStore] Updated active main repo session ${updatedSession.id}`);
       return {
         ...state,
         activeMainRepoSession: newActiveSession
@@ -120,7 +118,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           output: state.sessions[i].output,
           jsonMessages: state.sessions[i].jsonMessages
         };
-        console.log(`[SessionStore] Updated session ${updatedSession.id}`);
         newSessions[i] = updatedSessionWithOutput;
         break;
       }
@@ -151,16 +148,28 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   }),
   
   setActiveSession: async (sessionId) => {
-    console.log('[SessionStore] setActiveSession called with:', sessionId);
     
     if (!sessionId) {
       set({ activeSessionId: null, activeMainRepoSession: null });
+      // Notify backend about active session change for smart git status polling
+      try {
+        await window.electronAPI.invoke('sessions:set-active-session', null);
+      } catch (error) {
+        console.warn('Failed to notify backend about active session change:', error);
+      }
       return;
     }
     
     // Emit session-switched event for cleanup
     if (get().activeSessionId !== sessionId) {
       window.dispatchEvent(new CustomEvent('session-switched', { detail: { sessionId } }));
+      
+      // Notify backend about active session change for smart git status polling
+      try {
+        await window.electronAPI.invoke('sessions:set-active-session', sessionId);
+      } catch (error) {
+        console.warn('Failed to notify backend about active session change:', error);
+      }
     }
     
     // First check if the session is already in our local store
@@ -168,11 +177,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const existingSession = state.sessions.find(s => s.id === sessionId);
     
     if (existingSession) {
-      console.log('[SessionStore] Session found in local store:', existingSession.id, existingSession.name);
       
       if (existingSession.isMainRepo) {
         // Store main repo session separately with initialized arrays
-        console.log('[SessionStore] Setting existing main repo session as active');
         set({ 
           activeSessionId: sessionId, 
           activeMainRepoSession: {
@@ -183,7 +190,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         });
       } else {
         // Regular session - just set the ID
-        console.log('[SessionStore] Setting existing regular session as active');
         set({ activeSessionId: sessionId, activeMainRepoSession: null });
       }
       
@@ -198,19 +204,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     
     // If not in local store, fetch from backend (this might be a stale UI)
     try {
-      console.log('[SessionStore] Session not in local store, fetching from backend');
       const response = await API.sessions.get(sessionId);
-      console.log('[SessionStore] Session fetch response:', response);
       
       if (response.success && response.data) {
         const session = response.data;
-        console.log('[SessionStore] Session data from backend:', session);
         
         // Add the session to local store if not already there
         const currentSessions = get().sessions;
         const sessionExists = currentSessions.find(s => s.id === sessionId);
         if (!sessionExists) {
-          console.log('[SessionStore] Adding fetched session to local store');
           set(state => ({
             sessions: [...state.sessions, {
               ...session,
@@ -222,7 +224,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         
         if (session.isMainRepo) {
           // Store main repo session separately with initialized arrays
-          console.log('[SessionStore] Setting fetched main repo session as active');
           set({ 
             activeSessionId: sessionId, 
             activeMainRepoSession: {
@@ -233,7 +234,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           });
         } else {
           // Regular session
-          console.log('[SessionStore] Setting fetched regular session as active');
           set({ activeSessionId: sessionId, activeMainRepoSession: null });
         }
         // Only mark session as viewed if it wasn't already active
@@ -252,12 +252,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
   
   addSessionOutput: (output) => set((state) => {
-    console.log(`[SessionStore] Adding output for session ${output.sessionId}, type: ${output.type}`);
     
     // Find session in sessions array
     const sessionIndex = state.sessions.findIndex(s => s.id === output.sessionId);
     if (sessionIndex === -1) {
-      console.warn(`[SessionStore] Session ${output.sessionId} not found in store, cannot add output`);
       return state;
     }
     
@@ -272,7 +270,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (output.type === 'json') {
       // Update jsonMessages array with limit
       const currentMessages = session.jsonMessages || [];
-      const newMessage = {...output.data, timestamp: output.timestamp};
+      const newMessage = { ...(output.data as ClaudeJsonMessage), timestamp: output.timestamp };
       const newJsonMessages = currentMessages.length >= MAX_MESSAGES
         ? [...currentMessages.slice(1), newMessage] // Remove oldest when at limit
         : [...currentMessages, newMessage];
@@ -281,8 +279,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Add stdout/stderr to output array with limit
       const currentOutput = session.output || [];
       const newOutput = currentOutput.length >= MAX_OUTPUTS
-        ? [...currentOutput.slice(1), output.data] // Remove oldest when at limit
-        : [...currentOutput, output.data];
+        ? [...currentOutput.slice(1), output.data as string] // Remove oldest when at limit
+        : [...currentOutput, output.data as string];
       sessions[sessionIndex] = { ...session, output: newOutput };
     }
     
@@ -291,7 +289,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === output.sessionId) {
       if (output.type === 'json') {
         const currentMessages = state.activeMainRepoSession.jsonMessages || [];
-        const newMessage = {...output.data, timestamp: output.timestamp};
+        const newMessage = { ...(output.data as ClaudeJsonMessage), timestamp: output.timestamp };
         const newJsonMessages = currentMessages.length >= MAX_MESSAGES
           ? [...currentMessages.slice(1), newMessage]
           : [...currentMessages, newMessage];
@@ -299,8 +297,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       } else {
         const currentOutput = state.activeMainRepoSession.output || [];
         const newOutput = currentOutput.length >= MAX_OUTPUTS
-          ? [...currentOutput.slice(1), output.data]
-          : [...currentOutput, output.data];
+          ? [...currentOutput.slice(1), output.data as string]
+          : [...currentOutput, output.data as string];
         updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: newOutput };
       }
     }
@@ -337,11 +335,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   }),
   
   setSessionOutputs: (sessionId, outputs) => set((state) => {
-    console.log(`[SessionStore] Setting ${outputs.length} outputs for session ${sessionId}`);
     
     // PERFORMANCE: Process arrays in chunks to avoid V8 optimization bailouts
     const stdOutputs: string[] = [];
-    const jsonMessages: any[] = [];
+    const jsonMessages: ClaudeJsonMessage[] = [];
     
     // Process in smaller batches to avoid long-running loops that trigger V8 deoptimization
     const BATCH_SIZE = 100;
@@ -351,9 +348,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       for (let i = batch; i < batchEnd; i++) {
         const output = outputs[i];
         if (output.type === 'json') {
-          jsonMessages.push({ ...output.data, timestamp: output.timestamp });
+          jsonMessages.push({ ...(output.data as ClaudeJsonMessage), timestamp: output.timestamp });
         } else if (output.type === 'stdout' || output.type === 'stderr') {
-          stdOutputs.push(output.data);
+          stdOutputs.push(output.data as string);
         }
       }
       
@@ -363,7 +360,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         // but we can at least break up the work
         if (stdOutputs.length > 300 || jsonMessages.length > 100) {
           // Stop early if we already have enough data
-          console.warn(`[SessionStore] Stopping early at ${batchEnd} of ${outputs.length} outputs due to limits`);
           break;
         }
       }
@@ -382,9 +378,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       ? jsonMessages.slice(-MAX_STORED_MESSAGES)
       : jsonMessages;
     
-    if (stdOutputs.length > MAX_STORED_OUTPUTS) {
-      console.warn(`[SessionStore] Trimmed outputs from ${stdOutputs.length} to ${MAX_STORED_OUTPUTS} for performance`);
-    }
     
     // Performance optimization: Only create new array if session is found
     let updatedSessions = state.sessions;
@@ -407,7 +400,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Also update activeMainRepoSession if it matches
     let updatedActiveMainRepoSession = state.activeMainRepoSession;
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === sessionId) {
-      console.log(`[SessionStore] Also updating activeMainRepoSession`);
       updatedActiveMainRepoSession = { ...state.activeMainRepoSession, output: trimmedOutputs, jsonMessages: trimmedMessages };
     }
     
@@ -495,17 +487,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   
   getActiveSession: () => {
     const state = get();
-    console.log('[SessionStore] getActiveSession - activeSessionId:', state.activeSessionId, 'sessions count:', state.sessions.length);
     
     // If we have a main repo session, return it
     if (state.activeMainRepoSession && state.activeMainRepoSession.id === state.activeSessionId) {
-      console.log('[SessionStore] Returning activeMainRepoSession');
       return state.activeMainRepoSession;
     }
     
     // Otherwise look in regular sessions
     const found = state.sessions.find(session => session.id === state.activeSessionId);
-    console.log('[SessionStore] Found session in sessions array:', found?.id, found?.name);
     return found;
   },
 
@@ -702,8 +691,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         cleanedTerminalOutput[sessionId] = state.terminalOutput[sessionId];
       }
     });
-    
-    console.log('[SessionStore] Cleaned up inactive session data');
     
     return {
       sessions: cleanedSessions,

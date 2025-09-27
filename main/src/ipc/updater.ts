@@ -56,10 +56,16 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
           
           // Check if the working directory is clean (no uncommitted changes)
           try {
+            interface ExtendedExecOptions {
+              encoding: 'utf8';
+              cwd: string;
+              silent?: boolean;
+            }
             commandExecutor.execSync('git diff-index --quiet HEAD --', { 
               encoding: 'utf8',
-              cwd: process.cwd()
-            });
+              cwd: process.cwd(),
+              silent: true
+            } as ExtendedExecOptions);
             gitCommit = gitHash;
           } catch {
             // Working directory has uncommitted changes
@@ -76,7 +82,16 @@ export function registerUpdaterHandlers(ipcMain: IpcMain, { app, versionChecker 
         console.log('[Version Debug] Worktree name:', worktreeName);
       }
 
-      const responseData: any = {
+      const responseData: {
+        current: string;
+        name: string;
+        workingDirectory: string;
+        crystalDirectory: string;
+        buildDate?: string;
+        gitCommit?: string;
+        buildTimestamp?: number;
+        worktreeName?: string;
+      } = {
         current: app.getVersion(),
         name: app.getName(),
         workingDirectory: process.cwd(),

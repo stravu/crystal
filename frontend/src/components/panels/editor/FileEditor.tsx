@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import Editor from '@monaco-editor/react';
+import type * as monaco from 'monaco-editor';
 import { ChevronRight, ChevronDown, File, Folder, RefreshCw, Plus, Trash2, FolderPlus, Search, X, Eye, Code } from 'lucide-react';
 import { MonacoErrorBoundary } from '../../MonacoErrorBoundary';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -124,7 +125,7 @@ function FileTreeNode({ file, level, onFileClick, onRefresh, onDelete, selectedP
 
 interface FileTreeProps {
   sessionId: string;
-  onFileSelect: (file: FileItem) => void;
+  onFileSelect: (file: FileItem | null) => void;
   selectedPath: string | null;
   initialExpandedDirs?: string[];
   initialSearchQuery?: string;
@@ -238,7 +239,7 @@ function FileTree({
         
         // If the deleted file was selected, clear the selection
         if (selectedPath === file.path) {
-          onFileSelect(null as any);
+          onFileSelect(null);
         }
       } else {
         setError(`Failed to delete ${file.isDirectory ? 'folder' : 'file'}: ${result.error}`);
@@ -584,7 +585,8 @@ export function FileEditor({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
-  const editorRef = useRef<unknown>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof monaco | null>(null);
 
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
@@ -614,8 +616,8 @@ export function FileEditor({
     return ext === 'md' || ext === 'markdown';
   }, [selectedFile]);
 
-  const loadFile = useCallback(async (file: FileItem) => {
-    if (file.isDirectory) return;
+  const loadFile = useCallback(async (file: FileItem | null) => {
+    if (!file || file.isDirectory) return;
     
     setLoading(true);
     setError(null);
@@ -635,6 +637,46 @@ export function FileEditor({
         if (onFileChange) {
           onFileChange(file.path, false);
         }
+        
+        // After loading new file, we need to restore its position
+        // This happens in handleEditorMount when editor re-renders
+        // But we also need to tell parent the file path changed
+        if (onStateChange) {
+          onStateChange({ 
+            filePath: file.path,
+            isDirty: false 
+          });
+        }
+        
+        // If we have saved position for this file, restore it
+        // The actual restoration happens in handleEditorMount
+        // but we need to trigger a re-render with the right state
+        if (editorRef.current && initialState?.filePath === file.path) {
+          const monacoEditor = editorRef.current;
+          
+          // Restore cursor position
+          if (initialState.cursorPosition && monacoEditor.setPosition) {
+            const { line, column } = initialState.cursorPosition;
+            setTimeout(() => {
+              monacoEditor.setPosition({
+                lineNumber: line,
+                column: column
+              });
+              monacoEditor.revealPositionInCenter({
+                lineNumber: line,
+                column: column
+              });
+            }, 50);
+          }
+          
+          // Restore scroll position
+          if (initialState.scrollPosition !== undefined && monacoEditor.setScrollTop) {
+            const scrollPos = initialState.scrollPosition;
+            setTimeout(() => {
+              monacoEditor.setScrollTop(scrollPos);
+            }, 100);
+          }
+        }
       } else {
         setError(result.error);
       }
@@ -643,11 +685,71 @@ export function FileEditor({
     } finally {
       setLoading(false);
     }
-  }, [sessionId, onFileChange]);
+  }, [sessionId, onFileChange, onStateChange, initialState]);
 
 
-  const handleEditorMount = (editor: unknown) => {
+  const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor, monacoInstance: typeof monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monacoInstance;
+    
+    // Now we have properly typed Monaco editor
+    const monacoEditor = editor;
+    
+    // Track cursor position changes with debouncing
+    const saveCursorPosition = debounce((position: { lineNumber: number; column: number }) => {
+      if (onStateChange) {
+        onStateChange({
+          cursorPosition: {
+            line: position.lineNumber,
+            column: position.column
+          }
+        });
+      }
+    }, 500); // Debounce cursor position saves
+    
+    // Track scroll position changes with debouncing
+    const saveScrollPosition = debounce((scrollTop: number) => {
+      if (onStateChange) {
+        onStateChange({
+          scrollPosition: scrollTop
+        });
+      }
+    }, 500); // Debounce scroll position saves
+    
+    // Listen for cursor position changes
+    monacoEditor.onDidChangeCursorPosition?.((e: monaco.editor.ICursorPositionChangedEvent) => {
+      saveCursorPosition(e.position);
+    });
+    
+    // Listen for scroll position changes
+    monacoEditor.onDidScrollChange?.((e: { scrollTop?: number; scrollLeft?: number }) => {
+      if (e.scrollTop !== undefined) {
+        saveScrollPosition(e.scrollTop);
+      }
+    });
+    
+    // Restore cursor and scroll position if available
+    if (initialState?.cursorPosition && monacoEditor.setPosition) {
+      const { line, column } = initialState.cursorPosition;
+      setTimeout(() => {
+        monacoEditor.setPosition({
+          lineNumber: line,
+          column: column
+        });
+        monacoEditor.revealPositionInCenter({
+          lineNumber: line,
+          column: column
+        });
+      }, 50); // Small delay to ensure editor is ready
+    }
+    
+    if (initialState?.scrollPosition !== undefined && monacoEditor.setScrollTop) {
+      // Delay to ensure editor is fully rendered and content is loaded
+      const scrollPos = initialState.scrollPosition;
+      setTimeout(() => {
+        monacoEditor.setScrollTop(scrollPos);
+      }, 100);
+    }
   };
 
   const handleEditorChange = (value: string | undefined) => {
@@ -730,6 +832,26 @@ export function FileEditor({
       console.log('[FileEditor] No onStateChange callback');
     }
   }, [onStateChange]);
+  
+  // Cleanup effect for Monaco editor models
+  useEffect(() => {
+    return () => {
+      // Cleanup Monaco editor models when component unmounts or file changes
+      try {
+        if (editorRef.current && typeof editorRef.current === 'object' && editorRef.current !== null && 'getModel' in editorRef.current) {
+          const editor = editorRef.current as { getModel: () => unknown, dispose?: () => void };
+          const model = editor.getModel();
+          if (model && typeof model === 'object' && model !== null && 'dispose' in model) {
+            const typedModel = model as { dispose: () => void };
+            console.log('[FileEditor] Disposing Monaco model');
+            typedModel.dispose();
+          }
+        }
+      } catch (error) {
+        console.warn('[FileEditor] Error during Monaco cleanup:', error);
+      }
+    };
+  }, [selectedFile?.path]); // Run cleanup when file changes
 
   return (
     <div className="h-full flex">

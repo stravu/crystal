@@ -1,5 +1,6 @@
 import { IpcMain } from 'electron';
 import type { AppServices } from './types';
+import type { CreateProjectRequest, UpdateProjectRequest } from '../../../frontend/src/types/project';
 
 export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { databaseService, sessionManager, worktreeManager } = services;
@@ -24,7 +25,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('projects:create', async (_event, projectData: any) => {
+  ipcMain.handle('projects:create', async (_event, projectData: CreateProjectRequest) => {
     try {
       console.log('[Main] Creating project:', projectData);
 
@@ -123,7 +124,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         errorDetails = error.stack || error.toString();
 
         // Check if it's a command error
-        const cmdError = error as any;
+        const cmdError = error as Error & { cmd?: string; stderr?: string; stdout?: string };
         if (cmdError.cmd) {
           command = cmdError.cmd;
         }
@@ -159,7 +160,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
-  ipcMain.handle('projects:update', async (_event, projectId: string, updates: any) => {
+  ipcMain.handle('projects:update', async (_event, projectId: string, updates: UpdateProjectRequest) => {
     try {
       // Update the project
       const project = databaseService.updateProject(parseInt(projectId), updates);

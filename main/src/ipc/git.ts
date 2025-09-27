@@ -4,15 +4,57 @@ import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 import { panelManager } from '../services/panelManager';
 import { panelEventBus } from '../services/panelEventBus';
-import { PanelEventType } from '../../../shared/types/panels';
+import { PanelEventType, ToolPanelType, PanelEvent } from '../../../shared/types/panels';
 import type { Session } from '../types/session';
 import type { GitCommit } from '../services/gitDiffManager';
+import type { ExecException } from 'child_process';
+
+// Extended type for git system virtual panels
+type SystemPanelType = ToolPanelType | 'git';
+
+// Interface for custom git errors that contain additional context
+interface GitError extends Error {
+  gitCommands?: string[];
+  gitOutput?: string;
+  workingDirectory?: string;
+  projectPath?: string;
+  originalError?: Error;
+}
+
+// Interface for process errors that have stdout/stderr properties
+interface ProcessError {
+  stdout?: string;
+  stderr?: string;
+  message?: string;
+}
+
+// Interface for generic error objects with git-related properties
+interface ErrorWithGitContext {
+  gitCommand?: string;
+  gitCommands?: string[];
+  gitOutput?: string;
+  workingDirectory?: string;
+  originalError?: Error;
+  [key: string]: unknown;
+}
+
+// Interface for raw commit data from worktreeManager
+interface RawCommitData {
+  hash: string;
+  message: string;
+  date: string | Date;
+  author?: string;
+  additions?: number;
+  deletions?: number;
+  filesChanged?: number;
+}
+
 
 export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { sessionManager, gitDiffManager, worktreeManager, claudeCodeManager, gitStatusManager, databaseService } = services;
 
   // Helper function to emit git operation events to all sessions in a project
-  const emitGitOperationToProject = (sessionId: string, eventType: PanelEventType, message: string, details?: any) => {
+  const emitGitOperationToProject = (sessionId: string, eventType: PanelEventType, message: string, details?: Record<string, unknown>) => {
     try {
       const session = sessionManager.getSession(sessionId);
       if (!session) return;
@@ -27,7 +69,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         type: eventType,
         source: {
           panelId: 'git-system', // Special panel ID for git operations
-          panelType: 'git' as any, // Virtual panel type
+          panelType: 'git' as SystemPanelType, // Virtual panel type
           sessionId: sessionId // The session that triggered the operation
         },
         data: {
@@ -44,7 +86,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       
       // Emit the event once to the panel event bus
       // All Claude panels that have subscribed will receive it
-      panelEventBus.emitPanelEvent(event);
+      panelEventBus.emitPanelEvent(event as PanelEvent);
     } catch (error) {
       console.error('[Git] Failed to emit git operation event:', error);
     }
@@ -132,7 +174,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
     if (useFallback) {
       const fallbackLimit = limit;
       const fallbackCommits = await worktreeManager.getLastCommits(session.worktreePath, fallbackLimit);
-      commits = fallbackCommits.map((commit: any) => ({
+      commits = fallbackCommits.map((commit: RawCommitData) => ({
         hash: commit.hash,
         message: commit.message,
         date: new Date(commit.date),
@@ -278,16 +320,16 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         await refreshGitStatusForSession(sessionId);
         
         return { success: true };
-      } catch (commitError: any) {
+      } catch (commitError: unknown) {
         // Check if it's a pre-commit hook failure
-        if (commitError.stdout?.includes('pre-commit') || commitError.stderr?.includes('pre-commit')) {
+        if ((commitError && typeof commitError === 'object' && 'stdout' in commitError && (commitError as ProcessError).stdout?.includes('pre-commit')) || (commitError && typeof commitError === 'object' && 'stderr' in commitError && (commitError as ProcessError).stderr?.includes('pre-commit'))) {
           return { success: false, error: 'Pre-commit hooks failed. Please fix the issues and try again.' };
         }
         throw commitError;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to commit changes:', error);
-      const errorMessage = error.message || error.stderr || 'Failed to commit changes';
+      const errorMessage = (error instanceof Error ? error.message : '') || (error && typeof error === 'object' && 'stderr' in error ? (error as ProcessError).stderr : '') || 'Failed to commit changes';
       return { success: false, error: errorMessage };
     }
   });
@@ -612,7 +654,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         success: true, 
         data: conflictInfo 
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[IPC:git] Failed to check for rebase conflicts:`, error);
       return {
         success: false,
@@ -745,19 +787,19 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
       console.log(`[IPC:git] Rebase operation successful for session ${sessionId}`);
       return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[IPC:git] Failed to rebase main into worktree for session ${sessionId}:`, error);
 
       // Emit git operation failed event
-      const errorMessage = `✗ Rebase failed: ${error.message || 'Unknown error'}` +
-                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
+      const errorMessage = `✗ Rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+                          (error && typeof error === 'object' && 'gitOutput' in error && (error as GitError).gitOutput ? `\n\nGit output:\n${(error as GitError).gitOutput}` : '');
       
       // Don't let this block the error response either
       try {
         emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
           operation: 'rebase_from_main',
-          error: error.message,
-          gitOutput: error.gitOutput
+          error: error instanceof Error ? error.message : String(error),
+          gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as GitError).gitOutput : undefined
         });
       } catch (outputError) {
         console.error(`[IPC:git] Failed to emit git error event for session ${sessionId}:`, outputError);
@@ -768,10 +810,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         success: false,
         error: error instanceof Error ? error.message : 'Failed to rebase main into worktree',
         gitError: {
-          command: error.gitCommand,
-          output: error.gitOutput,
-          workingDirectory: error.workingDirectory,
-          originalError: error.originalError?.message
+          command: error && typeof error === 'object' && 'gitCommand' in error ? (error as ErrorWithGitContext).gitCommand : undefined,
+          output: error && typeof error === 'object' && 'gitOutput' in error ? (error as ErrorWithGitContext).gitOutput : (error instanceof Error ? error.message : String(error)),
+          workingDirectory: error && typeof error === 'object' && 'workingDirectory' in error ? (error as ErrorWithGitContext).workingDirectory : undefined,
+          originalError: error && typeof error === 'object' && 'originalError' in error ? (error as ErrorWithGitContext).originalError?.message : undefined
         }
       };
     }
@@ -815,9 +857,9 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         } else {
           console.log(`[IPC:git] No rebase in progress, proceeding to create Claude panel`);
         }
-      } catch (abortError: any) {
+      } catch (abortError: unknown) {
         // Not in a rebase state or already clean - that's fine
-        console.log('[IPC:git] No rebase to abort or already clean:', abortError.message);
+        console.log('[IPC:git] No rebase to abort or already clean:', abortError instanceof Error ? abortError.message : String(abortError));
       }
 
       // Create a new Claude panel to handle the rebase and conflicts
@@ -868,28 +910,28 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
             panelId: panel.id
           } 
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('[IPC:git] Failed to create Claude panel:', error);
         console.error('[IPC:git] Error details:', {
           sessionId,
           worktreePath: session.worktreePath,
-          errorMessage: error.message,
-          errorStack: error.stack
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined
         });
         
         // Provide more specific error messages
         let errorMessage = 'Failed to create Claude panel';
-        if (error.message?.includes('API key')) {
+        if (error instanceof Error && error.message?.includes('API key')) {
           errorMessage = 'Failed to create Claude panel: API key not configured';
-        } else if (error.message?.includes('not found')) {
+        } else if (error instanceof Error && error.message?.includes('not found')) {
           errorMessage = 'Failed to create Claude panel: Session or worktree not found';
-        } else if (error.message) {
+        } else if (error instanceof Error && error.message) {
           errorMessage = `Failed to create Claude panel: ${error.message}`;
         }
         
         return { success: false, error: errorMessage };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC:git] Failed to abort rebase and use Claude:', error);
       return {
         success: false,
@@ -960,34 +1002,35 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       
       console.log(`[IPC:git] Squash and rebase operation successful for session ${sessionId}`);
       return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[IPC:git] Failed to squash and rebase worktree to main for session ${sessionId}:`, error);
 
       // Emit git operation failed event
-      const errorMessage = `✗ Squash and rebase failed: ${error.message || 'Unknown error'}` +
-                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
+      const errorMessage = `✗ Squash and rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+                          (error && typeof error === 'object' && 'gitOutput' in error && (error as GitError).gitOutput ? `\n\nGit output:\n${(error as GitError).gitOutput}` : '');
       
       // Don't let this block the error response either
       try {
         emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
           operation: 'squash_and_rebase',
-          error: error.message,
-          gitOutput: error.gitOutput
+          error: error instanceof Error ? error.message : String(error),
+          gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as GitError).gitOutput : undefined
         });
       } catch (outputError) {
         console.error(`[IPC:git] Failed to emit git error event for session ${sessionId}:`, outputError);
       }
 
       // Pass detailed git error information to frontend
+      const gitError = error as GitError;
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to squash and rebase worktree to main',
         gitError: {
-          commands: error.gitCommands,
-          output: error.gitOutput,
-          workingDirectory: error.workingDirectory,
-          projectPath: error.projectPath,
-          originalError: error.originalError?.message
+          commands: gitError.gitCommands,
+          output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
+          workingDirectory: gitError.workingDirectory,
+          projectPath: gitError.projectPath,
+          originalError: gitError.originalError?.message
         }
       };
     }
@@ -1035,12 +1078,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       });
 
       return { success: true, data: { message: `Successfully rebased worktree to ${mainBranch}` } };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to rebase worktree to main:', error);
 
+      const gitError = error as GitError;
+      
       // Add error message to session output
-      const errorMessage = `✗ Rebase failed: ${error.message || 'Unknown error'}` +
-                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
+      const errorMessage = `✗ Rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+                          (gitError.gitOutput ? `\n\nGit output:\n${gitError.gitOutput}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stderr',
         data: errorMessage,
@@ -1051,11 +1096,11 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         success: false,
         error: error instanceof Error ? error.message : 'Failed to rebase worktree to main',
         gitError: {
-          commands: error.gitCommands,
-          output: error.gitOutput,
-          workingDirectory: error.workingDirectory,
-          projectPath: error.projectPath,
-          originalError: error.originalError?.message
+          commands: gitError.gitCommands,
+          output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
+          workingDirectory: gitError.workingDirectory,
+          projectPath: gitError.projectPath,
+          originalError: gitError.originalError?.message
         }
       };
     }
@@ -1100,27 +1145,29 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }
 
       return { success: true, data: result };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to pull from remote:', error);
 
       // Emit git operation failed event
-      const errorMessage = `✗ Pull failed: ${error.message || 'Unknown error'}` +
-                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
+      const gitError = error as GitError;
+      
+      const errorMessage = `✗ Pull failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+                          (gitError.gitOutput ? `\n\nGit output:\n${gitError.gitOutput}` : '');
       emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
         operation: 'pull',
-        error: error.message,
-        gitOutput: error.gitOutput
+        error: error instanceof Error ? error.message : String(error),
+        gitOutput: gitError.gitOutput
       });
 
       // Check if it's a merge conflict
-      if (error.message?.includes('CONFLICT') || error.gitOutput?.includes('CONFLICT')) {
+      if ((error instanceof Error && error.message?.includes('CONFLICT')) || (gitError.gitOutput?.includes('CONFLICT'))) {
         return {
           success: false,
           error: 'Merge conflicts detected. Please resolve conflicts manually or ask Claude to help.',
           isMergeConflict: true,
           gitError: {
-            output: error.gitOutput || error.message,
-            workingDirectory: error.workingDirectory || ''
+            output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
+            workingDirectory: gitError.workingDirectory || ''
           }
         };
       }
@@ -1129,8 +1176,8 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         success: false,
         error: error instanceof Error ? error.message : 'Failed to pull from remote',
         gitError: {
-          output: error.gitOutput || error.message,
-          workingDirectory: error.workingDirectory || ''
+          output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
+          workingDirectory: gitError.workingDirectory || ''
         }
       };
     }
@@ -1179,24 +1226,26 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }
 
       return { success: true, data: result };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to push to remote:', error);
 
+      const gitError = error as GitError;
+      
       // Emit git operation failed event
-      const errorMessage = `✗ Push failed: ${error.message || 'Unknown error'}` +
-                          (error.gitOutput ? `\n\nGit output:\n${error.gitOutput}` : '');
+      const errorMessage = `✗ Push failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+                          (gitError.gitOutput ? `\n\nGit output:\n${gitError.gitOutput}` : '');
       emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
         operation: 'push',
-        error: error.message,
-        gitOutput: error.gitOutput
+        error: error instanceof Error ? error.message : String(error),
+        gitOutput: gitError.gitOutput
       });
 
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to push to remote',
         gitError: {
-          output: error.gitOutput || error.message,
-          workingDirectory: error.workingDirectory || ''
+          output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
+          workingDirectory: gitError.workingDirectory || ''
         }
       };
     }
@@ -1233,7 +1282,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       }));
 
       return { success: true, data: executionDiffs };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to get last commits:', error);
       return {
         success: false,

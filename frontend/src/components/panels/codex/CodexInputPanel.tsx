@@ -1,7 +1,7 @@
 import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Send, Settings2, StopCircle } from 'lucide-react';
 import type { Session } from '../../../types/session';
-import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
+import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel, type CodexInputOptions } from '../../../../../shared/types/models';
 import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
@@ -9,7 +9,7 @@ const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 interface CodexInputPanelProps {
   session: Session;
   panelId: string;
-  onSendMessage: (message: string, options?: any) => Promise<void>;
+  onSendMessage: (message: string, options?: CodexInputOptions) => Promise<void>;
   disabled?: boolean;
   initialModel?: string;
 }
@@ -41,7 +41,7 @@ export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
   
   const [options, setOptions] = useState({
     model: getInitialModel(),
-    modelProvider: 'openai',
+    modelProvider: 'openai' as const,
     sandboxMode: 'workspace-write' as 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch: false
   });
@@ -118,7 +118,7 @@ export const CodexInputPanel: React.FC<CodexInputPanelProps> = ({
               <label className="text-text-secondary">Sandbox:</label>
               <select
                 value={options.sandboxMode}
-                onChange={(e) => setOptions({ ...options, sandboxMode: e.target.value as any })}
+                onChange={(e) => setOptions({ ...options, sandboxMode: e.target.value as 'read-only' | 'workspace-write' | 'danger-full-access' })}
                 className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary"
               >
                 <option value="read-only">Read Only</option>

@@ -4,22 +4,61 @@ import { usePanelStore } from '../stores/panelStore';
 import type { Session } from '../types/session';
 import { DEFAULT_CODEX_MODEL } from '../../../shared/types/models';
 
+// Type definitions for attachments and messages
+interface AttachedText {
+  content: string;
+  [key: string]: unknown;
+}
+
+interface AttachedImage {
+  name: string;
+  dataUrl: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+interface MessageOptions {
+  attachedTexts?: AttachedText[];
+  attachedImages?: AttachedImage[];
+  [key: string]: unknown;
+}
+
+interface ConversationMessage {
+  type: string;
+  content: unknown;
+  [key: string]: unknown;
+}
+
+interface CodexMessage {
+  msg?: {
+    type: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface CodexPanelEventData {
+  panelId: string;
+  type?: string;
+  data?: unknown;
+  msg?: string;
+  [key: string]: unknown;
+}
+
 interface CodexPanelHook {
   activeSession: Session | null;
   isProcessing: boolean;
   isInitialized: boolean;
-  handleSendMessage: (message: string, options?: any) => Promise<void>;
+  handleSendMessage: (message: string, options?: MessageOptions) => Promise<void>;
   handleApproval: (callId: string, decision: 'approved' | 'denied', type: 'exec' | 'patch') => Promise<void>;
   handleInterrupt: () => Promise<void>;
 }
 
 export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHook {
-  console.log(`[codex-debug] useCodexPanel called: Panel ${panelId}, Active: ${isActive}`);
-  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const initializingRef = useRef(false);
-  const conversationHistoryRef = useRef<any[]>([]);
+  const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   // Get session from panel
   const panel = usePanelStore(state => {
@@ -27,9 +66,6 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     if (!state.panels) return undefined;
     const allPanels = Object.values(state.panels).flat();
     const found = allPanels.find(p => p && p.id === panelId);
-    if (found) {
-      console.log(`[codex-debug] Panel found: ${found.id}, Session: ${found.sessionId}, Type: ${found.type}`);
-    }
     return found;
   });
   const sessionId = panel?.sessionId;
@@ -37,55 +73,55 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
   // Get session data
   const activeSession = useSessionStore(state => {
     const session = state.sessions.find(s => s.id === sessionId) || null;
-    if (session) {
-      console.log(`[codex-debug] Active session found: ${session.id}, Status: ${session.status}, Worktree: ${session.worktreePath}`);
-    } else if (sessionId) {
-      console.warn(`[codex-debug] No session found for ID: ${sessionId}`);
-    }
     return session;
   });
 
   // Initialize Codex panel when it becomes active and has a session
   useEffect(() => {
-    console.log(`[codex-debug] Init effect triggered: Active=${isActive}, SessionId=${sessionId}, Initialized=${isInitialized}, Initializing=${initializingRef.current}`);
     if (isActive && sessionId && !isInitialized && !initializingRef.current) {
-      console.log(`[codex-debug] Triggering initialization for panel ${panelId}`);
       initializeCodexPanel();
     }
   }, [isActive, sessionId, isInitialized]);
 
   // Listen for Codex events
   useEffect(() => {
-    const handleOutput = (data: any) => {
+    const handleOutput = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
-        console.log(`[codex-debug] Output event received for panel ${panelId}:`, JSON.stringify(data).substring(0, 500));
 
         const isCancellationMessage =
           data.type === 'json' &&
-          data.data?.type === 'session' &&
-          data.data?.data?.status === 'cancelled';
+          data.data && 
+          typeof data.data === 'object' && 
+          'type' in data.data && 
+          (data.data as { type?: string; data?: { status?: string } }).type === 'session' &&
+          'data' in data.data &&
+          (data.data as { type?: string; data?: { status?: string } }).data?.status === 'cancelled';
 
         if (isCancellationMessage) {
-          console.log(`[codex-debug] Cancellation message received for panel ${panelId}, marking processing as false`);
           setIsProcessing(false);
         }
 
         if (data.type === 'json' && data.data && !isCancellationMessage) {
+          const dataObj = data.data as Record<string, unknown>;
           conversationHistoryRef.current.push({
-            type: data.data.type || 'unknown',
+            type: String(dataObj.type || 'unknown'),
             content: data.data,
-            timestamp: data.timestamp || new Date().toISOString()
+            timestamp: String(data.timestamp || new Date().toISOString())
           });
         }
 
-        if (data.type === 'json' && data.data?.msg?.type === 'task_complete') {
-          console.log(`[codex-debug] Task complete received for panel ${panelId}, resetting processing state`);
-          setIsProcessing(false);
+        if (data.type === 'json' && data.data && typeof data.data === 'object' && 'msg' in data.data) {
+          const codexMessage = data.data as CodexMessage;
+          if (typeof codexMessage.msg === 'object' && codexMessage.msg?.type === 'task_complete') {
+            setIsProcessing(false);
+          }
         }
 
-        if (data.type === 'json' && data.data?.msg?.type === 'agent_message') {
-          console.log(`[codex-debug] Agent message received for panel ${panelId}, resetting processing state`);
-          setIsProcessing(false);
+        if (data.type === 'json' && data.data && typeof data.data === 'object' && 'msg' in data.data) {
+          const codexMessage = data.data as CodexMessage;
+          if (typeof codexMessage.msg === 'object' && codexMessage.msg?.type === 'agent_message') {
+            setIsProcessing(false);
+          }
         }
 
         // Don't re-dispatch the event - components already listen to IPC events directly
@@ -93,24 +129,22 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       }
     };
 
-    const handleSpawned = (data: any) => {
+    const handleSpawned = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
-        console.log(`[codex-debug] Spawned event received for panel ${panelId}`);
         setIsInitialized(true);
         setIsProcessing(false);
       }
     };
 
-    const handleExit = (data: any) => {
+    const handleExit = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
-        console.log(`[codex-debug] Exit event received for panel ${panelId}: Exit code ${data.exitCode}`);
         setIsProcessing(false);
       }
     };
 
-    const handleError = (data: any) => {
+    const handleError = (data: CodexPanelEventData) => {
       if (data.panelId === panelId) {
-        console.error(`[codex-debug] Error event received for panel ${panelId}:`, data.error);
+        console.error('Codex panel error:', data.error);
         setIsProcessing(false);
       }
     };
@@ -131,31 +165,25 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
 
   const initializeCodexPanel = async () => {
     if (!sessionId || !activeSession) {
-      console.warn(`[codex-debug] Cannot initialize panel ${panelId}: SessionId=${sessionId}, ActiveSession=${!!activeSession}`);
       return;
     }
     
     try {
       initializingRef.current = true;
-      console.log(`[codex-debug] Starting initialization for panel ${panelId}, Session ${sessionId}, Worktree: ${activeSession.worktreePath}`);
       
       // Initialize the Codex panel
-      console.log(`[codex-debug] Invoking codexPanel:initialize for panel ${panelId}`);
       const initResult = await window.electron?.invoke('codexPanel:initialize', panelId, sessionId, activeSession.worktreePath);
       
       if (initResult?.hasExistingSession) {
-        console.log(`[codex-debug] Panel ${panelId} has an existing Codex session ID - marking as initialized for continuation`);
         // If there's an existing session ID, treat the panel as initialized so we can continue it
         setIsInitialized(true);
         
         // Load existing conversation history for this panel
         try {
-          console.log(`[codex-debug] Loading conversation history for panel ${panelId}`);
           const outputs = await window.electron?.invoke('codexPanel:getOutputs', panelId);
           if (outputs && outputs.length > 0) {
-            console.log(`[codex-debug] Loaded ${outputs.length} outputs for panel ${panelId}`);
             // Rebuild conversation history from outputs
-            const history: any[] = [];
+            const history: ConversationMessage[] = [];
             for (const output of outputs) {
               if (output.type === 'json' && output.data) {
                 history.push({
@@ -166,32 +194,25 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
               }
             }
             conversationHistoryRef.current = history;
-            console.log(`[codex-debug] Restored ${history.length} conversation history items for panel ${panelId}`);
           }
         } catch (error) {
-          console.error(`[codex-debug] Failed to load conversation history for panel ${panelId}:`, error);
+          console.error('Failed to load conversation history:', error);
         }
       } else {
         // Check if it's running
-        console.log(`[codex-debug] Checking if panel ${panelId} is running`);
         const { isRunning } = await window.electron?.invoke('codexPanel:isRunning', panelId) || { isRunning: false };
-        console.log(`[codex-debug] Panel ${panelId} running status: ${isRunning}`);
         setIsInitialized(isRunning);
       }
       
     } catch (error) {
-      console.error(`[codex-debug] Failed to initialize panel ${panelId}:`, error);
+      console.error('Failed to initialize panel:', error);
     } finally {
       initializingRef.current = false;
-      console.log(`[codex-debug] Initialization complete for panel ${panelId}`);
     }
   };
 
-  const handleSendMessage = useCallback(async (message: string, options?: any) => {
-    console.log(`[codex-debug] handleSendMessage called for panel ${panelId}: "${message}", Initialized: ${isInitialized}`);
-    
+  const handleSendMessage = useCallback(async (message: string, options?: MessageOptions) => {
     if (!activeSession || !panelId) {
-      console.warn(`[codex-debug] Cannot send message: ActiveSession=${!!activeSession}, PanelId=${panelId}`);
       return;
     }
     
@@ -208,10 +229,9 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
             text.content
           );
           attachmentPaths.push(textFilePath);
-          console.log(`[codex-debug] Saved text attachment: ${textFilePath}`);
         }
       } catch (error) {
-        console.error('[codex-debug] Failed to save text attachments:', error);
+        console.error('Failed to save text attachments:', error);
       }
     }
     
@@ -220,16 +240,15 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
       try {
         const imagePaths = await window.electronAPI.sessions.saveImages(
           activeSession.id,
-          options.attachedImages.map((img: any) => ({
+          options.attachedImages.map((img: AttachedImage) => ({
             name: img.name,
             dataUrl: img.dataUrl,
             type: img.type,
           }))
         );
         attachmentPaths.push(...imagePaths);
-        console.log(`[codex-debug] Saved ${imagePaths.length} image attachments`);
       } catch (error) {
-        console.error('[codex-debug] Failed to save image attachments:', error);
+        console.error('Failed to save image attachments:', error);
       }
     }
     
@@ -237,7 +256,6 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     if (attachmentPaths.length > 0) {
       const attachmentsMessage = `\n\n<attachments>\nPlease look at these files which may provide additional instructions or context:\n${attachmentPaths.join('\n')}\n</attachments>`;
       finalMessage = message + attachmentsMessage;
-      console.log(`[codex-debug] Added ${attachmentPaths.length} attachment paths to message`);
     }
     
     // Add user message to conversation history
@@ -249,15 +267,12 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
     
     // Don't dispatch custom event - let the backend handle sending output events
     // This prevents duplicate events and maintains consistency
-    console.log(`[codex-debug] Added user input to conversation history`);
     
     setIsProcessing(true);
     
     try {
       if (!isInitialized) {
-        // Start Codex with the initial prompt
-        console.log(`[codex-debug] Starting Codex for panel ${panelId} with initial prompt`);
-        console.log(`[codex-debug] Options: ${JSON.stringify(options || {})}`); 
+        // Start Codex with the initial prompt 
         await window.electron?.invoke('codexPanel:start', 
           panelId, 
           activeSession.worktreePath, 
@@ -271,14 +286,10 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
           }
         );
         setIsInitialized(true);
-        console.log(`[codex-debug] Codex started for panel ${panelId}`);
       } else {
         // In interactive mode, each new prompt requires spawning a new process with 'continue'
-        console.log(`[codex-debug] Continuing Codex session for panel ${panelId} with new prompt`);
-        
         // Get conversation history for context
         const conversationHistory = conversationHistoryRef.current || [];
-        console.log(`[codex-debug] Using ${conversationHistory.length} conversation history items`);
         
         await window.electron?.invoke('codexPanel:continue', 
           panelId,
@@ -293,40 +304,31 @@ export function useCodexPanel(panelId: string, isActive: boolean): CodexPanelHoo
             webSearch: options?.webSearch || false
           }
         );
-        console.log(`[codex-debug] Codex continue invoked for panel ${panelId}`);
       }
     } catch (error) {
-      console.error(`[codex-debug] Failed to send message for panel ${panelId}:`, error);
+      console.error('Failed to send message:', error);
       setIsProcessing(false);
     }
   }, [activeSession, panelId, isInitialized]);
 
   const handleApproval = useCallback(async (callId: string, decision: 'approved' | 'denied', type: 'exec' | 'patch') => {
-    if (!panelId) {
-      console.warn(`[codex-debug] Cannot send approval: No panel ID`);
-      return;
-    }
+    if (!panelId) return;
     
     try {
-      console.log(`[codex-debug] Sending approval for panel ${panelId}: CallId=${callId}, Decision=${decision}, Type=${type}`);
       await window.electron?.invoke('codexPanel:sendApproval', panelId, callId, decision, type);
     } catch (error) {
-      console.error(`[codex-debug] Failed to send approval for panel ${panelId}:`, error);
+      console.error('Failed to send approval:', error);
     }
   }, [panelId]);
 
   const handleInterrupt = useCallback(async () => {
-    if (!panelId) {
-      console.warn(`[codex-debug] Cannot send interrupt: No panel ID`);
-      return;
-    }
+    if (!panelId) return;
     
     try {
-      console.log(`[codex-debug] Sending interrupt signal for panel ${panelId}`);
       await window.electron?.invoke('codexPanel:sendInterrupt', panelId);
       setIsProcessing(false);
     } catch (error) {
-      console.error(`[codex-debug] Failed to send interrupt for panel ${panelId}:`, error);
+      console.error('Failed to send interrupt:', error);
     }
   }, [panelId]);
 

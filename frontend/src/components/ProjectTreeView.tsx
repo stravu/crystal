@@ -10,7 +10,7 @@ import { EmptyState } from './EmptyState';
 import { LoadingSpinner } from './LoadingSpinner';
 import { API } from '../utils/api';
 import type { Session } from '../types/session';
-import type { Project } from '../types/project';
+import type { Project, CreateProjectRequest } from '../types/project';
 
 interface ProjectWithSessions extends Project {
   sessions: Session[];
@@ -26,7 +26,7 @@ export function ProjectTreeView() {
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', path: '', buildScript: '', runScript: '' });
+  const [newProject, setNewProject] = useState<CreateProjectRequest>({ name: '', path: '', buildScript: '', runScript: '' });
   const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const [showMainBranchWarning, setShowMainBranchWarning] = useState(false);
@@ -251,11 +251,11 @@ export function ProjectTreeView() {
           error: response.error || 'Unknown error occurred'
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error handling project click:', error);
       showError({
         title: 'Failed to open main repository session',
-        error: error.message || 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     }
   };
@@ -284,7 +284,7 @@ export function ProjectTreeView() {
     if (!newProject.name || !newProject.path) return;
 
     try {
-      const response = await API.projects.create(newProject);
+      const response = await API.projects.create({ ...newProject, active: false });
 
       if (!response.success) {
         showError({
@@ -301,12 +301,12 @@ export function ProjectTreeView() {
       
       // Just reload the projects list
       loadProjectsWithSessions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create project:', error);
       showError({
         title: 'Failed to Create Project',
-        error: error.message || 'An error occurred while creating the project.',
-        details: error.stack || error.toString()
+        error: error instanceof Error ? error.message : 'An error occurred while creating the project.',
+        details: error instanceof Error && error.stack ? error.stack : String(error)
       });
     }
   };

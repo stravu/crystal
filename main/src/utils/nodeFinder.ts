@@ -133,25 +133,37 @@ export async function testNodeExecutable(nodePath: string): Promise<boolean> {
 }
 
 /**
- * Find the Claude Code script file (for direct Node.js invocation fallback)
+ * Find a CLI tool's Node.js script file (for direct Node.js invocation fallback)
+ * This is a generic function that works for any npm-installed CLI tool
+ * @param cliExecutablePath Path to the CLI executable/command
+ * @returns Path to the actual JavaScript file, or null if not found
  */
-export function findClaudeCodeScript(claudeExecutablePath: string): string | null {
+export function findCliNodeScript(cliExecutablePath: string): string | null {
   try {
-    // Read the Claude executable to check if it's a script
-    const content = fs.readFileSync(claudeExecutablePath, 'utf8');
+    // Read the executable to check if it's a script
+    const content = fs.readFileSync(cliExecutablePath, 'utf8');
     
     // Check if it starts with a shebang
     if (content.startsWith('#!')) {
       // This is likely the script itself
-      return claudeExecutablePath;
+      return cliExecutablePath;
     }
 
-    // Check common locations relative to the executable
+    // Get the command name from the path (e.g., 'claude', 'codex', 'aider')
+    const commandName = path.basename(cliExecutablePath).replace(/\.(exe|cmd|bat)$/i, '');
+    
+    // Check common locations relative to the executable for npm-installed tools
     const possibleScriptPaths = [
-      claudeExecutablePath, // The executable itself might be the script
-      path.join(path.dirname(claudeExecutablePath), 'claude.js'),
-      path.join(path.dirname(claudeExecutablePath), '../lib/node_modules/@anthropic-ai/claude-code/dist/index.js'),
-      path.join(path.dirname(claudeExecutablePath), '../lib/claude-code/dist/index.js')
+      cliExecutablePath, // The executable itself might be the script
+      path.join(path.dirname(cliExecutablePath), `${commandName}.js`),
+      // Common npm global install patterns
+      path.join(path.dirname(cliExecutablePath), '../lib/node_modules', commandName, 'dist/index.js'),
+      path.join(path.dirname(cliExecutablePath), '../lib/node_modules', commandName, 'index.js'),
+      path.join(path.dirname(cliExecutablePath), '../lib/node_modules', commandName, 'lib/index.js'),
+      path.join(path.dirname(cliExecutablePath), '../lib/node_modules', commandName, 'bin', `${commandName}.js`),
+      // Specific patterns for known tools
+      path.join(path.dirname(cliExecutablePath), '../lib/node_modules/@anthropic-ai/claude-code/dist/index.js'),
+      path.join(path.dirname(cliExecutablePath), '../lib/node_modules/@openai/codex/dist/index.js'),
     ];
 
     for (const scriptPath of possibleScriptPaths) {
@@ -159,14 +171,20 @@ export function findClaudeCodeScript(claudeExecutablePath: string): string | nul
         const scriptContent = fs.readFileSync(scriptPath, 'utf8');
         // Check if it looks like a Node.js script
         if (scriptContent.includes('require') || scriptContent.includes('import') || scriptContent.includes('#!/usr/bin/env')) {
-          console.log(`[NodeFinder] Found Claude Code script at: ${scriptPath}`);
+          console.log(`[NodeFinder] Found CLI script at: ${scriptPath}`);
           return scriptPath;
         }
       }
     }
   } catch (e) {
-    console.error('[NodeFinder] Error finding Claude Code script:', e);
+    console.error('[NodeFinder] Error finding CLI script:', e);
   }
 
   return null;
 }
+
+/**
+ * @deprecated Use findCliNodeScript instead
+ * Kept for backward compatibility
+ */
+export const findClaudeCodeScript = findCliNodeScript;

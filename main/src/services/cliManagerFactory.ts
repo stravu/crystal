@@ -1,5 +1,6 @@
 import type { Logger } from '../utils/logger';
 import type { ConfigManager } from './configManager';
+import type { SessionManager } from './sessionManager';
 import { AbstractCliManager } from './panels/cli/AbstractCliManager';
 import { ClaudeCodeManager } from './panels/claude/claudeCodeManager';
 import { 
@@ -14,7 +15,7 @@ import {
  */
 export interface CliManagerFactoryConfig {
   /** Session manager instance */
-  sessionManager: any;
+  sessionManager: unknown;
   
   /** Logger instance */
   logger?: Logger;
@@ -23,7 +24,7 @@ export interface CliManagerFactoryConfig {
   configManager?: ConfigManager;
   
   /** Additional tool-specific options */
-  additionalOptions?: Record<string, any>;
+  additionalOptions?: Record<string, unknown>;
 }
 
 /**
@@ -67,7 +68,7 @@ export class CliManagerFactory {
       
       const manager = await this.registry.createManager(
         toolId,
-        config.sessionManager,
+        config.sessionManager as SessionManager,
         config.additionalOptions
       );
 
@@ -163,19 +164,20 @@ export class CliManagerFactory {
    */
   private registerClaudeTool(): void {
     const claudeManagerFactory: ManagerFactoryFunction = (
-      sessionManager: any,
+      sessionManager: unknown,
       logger?: Logger,
       configManager?: ConfigManager,
-      additionalOptions?: any
+      additionalOptions?: unknown
     ) => {
       // Extract Claude-specific options
-      const permissionIpcPath = additionalOptions?.permissionIpcPath || null;
+      const options = additionalOptions as Record<string, unknown> | undefined;
+      const permissionIpcPath = options?.permissionIpcPath || null;
       
       return new ClaudeCodeManager(
-        sessionManager,
+        sessionManager as SessionManager,
         logger,
         configManager,
-        permissionIpcPath
+        (typeof permissionIpcPath === 'string' ? permissionIpcPath : null) as string | null
       );
     };
 

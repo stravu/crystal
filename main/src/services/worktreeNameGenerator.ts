@@ -13,7 +13,6 @@ export class WorktreeNameGenerator {
     
     // Listen for config updates to reinitialize Anthropic client if API key changes
     this.configManager.on('config-updated', () => {
-      console.log('[WorktreeNameGenerator] Config updated, reinitializing Anthropic client...');
       this.initializeAnthropic();
     });
   }
@@ -21,24 +20,20 @@ export class WorktreeNameGenerator {
   private initializeAnthropic(): void {
     const apiKey = this.configManager.getAnthropicApiKey();
     if (apiKey) {
-      console.log('[WorktreeNameGenerator] Initializing Anthropic client with API key');
       this.anthropic = new Anthropic({
         apiKey: apiKey
       });
     } else {
-      console.log('[WorktreeNameGenerator] No API key found, AI name generation disabled');
       this.anthropic = null;
     }
   }
 
   async generateSessionName(prompt: string): Promise<string> {
     if (!this.anthropic) {
-      console.log('[WorktreeNameGenerator] No Anthropic client available, using fallback name generation');
       // Fallback to basic name generation if no API key
       return this.generateFallbackSessionName(prompt);
     }
 
-    console.log('[WorktreeNameGenerator] Attempting AI-powered session name generation for prompt:', prompt.substring(0, 50) + '...');
     try {
       const response = await this.anthropic.messages.create({
         model: 'claude-3-haiku-20240307', // Using Haiku for fast, cost-effective naming
@@ -75,7 +70,6 @@ Respond with ONLY the session name, nothing else.`
         const generatedName = content.text.trim();
         if (generatedName) {
           const sanitized = this.sanitizeSessionName(generatedName);
-          console.log('[WorktreeNameGenerator] AI generated session name:', sanitized);
           return sanitized;
         }
       }

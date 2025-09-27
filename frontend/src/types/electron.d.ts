@@ -1,5 +1,24 @@
 // Type definitions for Electron preload API
+import type { Session, SessionOutput, GitStatus, VersionUpdateInfo } from './session';
+import type { Project } from './project';
+import type { Folder } from './folder';
+import type { SessionCreationPreferences } from '../stores/sessionPreferencesStore';
+import type { ToolPanel } from '../../../shared/types/panels';
+import type { CreateSessionRequest } from './session';
 
+interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  source?: string;
+}
+
+interface PermissionResponse {
+  allow: boolean;
+  reason?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter default for flexible API responses
 interface IPCResponse<T = any> {
   success: boolean;
   data?: T;
@@ -10,7 +29,8 @@ interface IPCResponse<T = any> {
 
 interface ElectronAPI {
   // Generic invoke method for direct IPC calls
-  invoke: (channel: string, ...args: any[]) => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC bridge that returns different types based on channel
+  invoke: (channel: string, ...args: unknown[]) => Promise<any>;
   
   // Basic app info
   getAppVersion: () => Promise<string>;
@@ -37,10 +57,10 @@ interface ElectronAPI {
     getAllWithProjects: () => Promise<IPCResponse>;
     getArchivedWithProjects: () => Promise<IPCResponse>;
     get: (sessionId: string) => Promise<IPCResponse>;
-    create: (request: any) => Promise<IPCResponse>;
+    create: (request: CreateSessionRequest) => Promise<IPCResponse>;
     delete: (sessionId: string) => Promise<IPCResponse>;
     sendInput: (sessionId: string, input: string) => Promise<IPCResponse>;
-    continue: (sessionId: string, prompt?: string) => Promise<IPCResponse>;
+    continue: (sessionId: string, prompt?: string, model?: string) => Promise<IPCResponse>;
     getOutput: (sessionId: string, limit?: number) => Promise<IPCResponse>;
     getJsonMessages: (sessionId: string) => Promise<IPCResponse>;
     getStatistics: (sessionId: string) => Promise<IPCResponse>;
@@ -107,7 +127,7 @@ interface ElectronAPI {
     // Log operations
     getLogs: (sessionId: string) => Promise<IPCResponse>;
     clearLogs: (sessionId: string) => Promise<IPCResponse>;
-    addLog: (sessionId: string, entry: any) => Promise<IPCResponse>;
+    addLog: (sessionId: string, entry: LogEntry) => Promise<IPCResponse>;
     
     // Large text operations
     saveLargeText: (sessionId: string, text: string) => Promise<string>;
@@ -117,9 +137,9 @@ interface ElectronAPI {
   projects: {
     getAll: () => Promise<IPCResponse>;
     getActive: () => Promise<IPCResponse>;
-    create: (projectData: any) => Promise<IPCResponse>;
+    create: (projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => Promise<IPCResponse>;
     activate: (projectId: string) => Promise<IPCResponse>;
-    update: (projectId: string, updates: any) => Promise<IPCResponse>;
+    update: (projectId: string, updates: Partial<Project>) => Promise<IPCResponse>;
     delete: (projectId: string) => Promise<IPCResponse>;
     detectBranch: (path: string) => Promise<IPCResponse>;
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>) => Promise<IPCResponse>;
@@ -146,9 +166,9 @@ interface ElectronAPI {
   // Configuration
   config: {
     get: () => Promise<IPCResponse>;
-    update: (updates: any) => Promise<IPCResponse>;
+    update: (updates: Record<string, unknown>) => Promise<IPCResponse>;
     getSessionPreferences: () => Promise<IPCResponse>;
-    updateSessionPreferences: (preferences: any) => Promise<IPCResponse>;
+    updateSessionPreferences: (preferences: SessionCreationPreferences) => Promise<IPCResponse>;
   };
 
   // Prompts
@@ -165,13 +185,13 @@ interface ElectronAPI {
 
   // Dialog
   dialog: {
-    openFile: (options?: any) => Promise<IPCResponse<string | null>>;
-    openDirectory: (options?: any) => Promise<IPCResponse<string | null>>;
+    openFile: (options?: Electron.OpenDialogOptions) => Promise<IPCResponse<string | null>>;
+    openDirectory: (options?: Electron.OpenDialogOptions) => Promise<IPCResponse<string | null>>;
   };
 
   // Permissions
   permissions: {
-    respond: (requestId: string, response: any) => Promise<IPCResponse>;
+    respond: (requestId: string, response: PermissionResponse) => Promise<IPCResponse>;
     getPending: () => Promise<IPCResponse>;
   };
 
@@ -190,8 +210,8 @@ interface ElectronAPI {
   dashboard: {
     getProjectStatus: (projectId: number) => Promise<IPCResponse>;
     getProjectStatusProgressive: (projectId: number) => Promise<IPCResponse>;
-    onUpdate: (callback: (data: any) => void) => () => void;
-    onSessionUpdate: (callback: (data: any) => void) => () => void;
+    onUpdate: (callback: (data: Record<string, unknown>) => void) => () => void;
+    onSessionUpdate: (callback: (data: { type: string; projectId?: number; sessionId?: string; data: unknown }) => void) => () => void;
   };
 
   // UI State management
@@ -204,44 +224,44 @@ interface ElectronAPI {
 
   // Event listeners for real-time updates
   events: {
-    onSessionCreated: (callback: (session: any) => void) => () => void;
-    onSessionUpdated: (callback: (session: any) => void) => () => void;
-    onSessionDeleted: (callback: (session: any) => void) => () => void;
-    onSessionsLoaded: (callback: (sessions: any[]) => void) => () => void;
-    onSessionOutput: (callback: (output: any) => void) => () => void;
-    onSessionLog: (callback: (data: any) => void) => () => void;
+    onSessionCreated: (callback: (session: Session) => void) => () => void;
+    onSessionUpdated: (callback: (session: Session) => void) => () => void;
+    onSessionDeleted: (callback: (session: Session) => void) => () => void;
+    onSessionsLoaded: (callback: (sessions: Session[]) => void) => () => void;
+    onSessionOutput: (callback: (output: SessionOutput) => void) => () => void;
+    onSessionLog: (callback: (data: { sessionId: string; entry: LogEntry }) => void) => () => void;
     onSessionLogsCleared: (callback: (data: { sessionId: string }) => void) => () => void;
-    onSessionOutputAvailable: (callback: (info: any) => void) => () => void;
-    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: any }) => void) => () => void;
+    onSessionOutputAvailable: (callback: (info: { sessionId: string; hasNewOutput: boolean }) => void) => () => void;
+    onGitStatusUpdated: (callback: (data: { sessionId: string; gitStatus: GitStatus }) => void) => () => void;
     onGitStatusLoading: (callback: (data: { sessionId: string }) => void) => () => void;
     onGitStatusLoadingBatch?: (callback: (sessionIds: string[]) => void) => () => void;
-    onGitStatusUpdatedBatch?: (callback: (updates: Array<{ sessionId: string; status: any }>) => void) => () => void;
+    onGitStatusUpdatedBatch?: (callback: (updates: Array<{ sessionId: string; status: GitStatus }>) => void) => () => void;
     
     // Project events
-    onProjectUpdated: (callback: (project: any) => void) => () => void;
+    onProjectUpdated: (callback: (project: Project) => void) => () => void;
     
     // Folder events
-    onFolderCreated: (callback: (folder: any) => void) => () => void;
-    onFolderUpdated: (callback: (folder: any) => void) => () => void;
+    onFolderCreated: (callback: (folder: Folder) => void) => () => void;
+    onFolderUpdated: (callback: (folder: Folder) => void) => () => void;
     onFolderDeleted: (callback: (folderId: string) => void) => () => void;
     
     // Panel events
-    onPanelCreated: (callback: (panel: any) => void) => () => void;
-    onPanelUpdated: (callback: (panel: any) => void) => () => void;
+    onPanelCreated: (callback: (panel: ToolPanel) => void) => () => void;
+    onPanelUpdated: (callback: (panel: ToolPanel) => void) => () => void;
     onPanelPromptAdded: (callback: (data: { panelId: string; content: string }) => void) => () => void;
     onPanelResponseAdded: (callback: (data: { panelId: string; content: string }) => void) => () => void;
     
-    onTerminalOutput: (callback: (output: any) => void) => () => void;
+    onTerminalOutput: (callback: (output: { sessionId: string; data: string; type: 'stdout' | 'stderr' }) => void) => () => void;
     onMainLog: (callback: (level: string, message: string) => void) => () => void;
-    onVersionUpdateAvailable: (callback: (versionInfo: any) => void) => () => void;
+    onVersionUpdateAvailable: (callback: (versionInfo: VersionUpdateInfo) => void) => () => void;
     
     // Auto-updater events
     onUpdaterCheckingForUpdate: (callback: () => void) => () => void;
-    onUpdaterUpdateAvailable: (callback: (info: any) => void) => () => void;
-    onUpdaterUpdateNotAvailable: (callback: (info: any) => void) => () => void;
-    onUpdaterDownloadProgress: (callback: (progressInfo: any) => void) => () => void;
-    onUpdaterUpdateDownloaded: (callback: (info: any) => void) => () => void;
-    onUpdaterError: (callback: (error: any) => void) => () => void;
+    onUpdaterUpdateAvailable: (callback: (info: { version: string; releaseDate: string; releaseName?: string; releaseNotes?: string }) => void) => () => void;
+    onUpdaterUpdateNotAvailable: (callback: (info: { version: string }) => void) => () => void;
+    onUpdaterDownloadProgress: (callback: (progressInfo: { bytesPerSecond: number; percent: number; transferred: number; total: number }) => void) => () => void;
+    onUpdaterUpdateDownloaded: (callback: (info: { version: string; files: string[]; path: string; sha512: string; releaseDate: string }) => void) => () => void;
+    onUpdaterError: (callback: (error: Error) => void) => () => void;
     
     // Process management events
     onZombieProcessesDetected: (callback: (data: { sessionId?: string | null; pids?: number[]; message: string }) => void) => () => void;
@@ -252,7 +272,7 @@ interface ElectronAPI {
   // Panel operations
   panels: {
     getSessionPanels: (sessionId: string) => Promise<IPCResponse>;
-    createPanel: (sessionId: string, type: string, name: string, config?: any) => Promise<IPCResponse>;
+    createPanel: (sessionId: string, type: string, name: string, config?: Record<string, unknown>) => Promise<IPCResponse>;
     deletePanel: (panelId: string) => Promise<IPCResponse>;
     renamePanel: (panelId: string, name: string) => Promise<IPCResponse>;
     setActivePanel: (sessionId: string, panelId: string) => Promise<IPCResponse>;
@@ -261,7 +281,7 @@ interface ElectronAPI {
     getConversationMessages: (panelId: string) => Promise<IPCResponse>;
     getJsonMessages: (panelId: string) => Promise<IPCResponse>;
     getPrompts: (panelId: string) => Promise<IPCResponse>;
-    continue: (panelId: string, input: string) => Promise<IPCResponse>;
+    continue: (panelId: string, input: string, model?: string) => Promise<IPCResponse>;
     stop: (panelId: string) => Promise<IPCResponse>;
     resizeTerminal: (panelId: string, cols: number, rows: number) => Promise<IPCResponse>;
     sendTerminalInput: (panelId: string, data: string) => Promise<IPCResponse>;
@@ -271,6 +291,12 @@ interface ElectronAPI {
   claudePanels: {
     getModel: (panelId: string) => Promise<IPCResponse>;
     setModel: (panelId: string, model: string) => Promise<IPCResponse>;
+  };
+
+  // Codex panel operations
+  codexPanels: {
+    getSettings: (panelId: string) => Promise<IPCResponse>;
+    setSettings: (panelId: string, settings: Record<string, unknown>) => Promise<IPCResponse>;
   };
 
   // Logs panel operations
@@ -288,7 +314,7 @@ interface ElectronAPI {
         name: string;
         type: string;
         notnull: number;
-        dflt_value: any;
+        dflt_value: string | number | boolean | null;
         pk: number;
       }>;
       foreignKeys: Array<{
@@ -313,8 +339,11 @@ interface ElectronAPI {
 // Additional electron interface for IPC event listeners
 interface ElectronInterface {
   openExternal: (url: string) => Promise<void>;
-  invoke: (channel: string, ...args: any[]) => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC bridge that returns different types based on channel
+  invoke: (channel: string, ...args: unknown[]) => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC event callback that receives different argument types
   on: (channel: string, callback: (...args: any[]) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic IPC event callback that receives different argument types
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }
 

@@ -202,12 +202,12 @@ export async function testClaudeCodeInDirectory(directory: string, customClaudeP
   } catch (error) {
     console.error(`[ClaudeTest] Directory test failed: ${error instanceof Error ? error.message : error}`);
     if (error instanceof Error && 'code' in error) {
-      console.error(`[ClaudeTest] Error code: ${(error as any).code}`);
+      console.error(`[ClaudeTest] Error code: ${(error as NodeJS.ErrnoException).code}`);
     }
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error testing Claude Code in directory',
-      output: error instanceof Error && 'stdout' in error ? String((error as any).stdout) + String((error as any).stderr) : undefined
+      output: error instanceof Error && 'stdout' in error ? String((error as Error & {stdout?: string; stderr?: string}).stdout || '') + String((error as Error & {stdout?: string; stderr?: string}).stderr || '') : undefined
     };
   }
 }

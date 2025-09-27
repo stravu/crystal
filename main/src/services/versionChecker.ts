@@ -35,7 +35,6 @@ export class VersionChecker {
   public async checkForUpdates(): Promise<VersionInfo> {
     try {
       const currentVersion = app.getVersion();
-      this.logger.info(`[Version Checker] Current version: ${currentVersion}`);
 
       // Fetch latest release from GitHub API
       const response = await fetch('https://api.github.com/repos/stravu/crystal/releases/latest');
@@ -48,7 +47,6 @@ export class VersionChecker {
       
       // Skip pre-releases and drafts
       if (release.prerelease || release.draft) {
-        this.logger.info(`[Version Checker] Latest release is pre-release or draft, skipping`);
         return {
           current: currentVersion,
           latest: currentVersion,
@@ -58,8 +56,6 @@ export class VersionChecker {
 
       const latestVersion = this.normalizeVersion(release.tag_name);
       const hasUpdate = this.isNewerVersion(latestVersion, currentVersion);
-
-      this.logger.info(`[Version Checker] Latest version: ${latestVersion}, Has update: ${hasUpdate}`);
 
       return {
         current: currentVersion,
@@ -82,15 +78,13 @@ export class VersionChecker {
   }
 
   public async checkOnStartup(): Promise<void> {
-    this.logger.info(`[Version Checker] Performing startup version check`);
-    
     try {
       const versionInfo = await this.checkForUpdates();
       
       if (versionInfo.hasUpdate) {
         this.logger.info(`[Version Checker] Update available on startup: ${versionInfo.latest}`);
         // Emit event for UI notification
-        (process as any).emit('version-update-available', versionInfo);
+        (process as NodeJS.Process & { emit(event: 'version-update-available', data: VersionInfo): boolean }).emit('version-update-available', versionInfo);
       }
     } catch (error) {
       this.logger.error(`[Version Checker] Startup check failed:`, error as Error);
@@ -101,11 +95,8 @@ export class VersionChecker {
     // Check if auto-updates are enabled in config
     const config = this.configManager.getConfig();
     if (config.autoCheckUpdates === false) {
-      this.logger.info(`[Version Checker] Auto-update checking is disabled, skipping periodic checks`);
       return;
     }
-
-    this.logger.info(`[Version Checker] Starting periodic version checks (every 24 hours)`);
     
     // Set up periodic checks (don't check immediately since we do that on startup)
     this.checkTimeout = setInterval(() => {
@@ -117,7 +108,6 @@ export class VersionChecker {
     if (this.checkTimeout) {
       clearInterval(this.checkTimeout);
       this.checkTimeout = undefined;
-      this.logger.info(`[Version Checker] Stopped periodic version checks`);
     }
   }
 
@@ -126,7 +116,6 @@ export class VersionChecker {
       // Check if auto-updates are still enabled (settings might have changed)
       const config = this.configManager.getConfig();
       if (config.autoCheckUpdates === false) {
-        this.logger.info(`[Version Checker] Auto-update checking was disabled, stopping periodic checks`);
         this.stopPeriodicCheck();
         return;
       }
@@ -136,7 +125,7 @@ export class VersionChecker {
       if (versionInfo.hasUpdate) {
         this.logger.info(`[Version Checker] Update available: ${versionInfo.latest}`);
         // Emit event for UI notification
-        (process as any).emit('version-update-available', versionInfo);
+        (process as NodeJS.Process & { emit(event: 'version-update-available', data: VersionInfo): boolean }).emit('version-update-available', versionInfo);
       }
     } catch (error) {
       this.logger.error(`[Version Checker] Periodic check failed:`, error as Error);

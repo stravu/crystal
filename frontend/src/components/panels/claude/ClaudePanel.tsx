@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AIPanelProps } from '../ai/AbstractAIPanel';
+import { AIPanelProps, RichOutputSettings } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from './RichOutputWithSidebar';
 import { MessagesView } from '../ai/MessagesView';
 import { SessionStats } from './SessionStats';
@@ -10,7 +10,7 @@ import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransf
 import { Settings } from 'lucide-react';
 import { useConfigStore } from '../../../stores/configStore';
 
-export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
+export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive }) => {
   const hook = useClaudePanel(panel.id, isActive);
   const [activeView, setActiveView] = useState<'richOutput' | 'messages' | 'stats'>('richOutput');
   const [showSettings, setShowSettings] = useState(false);
@@ -19,7 +19,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
     return saved ? JSON.parse(saved) : {
       showToolCalls: true,
       compactMode: false,
-      collapseTools: false,
+      collapseTools: true,  // Changed to true for collapsed by default
       showThinking: true,
       showSessionInit: false,
     };
@@ -30,7 +30,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
 
-  const handleRichOutputSettingsChange = (newSettings: any) => {
+  const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));
   };
@@ -204,7 +204,9 @@ export const ClaudePanel: React.FC<AIPanelProps> = ({ panel, isActive }) => {
       )}
     </div>
   );
-};
+});
+
+ClaudePanel.displayName = 'ClaudePanel';
 
 // Default export for lazy loading
 export default ClaudePanel;

@@ -8,28 +8,38 @@ class CommandExecutor {
   execSync(command: string, options: ExecSyncOptionsWithStringEncoding): string;
   execSync(command: string, options?: ExecSyncOptionsWithBufferEncoding): Buffer;
   execSync(command: string, options?: ExecSyncOptions): string | Buffer {
-    // Log the command being executed
+    // Log the command being executed (unless silent mode requested)
     const cwd = options?.cwd || process.cwd();
-    console.log(`[CommandExecutor] Executing: ${command} in ${cwd}`);
+    
+    interface ExtendedOptions extends ExecSyncOptions {
+      silent?: boolean;
+    }
+    const extendedOptions = options as ExtendedOptions;
+    const silentMode = extendedOptions?.silent === true;
+    
+    if (!silentMode) {
+      console.log(`[CommandExecutor] Executing: ${command} in ${cwd}`);
+    }
 
     // Get enhanced shell PATH
     const shellPath = getShellPath();
     
-    // Merge enhanced PATH into options
+    // Merge enhanced PATH into options (but remove our custom silent flag)
+    const { silent: _silent, ...cleanOptions } = extendedOptions || {};
     const enhancedOptions = {
-      ...options,
+      ...cleanOptions,
       env: {
         ...process.env,
-        ...options?.env,
+        ...cleanOptions?.env,
         PATH: shellPath
       }
     };
 
     try {
-      const result = nodeExecSync(command, enhancedOptions as any);
+      const result = nodeExecSync(command, enhancedOptions as ExecSyncOptions);
       
-      // Log success with a preview of the result
-      if (result) {
+      // Log success with a preview of the result (unless silent mode)
+      if (result && !silentMode) {
         const resultStr = result.toString();
         const lines = resultStr.split('\n');
         const preview = lines[0].substring(0, 100) + 
@@ -38,10 +48,12 @@ class CommandExecutor {
       }
       
       return result;
-    } catch (error: any) {
-      // Log error
-      console.error(`[CommandExecutor] Failed: ${command}`);
-      console.error(`[CommandExecutor] Error: ${error.message}`);
+    } catch (error: unknown) {
+      // Log error (unless silent mode)
+      if (!silentMode) {
+        console.error(`[CommandExecutor] Failed: ${command}`);
+        console.error(`[CommandExecutor] Error: ${error instanceof Error ? error.message : String(error)}`);
+      }
       
       throw error;
     }
@@ -81,10 +93,10 @@ class CommandExecutor {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log error
       console.error(`[CommandExecutor] Async Failed: ${command}`);
-      console.error(`[CommandExecutor] Async Error: ${error.message}`);
+      console.error(`[CommandExecutor] Async Error: ${error instanceof Error ? error.message : String(error)}`);
       
       throw error;
     }

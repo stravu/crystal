@@ -62,6 +62,10 @@ export class PanelManager {
         metadata: panel.metadata
       });
       
+      // Update the panel state to reflect it's now active
+      panel.state.isActive = true;
+      panel.metadata.lastActiveAt = new Date().toISOString();
+      
       // Cache in memory
       this.panels.set(panelId, panel);
       
@@ -277,7 +281,7 @@ export class PanelManager {
     return panels.filter(p => p.type === type);
   }
   
-  async emitPanelEvent(panelId: string, eventType: PanelEventType, data: any): Promise<void> {
+  async emitPanelEvent(panelId: string, eventType: PanelEventType, data: unknown): Promise<void> {
     const panel = this.getPanel(panelId);
     if (!panel) {
       console.warn(`[PanelManager] Panel ${panelId} not found for event emission`);

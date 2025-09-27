@@ -26,13 +26,17 @@ interface AttachedText {
 
 interface SessionInputWithImagesProps {
   activeSession: Session;
-  viewMode?: any; // ViewMode removed - kept for compatibility
+  viewMode?: unknown; // ViewMode removed - kept for compatibility
   input: string;
   setInput: (input: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleTerminalCommand: () => void;
   handleSendInput: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
-  handleContinueConversation: (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => void;
+  handleContinueConversation: (
+    attachedImages?: AttachedImage[],
+    attachedTexts?: AttachedText[],
+    modelOverride?: string
+  ) => void;
   isStravuConnected: boolean;
   setShowStravuSearch: (show: boolean) => void;
   ultrathink: boolean;
@@ -241,7 +245,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
           setAttachedImages([]);
           setAttachedTexts([]);
         } else {
-          await handleContinueConversation(attachedImages, attachedTexts);
+          await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
           setAttachedImages([]);
           setAttachedTexts([]);
         }
@@ -269,7 +273,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         setAttachedImages([]);
         setAttachedTexts([]);
       } else {
-        await handleContinueConversation(attachedImages, attachedTexts);
+        await handleContinueConversation(attachedImages, attachedTexts, selectedModel);
         setAttachedImages([]);
         setAttachedTexts([]);
       }
@@ -338,22 +342,6 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     onFocus?.();
   }, [onFocus]);
 
-  const handleBlur = useCallback((e: React.FocusEvent) => {
-    // Check if the blur is due to clicking within the toolbar
-    const toolbar = e.currentTarget.closest('[data-toolbar-container]');
-    const relatedTarget = e.relatedTarget;
-    
-    // Only remove focus if we're actually leaving the toolbar area
-    if (!toolbar || !relatedTarget || !toolbar.contains(relatedTarget as Node)) {
-      setIsFocused(false);
-      setIsToolbarActive(false);
-      onBlur?.();
-    } else {
-      // Keep toolbar active if staying within toolbar
-      setIsFocused(false); // Input not focused, but toolbar still active
-      setIsToolbarActive(true);
-    }
-  }, [onBlur]);
 
 
   return (
@@ -434,7 +422,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             // Use a timeout to check if focus moved outside the toolbar
             setTimeout(() => {
               const activeElement = document.activeElement;
-              const toolbar = (e as any).currentTarget;
+              const toolbar = e.currentTarget as HTMLElement;
               
               if (!activeElement || !toolbar || !toolbar.contains(activeElement)) {
                 setIsToolbarActive(false);
@@ -516,7 +504,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 onKeyDown={onKeyDown}
                 onPaste={handlePaste}
                 onFocus={handleFocus}
-                onBlur={handleBlur as any}
+                onBlur={() => {
+                  // Simple blur handling without toolbar check
+                  setIsFocused(false);
+                  setIsToolbarActive(false);
+                  onBlur?.();
+                }}
                 style={{ 
                   height: `${textareaHeight}px`,
                   minHeight: '52px', 

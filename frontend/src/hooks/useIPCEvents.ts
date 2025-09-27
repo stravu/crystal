@@ -4,8 +4,20 @@ import { useErrorStore } from '../stores/errorStore';
 import { API } from '../utils/api';
 import type { Session, SessionOutput, GitStatus } from '../types/session';
 
+interface SessionEventData {
+  sessionId: string;
+  [key: string]: unknown;
+}
+
+type ValidatedEventData = SessionEventData | SessionOutput;
+
+interface SessionDeletedEventData {
+  id?: string;
+  sessionId?: string;
+}
+
 // Frontend validation helpers
-function validateEventSession(eventData: any, activeSessionId?: string): boolean {
+function validateEventSession(eventData: ValidatedEventData, activeSessionId?: string): boolean {
   if (!eventData || !eventData.sessionId) {
     console.warn('[useIPCEvents] Event missing sessionId:', eventData);
     return false;
@@ -21,8 +33,8 @@ function validateEventSession(eventData: any, activeSessionId?: string): boolean
 }
 
 
-// Throttle utility function
-function throttle<T extends (...args: any[]) => any>(
+// Throttle utility function  
+function throttle<T extends (...args: never[]) => void>(
   func: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -35,7 +47,9 @@ function throttle<T extends (...args: any[]) => any>(
     const timeSinceLastCall = now - lastCall;
     
     // Store the latest args for this session
-    const key = args[0]?.sessionId || args[0]?.id || 'default';
+    const firstArg = args[0] as Record<string, unknown> | undefined;
+    const rawKey = firstArg?.sessionId || firstArg?.id || 'default';
+    const key = String(rawKey);
     pendingCalls.set(key, args);
 
     if (timeSinceLastCall >= delay) {
@@ -75,6 +89,11 @@ export function useIPCEvents() {
         return; // Ignore invalid events
       }
       useSessionStore.getState().setGitStatusLoading(data.sessionId, true);
+      
+      // Also emit a custom event for individual components to listen to
+      window.dispatchEvent(new CustomEvent('git-status-loading', {
+        detail: { sessionId: data.sessionId }
+      }));
     }, 100)
   ).current;
   
@@ -89,7 +108,15 @@ export function useIPCEvents() {
       if (data.gitStatus.state !== 'clean' || process.env.NODE_ENV === 'development') {
         console.log(`[useIPCEvents] Git status: ${data.sessionId.substring(0, 8)} → ${data.gitStatus.state}`);
       }
+      
+      // Update the store and clear loading state
       useSessionStore.getState().updateSessionGitStatus(data.sessionId, data.gitStatus);
+      useSessionStore.getState().setGitStatusLoading(data.sessionId, false);
+      
+      // Also emit a custom event for individual components to listen to
+      window.dispatchEvent(new CustomEvent('git-status-updated', {
+        detail: { sessionId: data.sessionId, gitStatus: data.gitStatus }
+      }));
     }, 100)
   ).current;
   
@@ -147,10 +174,10 @@ export function useIPCEvents() {
     });
     unsubscribeFunctions.push(unsubscribeSessionUpdated);
 
-    const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((sessionData: any) => {
+    const unsubscribeSessionDeleted = window.electronAPI.events.onSessionDeleted((sessionData: SessionDeletedEventData | string) => {
       console.log('[useIPCEvents] Session deleted:', sessionData);
       // The backend sends just { id } for deleted sessions
-      const sessionId = sessionData.id || sessionData;
+      const sessionId = typeof sessionData === 'string' ? sessionData : sessionData.id || sessionData.sessionId;
       
       // Dispatch a custom event for other components to listen to
       window.dispatchEvent(new CustomEvent('session-deleted', {
@@ -197,7 +224,7 @@ export function useIPCEvents() {
       // Just emit custom event to notify that new output is available
       // Include panelId (if present) so panel-based views can react precisely
       window.dispatchEvent(new CustomEvent('session-output-available', {
-        detail: { sessionId: output.sessionId, panelId: (output as any).panelId }
+        detail: { sessionId: output.sessionId, panelId: output.panelId }
       }));
     });
     unsubscribeFunctions.push(unsubscribeSessionOutput);
@@ -266,6 +293,13 @@ export function useIPCEvents() {
     const unsubscribeGitStatusLoadingBatch = window.electronAPI.events.onGitStatusLoadingBatch?.((sessionIds: string[]) => {
       const updates = sessionIds.map(sessionId => ({ sessionId, loading: true }));
       useSessionStore.getState().setGitStatusLoadingBatch(updates);
+      
+      // Dispatch custom events for each session
+      sessionIds.forEach(sessionId => {
+        window.dispatchEvent(new CustomEvent('git-status-loading', {
+          detail: { sessionId }
+        }));
+      });
     });
     if (unsubscribeGitStatusLoadingBatch) {
       unsubscribeFunctions.push(unsubscribeGitStatusLoadingBatch);
@@ -274,6 +308,13 @@ export function useIPCEvents() {
     const unsubscribeGitStatusUpdatedBatch = window.electronAPI.events.onGitStatusUpdatedBatch?.((updates: Array<{ sessionId: string; status: GitStatus }>) => {
       console.log(`[useIPCEvents] Git status batch update: ${updates.length} sessions`);
       useSessionStore.getState().updateSessionGitStatusBatch(updates);
+      
+      // Dispatch custom events for each session
+      updates.forEach(({ sessionId, status }) => {
+        window.dispatchEvent(new CustomEvent('git-status-updated', {
+          detail: { sessionId, gitStatus: status }
+        }));
+      });
     });
     if (unsubscribeGitStatusUpdatedBatch) {
       unsubscribeFunctions.push(unsubscribeGitStatusUpdatedBatch);

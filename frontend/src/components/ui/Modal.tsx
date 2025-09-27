@@ -83,14 +83,14 @@ export const Modal: React.FC<ModalProps> = ({
   const handleOverlayClick = (e: React.MouseEvent) => {
     // Check if the click target is the modal content or its children
     const modalContent = modalRef.current;
-    const isClickInsideModal = modalContent && modalContent.contains(e.target as Node);
+    const isClickInsideModal = modalContent && e.target && e.target instanceof Node && modalContent.contains(e.target);
     
     // Only close if:
     // 1. closeOnOverlayClick is enabled
     // 2. The click is not inside the modal content
     // 3. The mousedown also started outside the modal content
     if (closeOnOverlayClick && !isClickInsideModal) {
-      const wasMouseDownInsideModal = modalContent && modalContent.contains(mouseDownTargetRef.current as Node);
+      const wasMouseDownInsideModal = modalContent && mouseDownTargetRef.current && mouseDownTargetRef.current instanceof Node && modalContent.contains(mouseDownTargetRef.current);
       if (!wasMouseDownInsideModal) {
         onClose();
       }

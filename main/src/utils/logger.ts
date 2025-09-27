@@ -195,7 +195,7 @@ export class Logger {
     processNext();
   }
   
-  private handleWriteError(error: any) {
+  private handleWriteError(error: NodeJS.ErrnoException) {
     if (error.code === 'EPIPE') {
       // Stream was closed, reinitialize
       this.logStream = null;
@@ -221,15 +221,15 @@ export class Logger {
     try {
       // Always log to console using the original console method to avoid recursion
       this.originalConsole.log(fullMessage);
-    } catch (consoleError: any) {
+    } catch (consoleError: unknown) {
       // If console logging fails (e.g., EPIPE), just write to file
-      if (consoleError.code !== 'EPIPE' && !this.isInErrorHandler) {
+      if ((consoleError as NodeJS.ErrnoException)?.code !== 'EPIPE' && !this.isInErrorHandler) {
         // Prevent recursion by setting flag
         this.isInErrorHandler = true;
         try {
           // For non-EPIPE errors, try to at least write the error to file
           // Use a direct write to avoid potential recursion through writeToFile
-          const errorMessage = `[${timestamp}] ERROR: Failed to write to console: ${consoleError.message}\n`;
+          const errorMessage = `[${timestamp}] ERROR: Failed to write to console: ${(consoleError as Error)?.message || 'Unknown error'}\n`;
           if (this.logStream && !this.logStream.destroyed) {
             this.logStream.write(errorMessage);
           }

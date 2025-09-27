@@ -5,14 +5,38 @@ import { User, Bot, Eye, EyeOff, Settings2, CheckCircle, XCircle, ArrowDown, Cop
 import { parseTimestamp, formatDistanceToNow } from '../../../utils/timestampUtils';
 import { ThinkingPlaceholder, InlineWorkingIndicator } from '../../session/ThinkingPlaceholder';
 import { MessageSegment } from './components/MessageSegment';
+import { ToolCallView } from './components/ToolCallView';
+import { ToolCallGroup } from './components/ToolCallGroup';
+import { TodoListDisplay } from './components/TodoListDisplay';
 import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransformer';
 import { RichOutputSettings } from './AbstractAIPanel';
 import { CodexMessageTransformer } from './transformers/CodexMessageTransformer';
 
+// Local interface for combining user prompts with output messages
+interface UserPromptMessage {
+  type: 'user';
+  message: {
+    role: 'user';
+    content: Array<{ type: 'text'; text: string }>;
+  };
+  timestamp: string;
+}
+
+// Interface for conversation messages from database
+interface ConversationMessage {
+  id: number;
+  session_id: string;
+  message_type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+// We'll use any for event handling since events can come from different sources with different shapes
+
 const defaultSettings: RichOutputSettings = {
   showToolCalls: true,
   compactMode: false,
-  collapseTools: false,
+  collapseTools: true, // Collapse tools by default
   showThinking: true,
   showSessionInit: false, // Hide by default - it's developer info
 };
@@ -167,6 +191,25 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         if (existingOutputs && existingOutputs.length > 0) {
           const transformedMessages = messageTransformer.transform(existingOutputs);
           setMessages(transformedMessages);
+          
+          // Auto-expand sub-agent (Task) tools for Codex too
+          const newSubAgentIds = new Set<string>();
+          transformedMessages.forEach(msg => {
+            msg.segments.forEach(seg => {
+              if (seg.type === 'tool_call' && seg.tool.name === 'Task') {
+                newSubAgentIds.add(seg.tool.id);
+              }
+            });
+          });
+          
+          // Add sub-agent IDs to expanded tools
+          if (newSubAgentIds.size > 0) {
+            setExpandedTools(prev => {
+              const next = new Set(prev);
+              newSubAgentIds.forEach(id => next.add(id));
+              return next;
+            });
+          }
         }
       } else {
         // For Claude panels, use the existing API calls
@@ -176,9 +219,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         ]);
         
         // Combine both sources - conversation messages have the actual user prompts
-        const userPrompts: any[] = [];
+        const userPrompts: UserPromptMessage[] = [];
         if (conversationResponse.success && Array.isArray(conversationResponse.data)) {
-          conversationResponse.data.forEach((msg: any) => {
+          conversationResponse.data.forEach((msg: ConversationMessage) => {
             if (msg.message_type === 'user') {
               userPrompts.push({
                 type: 'user',
@@ -209,6 +252,25 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         // Transform messages using the provided transformer
         const conversationMessages = messageTransformer.transform(allMessages);
         setMessages(conversationMessages);
+        
+        // Auto-expand sub-agent (Task) tools
+        const newSubAgentIds = new Set<string>();
+        conversationMessages.forEach(msg => {
+          msg.segments.forEach(seg => {
+            if (seg.type === 'tool_call' && seg.tool.name === 'Task') {
+              newSubAgentIds.add(seg.tool.id);
+            }
+          });
+        });
+        
+        // Add sub-agent IDs to expanded tools
+        if (newSubAgentIds.size > 0) {
+          setExpandedTools(prev => {
+            const next = new Set(prev);
+            newSubAgentIds.forEach(id => next.add(id));
+            return next;
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load messages:', err);
@@ -228,10 +290,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
     
-    const handleOutputAvailable = (event: any) => {
+    const handleOutputAvailable = (event: CustomEvent<{ sessionId?: string; panelId?: string; type?: string }> | { sessionId?: string; panelId?: string; type?: string; detail?: { sessionId?: string; panelId?: string; type?: string } }) => {
       // Handle both CustomEvent and Electron IPC events
-      const detail = event.detail || event;
-      if (detail.sessionId === panelId || detail.panelId === panelId) {
+      const detail = 'detail' in event ? event.detail : event;
+      if (detail && (detail.sessionId === panelId || detail.panelId === panelId)) {
         // Debounce message reloading to prevent excessive re-renders
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -248,7 +310,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       window.electron?.on(outputEventName, handleOutputAvailable);
       // Don't also add a window event listener - this causes duplicate handling
     } else {
-      window.addEventListener('session-output-available', handleOutputAvailable as any);
+      window.addEventListener('session-output-available', handleOutputAvailable as EventListener);
     }
     
     return () => {
@@ -256,7 +318,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       if (outputEventName.includes('codex')) {
         window.electron?.off(outputEventName, handleOutputAvailable);
       } else {
-        window.removeEventListener('session-output-available', handleOutputAvailable as any);
+        window.removeEventListener('session-output-available', handleOutputAvailable as EventListener);
       }
     };
   }, [panelId, outputEventName]); // Remove messageTransformer from dependencies to avoid re-registering
@@ -437,7 +499,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       return renderSystemMessage(message, needsExtraSpacing || false);
     }
     
-    // Check if this message has any renderable content
+    // Check if this message has any renderable content (including TodoWrite for now, filtered later)
     const hasRenderableContent = hasTextContent || hasToolCalls || hasThinking || hasDiffs || hasToolResults;
     
     // If no renderable content and not a special system message, skip or show raw
@@ -573,24 +635,83 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             />
           )}
           
-          {/* Tool calls */}
-          {settings.showToolCalls && message.segments
-            .filter(seg => seg.type === 'tool_call')
-            .map((seg, idx) => (
-              <MessageSegment
-                key={`${message.id}-tool-${idx}`}
-                segment={seg}
-                messageId={message.id}
-                index={idx}
-                isUser={isUser}
-                expandedTools={expandedTools}
-                collapseTools={settings.collapseTools}
-                showToolCalls={settings.showToolCalls}
-                showThinking={settings.showThinking}
-                onToggleToolExpand={toggleToolExpand}
-              />
-            ))
-          }
+          {/* Group consecutive tools, but break on TodoWrite */}
+          {settings.showToolCalls && (() => {
+            const toolSegments = message.segments.filter(seg => seg.type === 'tool_call');
+            if (toolSegments.length === 0) return null;
+            
+            const groups: { tools: typeof message.segments, isTodoWrite: boolean }[] = [];
+            let currentGroup: typeof message.segments = [];
+            
+            toolSegments.forEach((seg) => {
+              if (seg.type === 'tool_call' && seg.tool.name === 'TodoWrite') {
+                // If we have a current group, save it
+                if (currentGroup.length > 0) {
+                  groups.push({ tools: currentGroup, isTodoWrite: false });
+                  currentGroup = [];
+                }
+                // Add TodoWrite as its own group
+                groups.push({ tools: [seg], isTodoWrite: true });
+              } else {
+                // Add to current group
+                currentGroup.push(seg);
+              }
+            });
+            
+            // Don't forget the last group if it exists
+            if (currentGroup.length > 0) {
+              groups.push({ tools: currentGroup, isTodoWrite: false });
+            }
+            
+            return groups.map((group, groupIdx) => {
+              if (group.isTodoWrite && group.tools.length === 1) {
+                const seg = group.tools[0];
+                if (seg.type === 'tool_call' && seg.tool.result) {
+                  try {
+                    const resultData = typeof seg.tool.result.content === 'string' 
+                      ? JSON.parse(seg.tool.result.content)
+                      : seg.tool.result.content;
+                    if (resultData.todos && Array.isArray(resultData.todos)) {
+                      return (
+                        <TodoListDisplay
+                          key={`${message.id}-todo-${groupIdx}`}
+                          todos={resultData.todos}
+                        />
+                      );
+                    }
+                  } catch (e) {
+                    // If parsing fails, show as regular tool
+                  }
+                }
+                // Fallback to regular tool display if TodoWrite has no valid result
+                return (
+                  <MessageSegment
+                    key={`${message.id}-tool-group-${groupIdx}`}
+                    segment={seg}
+                    messageId={message.id}
+                    index={groupIdx}
+                    isUser={isUser}
+                    expandedTools={expandedTools}
+                    collapseTools={settings.collapseTools}
+                    showToolCalls={settings.showToolCalls}
+                    showThinking={settings.showThinking}
+                    onToggleToolExpand={toggleToolExpand}
+                  />
+                );
+              } else {
+                // Regular tool group
+                return (
+                  <ToolCallGroup
+                    key={`${message.id}-tool-group-${groupIdx}`}
+                    tools={group.tools}
+                    expandedTools={expandedTools}
+                    collapseTools={settings.collapseTools}
+                    onToggleToolExpand={toggleToolExpand}
+                  />
+                );
+              }
+            });
+          })()}
           
           {/* Diff segments */}
           {message.segments
@@ -646,14 +767,18 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
       const sessionInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
-      const initialPrompt = sessionInfo.initialPrompt || sessionInfo.initial_prompt;
-      const command = sessionInfo.codexCommand || sessionInfo.claudeCommand || sessionInfo.codex_command;
-      const worktreePath = sessionInfo.worktreePath || sessionInfo.worktree_path;
-      const model = sessionInfo.model;
-      const provider = sessionInfo.modelProvider || sessionInfo.model_provider;
-      const approvalPolicy = sessionInfo.approvalPolicy || sessionInfo.approval_policy;
-      const sandboxMode = sessionInfo.sandboxMode || sessionInfo.sandbox_mode;
-      const permissionMode = sessionInfo.permissionMode || sessionInfo.permission_mode;
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const initialPrompt = toString(sessionInfo.initialPrompt || sessionInfo.initial_prompt);
+      const command = toString(sessionInfo.codexCommand || sessionInfo.claudeCommand || sessionInfo.codex_command);
+      const worktreePath = toString(sessionInfo.worktreePath || sessionInfo.worktree_path);
+      const model = toString(sessionInfo.model);
+      const provider = toString(sessionInfo.modelProvider || sessionInfo.model_provider);
+      const approvalPolicy = toString(sessionInfo.approvalPolicy || sessionInfo.approval_policy);
+      const sandboxMode = toString(sessionInfo.sandboxMode || sessionInfo.sandbox_mode);
+      const permissionMode = toString(sessionInfo.permissionMode || sessionInfo.permission_mode);
       const rawResumeSessionId = sessionInfo.resumeSessionId ?? sessionInfo.resume_session_id;
       const resumeSessionId = typeof rawResumeSessionId === 'string' && rawResumeSessionId.trim().length > 0
         ? rawResumeSessionId
@@ -772,12 +897,16 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
       const runtimeInfo = infoSegment?.type === 'system_info' ? infoSegment.info || {} : {};
-      const provider = runtimeInfo.provider;
-      const sandboxMode = runtimeInfo.sandboxMode;
-      const approvalPolicy = runtimeInfo.approvalPolicy;
-      const reasoningEffort = runtimeInfo.reasoningEffort;
-      const reasoningSummaries = runtimeInfo.reasoningSummaries;
-      const workdir = runtimeInfo.workdir;
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const provider = toString(runtimeInfo.provider);
+      const sandboxMode = toString(runtimeInfo.sandboxMode);
+      const approvalPolicy = toString(runtimeInfo.approvalPolicy);
+      const reasoningEffort = toString(runtimeInfo.reasoningEffort);
+      const reasoningSummaries = toString(runtimeInfo.reasoningSummaries);
+      const workdir = toString(runtimeInfo.workdir);
 
       return (
         <div
@@ -886,6 +1015,13 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     if (message.metadata?.systemSubtype === 'init') {
       const info = message.segments.find(seg => seg.type === 'system_info');
       if (info?.type === 'system_info') {
+        // Type guard helper to safely convert unknown values to strings
+        const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+        
+        const infoData = info.info || {};
+        const model = toString(infoData.model);
+        const cwd = toString(infoData.cwd);
+        const toolsLength = Array.isArray(infoData.tools) ? infoData.tools.length : 0;
         return (
           <div
             key={message.id}
@@ -906,10 +1042,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                   </span>
                 </div>
                 <div className="text-sm text-text-secondary space-y-1">
-                  <div>Model: <span className="text-text-primary font-mono">{info.info.model}</span></div>
-                  <div>Working Directory: <span className="text-text-primary font-mono text-xs">{info.info.cwd}</span></div>
+                  <div>Model: <span className="text-text-primary font-mono">{model}</span></div>
+                  <div>Working Directory: <span className="text-text-primary font-mono text-xs">{cwd}</span></div>
                   <div>
-                    Tools: <span className="text-text-tertiary">{info.info.tools?.length || 0} available</span>
+                    Tools: <span className="text-text-tertiary">{toolsLength} available</span>
                   </div>
                 </div>
               </div>
@@ -918,9 +1054,13 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         );
       }
     } else if (message.metadata?.systemSubtype === 'error') {
-      const errorInfo = message.segments.find(seg => seg.type === 'system_info')?.info;
-      const errorMessage = errorInfo?.message || textContent;
-      const errorTitle = errorInfo?.error || 'Session Error';
+      const errorInfo = message.segments.find(seg => seg.type === 'system_info')?.info || {};
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const errorMessage = toString(errorInfo.message) || textContent;
+      const errorTitle = toString(errorInfo.error) || 'Session Error';
       
       return (
         <div
@@ -956,7 +1096,12 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       );
     } else if (message.metadata?.systemSubtype === 'context_compacted') {
       const infoSegment = message.segments.find(seg => seg.type === 'system_info');
-      const helpMessage = infoSegment?.type === 'system_info' ? infoSegment.info.message : 
+      
+      // Type guard helper to safely convert unknown values to strings
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
+      const helpMessage = infoSegment?.type === 'system_info' ? 
+        toString(infoSegment.info?.message) || 'Context has been compacted. You can continue chatting - your next message will automatically include the context summary above.' :
         'Context has been compacted. You can continue chatting - your next message will automatically include the context summary above.';
       
       return (
@@ -1115,6 +1260,10 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     if (systemInfo?.type === 'system_info' && systemInfo.info) {
       const info = systemInfo.info;
       
+      // Type guard helpers to safely convert unknown values
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      const toNumber = (value: unknown): number => typeof value === 'number' ? value : 0;
+      
       // Handle specific system_info types
       if (info.type === 'session_status') {
         const rawStatus = typeof info.status === 'string' ? info.status : 'unknown';
@@ -1178,6 +1327,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         if (!showSystemMessages && isCodexTransformer) {
           return null;
         }
+        
+        const modelContextWindow = toNumber(info.model_context_window);
+        
         return (
           <div
             key={message.id}
@@ -1190,9 +1342,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             <div className="flex items-center gap-2 text-xs text-interactive">
               <span>📋</span>
               <span>Task started</span>
-              {info.model_context_window && (
+              {modelContextWindow > 0 && (
                 <span className="text-text-tertiary">
-                  • Context: {(info.model_context_window / 1000).toFixed(0)}k tokens
+                  • Context: {(modelContextWindow / 1000).toFixed(0)}k tokens
                 </span>
               )}
             </div>
@@ -1201,6 +1353,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       
       if (info.type === 'task_complete') {
+        const lastMessage = toString(info.last_message);
+        
         return (
           <div
             key={message.id}
@@ -1213,8 +1367,8 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             <div className="flex items-center gap-2 text-xs text-status-success">
               <span>✅</span>
               <span>Task completed</span>
-              {info.last_message && (
-                <span className="text-text-tertiary">• {info.last_message}</span>
+              {lastMessage && (
+                <span className="text-text-tertiary">• {lastMessage}</span>
               )}
             </div>
           </div>
@@ -1222,6 +1376,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       }
       
       if (info.type === 'token_usage') {
+        const inputTokens = toNumber(info.input_tokens);
+        const outputTokens = toNumber(info.output_tokens);
+        const totalTokens = toNumber(info.total_tokens);
+        const cachedTokens = toNumber(info.cached_tokens);
+        
         return (
           <div
             key={message.id}
@@ -1234,11 +1393,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             <div className="flex items-center gap-3 text-xs text-text-tertiary">
               <span>🔢</span>
               <span>Tokens:</span>
-              {info.input_tokens && <span>In: {info.input_tokens.toLocaleString()}</span>}
-              {info.output_tokens && <span>Out: {info.output_tokens.toLocaleString()}</span>}
-              {info.total_tokens && <span className="text-text-secondary">Total: {info.total_tokens.toLocaleString()}</span>}
-              {info.cached_tokens && info.cached_tokens > 0 && (
-                <span className="text-interactive">Cached: {info.cached_tokens.toLocaleString()}</span>
+              {inputTokens > 0 && <span>In: {inputTokens.toLocaleString()}</span>}
+              {outputTokens > 0 && <span>Out: {outputTokens.toLocaleString()}</span>}
+              {totalTokens > 0 && <span className="text-text-secondary">Total: {totalTokens.toLocaleString()}</span>}
+              {cachedTokens > 0 && (
+                <span className="text-interactive">Cached: {cachedTokens.toLocaleString()}</span>
               )}
             </div>
           </div>
@@ -1296,13 +1455,267 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
   // Memoize the rendered messages to prevent unnecessary re-renders
   const renderedMessages = useMemo(() => {
     let userMessageIndex = 0;
-    return filteredMessages.map((msg, idx) => {
+    const elements: (React.ReactElement | null)[] = [];
+    
+    // Group consecutive tool-only messages
+    let i = 0;
+    while (i < filteredMessages.length) {
+      const msg = filteredMessages[i];
       const isUser = msg.role === 'user';
-      const element = renderMessage(msg, idx, isUser ? userMessageIndex : undefined);
-      if (isUser) userMessageIndex++;
-      return element;
-    }).filter(element => element !== null); // Filter out null elements
-  }, [filteredMessages, collapsedMessages, expandedTools, settings]);
+      
+      // Check if this message contains only tool calls
+      const hasOnlyToolCalls = !isUser && 
+        msg.segments.length > 0 && 
+        msg.segments.every(seg => seg.type === 'tool_call');
+      
+      if (hasOnlyToolCalls && settings.showToolCalls) {
+        // Collect consecutive tool messages, but break on TodoWrite
+        const toolGroups: { messages: typeof filteredMessages, isTodoWrite: boolean }[] = [];
+        let currentGroup: typeof filteredMessages = [];
+        const messagesToProcess = [msg];
+        let j = i + 1;
+        
+        // First collect all consecutive tool-only messages
+        while (j < filteredMessages.length) {
+          const nextMsg = filteredMessages[j];
+          const nextHasOnlyToolCalls = !nextMsg.role || (nextMsg.role === 'assistant' && 
+            nextMsg.segments.length > 0 && 
+            nextMsg.segments.every(seg => seg.type === 'tool_call'));
+          
+          if (nextHasOnlyToolCalls) {
+            messagesToProcess.push(nextMsg);
+            j++;
+          } else {
+            break;
+          }
+        }
+        
+        // Now group them, breaking on TodoWrite
+        for (const toolMsg of messagesToProcess) {
+          const hasTodoWrite = toolMsg.segments.some(seg => 
+            seg.type === 'tool_call' && seg.tool.name === 'TodoWrite'
+          );
+          
+          if (hasTodoWrite) {
+            // Save current group if any
+            if (currentGroup.length > 0) {
+              toolGroups.push({ messages: currentGroup, isTodoWrite: false });
+              currentGroup = [];
+            }
+            // Add TodoWrite message as its own group
+            toolGroups.push({ messages: [toolMsg], isTodoWrite: true });
+          } else {
+            // Add to current group
+            currentGroup.push(toolMsg);
+          }
+        }
+        
+        // Save last group if any
+        if (currentGroup.length > 0) {
+          toolGroups.push({ messages: currentGroup, isTodoWrite: false });
+        }
+        
+        // toolMessages is no longer needed since we use toolGroups now
+        
+        // Render each group
+        if (toolGroups.length > 0) {
+          toolGroups.forEach((group, groupIdx) => {
+            if (group.isTodoWrite) {
+              // Render TodoWrite display
+              const todoMsg = group.messages[0];
+              const todoSegment = todoMsg.segments.find(seg => 
+                seg.type === 'tool_call' && seg.tool.name === 'TodoWrite'
+              );
+              
+              if (todoSegment && todoSegment.type === 'tool_call') {
+                let todos = todoSegment.tool.input?.todos;
+                if (!todos && todoSegment.tool.result) {
+                  try {
+                    const resultContent = typeof todoSegment.tool.result.content === 'string' 
+                      ? JSON.parse(todoSegment.tool.result.content)
+                      : todoSegment.tool.result.content;
+                    todos = resultContent?.todos;
+                  } catch (e) {
+                    // Failed to parse result
+                  }
+                }
+                
+                // Type guard to ensure todos is an array
+                const validTodos = Array.isArray(todos) ? todos : [];
+                
+                if (validTodos.length > 0) {
+                  // Wrap TodoListDisplay in an assistant message block
+                  elements.push(
+                    <div
+                      key={`todo-display-${i}-${groupIdx}`}
+                      className={`
+                        rounded-lg transition-all relative group
+                        bg-surface-primary
+                        ${settings.compactMode ? 'p-3 mt-2' : 'p-4 mt-3'}
+                      `}
+                    >
+                      {/* Message Header */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="rounded-full p-1.5 flex-shrink-0 bg-interactive/20 text-interactive-on-dark">
+                          <Bot className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 flex items-baseline gap-2">
+                          <span className="font-medium text-text-primary text-sm">
+                            {messageTransformer.getAgentName()}
+                          </span>
+                          <span className="text-xs text-text-tertiary">
+                            {formatDistanceToNow(parseTimestamp(todoMsg.timestamp))}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Todo List Content */}
+                      <div className="ml-7">
+                        <TodoListDisplay todos={validTodos} timestamp={todoMsg.timestamp} />
+                      </div>
+                    </div>
+                  );
+                }
+              }
+            } else if (group.messages.length > 1) {
+              // Render tool group
+              const allToolSegments = group.messages.flatMap(m => 
+                m.segments.filter(seg => seg.type === 'tool_call')
+              );
+              
+              elements.push(
+                <div
+                  key={`tool-group-${i}-${groupIdx}`}
+                  className={`rounded-lg bg-surface-primary ${settings.compactMode ? 'p-3 mt-2' : 'p-4 mt-3'}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="rounded-full p-1.5 flex-shrink-0 bg-interactive/20 text-interactive-on-dark">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="font-medium text-text-primary text-sm">
+                        {messageTransformer.getAgentName()}
+                      </span>
+                      <span className="text-xs text-text-tertiary">
+                        Tool sequence
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'success').length > 0 && (
+                        <span className="text-status-success">
+                          {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'success').length}✓
+                        </span>
+                      )}
+                      {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'error').length > 0 && (
+                        <span className="text-status-error">
+                          {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'error').length}✗
+                        </span>
+                      )}
+                      {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'pending').length > 0 && (
+                        <span className="text-text-tertiary">
+                          {allToolSegments.filter(seg => seg.type === 'tool_call' && seg.tool.status === 'pending').length}⏳
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ml-7 space-y-[1px]">
+                    {allToolSegments.map((seg, segIdx) => (
+                      <div key={`grouped-tool-${i}-${groupIdx}-${segIdx}`}>
+                        {seg.type === 'tool_call' && (
+                          <ToolCallView
+                            tool={seg.tool}
+                            isExpanded={settings.collapseTools ? expandedTools.has(seg.tool.id) : false}
+                            collapseTools={settings.collapseTools}
+                            onToggleExpand={toggleToolExpand}
+                            expandedTools={expandedTools}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            } else if (group.messages.length === 1) {
+              // Single tool message, render normally
+              const element = renderMessage(group.messages[0], i);
+              elements.push(element);
+            }
+          });
+          
+          i = j; // Skip all the messages we processed
+        } else {
+          // Single tool-only message, render normally
+          const element = renderMessage(msg, i, isUser ? userMessageIndex : undefined);
+          if (isUser) userMessageIndex++;
+          elements.push(element);
+          i++;
+        }
+      } else {
+        // Regular message, render normally
+        const element = renderMessage(msg, i, isUser ? userMessageIndex : undefined);
+        if (isUser) userMessageIndex++;
+        
+        // If this message has TodoWrite mixed with other content, also render TodoWrite separately
+        if (!isUser && msg.segments.some(seg => seg.type === 'tool_call' && seg.tool.name === 'TodoWrite')) {
+          // Find the last TodoWrite in this message
+          const todoSegments = msg.segments.filter(seg => seg.type === 'tool_call' && seg.tool.name === 'TodoWrite');
+          const lastTodoSegment = todoSegments[todoSegments.length - 1];
+          
+          if (lastTodoSegment && lastTodoSegment.type === 'tool_call' && lastTodoSegment.tool.input?.todos) {
+            // Type guard to ensure todos is an array
+            const todoList = Array.isArray(lastTodoSegment.tool.input.todos) ? lastTodoSegment.tool.input.todos : [];
+            
+            if (todoList.length > 0) {
+              // First add the regular message (with TodoWrite filtered out in renderMessage)
+              elements.push(element);
+              
+              // Then add the TodoWrite display separately, wrapped in an assistant message block
+              const todoElement = (
+              <div
+                key={`todo-display-${msg.id}`}
+                className={`
+                  rounded-lg transition-all relative group
+                  bg-surface-primary
+                  ${settings.compactMode ? 'p-3 mt-2' : 'p-4 mt-3'}
+                `}
+              >
+                {/* Message Header */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-full p-1.5 flex-shrink-0 bg-interactive/20 text-interactive-on-dark">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 flex items-baseline gap-2">
+                    <span className="font-medium text-text-primary text-sm">
+                      {messageTransformer.getAgentName()}
+                    </span>
+                    <span className="text-xs text-text-tertiary">
+                      {formatDistanceToNow(parseTimestamp(msg.timestamp))}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Todo List Content */}
+                <div className="ml-7">
+                  <TodoListDisplay todos={todoList} timestamp={msg.timestamp} />
+                </div>
+              </div>
+            );
+            elements.push(todoElement);
+            } else {
+              elements.push(element);
+            }
+          } else {
+            elements.push(element);
+          }
+        } else {
+          elements.push(element);
+        }
+        i++;
+      }
+    }
+    
+    return elements.filter(element => element !== null); // Filter out null elements
+  }, [filteredMessages, collapsedMessages, expandedTools, settings, toggleToolExpand]);
 
   if (loading) {
     return (

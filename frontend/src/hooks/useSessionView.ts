@@ -2,12 +2,23 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { useErrorStore } from '../stores/errorStore';
-import { API } from '../utils/api';
+import { API, GitErrorResponse } from '../utils/api';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { Session, GitCommands, GitErrorDetails } from '../types/session';
+import { Session, GitCommands, GitErrorDetails, AttachedImage, AttachedText } from '../types/session';
 import { getTerminalTheme, getScriptTerminalTheme } from '../utils/terminalTheme';
 import { createVisibilityAwareInterval } from '../utils/performanceUtils';
+
+interface PromptMarker {
+  id: number;
+  session_id?: string;
+  panel_id?: string;
+  prompt_text: string;
+  output_index: number;
+  output_line?: number;
+  timestamp: string;
+  completion_timestamp?: string;
+}
 
 
 export const useSessionView = (
@@ -214,8 +225,8 @@ export const useSessionView = (
       }
       
       setLoadError(null);
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log(`[loadOutputContent] Request aborted for session ${sessionId}`);
         // CRITICAL: Reset loading state before returning
         loadingRef.current = false;
@@ -248,7 +259,7 @@ export const useSessionView = (
       } else {
         setLoadError(error instanceof Error ? error.message : 'Failed to load output content');
         if (terminalInstance.current && lastProcessedOutputLength.current === 0) {
-          terminalInstance.current.writeln(`\r\n❌ Error loading output: ${error.message || 'Unknown error'}\r\n`);
+          terminalInstance.current.writeln(`\r\n❌ Error loading output: ${error instanceof Error ? error.message : 'Unknown error'}\r\n`);
         }
       }
     } finally {
@@ -399,25 +410,39 @@ export const useSessionView = (
       return '';
     }
     
-    // CRITICAL PERFORMANCE FIX: Much more aggressive limiting
-    // Process only recent output to avoid massive array operations that lock up V8
-    const MAX_OUTPUT_TO_PROCESS = 500; // Drastically reduced from 2000
+    // CRITICAL PERFORMANCE FIX: Even more aggressive limiting to prevent 2800ms+ frames
+    // Reduced from 500 to 150 to avoid V8 string concatenation bailouts
+    const MAX_OUTPUT_TO_PROCESS = 150;
+    
+    // Early exit for extremely large outputs that would cause UI blocking
+    if (outputArray.length > 5000) {
+      console.warn(`[Performance] Output array too large (${outputArray.length} items), showing recent ${MAX_OUTPUT_TO_PROCESS} items only`);
+    }
+    
     const outputToProcess = outputArray.length > MAX_OUTPUT_TO_PROCESS 
       ? outputArray.slice(-MAX_OUTPUT_TO_PROCESS)
       : outputArray;
     
-    // PERFORMANCE: Build string in chunks to avoid V8 string concatenation issues
-    if (outputToProcess.length > 100) {
-      // For large arrays, build in chunks to avoid V8 optimization bailouts
-      const chunks: string[] = [];
-      const chunkSize = 50;
-      for (let i = 0; i < outputToProcess.length; i += chunkSize) {
-        const chunk = outputToProcess.slice(i, Math.min(i + chunkSize, outputToProcess.length));
-        chunks.push(chunk.join(''));
+    // PERFORMANCE: Optimized string building to prevent V8 bailouts
+    if (outputToProcess.length > 50) {
+      // Use a more efficient approach - build directly without intermediate arrays
+      let result = '';
+      const batchSize = 25; // Smaller batches for better V8 performance
+      
+      for (let i = 0; i < outputToProcess.length; i += batchSize) {
+        const endIndex = Math.min(i + batchSize, outputToProcess.length);
+        let batchResult = '';
+        
+        // Build each batch without creating intermediate arrays
+        for (let j = i; j < endIndex; j++) {
+          batchResult += outputToProcess[j];
+        }
+        result += batchResult;
       }
-      return chunks.join('');
+      
+      return result;
     } else {
-      // For small arrays, direct join is fine
+      // For small arrays, direct join is still efficient
       return outputToProcess.join('');
     }
   }, [activeSession?.id, currentSessionIdForOutput, outputCount]);
@@ -443,8 +468,16 @@ export const useSessionView = (
       setIsWaitingForFirstOutput(false);
     }
 
-    // PERFORMANCE FIX: More aggressive debouncing for large outputs
-    const delay = outputCount > 100 ? 200 : 50; // Longer delay for large outputs
+    // PERFORMANCE FIX: Even more aggressive debouncing for large outputs to prevent frame drops
+    let delay = 50; // Default delay
+    if (outputCount > 1000) {
+      delay = 500; // Much longer delay for very large outputs
+    } else if (outputCount > 500) {
+      delay = 300; // Longer delay for large outputs
+    } else if (outputCount > 100) {
+      delay = 150; // Moderate delay for medium outputs
+    }
+    
     const timeoutId = setTimeout(() => {
       setFormattedOutput(formattedOutputMemo);
     }, delay);
@@ -471,7 +504,7 @@ export const useSessionView = (
     
     // Check for stuck loading state and force reset if needed
     if (loadingRef.current && outputLoadState === 'idle') {
-      console.warn(`[Output Load Effect] Detected stuck loading state, forcing reset`);
+      // Stuck loading state detected - debug logging removed
       forceResetLoadingState();
     }
     
@@ -525,7 +558,15 @@ export const useSessionView = (
   useEffect(() => {
     let reloadDebounceTimer: NodeJS.Timeout | null = null;
     let lastReloadTime = 0;
-    const MIN_RELOAD_INTERVAL = 1000; // Increased to 1 second to prevent rapid reloads
+    // PERFORMANCE: Adaptive reload interval based on output size
+    const getMinReloadInterval = () => {
+      const outputSize = activeSession?.output?.length || 0;
+      if (outputSize > 2000) return 3000; // 3 seconds for very large outputs
+      if (outputSize > 1000) return 2000; // 2 seconds for large outputs  
+      if (outputSize > 500) return 1500;  // 1.5 seconds for medium outputs
+      return 1000; // 1 second for small outputs
+    };
+    const MIN_RELOAD_INTERVAL = getMinReloadInterval();
     
     const handleOutputAvailable = (event: CustomEvent) => {
       const { sessionId } = event.detail;
@@ -671,21 +712,35 @@ export const useSessionView = (
   const fullScriptOutputMemo = useMemo(() => {
     if (!scriptOutput || scriptOutput.length === 0) return '';
     
-    // CRITICAL PERFORMANCE FIX: Much more aggressive limit
-    const MAX_TERMINAL_OUTPUT = 300; // Drastically reduced from 1000
+    // CRITICAL PERFORMANCE FIX: Even more aggressive limit for terminal output
+    const MAX_TERMINAL_OUTPUT = 100; // Further reduced from 300 to prevent blocking
+    
+    // Early warning for very large terminal outputs
+    if (scriptOutput.length > 2000) {
+      console.warn(`[Performance] Script output too large (${scriptOutput.length} items), showing recent ${MAX_TERMINAL_OUTPUT} items only`);
+    }
+    
     const outputToProcess = scriptOutput.length > MAX_TERMINAL_OUTPUT
       ? scriptOutput.slice(-MAX_TERMINAL_OUTPUT)
       : scriptOutput;
     
-    // Build in chunks for better performance
-    if (outputToProcess.length > 50) {
-      const chunks: string[] = [];
-      const chunkSize = 25;
-      for (let i = 0; i < outputToProcess.length; i += chunkSize) {
-        const chunk = outputToProcess.slice(i, Math.min(i + chunkSize, outputToProcess.length));
-        chunks.push(chunk.join(''));
+    // PERFORMANCE: Direct string building without intermediate arrays
+    if (outputToProcess.length > 25) {
+      let result = '';
+      const batchSize = 15; // Very small batches for terminal output
+      
+      for (let i = 0; i < outputToProcess.length; i += batchSize) {
+        const endIndex = Math.min(i + batchSize, outputToProcess.length);
+        let batchResult = '';
+        
+        // Build each batch directly
+        for (let j = i; j < endIndex; j++) {
+          batchResult += outputToProcess[j];
+        }
+        result += batchResult;
       }
-      return chunks.join('');
+      
+      return result;
     } else {
       return outputToProcess.join('');
     }
@@ -770,8 +825,7 @@ export const useSessionView = (
       terminalInstance.current.write(newContent);
       lastProcessedOutputLength.current = formattedOutput.length;
     } else if (formattedOutput.length < lastProcessedOutputLength.current) {
-      // This shouldn't happen, but log it if it does
-      console.warn(`[Terminal Write Effect] Formatted output shrank from ${lastProcessedOutputLength.current} to ${formattedOutput.length}`);
+      // This shouldn't happen, debug logging removed
     }
     
     if (formattedOutput.length > 0) {
@@ -1026,13 +1080,13 @@ export const useSessionView = (
     previousStatusRef.current = status;
   }, [activeSession?.status, activeSessionId]);
   
-  const handleNavigateToPrompt = useCallback((marker: any) => {
+  const handleNavigateToPrompt = useCallback((marker: PromptMarker) => {
     if (!terminalInstance.current) return;
     // Output view removed - always navigate directly
     navigateToPromptInTerminal(marker);
   }, []);
 
-  const navigateToPromptInTerminal = (marker: any) => {
+  const navigateToPromptInTerminal = (marker: PromptMarker) => {
     if (!terminalInstance.current || !activeSession) return;
     const { prompt_text, output_line } = marker;
     if (!prompt_text) return;
@@ -1103,7 +1157,7 @@ export const useSessionView = (
     return () => window.removeEventListener('keydown', handleDebugKeyboard);
   }, [debugState, forceResetLoadingState]);
 
-  const handleSendInput = async (attachedImages?: any[], attachedTexts?: any[]) => {
+  const handleSendInput = async (attachedImages?: AttachedImage[], attachedTexts?: AttachedText[]) => {
     console.log('[useSessionView] handleSendInput called', { input, activeSession: activeSession?.id, hasActiveSession: !!activeSession });
     if (!input.trim() || !activeSession) {
       console.log('[useSessionView] handleSendInput early return', { inputTrimmed: !input.trim(), noActiveSession: !activeSession });
@@ -1178,7 +1232,11 @@ export const useSessionView = (
     }
   };
 
-  const handleContinueConversation = async (attachedImages?: any[], attachedTexts?: any[]) => {
+  const handleContinueConversation = async (
+    attachedImages?: AttachedImage[],
+    attachedTexts?: AttachedText[],
+    modelOverride?: string
+  ) => {
     if (!input.trim() || !activeSession) return;
     
     // Mark that we're continuing a conversation to prevent output reload
@@ -1245,7 +1303,7 @@ export const useSessionView = (
       finalInput = `${finalInput}${attachmentsMessage}`;
     }
     
-    const response = await API.sessions.continue(activeSession.id, finalInput);
+    const response = await API.sessions.continue(activeSession.id, finalInput, modelOverride);
     if (response.success) {
       setInput('');
       setUltrathink(false);
@@ -1326,12 +1384,12 @@ export const useSessionView = (
     setMergeError(null);
     try {
       console.log(`[handleRebaseMainIntoWorktree] Calling API.sessions.rebaseMainIntoWorktree`);
-      const response = await API.sessions.rebaseMainIntoWorktree(activeSession.id);
+      const response: GitErrorResponse = await API.sessions.rebaseMainIntoWorktree(activeSession.id);
       console.log(`[handleRebaseMainIntoWorktree] API call completed`, response);
       
       if (!response.success) {
-        if ((response as any).gitError) {
-          const gitError = (response as any).gitError;
+        if (response.gitError) {
+          const gitError = response.gitError;
           setGitErrorDetails({
             title: gitError.hasConflicts ? 'Rebase Conflicts Detected' : 'Rebase Failed',
             message: response.error || 'Failed to rebase main into worktree',
@@ -1390,7 +1448,7 @@ export const useSessionView = (
     try {
       const promptsResponse = await API.sessions.getPrompts(activeSession.id);
       if (promptsResponse.success && promptsResponse.data?.length > 0) {
-        return promptsResponse.data.map((p: any) => p.prompt_text || p.content).filter(Boolean).join('\n\n');
+        return promptsResponse.data.map((p: PromptMarker) => p.prompt_text).filter(Boolean).join('\n\n');
       }
     } catch (error) {
       console.error('Error generating default commit message:', error);
@@ -1415,13 +1473,13 @@ export const useSessionView = (
     setMergeError(null);
     setShowCommitMessageDialog(false);
     try {
-      const response = shouldSquash
+      const response: GitErrorResponse = shouldSquash
         ? await API.sessions.squashAndRebaseToMain(activeSession.id, message)
         : await API.sessions.rebaseToMain(activeSession.id);
 
       if (!response.success) {
-        if ((response as any).gitError) {
-          const gitError = (response as any).gitError;
+        if (response.gitError) {
+          const gitError = response.gitError;
           setGitErrorDetails({
             title: shouldSquash ? 'Squash and Rebase Failed' : 'Rebase Failed',
             message: response.error || `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`,
@@ -1476,8 +1534,8 @@ export const useSessionView = (
     }
   };
   
-  const handleStravuFileSelect = (file: any, content: string) => {
-    const formattedContent = `\n\n## File: ${file.name}\n\`\`\`${file.type}\n${content}\n\`\`\`\n\n`;
+  const handleStravuFileSelect = (notebook: { id: string; title: string; excerpt?: string }, content: string) => {
+    const formattedContent = `\n\n## Notebook: ${notebook.title}\n\`\`\`\n${content}\n\`\`\`\n\n`;
     setInput(prev => prev + formattedContent);
   };
 

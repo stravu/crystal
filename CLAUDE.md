@@ -11,6 +11,7 @@ Use these reference pages for more information:
 - How to invoke Claude Code through the command line as an SDK: https://docs.anthropic.com/en/docs/claude-code/sdk
 - How to run multiple Claude Code instances with Git Worktrees: https://docs.anthropic.com/en/docs/claude-code/tutorials#run-parallel-claude-code-sessions-with-git-worktrees
 - **[Adding New CLI Tools](./docs/ADDING_NEW_CLI_TOOLS.md)**: Guide for extending Crystal to support additional CLI tools beyond Claude Code
+- **[Implementing New CLI Agents](./docs/IMPLEMENTING_NEW_CLI_AGENTS.md)**: Step-by-step instructions for adding new CLI agent tools with code examples and best practices
 - **[Codex Protocol Wrapper Documentation](./CODEX_PROTO_WRAPPER_DOCUMENTATION.md)**: Comprehensive documentation for wrapping OpenAI Codex CLI with protocol-based communication. Includes details on resume functionality compatibility with protocol mode (lines 222-386 demonstrate that resume and proto work together seamlessly)
 
 ## Implementation Status: ✅ COMPLETE
@@ -788,6 +789,23 @@ In development mode, Crystal automatically captures all frontend console logs an
 **File rotation**: The log file grows continuously during development. Delete or truncate it manually if it gets too large.
 
 **Note**: This feature is only active in development mode and will not affect production builds.
+
+## TypeScript Coding Standards
+
+### NO 'ANY' TYPE USAGE
+
+**IMPORTANT**: This codebase enforces a strict no-any policy. The TypeScript 'any' type is NOT allowed.
+
+- ❌ **NEVER use `any` type** - ESLint will error and CI/CD will fail
+- ✅ Use `unknown` when the type is truly unknown (requires type guards before use)
+- ✅ Use specific types or interfaces whenever possible
+- ✅ Use generics with type constraints for flexible but type-safe code
+
+
+**Enforcement**:
+- ESLint rule `@typescript-eslint/no-explicit-any` is set to `'error'`
+- GitHub Actions quality workflow enforces this on all PRs
+- Local development will show errors immediately
 
 ## Disclaimer
 

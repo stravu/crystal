@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import type { Logger } from '../utils/logger';
 import type { ConfigManager } from './configManager';
 import { AbstractCliManager } from './panels/cli/AbstractCliManager';
+import type { SessionManager } from './sessionManager';
 
 /**
  * Defines the capabilities and features of a CLI tool
@@ -108,10 +109,10 @@ export interface CliOutputFormat {
  * Factory function type for creating CLI managers
  */
 export type CliManagerFactory = (
-  sessionManager: any,
+  sessionManager: SessionManager | null,
   logger?: Logger,
   configManager?: ConfigManager,
-  additionalOptions?: any
+  additionalOptions?: Record<string, unknown>
 ) => AbstractCliManager;
 
 /**
@@ -145,7 +146,7 @@ export interface ToolAvailabilityResult {
   path?: string;
   
   /** Additional metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -301,8 +302,8 @@ export class CliToolRegistry extends EventEmitter {
    */
   public async createManager(
     toolId: string,
-    sessionManager: any,
-    additionalOptions?: any
+    sessionManager: SessionManager,
+    additionalOptions?: Record<string, unknown>
   ): Promise<AbstractCliManager> {
     const tool = this.tools.get(toolId);
     if (!tool) {
@@ -374,7 +375,8 @@ export class CliToolRegistry extends EventEmitter {
     try {
       // Create a temporary manager instance to test availability
       const tempManager = tool.managerFactory(null, this.logger, this.configManager);
-      const result = await (tempManager as any).testCliAvailability();
+      // Access the protected method via type assertion as a temporary workaround
+      const result = await (tempManager as AbstractCliManager & { getCachedAvailability(): Promise<ToolAvailabilityResult> }).getCachedAvailability();
 
       // Cache the result
       this.availabilityCache.set(toolId, {
@@ -441,7 +443,7 @@ export class CliToolRegistry extends EventEmitter {
    */
   public async getDefaultTool(): Promise<CliToolDefinition | null> {
     const tools = Array.from(this.tools.values()).sort((a, b) => 
-      ((b as any).priority || 0) - ((a as any).priority || 0)
+      ((b as CliToolDefinition & { priority?: number }).priority || 0) - ((a as CliToolDefinition & { priority?: number }).priority || 0)
     );
 
     for (const tool of tools) {

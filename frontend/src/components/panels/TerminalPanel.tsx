@@ -3,10 +3,24 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { useSession } from '../../contexts/SessionContext';
 import { TerminalPanelProps } from '../../types/panelComponents';
+import { renderLog, devLog } from '../../utils/console';
 import '@xterm/xterm/css/xterm.css';
 
-export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive }) => {
-  console.log('[TerminalPanel] Component rendering, panel:', panel.id, 'isActive:', isActive);
+// Define window extensions for terminal state restoration
+interface TerminalRestoreState {
+  scrollbackBuffer: string | string[];
+  cursorX?: number;
+  cursorY?: number;
+}
+
+declare global {
+  interface Window {
+    __terminalRestoreState?: TerminalRestoreState;
+  }
+}
+
+export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, isActive }) => {
+  renderLog('[TerminalPanel] Component rendering, panel:', panel.id, 'isActive:', isActive);
   
   // All hooks must be called at the top level, before any conditional returns
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -21,18 +35,18 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
   const workingDirectory = sessionContext?.workingDirectory;
   
   if (sessionContext) {
-    console.log('[TerminalPanel] Session context:', sessionContext);
+    devLog.debug('[TerminalPanel] Session context:', sessionContext);
   } else {
-    console.error('[TerminalPanel] No session context available');
+    devLog.error('[TerminalPanel] No session context available');
   }
 
   // Initialize terminal only once when component first mounts
-  // Keep it alive even when switching tabs
+  // Keep it alive even when switching sessions
   useEffect(() => {
-    console.log('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
+    devLog.debug('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
     
-    if (!terminalRef.current || !sessionId || !workingDirectory) {
-      console.log('[TerminalPanel] Missing dependencies, skipping initialization');
+    if (!terminalRef.current) {
+      devLog.debug('[TerminalPanel] Missing terminal ref, skipping initialization');
       return;
     }
 
@@ -42,7 +56,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
 
     const initializeTerminal = async () => {
       try {
-        console.log('[TerminalPanel] Starting initialization for panel:', panel.id);
+        devLog.debug('[TerminalPanel] Starting initialization for panel:', panel.id);
         
         // Check if already initialized on backend
         const initialized = await window.electronAPI.invoke('panels:checkInitialized', panel.id);
@@ -51,11 +65,22 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
         if (!initialized) {
           // Initialize backend PTY process
           console.log('[TerminalPanel] Initializing backend PTY process...');
+          // Use workingDirectory and sessionId if available, but don't require them
           await window.electronAPI.invoke('panels:initialize', panel.id, {
-            cwd: workingDirectory,
-            sessionId
+            cwd: workingDirectory || process.cwd(),
+            sessionId: sessionId || panel.sessionId
           });
           console.log('[TerminalPanel] Backend PTY process initialized');
+        } else {
+          // Terminal is already initialized, get its state to restore scrollback
+          console.log('[TerminalPanel] Restoring terminal state from backend...');
+          const terminalState = await window.electronAPI.invoke('terminal:getState', panel.id);
+          if (terminalState && terminalState.scrollbackBuffer) {
+            // We'll restore this to the terminal after it's created
+            console.log('[TerminalPanel] Found scrollback buffer with', terminalState.scrollbackBuffer.length, 'lines');
+            // Store for restoration after terminal is created
+            window.__terminalRestoreState = terminalState;
+          }
         }
 
         // FIX: Check if component was unmounted during async operation
@@ -88,17 +113,40 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
           
           xtermRef.current = terminal;
           fitAddonRef.current = fitAddon;
+          
+          // Restore scrollback if we have saved state
+          const restoreState = window.__terminalRestoreState;
+          if (restoreState && restoreState.scrollbackBuffer) {
+            // Handle both string and array formats
+            let restoredContent: string;
+            if (typeof restoreState.scrollbackBuffer === 'string') {
+              restoredContent = restoreState.scrollbackBuffer;
+              console.log('[TerminalPanel] Restoring', restoredContent.length, 'chars of scrollback');
+            } else if (Array.isArray(restoreState.scrollbackBuffer)) {
+              restoredContent = restoreState.scrollbackBuffer.join('\n');
+              console.log('[TerminalPanel] Restoring', restoreState.scrollbackBuffer.length, 'lines of scrollback');
+            } else {
+              restoredContent = '';
+            }
+            
+            if (restoredContent) {
+              terminal.write(restoredContent);
+            }
+            delete window.__terminalRestoreState;
+          }
+          
           setIsInitialized(true);
           console.log('[TerminalPanel] Terminal initialization complete, isInitialized set to true');
 
           // Set up IPC communication for terminal I/O
-          const outputHandler = (data: any) => {
+          const outputHandler = (data: { panelId?: string; sessionId?: string; output?: string } | unknown) => {
             // Check if this is panel terminal output (has panelId) vs session terminal output (has sessionId)
-            if ('panelId' in data && data.panelId && 'output' in data) {
-              console.log('[TerminalPanel] Received panel output for:', data.panelId, 'Current panel:', panel.id);
-              if (data.panelId === panel.id && terminal && !disposed) {
-                console.log('[TerminalPanel] Writing to terminal:', data.output.substring(0, 50) + '...');
-                terminal.write(data.output);
+            if (data && typeof data === 'object' && 'panelId' in data && data.panelId && 'output' in data) {
+              const typedData = data as { panelId: string; output: string };
+              console.log('[TerminalPanel] Received panel output for:', typedData.panelId, 'Current panel:', panel.id);
+              if (typedData.panelId === panel.id && terminal && !disposed) {
+                console.log('[TerminalPanel] Writing to terminal:', typedData.output.substring(0, 50) + '...');
+                terminal.write(typedData.output);
               }
             }
             // Ignore session terminal output (has sessionId instead of panelId)
@@ -171,7 +219,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
       
       setIsInitialized(false);
     };
-  }, [panel.id, sessionId, workingDirectory]); // Depend on panel.id and session info
+  }, [panel.id]); // Only depend on panel.id to prevent re-initialization on session switch
 
   // Handle visibility changes (resize when becoming visible)
   useEffect(() => {
@@ -218,6 +266,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ panel, isActive })
       )}
     </div>
   );
-};
+});
+
+TerminalPanel.displayName = 'TerminalPanel';
 
 export default TerminalPanel;

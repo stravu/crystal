@@ -9,7 +9,6 @@ const { execSync } = require('child_process');
 // GitHub Actions sets GITHUB_ACTIONS=true (boolean true, not string 'true')
 if (process.env.CI || process.env.GITHUB_ACTIONS) {
   console.log('Skipping package.json restoration in CI environment');
-  console.log('CI:', process.env.CI, 'GITHUB_ACTIONS:', process.env.GITHUB_ACTIONS);
   process.exit(0);
 }
 

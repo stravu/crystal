@@ -1,5 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { Session } from '../types/session';
+import type { LucideIcon } from 'lucide-react';
 
 interface SessionContextValue {
   sessionId: string;
@@ -10,7 +11,7 @@ interface SessionContextValue {
   gitBranchActions?: Array<{
     id: string;
     label: string;
-    icon: any;
+    icon: LucideIcon;
     onClick: () => void;
     disabled: boolean;
     variant: 'default' | 'success' | 'danger';
@@ -28,7 +29,7 @@ export const SessionProvider: React.FC<{
   gitBranchActions?: Array<{
     id: string;
     label: string;
-    icon: any;
+    icon: LucideIcon;
     onClick: () => void;
     disabled: boolean;
     variant: 'default' | 'success' | 'danger';

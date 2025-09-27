@@ -1,4 +1,5 @@
 import { formatDistanceToNow as formatDistance, formatForDisplay } from './timestampUtils';
+import type { ClaudeJsonMessage, MessageContent } from '../types/session';
 
 export function formatDistanceToNow(date: Date): string {
   // Use the timestamp utility but remove the "ago" suffix for backward compatibility
@@ -6,7 +7,7 @@ export function formatDistanceToNow(date: Date): string {
   return result.replace(' ago', '');
 }
 
-export function formatJsonForWeb(jsonMessage: any): string {
+export function formatJsonForWeb(jsonMessage: ClaudeJsonMessage): string {
   const timestamp = formatForDisplay(jsonMessage.timestamp || new Date());
   
   if (jsonMessage.type === 'system') {
@@ -32,7 +33,7 @@ export function formatJsonForWeb(jsonMessage: any): string {
     if (jsonMessage.message?.content) {
       if (Array.isArray(jsonMessage.message.content)) {
         content = jsonMessage.message.content
-          .map((item: any) => {
+          .map((item: MessageContent) => {
             if (item.type === 'text') return item.text;
             if (item.type === 'tool_result') return `Tool result: ${item.content}`;
             return JSON.stringify(item);
@@ -55,7 +56,7 @@ export function formatJsonForWeb(jsonMessage: any): string {
     if (jsonMessage.message?.content) {
       if (Array.isArray(jsonMessage.message.content)) {
         content = jsonMessage.message.content
-          .map((item: any) => {
+          .map((item: MessageContent) => {
             if (item.type === 'text') return item.text;
             if (item.type === 'tool_use') return `[Using tool: ${item.name}]`;
             return JSON.stringify(item);

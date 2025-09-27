@@ -6,8 +6,8 @@ import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { ConversationMessage } from '../../../database/models';
 import { getShellPath, findExecutableInPath } from '../../../utils/shellPath';
-import { getAugmentedPath } from '../../../utils/claudeCodeTest';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 
 interface CliProcess {
@@ -28,14 +28,14 @@ interface CliSpawnOptions {
   worktreePath: string;
   prompt: string;
   isResume?: boolean;
-  [key: string]: any; // Allow CLI-specific options
+  [key: string]: unknown; // Allow CLI-specific options
 }
 
 interface CliOutputEvent {
   panelId: string;
   sessionId: string;
   type: 'json' | 'stdout' | 'stderr';
-  data: any;
+  data: unknown;
   timestamp: Date;
 }
 
@@ -68,7 +68,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   protected readonly execAsync = promisify(exec);
 
   constructor(
-    protected sessionManager: any,
+    protected sessionManager: import('../../sessionManager').SessionManager,
     protected logger?: Logger,
     protected configManager?: ConfigManager
   ) {
@@ -318,13 +318,13 @@ export abstract class AbstractCliManager extends EventEmitter {
    * Start a CLI panel with the given options
    * This should be implemented by each CLI tool manager
    */
-  abstract startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, ...args: any[]): Promise<void>;
+  abstract startPanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, ...args: unknown[]): Promise<void>;
 
   /**
    * Continue a CLI panel with conversation history
    * This should be implemented by each CLI tool manager
    */
-  abstract continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], ...args: any[]): Promise<void>;
+  abstract continuePanel(panelId: string, sessionId: string, worktreePath: string, prompt: string, conversationHistory: ConversationMessage[], ...args: unknown[]): Promise<void>;
 
   /**
    * Stop a CLI panel
@@ -336,7 +336,7 @@ export abstract class AbstractCliManager extends EventEmitter {
    * Restart a panel with conversation history
    * This should be implemented by each CLI tool manager
    */
-  abstract restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: any[]): Promise<void>;
+  abstract restartPanelWithHistory(panelId: string, sessionId: string, worktreePath: string, initialPrompt: string, conversationHistory: ConversationMessage[]): Promise<void>;
 
   // Legacy session-based methods for backward compatibility
   // These provide default implementations that map to panel-based methods
@@ -344,7 +344,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   /**
    * @deprecated Use startPanel with real panel IDs instead
    */
-  async startSession(sessionId: string, worktreePath: string, prompt: string, ...args: any[]): Promise<void> {
+  async startSession(sessionId: string, worktreePath: string, prompt: string, ...args: unknown[]): Promise<void> {
     console.warn(`[${this.getCliToolName()}Manager] DEPRECATED: startSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
     const virtualPanelId = `session-${sessionId}`;
     return this.startPanel(virtualPanelId, sessionId, worktreePath, prompt, ...args);
@@ -353,7 +353,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   /**
    * @deprecated Use continuePanel with real panel IDs instead
    */
-  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: any[], ...args: any[]): Promise<void> {
+  async continueSession(sessionId: string, worktreePath: string, prompt: string, conversationHistory: ConversationMessage[], ...args: unknown[]): Promise<void> {
     console.warn(`[${this.getCliToolName()}Manager] DEPRECATED: continueSession called with virtual panel ID for session ${sessionId}. Use real panel IDs instead.`);
     const virtualPanelId = `session-${sessionId}`;
     return this.continuePanel(virtualPanelId, sessionId, worktreePath, prompt, conversationHistory, ...args);
@@ -378,6 +378,73 @@ export abstract class AbstractCliManager extends EventEmitter {
   }
 
   // Protected utility methods
+
+  /**
+   * Find and store tool-specific session ID for resume functionality
+   * This is used by CLI tools that have their own session management systems
+   * @param panelId The panel ID
+   * @param sessionIdPath Path to search for session files
+   * @param extractSessionId Function to extract session ID from a session file
+   */
+  protected async findAndStoreToolSessionId(
+    panelId: string,
+    sessionIdPath: string,
+    extractSessionId: (filePath: string, worktreePath: string) => Promise<string | null>
+  ): Promise<void> {
+    try {
+      const fs = await import('fs').then(m => m.promises);
+      const path = await import('path');
+      
+      // Check if session directory exists
+      try {
+        await fs.access(sessionIdPath);
+      } catch {
+        this.logger?.verbose(`[${this.getCliToolName()}] Session directory not found: ${sessionIdPath}`);
+        return;
+      }
+
+      // Get the worktree path for this panel
+      const process = this.processes.get(panelId);
+      if (!process) {
+        this.logger?.warn(`[${this.getCliToolName()}] No process found for panel ${panelId}`);
+        return;
+      }
+
+      // Extract session ID
+      const sessionId = await extractSessionId(sessionIdPath, process.worktreePath);
+      
+      if (sessionId) {
+        this.logger?.info(`[${this.getCliToolName()}] Found session ID for panel ${panelId}: ${sessionId}`);
+        
+        // Store the session ID in the panel's custom state
+        if (this.sessionManager) {
+          // Use panelManager instead of direct database access
+          const { panelManager } = await import('../../panelManager');
+          const panel = await panelManager.getPanel(panelId);
+          if (panel) {
+            const currentState = panel.state || {};
+            const customState = (currentState.customState as Record<string, unknown>) || {};
+            
+            // Only update if we don't already have a session ID
+            const toolSessionKey = `${this.getCliToolName().toLowerCase()}SessionId`;
+            if (!customState[toolSessionKey]) {
+              const updatedState = {
+                ...currentState,
+                customState: { ...customState, [toolSessionKey]: sessionId }
+              };
+              
+              await panelManager.updatePanel(panelId, { state: updatedState });
+              this.logger?.verbose(`[${this.getCliToolName()}] Stored session ID in panel ${panelId}: ${sessionId}`);
+            }
+          }
+        }
+      } else {
+        this.logger?.verbose(`[${this.getCliToolName()}] No session ID found for panel ${panelId}`);
+      }
+    } catch (error) {
+      this.logger?.error(`[${this.getCliToolName()}] Error finding session ID: ${error}`);
+    }
+  }
 
   /**
    * Get cached availability result or perform fresh check
@@ -407,7 +474,7 @@ export abstract class AbstractCliManager extends EventEmitter {
   protected async handleCliNotAvailable(availability: { available: boolean; error?: string }, panelId: string, sessionId: string): Promise<void> {
     this.logger?.error(`${this.getCliToolName()} not available: ${availability.error}`);
     this.logger?.error(`Current PATH: ${process.env.PATH}`);
-    this.logger?.error(`Augmented PATH will be: ${getAugmentedPath()}`);
+    this.logger?.error(`Enhanced PATH searched: ${getShellPath()}`);
 
     // Emit error message to show in the UI
     const errorMessage = {
@@ -452,7 +519,7 @@ export abstract class AbstractCliManager extends EventEmitter {
       `- Add the ${this.getCliToolName()} installation directory to your PATH environment variable`,
       '- Or set a custom executable path in Crystal Settings',
       '',
-      `Current PATH: ${process.env.PATH}`,
+      `Enhanced PATH searched: ${getShellPath()}`,
       `Attempted command: ${this.getCliToolName()} --version`
     ].join('\n');
   }
@@ -479,8 +546,11 @@ export abstract class AbstractCliManager extends EventEmitter {
     } as { [key: string]: string };
   }
 
+
   /**
-   * Spawn PTY process with error handling and fallbacks
+   * Spawn PTY process with error handling and Node.js fallback
+   * This handles the common case where CLI tools are Node.js scripts with shebangs
+   * that may not work correctly on all systems
    */
   protected async spawnPtyProcess(command: string, args: string[], cwd: string, env: { [key: string]: string }): Promise<pty.IPty> {
     if (!pty) {
@@ -493,7 +563,9 @@ export abstract class AbstractCliManager extends EventEmitter {
 
     let ptyProcess: pty.IPty;
     let spawnAttempt = 0;
-    let lastError: any;
+    let lastError: unknown;
+    const toolName = this.getCliToolName().toLowerCase();
+    const needsNodeFallbackKey = `${toolName}NeedsNodeFallback`;
 
     // Try normal spawn first, then fallback to Node.js invocation if it fails
     while (spawnAttempt < 2) {
@@ -505,13 +577,53 @@ export abstract class AbstractCliManager extends EventEmitter {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        ptyProcess = pty.spawn(command, args, {
-          name: 'xterm-color',
-          cols: 80,
-          rows: 30,
-          cwd,
-          env
-        });
+        if (spawnAttempt === 0 && !(global as typeof global & Record<string, boolean>)[needsNodeFallbackKey]) {
+          // First attempt: normal spawn
+          ptyProcess = pty.spawn(command, args, {
+            name: 'xterm-color',
+            cols: 80,
+            rows: 30,
+            cwd,
+            env
+          });
+        } else {
+          // Second attempt or if we know we need Node.js: use Node.js directly
+          this.logger?.verbose(`[${this.getCliToolName()}] Using Node.js fallback for execution`);
+
+          // Try to find the CLI script (for npm-installed tools)
+          let scriptPath = command;
+          
+          // For tools installed via npm, the command might be a symlink to a script
+          // Try using the nodeFinder utility to locate the actual script
+          try {
+            // Use dynamic import to avoid circular dependencies
+            const { findCliNodeScript } = await import('../../../utils/nodeFinder');
+            const foundScript = findCliNodeScript(command);
+            if (foundScript) {
+              scriptPath = foundScript;
+              this.logger?.verbose(`[${this.getCliToolName()}] Found script at: ${scriptPath}`);
+            }
+          } catch (e) {
+            // If we can't find the script helper, just use the command as-is
+            this.logger?.verbose(`[${this.getCliToolName()}] Using command directly for Node.js invocation`);
+          }
+
+          const nodePath = await findNodeExecutable();
+          this.logger?.verbose(`[${this.getCliToolName()}] Using Node.js: ${nodePath}`);
+
+          // Spawn with Node.js directly
+          const nodeArgs = scriptPath === command 
+            ? [command, ...args] // Command might be a direct script path
+            : ['--no-warnings', '--enable-source-maps', scriptPath, ...args]; // Found script path
+            
+          ptyProcess = pty.spawn(nodePath, nodeArgs, {
+            name: 'xterm-color',
+            cols: 80,
+            rows: 30,
+            cwd,
+            env
+          });
+        }
 
         const spawnTime = Date.now() - startTime;
         this.logger?.verbose(`${this.getCliToolName()} process spawned successfully in ${spawnTime}ms`);
@@ -520,15 +632,17 @@ export abstract class AbstractCliManager extends EventEmitter {
         lastError = spawnError;
         spawnAttempt++;
 
-        if (spawnAttempt === 1) {
+        if (spawnAttempt === 1 && !(global as typeof global & Record<string, boolean>)[needsNodeFallbackKey]) {
           const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
           this.logger?.error(`First ${this.getCliToolName()} spawn attempt failed: ${errorMsg}`);
 
-          // Check for typical shebang-related errors (mainly for Node.js-based CLIs)
+          // Check for typical shebang-related errors
           if (errorMsg.includes('No such file or directory') ||
               errorMsg.includes('env: node:') ||
+              errorMsg.includes('is not recognized') ||
               errorMsg.includes('ENOENT')) {
             this.logger?.verbose(`Error suggests shebang issue, will try Node.js fallback`);
+            (global as typeof global & Record<string, boolean>)[needsNodeFallbackKey] = true;
             continue;
           }
         }

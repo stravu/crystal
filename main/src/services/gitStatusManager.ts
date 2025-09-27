@@ -8,6 +8,8 @@ import type { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import type { GitDiffManager } from './gitDiffManager';
 import { GitStatusLogger } from './gitStatusLogger';
+import { GitFileWatcher } from './gitFileWatcher';
+import { fastCheckWorkingDirectory, fastGetAheadBehind, fastGetDiffStats } from './gitPlumbingCommands';
 
 interface GitStatusCache {
   [sessionId: string]: {
@@ -16,39 +18,15 @@ interface GitStatusCache {
   };
 }
 
-/**
- * Result of a git command execution
- */
-interface GitCommandResult<T = string> {
-  success: boolean;
-  output?: T;
-  error?: Error;
-}
-
-/**
- * Git diff statistics
- */
-interface GitDiffStats {
-  filesChanged: number;
-  additions: number;
-  deletions: number;
-}
-
-/**
- * Git rev-list count result
- */
-interface RevListCount {
-  ahead: number;
-  behind: number;
-}
 
 export class GitStatusManager extends EventEmitter {
   private cache: GitStatusCache = {};
-  // Removed polling - now event-driven only
+  // Smart visibility-aware polling for active sessions only
   private readonly CACHE_TTL_MS = 5000; // 5 seconds cache
   private refreshDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly DEBOUNCE_MS = 500; // 500ms debounce for rapid refresh requests
+  private readonly DEBOUNCE_MS = 2000; // 2 seconds debounce to batch rapid changes
   private gitLogger: GitStatusLogger;
+  private fileWatcher: GitFileWatcher;
   
   // Throttling for UI events
   private eventThrottleTimer: NodeJS.Timeout | null = null;
@@ -57,7 +35,7 @@ export class GitStatusManager extends EventEmitter {
   
   // Concurrent operation limiting
   private activeOperations = 0;
-  private readonly MAX_CONCURRENT_OPERATIONS = 5; // Increased from 3 for better throughput
+  private readonly MAX_CONCURRENT_OPERATIONS = 3; // Reduced to limit CPU usage
   private operationQueue: Array<() => Promise<void>> = [];
   
   // Cancellation support
@@ -66,7 +44,11 @@ export class GitStatusManager extends EventEmitter {
   // Initial load management
   private isInitialLoadInProgress = false;
   private initialLoadQueue: string[] = [];
-  private readonly INITIAL_LOAD_DELAY_MS = 100; // Stagger initial loads by 100ms
+  private readonly INITIAL_LOAD_DELAY_MS = 200; // Increased to 200ms for better staggering
+  
+  // Track active session and window visibility for optimized refreshes
+  private activeSessionId: string | null = null;
+  private isWindowVisible = true;
 
   constructor(
     private sessionManager: SessionManager,
@@ -75,147 +57,91 @@ export class GitStatusManager extends EventEmitter {
     private logger?: Logger
   ) {
     super();
+    // Increase max listeners to prevent warnings when many components listen to git status events
+    // This is expected since each SessionListItem listens for git status updates
+    this.setMaxListeners(100);
     this.gitLogger = new GitStatusLogger(logger);
+    
+    // Initialize file watcher for smart refresh detection
+    this.fileWatcher = new GitFileWatcher(logger);
+    this.fileWatcher.on('needs-refresh', (sessionId: string) => {
+      // File watcher detected changes, refresh git status
+      this.logger?.info(`[GitStatus] File watcher triggered refresh for session ${sessionId}`);
+      this.refreshSessionGitStatus(sessionId, false).catch(error => {
+        this.logger?.error(`[GitStatus] Failed to refresh after file change for session ${sessionId}:`, error);
+      });
+    });
   }
 
+
   /**
-   * Execute a git command with proper error handling
-   * @param command The git command to execute
-   * @param cwd The working directory
-   * @returns GitCommandResult with success status and output
+   * Set the currently active session for smart polling
    */
-  private executeGitCommand(command: string, cwd: string): GitCommandResult<string> {
-    try {
-      const output = execSync(command, { cwd });
-      return {
-        success: true,
-        output: output.toString().trim()
-      };
-    } catch (error) {
-      // Log unexpected errors (non-git command failures)
-      if (error instanceof Error && !error.message.includes('Command failed')) {
-        this.logger?.error(`[GitStatus] Unexpected error executing git command: ${command}`, error);
+  setActiveSession(sessionId: string | null): void {
+    const previousActive = this.activeSessionId;
+    this.activeSessionId = sessionId;
+    
+    if (previousActive !== sessionId) {
+      console.log(`[GitStatus] Active session changed from ${previousActive} to ${sessionId}`);
+      
+      // Start watching the active session's files if we have one
+      if (sessionId) {
+        this.startWatchingSession(sessionId);
+        
+        // If window is visible, also refresh immediately
+        if (this.isWindowVisible) {
+          this.refreshSessionGitStatus(sessionId, false).catch(error => {
+            console.warn(`[GitStatus] Failed to refresh active session ${sessionId}:`, error);
+          });
+        }
       }
-      return {
-        success: false,
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Get untracked files in the repository
-   */
-  private getUntrackedFiles(cwd: string): GitCommandResult<boolean> {
-    const result = this.executeGitCommand('git ls-files --others --exclude-standard', cwd);
-    return {
-      success: result.success,
-      output: result.success && result.output ? result.output.length > 0 : false,
-      error: result.error
-    };
-  }
-
-  /**
-   * Get ahead/behind count compared to a branch
-   */
-  private getRevListCount(cwd: string, baseBranch: string): GitCommandResult<RevListCount> {
-    const result = this.executeGitCommand(`git rev-list --left-right --count ${baseBranch}...HEAD`, cwd);
-    if (result.success && result.output) {
-      const [behind, ahead] = result.output.split('\t').map(n => parseInt(n, 10));
-      return {
-        success: true,
-        output: {
-          ahead: ahead || 0,
-          behind: behind || 0
-        }
-      };
-    }
-    return {
-      success: false,
-      error: result.error
-    };
-  }
-
-  /**
-   * Get diff statistics between branches
-   */
-  private getDiffStats(cwd: string, baseBranch: string): GitCommandResult<GitDiffStats> {
-    const result = this.executeGitCommand(`git diff --shortstat ${baseBranch}...HEAD`, cwd);
-    if (result.success && result.output) {
-      const statLine = result.output;
       
-      // Parse the stat line: "X files changed, Y insertions(+), Z deletions(-)"
-      const filesMatch = statLine.match(/(\d+) files? changed/);
-      const additionsMatch = statLine.match(/(\d+) insertions?\(\+\)/);
-      const deletionsMatch = statLine.match(/(\d+) deletions?\(-\)/);
-      
-      return {
-        success: true,
-        output: {
-          filesChanged: filesMatch ? parseInt(filesMatch[1], 10) : 0,
-          additions: additionsMatch ? parseInt(additionsMatch[1], 10) : 0,
-          deletions: deletionsMatch ? parseInt(deletionsMatch[1], 10) : 0
-        }
-      };
+      // Stop watching the previous active session if it exists
+      if (previousActive) {
+        this.stopWatchingSession(previousActive);
+      }
     }
-    return {
-      success: false,
-      error: result.error
-    };
   }
-
+  
   /**
-   * Check for merge conflicts in the repository
+   * Start file watching for a session
    */
-  private checkMergeConflicts(cwd: string): GitCommandResult<boolean> {
-    const result = this.executeGitCommand('git status --porcelain=v1', cwd);
-    if (result.success && result.output) {
-      const hasConflicts = result.output.includes('UU ') || result.output.includes('AA ') || 
-                          result.output.includes('DD ') || result.output.includes('AU ') || 
-                          result.output.includes('UA ') || result.output.includes('UD ') || 
-                          result.output.includes('DU ');
-      return {
-        success: true,
-        output: hasConflicts
-      };
+  private async startWatchingSession(sessionId: string): Promise<void> {
+    try {
+      const session = await this.sessionManager.getSession(sessionId);
+      if (session?.worktreePath) {
+        this.fileWatcher.startWatching(sessionId, session.worktreePath);
+        this.logger?.info(`[GitStatus] Started file watching for session ${sessionId}`);
+      }
+    } catch (error) {
+      this.logger?.error(`[GitStatus] Failed to start file watching for session ${sessionId}:`, error as Error);
     }
-    return {
-      success: false,
-      error: result.error
-    };
   }
-
+  
   /**
-   * Get total commit count ahead of a branch
+   * Stop file watching for a session
    */
-  private getTotalCommitCount(cwd: string, baseBranch: string): GitCommandResult<number> {
-    const result = this.executeGitCommand(`git rev-list --count ${baseBranch}..HEAD`, cwd);
-    if (result.success && result.output) {
-      return {
-        success: true,
-        output: parseInt(result.output, 10)
-      };
-    }
-    return {
-      success: false,
-      error: result.error
-    };
+  private stopWatchingSession(sessionId: string): void {
+    this.fileWatcher.stopWatching(sessionId);
+    this.logger?.info(`[GitStatus] Stopped file watching for session ${sessionId}`);
   }
-
+  
   /**
-   * Start git status manager (no longer polls)
+   * Start git status manager (initializes file watching)
    */
   startPolling(): void {
-    // This method is kept for compatibility but no longer polls
-    // Git status updates are now event-driven only
-    this.gitLogger.logPollStart(0); // Log that we're not polling any sessions
+    // File watching is started per-session in setActiveSession
+    // This method is kept for backward compatibility
+    this.gitLogger.logPollStart(1);
   }
 
   /**
    * Stop git status manager
    */
   stopPolling(): void {
-    // No polling to stop, but still clean up other resources
+    // Stop all file watchers
+    this.fileWatcher.stopAll();
+    
     this.gitLogger.logSummary();
 
     // Clear any pending debounce timers
@@ -236,8 +162,15 @@ export class GitStatusManager extends EventEmitter {
 
   // Called when window focus changes
   handleVisibilityChange(isHidden: boolean): void {
+    this.isWindowVisible = !isHidden;
     this.gitLogger.logFocusChange(!isHidden);
-    // No longer polls on visibility change - status updates are event-driven
+    
+    // If window becomes visible and we have an active session, refresh it
+    if (!isHidden && this.activeSessionId) {
+      this.refreshSessionGitStatus(this.activeSessionId, false).catch(error => {
+        console.warn(`[GitStatus] Failed to refresh active session on focus:`, error);
+      });
+    }
   }
 
   /**
@@ -272,6 +205,10 @@ export class GitStatusManager extends EventEmitter {
    * @param isUserInitiated - Whether this refresh was triggered by user action (shows loading spinner)
    */
   async refreshSessionGitStatus(sessionId: string, isUserInitiated = false): Promise<GitStatus | null> {
+    // Immediately emit loading state so user sees refresh is happening
+    // This provides immediate visual feedback
+    this.emitThrottled(sessionId, 'loading');
+    
     // Clear any existing debounce timer for this session
     const existingTimer = this.refreshDebounceTimers.get(sessionId);
     if (existingTimer) {
@@ -287,9 +224,20 @@ export class GitStatusManager extends EventEmitter {
         this.refreshDebounceTimers.delete(sessionId);
         this.gitLogger.logDebounce(sessionId, 'complete');
         
-        // Only emit loading event for user-initiated refreshes
-        if (isUserInitiated) {
-          this.emitThrottled(sessionId, 'loading');
+        // Fast path: check if git status actually changed before doing expensive operations
+        const session = await this.sessionManager.getSession(sessionId);
+        if (session?.worktreePath) {
+          const hasChanged = await this.hasGitStatusChanged(sessionId, session.worktreePath);
+          if (!hasChanged) {
+            this.logger?.info(`[GitStatus] Quick check: no changes for session ${sessionId}, skipping refresh`);
+            // Still emit updated to clear loading state even if no changes
+            const cached = this.cache[sessionId]?.status || null;
+            if (cached) {
+              this.emitThrottled(sessionId, 'updated', cached);
+            }
+            resolve(cached);
+            return;
+          }
         }
         
         const status = await this.fetchGitStatus(sessionId);
@@ -318,6 +266,8 @@ export class GitStatusManager extends EventEmitter {
     // Add to initial load queue if not already there
     if (!this.initialLoadQueue.includes(sessionId)) {
       this.initialLoadQueue.push(sessionId);
+      // Show loading immediately for this session
+      this.emitThrottled(sessionId, 'loading');
     }
 
     // Start processing queue if not already running
@@ -381,6 +331,11 @@ export class GitStatusManager extends EventEmitter {
       );
 
       this.gitLogger.logPollStart(activeSessions.length);
+      
+      // Immediately show loading for all sessions so user sees refresh happening
+      activeSessions.forEach(session => {
+        this.emitThrottled(session.id, 'loading');
+      });
 
       // Process sessions with concurrent limiting
       let successCount = 0;
@@ -446,6 +401,47 @@ export class GitStatusManager extends EventEmitter {
   }
 
   /**
+   * Quick check if git status actually changed using fast plumbing commands
+   * Returns true if status is different from cached, false if unchanged
+   */
+  private async hasGitStatusChanged(sessionId: string, worktreePath: string): Promise<boolean> {
+    const cached = this.cache[sessionId];
+    if (!cached) return true;
+    
+    try {
+      // Quick check using plumbing commands
+      const quickStatus = fastCheckWorkingDirectory(worktreePath);
+      
+      // Compare with cached status
+      const cachedHasChanges = cached.status.hasUncommittedChanges || cached.status.hasUntrackedFiles;
+      const currentHasChanges = quickStatus.hasModified || quickStatus.hasStaged || quickStatus.hasUntracked;
+      
+      // If the basic state differs, we need to refresh
+      if (cachedHasChanges !== currentHasChanges) {
+        return true;
+      }
+      
+      // If both have no changes, check if ahead/behind changed
+      if (!currentHasChanges) {
+        const project = this.sessionManager.getProjectForSession(sessionId);
+        if (project?.path) {
+          const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
+          const { ahead, behind } = fastGetAheadBehind(worktreePath, mainBranch);
+          
+          if ((cached.status.ahead || 0) !== ahead || (cached.status.behind || 0) !== behind) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    } catch {
+      // On any error, assume we need to refresh
+      return true;
+    }
+  }
+
+  /**
    * Fetch git status for a session
    */
   private async fetchGitStatus(sessionId: string): Promise<GitStatus | null> {
@@ -473,38 +469,54 @@ export class GitStatusManager extends EventEmitter {
         return null;
       }
 
-      // Get uncommitted changes
-      const uncommittedDiff = await this.gitDiffManager.captureWorkingDirectoryDiff(session.worktreePath);
-      const hasUncommittedChanges = uncommittedDiff.stats.filesChanged > 0;
+      // Use fast plumbing commands for initial checks
+      const quickStatus = fastCheckWorkingDirectory(session.worktreePath);
+      const hasUncommittedChanges = quickStatus.hasModified || quickStatus.hasStaged;
+      const hasUntrackedFiles = quickStatus.hasUntracked;
+      const hasMergeConflicts = quickStatus.hasConflicts;
       
-      // Check for untracked files
-      const untrackedResult = this.getUntrackedFiles(session.worktreePath);
-      const hasUntrackedFiles = untrackedResult.success ? untrackedResult.output! : false;
+      // Get uncommitted changes details only if needed
+      let uncommittedDiff = { stats: { filesChanged: 0, additions: 0, deletions: 0 } };
+      if (hasUncommittedChanges) {
+        // Use fast diff stats instead of full diff capture when possible
+        const quickStats = fastGetDiffStats(session.worktreePath);
+        uncommittedDiff = {
+          stats: {
+            filesChanged: quickStats.filesChanged,
+            additions: quickStats.additions,
+            deletions: quickStats.deletions
+          }
+        };
+      }
       
-      // Get ahead/behind status
+      // Get ahead/behind status using fast plumbing command
       const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
-      
-      const revListResult = this.getRevListCount(session.worktreePath, mainBranch);
-      const ahead = revListResult.success ? revListResult.output!.ahead : 0;
-      const behind = revListResult.success ? revListResult.output!.behind : 0;
+      const { ahead, behind } = fastGetAheadBehind(session.worktreePath, mainBranch);
 
       // Get total additions/deletions for all commits in the branch (compared to main)
       let totalCommitAdditions = 0;
       let totalCommitDeletions = 0;
       let totalCommitFilesChanged = 0;
       if (ahead > 0) {
-        const diffStatsResult = this.getDiffStats(session.worktreePath, mainBranch);
-        if (diffStatsResult.success && diffStatsResult.output) {
-          totalCommitFilesChanged = diffStatsResult.output.filesChanged;
-          totalCommitAdditions = diffStatsResult.output.additions;
-          totalCommitDeletions = diffStatsResult.output.deletions;
+        // Use git diff --shortstat for commit statistics
+        try {
+          const statLine = execSync(`git diff --shortstat ${mainBranch}...HEAD`, { cwd: session.worktreePath }).toString().trim();
+          if (statLine) {
+            const filesMatch = statLine.match(/(\d+) files? changed/);
+            const additionsMatch = statLine.match(/(\d+) insertions?\(\+\)/);
+            const deletionsMatch = statLine.match(/(\d+) deletions?\(-\)/);
+            
+            totalCommitFilesChanged = filesMatch ? parseInt(filesMatch[1], 10) : 0;
+            totalCommitAdditions = additionsMatch ? parseInt(additionsMatch[1], 10) : 0;
+            totalCommitDeletions = deletionsMatch ? parseInt(deletionsMatch[1], 10) : 0;
+          }
+        } catch {
+          // Keep defaults of 0 if command fails
         }
       }
 
-      // Check for rebase or merge conflicts
+      // Check for rebase in progress
       let isRebasing = false;
-      const conflictResult = this.checkMergeConflicts(session.worktreePath);
-      const hasMergeConflicts = conflictResult.success ? conflictResult.output! : false;
       
       // Check for rebase in progress using filesystem APIs
       const rebaseMergeExists = existsSync(join(session.worktreePath, '.git', 'rebase-merge'));
@@ -542,8 +554,13 @@ export class GitStatusManager extends EventEmitter {
       const isReadyToMerge = ahead > 0 && !hasUncommittedChanges && !hasUntrackedFiles && behind === 0;
 
       // Get total number of commits in the branch
-      const commitCountResult = this.getTotalCommitCount(session.worktreePath, mainBranch);
-      const totalCommits = commitCountResult.success ? commitCountResult.output! : ahead;
+      let totalCommits = ahead;
+      try {
+        const countStr = execSync(`git rev-list --count ${mainBranch}..HEAD`, { cwd: session.worktreePath }).toString().trim();
+        totalCommits = parseInt(countStr, 10) || ahead;
+      } catch {
+        // Keep default of ahead if command fails
+      }
 
       const result = {
         state,

@@ -4,13 +4,47 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { SessionManager } from '../../sessionManager';
+import type { ConversationMessage } from '../../../database/models';
 import { findExecutableInPath } from '../../../utils/shellPath';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { DEFAULT_CODEX_MODEL, getCodexModelConfig } from '../../../../../shared/types/models';
 import type { CodexPanelState } from '../../../../../shared/types/panels';
+import type { ToolPanel } from '../../../../../shared/types/panels';
 import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { panelManager } from '../../panelManager';
-import { DEFAULT_STRUCTURED_PROMPT_TEMPLATE } from '../../../../../shared/types';
+import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
+
+interface CodexDebugState {
+  pid?: number;
+  isConnected: boolean;
+  sessionId: string;
+  panelId: string;
+  worktreePath?: string;
+  codexSessionId?: string;
+  processState: string;
+  model?: string;
+  modelProvider?: string;
+  totalMessagesReceived: number;
+  totalMessagesSent: number;
+}
+
+interface SessionInfoMessage {
+  type: string;
+  initial_prompt: string;
+  original_prompt: string;
+  codex_command: string;
+  worktree_path: string;
+  model: string;
+  model_provider?: string;
+  approval_policy?: string;
+  sandbox_mode?: boolean | string;
+  permission_mode?: string;
+  resume_session_id?: string;
+  is_resume?: boolean;
+  web_search?: boolean;
+  timestamp?: string;
+}
 
 interface CodexSpawnOptions {
   panelId: string;
@@ -28,6 +62,7 @@ interface CodexSpawnOptions {
   webSearch?: boolean;
   isResume?: boolean;
   resumeSessionId?: string;
+  [key: string]: unknown; // Allow CLI-specific options
 }
 
 interface CodexProcess {
@@ -51,7 +86,7 @@ export class CodexManager extends AbstractCliManager {
   private originalPrompts: Map<string, string> = new Map(); // Track original prompts per panel
   
   constructor(
-    sessionManager: any,
+    sessionManager: SessionManager,
     logger?: Logger,
     configManager?: ConfigManager
   ) {
@@ -99,9 +134,10 @@ export class CodexManager extends AbstractCliManager {
           version,
           path: command
         };
-      } catch (directError: any) {
+      } catch (directError: unknown) {
         // Check if it's a shebang/node error
-        const errorMsg = directError.message || String(directError);
+        const error = directError as { message?: string };
+        const errorMsg = error.message || String(directError);
         const isShebangError = errorMsg.includes('env: node:') || 
                                errorMsg.includes('No such file or directory') ||
                                errorMsg.includes('is not recognized') ||
@@ -126,7 +162,7 @@ export class CodexManager extends AbstractCliManager {
             this.logger?.info(`[codex] Codex version detected via Node.js fallback: ${version}`);
             
             // Store that we need Node.js fallback
-            (global as any).codexNeedsNodeFallback = true;
+            (global as typeof global & { codexNeedsNodeFallback?: boolean }).codexNeedsNodeFallback = true;
             this.logger?.info('[codex] Node.js fallback mode enabled for future executions');
             
             return {
@@ -134,8 +170,9 @@ export class CodexManager extends AbstractCliManager {
               version,
               path: command
             };
-          } catch (nodeError: any) {
-            const nodeErrorMsg = nodeError.message || String(nodeError);
+          } catch (nodeError: unknown) {
+            const nodeErr = nodeError as { message?: string };
+            const nodeErrorMsg = nodeErr.message || String(nodeError);
             this.logger?.error(`[codex] Node.js fallback also failed: ${nodeErrorMsg}`);
             throw new Error(`Codex execution failed. Original error: ${errorMsg}. Node.js fallback error: ${nodeErrorMsg}`);
           }
@@ -179,7 +216,7 @@ export class CodexManager extends AbstractCliManager {
     const dbSession = this.sessionManager.getDbSession(options.sessionId);
     
     // Enhance prompt for structured commit mode if needed
-    const finalPrompt = this.enhancePromptForStructuredCommit(prompt, dbSession);
+    const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: options.sessionId }, this.logger);
 
     const args: string[] = ['exec', '--json'];
 
@@ -254,7 +291,7 @@ export class CodexManager extends AbstractCliManager {
       webSearch
     } = params;
 
-    const sessionInfoMessage: Record<string, any> = {
+    const sessionInfoMessage: SessionInfoMessage = {
       type: 'session_info',
       initial_prompt: prompt,
       original_prompt: prompt, // Store original prompt separately for transformer use
@@ -300,7 +337,7 @@ export class CodexManager extends AbstractCliManager {
 
   protected async getCliExecutablePath(): Promise<string> {
     // Check for custom path in config
-    const config = this.configManager?.getConfig() as any;
+    const config = this.configManager?.getConfig();
     const customPath = config?.codexExecutablePath;
     if (customPath) {
       this.logger?.info(`[codex] Using custom Codex executable path: ${customPath}`);
@@ -320,14 +357,14 @@ export class CodexManager extends AbstractCliManager {
     panelId: string;
     sessionId: string;
     type: 'json' | 'stdout' | 'stderr';
-    data: any;
+    data: unknown;
     timestamp: Date;
   }> {
     const events: Array<{
       panelId: string;
       sessionId: string;
       type: 'json' | 'stdout' | 'stderr';
-      data: any;
+      data: unknown;
       timestamp: Date;
     }> = [];
 
@@ -355,10 +392,11 @@ export class CodexManager extends AbstractCliManager {
           // Check if we already have a session ID stored
           let existingSessionId: string | undefined;
           if (this.sessionManager) {
-            const db = (this.sessionManager as any).db;
+            const db = this.sessionManager.db;
             if (db) {
               const panel = db.getPanel(panelId);
-              existingSessionId = panel?.state?.customState?.codexSessionId;
+              const customState = panel?.state?.customState as Record<string, unknown> | undefined;
+              existingSessionId = (customState?.agentSessionId as string) || (customState?.codexSessionId as string);
             }
           }
           
@@ -398,19 +436,23 @@ export class CodexManager extends AbstractCliManager {
           
           // Store the session ID in the panel's custom state (similar to Claude)
           if (this.sessionManager) {
-            const db = (this.sessionManager as any).db;
+            const db = this.sessionManager.db;
             if (db) {
               const panel = db.getPanel(panelId);
               if (panel) {
                 // Check if we already have a session ID stored
                 const currentState = panel.state || {};
-                const customState = currentState.customState || {};
+                const customState = (currentState.customState as Record<string, unknown>) || {};
                 
                 // Only update if we don't have one - never overwrite existing session IDs
-                if (!customState.codexSessionId) {
+                if (!customState.agentSessionId && !customState.codexSessionId) {
                   const updatedState = {
                     ...currentState,
-                    customState: { ...customState, codexSessionId }
+                    customState: { 
+                      ...customState, 
+                      agentSessionId: codexSessionId, // Use new generic field
+                      codexSessionId  // Keep legacy field for backward compatibility
+                    }
                   };
                   // Use panelManager to update so cache is properly updated
                   // Schedule the update asynchronously since parseCliOutput is not async
@@ -478,7 +520,7 @@ export class CodexManager extends AbstractCliManager {
     const env: { [key: string]: string } = {};
     
     // Get API key from environment or config
-    const config = this.configManager?.getConfig() as any;
+    const config = this.configManager?.getConfig();
     const apiKey = process.env.OPENAI_API_KEY || config?.openaiApiKey;
     if (apiKey) {
       env.OPENAI_API_KEY = apiKey;
@@ -535,80 +577,14 @@ export class CodexManager extends AbstractCliManager {
     ].join('\n');
   }
 
-  // Override spawnPtyProcess to handle Node.js fallback for Codex (similar to Claude)
+  // Codex now uses the base class spawnPtyProcess with Node.js fallback
+  // Override only to add Codex-specific logging
   protected async spawnPtyProcess(command: string, args: string[], cwd: string, env: { [key: string]: string }): Promise<import('@homebridge/node-pty-prebuilt-multiarch').IPty> {
-    const pty = await import('@homebridge/node-pty-prebuilt-multiarch');
-    
-    if (!pty) {
-      throw new Error('node-pty not available');
-    }
-
-    const fullCommand = `${command} ${args.join(' ')}`;
-    this.logger?.verbose(`[codex] Executing Codex command: ${fullCommand}`);
     this.logger?.info(`[session-id-debug] Spawning Codex in directory: ${cwd}`);
     this.logger?.info(`[session-id-debug] This is where ~/.codex/sessions will be created`);
-
-    let ptyProcess: import('@homebridge/node-pty-prebuilt-multiarch').IPty;
-    let spawnAttempt = 0;
-    let lastError: any;
-
-    // Try normal spawn first, then fallback to Node.js invocation if it fails
-    while (spawnAttempt < 2) {
-      try {
-        if (spawnAttempt === 0 && !(global as any).codexNeedsNodeFallback) {
-          // First attempt: normal spawn
-          ptyProcess = pty.spawn(command, args, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        } else {
-          // Second attempt or if we know we need Node.js: use Node.js directly
-          this.logger?.verbose(`[codex] Using Node.js fallback for Codex execution`);
-          
-          const nodePath = await findNodeExecutable();
-          this.logger?.verbose(`[codex] Using Node.js: ${nodePath}`);
-          
-          // Spawn with Node.js directly
-          const nodeArgs = [command, ...args];
-          ptyProcess = pty.spawn(nodePath, nodeArgs, {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env
-          });
-        }
-
-        this.logger?.verbose(`[codex] Process spawned successfully`);
-        return ptyProcess;
-      } catch (spawnError) {
-        lastError = spawnError;
-        spawnAttempt++;
-
-        if (spawnAttempt === 1 && !(global as any).codexNeedsNodeFallback) {
-          const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
-          this.logger?.error(`[codex] First spawn attempt failed: ${errorMsg}`);
-
-          // Check for typical shebang-related errors
-          if (errorMsg.includes('No such file or directory') ||
-              errorMsg.includes('env: node:') ||
-              errorMsg.includes('ENOENT')) {
-            this.logger?.verbose(`[codex] Error suggests shebang issue, will try Node.js fallback`);
-            (global as any).codexNeedsNodeFallback = true;
-            continue;
-          }
-        }
-        break;
-      }
-    }
-
-    // If we failed after all attempts, handle the error
-    const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
-    this.logger?.error(`[codex] Failed to spawn Codex process after ${spawnAttempt} attempts: ${errorMsg}`);
-    throw new Error(`Failed to spawn Codex: ${errorMsg}`);
+    
+    // Use the base class implementation which now handles Node.js fallback
+    return super.spawnPtyProcess(command, args, cwd, env);
   }
 
   // Public methods for panel interaction (similar to Claude's interface)
@@ -827,13 +803,13 @@ export class CodexManager extends AbstractCliManager {
             
             // Store in the panel state (but check if we're overwriting)
             if (this.sessionManager) {
-              const db = (this.sessionManager as any).db;
+              const db = this.sessionManager.db;
               if (db) {
                 const panel = db.getPanel(panelId);
                 if (panel) {
                   const currentState = panel.state || {};
-                  const customState = currentState.customState || {};
-                  const existingSessionId = customState.codexSessionId;
+                  const customState = (currentState.customState as Record<string, unknown>) || {};
+                  const existingSessionId = (customState.agentSessionId as string) || (customState.codexSessionId as string);
                   
                   if (existingSessionId) {
                     this.logger?.warn(`[session-id-debug] WARNING: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
@@ -842,7 +818,11 @@ export class CodexManager extends AbstractCliManager {
                   
                   const updatedState = { 
                     ...currentState, 
-                    customState: { ...customState, codexSessionId: sessionId } 
+                    customState: { 
+                      ...customState, 
+                      agentSessionId: sessionId, // Use new generic field
+                      codexSessionId: sessionId  // Keep legacy field for backward compatibility
+                    } 
                   };
                   
                   this.logger?.info(`[session-id-debug] About to update panel state with: ${JSON.stringify(updatedState)}`);
@@ -851,8 +831,8 @@ export class CodexManager extends AbstractCliManager {
                   
                   // Verify it was saved
                   const verifyPanel = panelManager.getPanel(panelId);
-                  const verifyCustomState = verifyPanel?.state?.customState as any;
-                  const savedSessionId = verifyCustomState?.codexSessionId;
+                  const verifyCustomState = verifyPanel?.state?.customState as CodexPanelState;
+                  const savedSessionId = verifyCustomState?.agentSessionId || verifyCustomState?.codexSessionId;
                   if (savedSessionId === sessionId) {
                     this.logger?.info(`[session-id-debug] ✅ Verified session ID was stored correctly: ${savedSessionId}`);
                   } else {
@@ -901,15 +881,15 @@ export class CodexManager extends AbstractCliManager {
             
             // Store in the panel state
             if (this.sessionManager) {
-              const db = (this.sessionManager as any).db;
+              const db = this.sessionManager.db;
               if (db) {
                 const panel = db.getPanel(panelId);
                 if (panel) {
                   const currentState = panel.state || {};
-                  const customState = currentState.customState || {};
+                  const customState = (currentState.customState as Record<string, unknown>) || {};
                   
                   // Check if session ID already exists
-                  const existingSessionId = customState.codexSessionId;
+                  const existingSessionId = (customState.agentSessionId as string) || (customState.codexSessionId as string);
                   if (existingSessionId) {
                     this.logger?.warn(`[session-id-debug] FALLBACK: Attempted to overwrite existing session ID ${existingSessionId} with ${sessionId} - BLOCKED`);
                     return; // Don't overwrite existing session ID
@@ -917,7 +897,11 @@ export class CodexManager extends AbstractCliManager {
                   
                   const updatedState = { 
                     ...currentState, 
-                    customState: { ...customState, codexSessionId: sessionId } 
+                    customState: { 
+                      ...customState, 
+                      agentSessionId: sessionId, // Use new generic field
+                      codexSessionId: sessionId  // Keep legacy field for backward compatibility
+                    } 
                   };
                   
                   this.logger?.info(`[session-id-debug] FALLBACK: About to update panel state with: ${JSON.stringify(updatedState)}`);
@@ -926,8 +910,8 @@ export class CodexManager extends AbstractCliManager {
                   
                   // Verify it was saved
                   const verifyPanel = panelManager.getPanel(panelId);
-                  const verifyCustomState = verifyPanel?.state?.customState as any;
-                  const savedSessionId = verifyCustomState?.codexSessionId;
+                  const verifyCustomState = verifyPanel?.state?.customState as CodexPanelState;
+                  const savedSessionId = verifyCustomState?.agentSessionId || verifyCustomState?.codexSessionId;
                   if (savedSessionId === sessionId) {
                     this.logger?.info(`[session-id-debug] ✅ FALLBACK: Verified session ID was stored correctly: ${savedSessionId}`);
                   } else {
@@ -954,10 +938,11 @@ export class CodexManager extends AbstractCliManager {
     sessionId: string,
     worktreePath: string,
     prompt: string,
-    conversationHistory: any[],
+    conversationHistory: ConversationMessage[],
     model?: string,
     modelProvider?: string,
     thinkingLevel?: 'low' | 'medium' | 'high',
+    approvalPolicy?: 'auto' | 'manual',
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access',
     webSearch?: boolean
   ): Promise<void> {
@@ -968,19 +953,21 @@ export class CodexManager extends AbstractCliManager {
     this.logger?.info(`[session-id-debug] Worktree: ${worktreePath}`);
     this.logger?.info(`[session-id-debug] New prompt: "${prompt}"`);
     this.logger?.info(`[session-id-debug] History items: ${conversationHistory.length}`);
+    this.logger?.info(`[session-id-debug] Passed approvalPolicy: ${approvalPolicy || 'undefined'}`);
     this.logger?.info(`[session-id-debug] Passed sandboxMode: ${sandboxMode || 'undefined'}`);
     this.logger?.info(`[session-id-debug] Passed webSearch: ${webSearch !== undefined ? webSearch : 'undefined'}`);
-    
+
     let panelState: CodexPanelState | undefined;
     // Try to get the session ID from the panel's custom state
     let codexSessionId = null;
     if (this.sessionManager) {
-      const db = (this.sessionManager as any).db;
+      const db = (this.sessionManager as { db?: { getPanel: (id: string) => { state?: { customState?: CodexPanelState } } | null } }).db;
       if (db) {
         const panel = db.getPanel(panelId);
         if (panel) {
           panelState = panel.state?.customState as CodexPanelState | undefined;
-          codexSessionId = panelState?.codexSessionId;
+          const customStateGeneric = panel.state?.customState as Record<string, unknown> | undefined;
+          codexSessionId = (customStateGeneric?.agentSessionId as string) || (customStateGeneric?.codexSessionId as string);
           this.logger?.info(`[session-id-debug] Retrieved from panel state: ${codexSessionId || 'null'}`);
           this.logger?.info(`[session-id-debug] Full panel state: ${JSON.stringify(panel.state)}`);
         } else {
@@ -1012,10 +999,10 @@ export class CodexManager extends AbstractCliManager {
       // Prefer the passed parameters over the saved panel state
       const resolvedModel = model || panelState?.model || DEFAULT_CODEX_MODEL;
       const resolvedModelProvider = modelProvider || panelState?.modelProvider || 'openai';
-      const resolvedApprovalPolicy = panelState?.approvalPolicy;
+      const resolvedApprovalPolicy = approvalPolicy ?? panelState?.approvalPolicy;
       const resolvedSandboxMode = sandboxMode !== undefined ? sandboxMode : (panelState?.sandboxMode || 'workspace-write');
       const resolvedWebSearch = webSearch !== undefined ? webSearch : (panelState?.webSearch || false);
-      
+
       this.logger?.info(`[session-id-debug] Resolved sandboxMode: ${resolvedSandboxMode}`);
       this.logger?.info(`[session-id-debug] Resolved webSearch: ${resolvedWebSearch}`);
 
@@ -1067,7 +1054,7 @@ export class CodexManager extends AbstractCliManager {
         model || panelState?.model,
         modelProvider || panelState?.modelProvider,
         thinkingLevel,
-        panelState?.approvalPolicy,
+        approvalPolicy ?? panelState?.approvalPolicy,
         sandboxMode !== undefined ? sandboxMode : panelState?.sandboxMode,
         webSearch !== undefined ? webSearch : panelState?.webSearch
       );
@@ -1088,7 +1075,7 @@ export class CodexManager extends AbstractCliManager {
     sessionId: string,
     worktreePath: string,
     initialPrompt: string,
-    conversationHistory: string[]
+    conversationHistory: ConversationMessage[]
   ): Promise<void> {
     // Kill existing process if it exists
     await this.killProcess(panelId);
@@ -1158,35 +1145,6 @@ export class CodexManager extends AbstractCliManager {
   }
 
   /**
-   * Enhance prompt for structured commit mode (similar to Claude implementation)
-   */
-  private enhancePromptForStructuredCommit(prompt: string, dbSession: any): string {
-    // Check if session has structured commit mode
-    if (dbSession?.commit_mode === 'structured') {
-      this.logger?.verbose(`Session ${dbSession.id} uses structured commit mode, enhancing prompt`);
-
-      let commitModeSettings;
-      if (dbSession.commit_mode_settings) {
-        try {
-          commitModeSettings = JSON.parse(dbSession.commit_mode_settings);
-        } catch (e) {
-          this.logger?.error(`Failed to parse commit mode settings: ${e}`);
-        }
-      }
-
-      // Get structured prompt template from settings or use default
-      const structuredPromptTemplate = commitModeSettings?.structuredPromptTemplate || DEFAULT_STRUCTURED_PROMPT_TEMPLATE;
-
-      // Add structured commit instructions to the prompt
-      const enhancedPrompt = `${prompt}\n\n${structuredPromptTemplate}`;
-      this.logger?.verbose(`Added structured commit instructions to prompt`);
-      return enhancedPrompt;
-    }
-
-    return prompt;
-  }
-
-  /**
    * Get the original prompt for a panel (before structured commit enhancement)
    */
   getOriginalPrompt(panelId: string): string | undefined {
@@ -1196,7 +1154,7 @@ export class CodexManager extends AbstractCliManager {
   /**
    * Get debug state information for a panel
    */
-  async getDebugState(panelId: string): Promise<any> {
+  async getDebugState(panelId: string): Promise<CodexDebugState> {
     this.logger?.info(`[codex] Getting debug state for panel ${panelId}`);
     
     const cliProcess = this.processes.get(panelId);
@@ -1227,22 +1185,24 @@ export class CodexManager extends AbstractCliManager {
     }
     
     // Get panel state for additional info
-    const panelState = panel?.state?.customState as any;
+    const panelState = panel?.state?.customState as CodexPanelState;
     
     // Get Codex session ID for resume capability
-    let codexSessionId = null;
+    let codexSessionId: string | undefined = undefined;
     
     // Try to get from panel's custom state first
-    if (panel?.state?.customState?.codexSessionId) {
-      codexSessionId = panel.state.customState.codexSessionId;
+    const panelCustomState = panel?.state?.customState as Record<string, unknown> | undefined;
+    if (panelCustomState?.agentSessionId || panelCustomState?.codexSessionId) {
+      codexSessionId = (panelCustomState.agentSessionId as string) || (panelCustomState.codexSessionId as string);
       this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from panel state: ${codexSessionId}`);
     } else if (this.sessionManager) {
       // Fallback to trying to get from sessionManager/db directly
-      const db = (this.sessionManager as any).db;
+      const db = (this.sessionManager as { db?: { getPanel: (id: string) => { state?: { customState?: CodexPanelState } } | null } }).db;
       if (db) {
         const dbPanel = db.getPanel(panelId);
-        if (dbPanel?.state?.customState?.codexSessionId) {
-          codexSessionId = dbPanel.state.customState.codexSessionId;
+        const dbPanelCustomState = dbPanel?.state?.customState as Record<string, unknown> | undefined;
+        if (dbPanelCustomState?.agentSessionId || dbPanelCustomState?.codexSessionId) {
+          codexSessionId = (dbPanelCustomState.agentSessionId as string) || (dbPanelCustomState.codexSessionId as string);
           this.logger?.info(`[session-id-debug] Debug state: Retrieved session ID from DB: ${codexSessionId}`);
         } else {
           this.logger?.info(`[session-id-debug] Debug state: No session ID found in DB for panel ${panelId}`);
@@ -1262,7 +1222,7 @@ export class CodexManager extends AbstractCliManager {
     // Get message statistics
     const outputs = this.sessionManager.getSessionOutputsForPanel(panelId);
     const messageStats = {
-      totalMessagesReceived: outputs.filter((o: any) => o.type === 'json').length,
+      totalMessagesReceived: outputs.filter((o: { type?: string }) => o.type === 'json').length,
       totalMessagesSent: 0, // Interactive mode doesn't track sent messages the same way
     };
     

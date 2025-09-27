@@ -38,10 +38,10 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
         if (elementRef.current) {
           elementRef.current.innerHTML = svg;
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Mermaid rendering error:', error);
         setHasError(true);
-        setErrorMessage(error?.message || 'Failed to render diagram');
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to render diagram');
         
         // Try to clean up mermaid's internal state
         try {

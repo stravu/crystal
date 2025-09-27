@@ -140,12 +140,17 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     async (type: ToolPanelType) => {
       if (!mainRepoSessionId) return;
       
-      await panelApi.createPanel({
+      const newPanel = await panelApi.createPanel({
         sessionId: mainRepoSessionId,
         type
       });
+      
+      // Immediately add the panel and set it as active
+      // The panel:created event will also fire, but addPanel checks for duplicates
+      addPanel(newPanel);
+      setActivePanelInStore(mainRepoSessionId, newPanel.id);
     },
-    [mainRepoSessionId]
+    [mainRepoSessionId, addPanel, setActivePanelInStore]
   );
   
   // Wrapped git operations

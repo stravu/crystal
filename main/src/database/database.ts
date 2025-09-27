@@ -2,7 +2,48 @@ import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, CreatePanelExecutionDiffData } from './models';
-import type { ToolPanel } from '../../../shared/types/panels';
+import type { ToolPanel, ToolPanelType, ToolPanelState, ToolPanelMetadata } from '../../../shared/types/panels';
+
+// Interface for legacy claude_panel_settings during migration
+interface ClaudePanelSetting {
+  id: number;
+  panel_id: string;
+  model?: string;
+  commit_mode?: boolean;
+  system_prompt?: string;
+  max_tokens?: number;
+  temperature?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Interface for tool panel database rows
+interface ToolPanelRow {
+  id: string;
+  session_id: string;
+  type: string;
+  title: string;
+  state: string | null;
+  metadata: string | null;
+  created_at: string;
+}
+
+// Interface for execution diff database rows
+interface ExecutionDiffRow {
+  id: number;
+  session_id: string;
+  prompt_marker_id?: number;
+  execution_sequence: number;
+  git_diff?: string;
+  files_changed?: string;
+  stats_additions: number;
+  stats_deletions: number;
+  stats_files_changed: number;
+  before_commit_hash?: string;
+  after_commit_hash?: string;
+  commit_message?: string;
+  timestamp: string;
+}
 
 export class DatabaseService {
   private db: Database.Database;
@@ -71,10 +112,28 @@ export class DatabaseService {
 
   private runMigrations(): void {
     // Check if archived column exists
-    const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasArchivedColumn = tableInfo.some((col: any) => col.name === 'archived');
-    const hasInitialPromptColumn = tableInfo.some((col: any) => col.name === 'initial_prompt');
-    const hasLastViewedAtColumn = tableInfo.some((col: any) => col.name === 'last_viewed_at');
+    interface SqliteTableInfo {
+      cid: number;
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: unknown;
+      pk: number;
+    }
+    
+    // Legacy project_folders table structure for migration
+    interface LegacyProjectFolder {
+      id: number;
+      name: string;
+      project_id: number;
+      display_order?: number;
+      created_at?: string;
+      updated_at?: string;
+    }
+    const tableInfo = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasArchivedColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'archived');
+    const hasInitialPromptColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'initial_prompt');
+    const hasLastViewedAtColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'last_viewed_at');
     
     if (!hasArchivedColumn) {
       // Run migration to add archived column
@@ -84,7 +143,7 @@ export class DatabaseService {
 
     // Check if we need to rename prompt to initial_prompt
     if (!hasInitialPromptColumn) {
-      const hasPromptColumn = tableInfo.some((col: any) => col.name === 'prompt');
+      const hasPromptColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'prompt');
       if (hasPromptColumn) {
         this.db.prepare("ALTER TABLE sessions RENAME COLUMN prompt TO initial_prompt").run();
       }
@@ -125,9 +184,9 @@ export class DatabaseService {
       this.db.prepare("CREATE INDEX idx_prompt_markers_timestamp ON prompt_markers(timestamp)").run();
     } else {
       // Check if the table has the correct column name
-      const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
-      const hasOutputLineColumn = promptMarkersInfo.some((col: any) => col.name === 'output_line');
-      const hasTerminalLineColumn = promptMarkersInfo.some((col: any) => col.name === 'terminal_line');
+      const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+      const hasOutputLineColumn = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'output_line');
+      const hasTerminalLineColumn = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'terminal_line');
       
       if (hasTerminalLineColumn && !hasOutputLineColumn) {
         // Rename the column from terminal_line to output_line
@@ -170,15 +229,15 @@ export class DatabaseService {
     }
 
     // Add commit_message column to execution_diffs if it doesn't exist
-    const executionDiffsTableInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all();
-    const hasCommitMessageColumn = executionDiffsTableInfo.some((col: any) => col.name === 'commit_message');
+    const executionDiffsTableInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all() as SqliteTableInfo[];
+    const hasCommitMessageColumn = executionDiffsTableInfo.some((col: SqliteTableInfo) => col.name === 'commit_message');
     if (!hasCommitMessageColumn) {
       this.db.prepare("ALTER TABLE execution_diffs ADD COLUMN commit_message TEXT").run();
     }
 
     // Check if claude_session_id column exists
-    const sessionTableInfoClaude = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasClaudeSessionIdColumn = sessionTableInfoClaude.some((col: any) => col.name === 'claude_session_id');
+    const sessionTableInfoClaude = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasClaudeSessionIdColumn = sessionTableInfoClaude.some((col: SqliteTableInfo) => col.name === 'claude_session_id');
     
     if (!hasClaudeSessionIdColumn) {
       // Add claude_session_id column to store Claude's actual session ID
@@ -186,7 +245,7 @@ export class DatabaseService {
     }
 
     // Check if permission_mode column exists
-    const hasPermissionModeColumn = sessionTableInfoClaude.some((col: any) => col.name === 'permission_mode');
+    const hasPermissionModeColumn = sessionTableInfoClaude.some((col: SqliteTableInfo) => col.name === 'permission_mode');
     
     if (!hasPermissionModeColumn) {
       // Add permission_mode column to sessions table
@@ -212,8 +271,8 @@ export class DatabaseService {
         `).run();
         
         // Add project_id to sessions table
-        const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all();
-        const hasProjectIdColumn = sessionsTableInfoProjects.some((col: any) => col.name === 'project_id');
+        const sessionsTableInfoProjects = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+        const hasProjectIdColumn = sessionsTableInfoProjects.some((col: SqliteTableInfo) => col.name === 'project_id');
         
         if (!hasProjectIdColumn) {
           this.db.prepare("ALTER TABLE sessions ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE").run();
@@ -249,8 +308,8 @@ export class DatabaseService {
     }
 
     // Add is_main_repo column to sessions table if it doesn't exist
-    const sessionTableInfoForMainRepo = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasIsMainRepoColumn = sessionTableInfoForMainRepo.some((col: any) => col.name === 'is_main_repo');
+    const sessionTableInfoForMainRepo = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasIsMainRepoColumn = sessionTableInfoForMainRepo.some((col: SqliteTableInfo) => col.name === 'is_main_repo');
     
     if (!hasIsMainRepoColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN is_main_repo BOOLEAN DEFAULT 0").run();
@@ -258,29 +317,29 @@ export class DatabaseService {
     }
 
     // Add main_branch column to projects table if it doesn't exist
-    const projectsTableInfo = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasMainBranchColumn = projectsTableInfo.some((col: any) => col.name === 'main_branch');
+    const projectsTableInfo = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasMainBranchColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'main_branch');
     
     if (!hasMainBranchColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN main_branch TEXT").run();
     }
 
     // Add build_script column to projects table if it doesn't exist
-    const hasBuildScriptColumn = projectsTableInfo.some((col: any) => col.name === 'build_script');
+    const hasBuildScriptColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'build_script');
     
     if (!hasBuildScriptColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN build_script TEXT").run();
     }
 
     // Add default_permission_mode column to projects table if it doesn't exist
-    const hasDefaultPermissionModeColumn = projectsTableInfo.some((col: any) => col.name === 'default_permission_mode');
+    const hasDefaultPermissionModeColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'default_permission_mode');
     
     if (!hasDefaultPermissionModeColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN default_permission_mode TEXT DEFAULT 'ignore' CHECK(default_permission_mode IN ('approve', 'ignore'))").run();
     }
 
     // Add open_ide_command column to projects table if it doesn't exist
-    const hasOpenIdeCommandColumn = projectsTableInfo.some((col: any) => col.name === 'open_ide_command');
+    const hasOpenIdeCommandColumn = projectsTableInfo.some((col: SqliteTableInfo) => col.name === 'open_ide_command');
     
     if (!hasOpenIdeCommandColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN open_ide_command TEXT").run();
@@ -315,10 +374,10 @@ export class DatabaseService {
     }
     
     // Check if display_order columns exist
-    const projectsTableInfo2 = this.db.prepare("PRAGMA table_info(projects)").all();
-    const sessionsTableInfo2 = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasProjectsDisplayOrder = projectsTableInfo2.some((col: any) => col.name === 'display_order');
-    const hasSessionsDisplayOrder = sessionsTableInfo2.some((col: any) => col.name === 'display_order');
+    const projectsTableInfo2 = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const sessionsTableInfo2 = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasProjectsDisplayOrder = projectsTableInfo2.some((col: SqliteTableInfo) => col.name === 'display_order');
+    const hasSessionsDisplayOrder = sessionsTableInfo2.some((col: SqliteTableInfo) => col.name === 'display_order');
     
     if (!hasProjectsDisplayOrder) {
       // Add display_order to projects
@@ -359,19 +418,19 @@ export class DatabaseService {
     
     // Normalize timestamp fields migration
     // Check if last_viewed_at is still TEXT type
-    const sessionTableInfoTimestamp = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const lastViewedAtColumn = sessionTableInfoTimestamp.find((col: any) => col.name === 'last_viewed_at') as any;
+    const sessionTableInfoTimestamp = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const lastViewedAtColumn = sessionTableInfoTimestamp.find((col: SqliteTableInfo) => col.name === 'last_viewed_at');
     
     // Skip this migration if last_viewed_at_new already exists (migration partially completed)
-    const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'last_viewed_at_new');
+    const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: SqliteTableInfo) => col.name === 'last_viewed_at_new');
     
     if (lastViewedAtColumn && lastViewedAtColumn.type === 'TEXT' && !hasLastViewedAtNew) {
       console.log('[Database] Running timestamp normalization migration...');
       
       try {
         // Check if the new columns already exist (from a previous failed migration)
-        const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'last_viewed_at_new');
-        const hasRunStartedAtNew = sessionTableInfoTimestamp.some((col: any) => col.name === 'run_started_at_new');
+        const hasLastViewedAtNew = sessionTableInfoTimestamp.some((col: SqliteTableInfo) => col.name === 'last_viewed_at_new');
+        const hasRunStartedAtNew = sessionTableInfoTimestamp.some((col: SqliteTableInfo) => col.name === 'run_started_at_new');
         
         // Create new temporary columns with DATETIME type if they don't exist
         if (!hasLastViewedAtNew) {
@@ -438,16 +497,16 @@ export class DatabaseService {
     }
     
     // Add missing completion_timestamp to prompt_markers if it doesn't exist
-    const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
-    const hasCompletionTimestamp = promptMarkersInfo.some((col: any) => col.name === 'completion_timestamp');
+    const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+    const hasCompletionTimestamp = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'completion_timestamp');
     
     if (!hasCompletionTimestamp) {
       this.db.prepare("ALTER TABLE prompt_markers ADD COLUMN completion_timestamp DATETIME").run();
     }
     
     // Add is_favorite column to sessions table if it doesn't exist
-    const sessionTableInfoFavorite = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasIsFavoriteColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'is_favorite');
+    const sessionTableInfoFavorite = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasIsFavoriteColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'is_favorite');
     
     if (!hasIsFavoriteColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN is_favorite BOOLEAN DEFAULT 0").run();
@@ -455,7 +514,7 @@ export class DatabaseService {
     }
 
     // Add auto_commit column to sessions table if it doesn't exist
-    const hasAutoCommitColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'auto_commit');
+    const hasAutoCommitColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'auto_commit');
     
     if (!hasAutoCommitColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN auto_commit BOOLEAN DEFAULT 1").run();
@@ -463,7 +522,7 @@ export class DatabaseService {
     }
 
     // Add skip_continue_next column to sessions table if it doesn't exist
-    const hasSkipContinueNextColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'skip_continue_next');
+    const hasSkipContinueNextColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'skip_continue_next');
     
     if (!hasSkipContinueNextColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN skip_continue_next BOOLEAN DEFAULT 0").run();
@@ -480,8 +539,8 @@ export class DatabaseService {
       
       // Check if the old folders table has INTEGER id
       if (foldersExists) {
-        const foldersInfo = this.db.prepare("PRAGMA table_info(folders)").all();
-        const idColumn = foldersInfo.find((col: any) => col.name === 'id') as any;
+        const foldersInfo = this.db.prepare("PRAGMA table_info(folders)").all() as SqliteTableInfo[];
+        const idColumn = foldersInfo.find((col: SqliteTableInfo) => col.name === 'id');
         
         if (idColumn && idColumn.type === 'INTEGER') {
           // Old folders table with INTEGER id exists, drop it
@@ -504,7 +563,7 @@ export class DatabaseService {
       `).run();
       
       // Migrate data from project_folders to folders
-      const projectFolders = this.db.prepare('SELECT * FROM project_folders').all() as any[];
+      const projectFolders = this.db.prepare('SELECT * FROM project_folders').all() as LegacyProjectFolder[];
       console.log(`[Database] Migrating ${projectFolders.length} folders from project_folders to folders table...`);
       
       for (const folder of projectFolders) {
@@ -527,8 +586,8 @@ export class DatabaseService {
       console.log('[Database] Dropped legacy project_folders table');
       
       // Update sessions table folder_id column type if needed
-      const sessionTableInfo = this.db.prepare("PRAGMA table_info(sessions)").all();
-      const folderIdColumn = sessionTableInfo.find((col: any) => col.name === 'folder_id') as any;
+      const sessionTableInfo = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+      const folderIdColumn = sessionTableInfo.find((col: SqliteTableInfo) => col.name === 'folder_id');
       
       if (folderIdColumn && folderIdColumn.type === 'INTEGER') {
         console.log('[Database] Converting sessions.folder_id from INTEGER to TEXT...');
@@ -608,7 +667,7 @@ export class DatabaseService {
     `).run();
 
     // Add folder_id column to sessions table if it doesn't exist
-    const hasFolderIdColumn = sessionTableInfoFavorite.some((col: any) => col.name === 'folder_id');
+    const hasFolderIdColumn = sessionTableInfoFavorite.some((col: SqliteTableInfo) => col.name === 'folder_id');
     
     if (!hasFolderIdColumn) {
       this.db.prepare('ALTER TABLE sessions ADD COLUMN folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL').run();
@@ -622,8 +681,8 @@ export class DatabaseService {
     }
 
     // Add parent_folder_id column to folders table for nested folders support
-    const foldersTableInfo = this.db.prepare("PRAGMA table_info(folders)").all();
-    const hasParentFolderIdColumn = foldersTableInfo.some((col: any) => col.name === 'parent_folder_id');
+    const foldersTableInfo = this.db.prepare("PRAGMA table_info(folders)").all() as SqliteTableInfo[];
+    const hasParentFolderIdColumn = foldersTableInfo.some((col: SqliteTableInfo) => col.name === 'parent_folder_id');
     
     if (!hasParentFolderIdColumn) {
       this.db.prepare('ALTER TABLE folders ADD COLUMN parent_folder_id TEXT REFERENCES folders(id) ON DELETE CASCADE').run();
@@ -667,8 +726,8 @@ export class DatabaseService {
     }
 
     // Remove model column from sessions table if it exists (moved to panel level)
-    const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasModelColumn = sessionTableInfoModel.some((col: any) => col.name === 'model');
+    const sessionTableInfoModel = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasModelColumn = sessionTableInfoModel.some((col: SqliteTableInfo) => col.name === 'model');
     
     if (hasModelColumn) {
       // Note: SQLite doesn't support DROP COLUMN in older versions
@@ -677,8 +736,8 @@ export class DatabaseService {
     }
 
     // Add tool_type column to sessions table if it doesn't exist
-    const sessionTableInfoToolType = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasToolTypeColumn = sessionTableInfoToolType.some((col: any) => col.name === 'tool_type');
+    const sessionTableInfoToolType = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasToolTypeColumn = sessionTableInfoToolType.some((col: SqliteTableInfo) => col.name === 'tool_type');
 
     if (!hasToolTypeColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN tool_type TEXT DEFAULT 'claude'").run();
@@ -688,7 +747,7 @@ export class DatabaseService {
       try {
         // No longer detecting based on model since it's panel-level now
       } catch (error) {
-        console.error('[Database] Failed to backfill tool_type for Codex sessions:', error);
+        // Migration error handling removed - empty try/catch serves no purpose
       }
     }
 
@@ -732,8 +791,8 @@ export class DatabaseService {
     }
 
     // Add worktree_folder column to projects table if it doesn't exist
-    const projectsTableInfoWorktree = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasWorktreeFolderColumn = projectsTableInfoWorktree.some((col: any) => col.name === 'worktree_folder');
+    const projectsTableInfoWorktree = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasWorktreeFolderColumn = projectsTableInfoWorktree.some((col: SqliteTableInfo) => col.name === 'worktree_folder');
     
     if (!hasWorktreeFolderColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN worktree_folder TEXT").run();
@@ -741,8 +800,8 @@ export class DatabaseService {
     }
 
     // Add lastUsedModel column to projects table if it doesn't exist
-    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: any) => col.name === 'lastUsedModel');
+    const projectsTableInfoModel = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasLastUsedModelColumn = projectsTableInfoModel.some((col: SqliteTableInfo) => col.name === 'lastUsedModel');
     
     if (!hasLastUsedModelColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN lastUsedModel TEXT DEFAULT 'sonnet'").run();
@@ -750,9 +809,9 @@ export class DatabaseService {
     }
 
     // Add base_commit and base_branch columns to sessions table if they don't exist
-    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_commit');
-    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: any) => col.name === 'base_branch');
+    const sessionsTableInfoBase = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasBaseCommitColumn = sessionsTableInfoBase.some((col: SqliteTableInfo) => col.name === 'base_commit');
+    const hasBaseBranchColumn = sessionsTableInfoBase.some((col: SqliteTableInfo) => col.name === 'base_branch');
     
     if (!hasBaseCommitColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN base_commit TEXT").run();
@@ -765,10 +824,10 @@ export class DatabaseService {
     }
 
     // Add commit mode settings columns to projects table if they don't exist
-    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all();
-    const hasCommitModeColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
-    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_structured_prompt_template');
-    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: any) => col.name === 'commit_checkpoint_prefix');
+    const projectsTableInfoCommit = this.db.prepare("PRAGMA table_info(projects)").all() as SqliteTableInfo[];
+    const hasCommitModeColumn = projectsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_mode');
+    const hasCommitStructuredPromptTemplateColumn = projectsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_structured_prompt_template');
+    const hasCommitCheckpointPrefixColumn = projectsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_checkpoint_prefix');
     
     if (!hasCommitModeColumn) {
       this.db.prepare("ALTER TABLE projects ADD COLUMN commit_mode TEXT DEFAULT 'checkpoint'").run();
@@ -786,9 +845,9 @@ export class DatabaseService {
     }
 
     // Add commit mode settings columns to sessions table if they don't exist
-    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode');
-    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: any) => col.name === 'commit_mode_settings');
+    const sessionsTableInfoCommit = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasSessionCommitModeColumn = sessionsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_mode');
+    const hasSessionCommitModeSettingsColumn = sessionsTableInfoCommit.some((col: SqliteTableInfo) => col.name === 'commit_mode_settings');
     
     if (!hasSessionCommitModeColumn) {
       try {
@@ -850,8 +909,8 @@ export class DatabaseService {
     }
 
     // Add active_panel_id column to sessions table if it doesn't exist
-    const sessionsTableInfoPanel = this.db.prepare("PRAGMA table_info(sessions)").all();
-    const hasActivePanelIdColumn = sessionsTableInfoPanel.some((col: any) => col.name === 'active_panel_id');
+    const sessionsTableInfoPanel = this.db.prepare("PRAGMA table_info(sessions)").all() as SqliteTableInfo[];
+    const hasActivePanelIdColumn = sessionsTableInfoPanel.some((col: SqliteTableInfo) => col.name === 'active_panel_id');
     
     if (!hasActivePanelIdColumn) {
       this.db.prepare("ALTER TABLE sessions ADD COLUMN active_panel_id TEXT").run();
@@ -865,15 +924,15 @@ export class DatabaseService {
       
       try {
         // Step 1: Add panel_id columns to Claude tables if they don't exist
-        const sessionOutputsInfo = this.db.prepare("PRAGMA table_info(session_outputs)").all();
-        const conversationMessagesInfo = this.db.prepare("PRAGMA table_info(conversation_messages)").all();
-        const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all();
-        const executionDiffsInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all();
+        const sessionOutputsInfo = this.db.prepare("PRAGMA table_info(session_outputs)").all() as SqliteTableInfo[];
+        const conversationMessagesInfo = this.db.prepare("PRAGMA table_info(conversation_messages)").all() as SqliteTableInfo[];
+        const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+        const executionDiffsInfo = this.db.prepare("PRAGMA table_info(execution_diffs)").all() as SqliteTableInfo[];
 
-        const hasSessionOutputsPanelId = sessionOutputsInfo.some((col: any) => col.name === 'panel_id');
-        const hasConversationMessagesPanelId = conversationMessagesInfo.some((col: any) => col.name === 'panel_id');
-        const hasPromptMarkersPanelId = promptMarkersInfo.some((col: any) => col.name === 'panel_id');
-        const hasExecutionDiffsPanelId = executionDiffsInfo.some((col: any) => col.name === 'panel_id');
+        const hasSessionOutputsPanelId = sessionOutputsInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
+        const hasConversationMessagesPanelId = conversationMessagesInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
+        const hasPromptMarkersPanelId = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
+        const hasExecutionDiffsPanelId = executionDiffsInfo.some((col: SqliteTableInfo) => col.name === 'panel_id');
 
         if (!hasSessionOutputsPanelId) {
           this.db.prepare("ALTER TABLE session_outputs ADD COLUMN panel_id TEXT").run();
@@ -1055,6 +1114,68 @@ export class DatabaseService {
         // Don't throw - allow app to continue
       }
     }
+
+    // Migration 006: Unified panel settings storage
+    const unifiedSettingsMigrationComplete = this.db.prepare(
+      "SELECT value FROM user_preferences WHERE key = 'unified_panel_settings_migrated'"
+    ).get() as { value: string } | undefined;
+    
+    if (!unifiedSettingsMigrationComplete) {
+      console.log('[Database] Running migration 006: Unified panel settings storage');
+      
+      try {
+        // Step 1: Add settings column to tool_panels if it doesn't exist
+        const toolPanelsInfo = this.db.prepare("PRAGMA table_info(tool_panels)").all() as SqliteTableInfo[];
+        const hasSettingsColumn = toolPanelsInfo.some((col: SqliteTableInfo) => col.name === 'settings');
+        
+        if (!hasSettingsColumn) {
+          this.db.prepare("ALTER TABLE tool_panels ADD COLUMN settings TEXT DEFAULT '{}'").run();
+          console.log('[Database] Added settings column to tool_panels table');
+        }
+
+        // Step 2: Check if claude_panel_settings table exists
+        const claudePanelSettingsExists = this.db.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='claude_panel_settings'"
+        ).get();
+
+        if (claudePanelSettingsExists) {
+          // Migrate data from claude_panel_settings to unified settings
+          const claudeSettings = this.db.prepare("SELECT * FROM claude_panel_settings").all() as ClaudePanelSetting[];
+          
+          for (const setting of claudeSettings) {
+            const unifiedSettings = {
+              model: setting.model || 'auto',
+              commitMode: Boolean(setting.commit_mode),
+              systemPrompt: setting.system_prompt,
+              maxTokens: setting.max_tokens || 4096,
+              temperature: setting.temperature || 0.7,
+              createdAt: setting.created_at,
+              updatedAt: setting.updated_at
+            };
+            
+            this.db.prepare(`
+              UPDATE tool_panels 
+              SET settings = ?
+              WHERE id = ? AND type = 'claude'
+            `).run(JSON.stringify(unifiedSettings), setting.panel_id);
+            
+            console.log(`[Database] Migrated settings for Claude panel ${setting.panel_id}`);
+          }
+          
+          // Drop the old table
+          this.db.prepare("DROP TABLE claude_panel_settings").run();
+          console.log('[Database] Dropped claude_panel_settings table');
+        }
+
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('unified_panel_settings_migrated', 'true')").run();
+        console.log('[Database] Completed unified panel settings migration 006');
+        
+      } catch (error) {
+        console.error('[Database] Failed to run unified panel settings migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
   }
 
   // Project operations
@@ -1106,7 +1227,7 @@ export class DatabaseService {
 
   updateProject(id: number, updates: Partial<Omit<Project, 'id' | 'created_at'>>): Project | undefined {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
 
     if (updates.name !== undefined) {
       fields.push('name = ?');
@@ -1270,7 +1391,7 @@ export class DatabaseService {
 
   updateFolder(id: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }): void {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
     
     if (updates.name !== undefined) {
       fields.push('name = ?');
@@ -1404,7 +1525,7 @@ export class DatabaseService {
 
   updateRunCommand(id: number, updates: { command?: string; display_name?: string; order_index?: number }): ProjectRunCommand | undefined {
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
 
     if (updates.command !== undefined) {
       fields.push('command = ?');
@@ -1520,11 +1641,16 @@ export class DatabaseService {
     return this.db.prepare('SELECT * FROM sessions WHERE project_id = ? AND is_main_repo = 1 AND (archived = 0 OR archived IS NULL)').get(projectId) as Session | undefined;
   }
 
+  checkSessionNameExists(name: string): boolean {
+    const result = this.db.prepare('SELECT id FROM sessions WHERE (name = ? OR worktree_name = ?) LIMIT 1').get(name, name);
+    return result !== undefined;
+  }
+
   updateSession(id: string, data: UpdateSessionData): Session | undefined {
     console.log(`[Database] Updating session ${id} with data:`, data);
     
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -1991,7 +2117,10 @@ export class DatabaseService {
       data.commit_message || null
     );
 
-    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
+    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid) as ExecutionDiffRow | undefined;
+    if (!diff) {
+      throw new Error('Failed to retrieve created execution diff');
+    }
     return this.convertDbExecutionDiff(diff);
   }
 
@@ -2000,13 +2129,13 @@ export class DatabaseService {
       SELECT * FROM execution_diffs 
       WHERE session_id = ? 
       ORDER BY execution_sequence ASC
-    `).all(sessionId);
+    `).all(sessionId) as ExecutionDiffRow[];
     
-    return rows.map(this.convertDbExecutionDiff);
+    return rows.map(this.convertDbExecutionDiff.bind(this));
   }
 
   getExecutionDiff(id: number): ExecutionDiff | undefined {
-    const row = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(id);
+    const row = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(id) as ExecutionDiffRow | undefined;
     return row ? this.convertDbExecutionDiff(row) : undefined;
   }
 
@@ -2015,12 +2144,12 @@ export class DatabaseService {
       SELECT MAX(execution_sequence) as max_seq 
       FROM execution_diffs 
       WHERE session_id = ?
-    `).get(sessionId) as any;
+    `).get(sessionId) as { max_seq: number | null } | undefined;
     
     return (result?.max_seq || 0) + 1;
   }
 
-  private convertDbExecutionDiff(row: any): ExecutionDiff {
+  private convertDbExecutionDiff(row: ExecutionDiffRow): ExecutionDiff {
     return {
       id: row.id,
       session_id: row.session_id,
@@ -2061,7 +2190,10 @@ export class DatabaseService {
       data.commit_message || null
     );
 
-    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid);
+    const diff = this.db.prepare('SELECT * FROM execution_diffs WHERE id = ?').get(result.lastInsertRowid) as ExecutionDiffRow | undefined;
+    if (!diff) {
+      throw new Error('Failed to retrieve created panel execution diff');
+    }
     return this.convertDbExecutionDiff(diff);
   }
 
@@ -2070,9 +2202,9 @@ export class DatabaseService {
       SELECT * FROM execution_diffs 
       WHERE panel_id = ? 
       ORDER BY execution_sequence ASC
-    `).all(panelId);
+    `).all(panelId) as ExecutionDiffRow[];
     
-    return rows.map(this.convertDbExecutionDiff);
+    return rows.map(this.convertDbExecutionDiff.bind(this));
   }
 
   getNextPanelExecutionSequence(panelId: string): number {
@@ -2080,7 +2212,7 @@ export class DatabaseService {
       SELECT MAX(execution_sequence) as max_seq 
       FROM execution_diffs 
       WHERE panel_id = ?
-    `).get(panelId) as any;
+    `).get(panelId) as { max_seq: number | null } | undefined;
     
     return (result?.max_seq || 0) + 1;
   }
@@ -2141,7 +2273,7 @@ export class DatabaseService {
       name: string; 
       type: string; 
       notnull: number; 
-      dflt_value: any; 
+      dflt_value: unknown; 
       pk: number 
     }>;
     foreignKeys: Array<{
@@ -2168,7 +2300,7 @@ export class DatabaseService {
       name: string;
       type: string;
       notnull: number;
-      dflt_value: any;
+      dflt_value: unknown;
       pk: number;
     }>;
     
@@ -2236,7 +2368,7 @@ export class DatabaseService {
       FROM app_opens
       ORDER BY opened_at DESC
       LIMIT 1
-    `).get() as any;
+    `).get() as { opened_at: string; welcome_hidden: number; discord_shown: number } | undefined;
 
     if (!result) return null;
     
@@ -2292,8 +2424,8 @@ export class DatabaseService {
     sessionId: string;
     type: string;
     title: string;
-    state?: any;
-    metadata?: any;
+    state?: unknown;
+    metadata?: unknown;
   }): void {
     this.transaction(() => {
       const stateJson = data.state ? JSON.stringify(data.state) : null;
@@ -2308,8 +2440,8 @@ export class DatabaseService {
 
   updatePanel(panelId: string, updates: {
     title?: string;
-    state?: any;
-    metadata?: any;
+    state?: unknown;
+    metadata?: unknown;
   }): void {
     // Add debug logging to track panel state changes
     if (updates.state !== undefined) {
@@ -2322,7 +2454,7 @@ export class DatabaseService {
     
     this.transaction(() => {
       const setClauses: string[] = [];
-      const values: any[] = [];
+      const values: (string | number | boolean | null)[] = [];
       
       if (updates.title !== undefined) {
         setClauses.push('title = ?');
@@ -2373,8 +2505,8 @@ export class DatabaseService {
     sessionId: string;
     type: string;
     title: string;
-    state?: any;
-    metadata?: any;
+    state?: unknown;
+    metadata?: unknown;
   }): void {
     this.transaction(() => {
       // Create the panel
@@ -2392,43 +2524,61 @@ export class DatabaseService {
   }
 
   getPanel(panelId: string): ToolPanel | null {
-    const row = this.db.prepare('SELECT * FROM tool_panels WHERE id = ?').get(panelId) as any;
+    const row = this.db.prepare('SELECT * FROM tool_panels WHERE id = ?').get(panelId) as ToolPanelRow | undefined;
     
     if (!row) return null;
+    
+    // Check if this panel is the active one for its session
+    const activePanel = this.db.prepare('SELECT active_panel_id FROM sessions WHERE id = ?').get(row.session_id) as { active_panel_id: string | null } | undefined;
+    const isActive = activePanel?.active_panel_id === panelId;
+    
+    const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false, customState: {} };
+    // Update isActive based on whether this panel is the active one
+    state.isActive = isActive;
     
     return {
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state,
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     };
   }
 
   getPanelsForSession(sessionId: string): ToolPanel[] {
-    const rows = this.db.prepare('SELECT * FROM tool_panels WHERE session_id = ? ORDER BY created_at').all(sessionId) as any[];
+    const rows = this.db.prepare('SELECT * FROM tool_panels WHERE session_id = ? ORDER BY created_at').all(sessionId) as ToolPanelRow[];
     
-    return rows.map(row => ({
-      id: row.id,
-      sessionId: row.session_id,
-      type: row.type,
-      title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
-    }));
+    // Get the active panel ID for this session
+    const activePanel = this.db.prepare('SELECT active_panel_id FROM sessions WHERE id = ?').get(sessionId) as { active_panel_id: string | null } | undefined;
+    const activePanelId = activePanel?.active_panel_id;
+    
+    return rows.map(row => {
+      const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false, hasBeenViewed: false, customState: {} };
+      // Update isActive based on whether this panel is the active one
+      state.isActive = row.id === activePanelId;
+      
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        type: row.type as ToolPanelType,
+        title: row.title,
+        state,
+        metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
+      };
+    });
   }
 
   getAllPanels(): ToolPanel[] {
-    const rows = this.db.prepare('SELECT * FROM tool_panels ORDER BY created_at').all() as any[];
+    const rows = this.db.prepare('SELECT * FROM tool_panels ORDER BY created_at').all() as ToolPanelRow[];
     
     return rows.map(row => ({
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     }));
   }
 
@@ -2438,15 +2588,15 @@ export class DatabaseService {
       JOIN sessions s ON tp.session_id = s.id
       WHERE s.archived = 0 OR s.archived IS NULL
       ORDER BY tp.created_at
-    `).all() as any[];
+    `).all() as ToolPanelRow[];
     
     return rows.map(row => ({
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state: row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: false },
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     }));
   }
 
@@ -2459,17 +2609,21 @@ export class DatabaseService {
       SELECT tp.* FROM tool_panels tp
       JOIN sessions s ON s.active_panel_id = tp.id
       WHERE s.id = ?
-    `).get(sessionId) as any;
+    `).get(sessionId) as ToolPanelRow | undefined;
     
     if (!row) return null;
+    
+    const state = row.state ? JSON.parse(row.state) as ToolPanelState : { isActive: true, hasBeenViewed: false };
+    // This panel is the active one by definition (we joined on active_panel_id)
+    state.isActive = true;
     
     return {
       id: row.id,
       sessionId: row.session_id,
-      type: row.type,
+      type: row.type as ToolPanelType,
       title: row.title,
-      state: row.state ? JSON.parse(row.state) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      state,
+      metadata: row.metadata ? JSON.parse(row.metadata) as ToolPanelMetadata : { createdAt: row.created_at, lastActiveAt: row.created_at, position: 0 }
     };
   }
 
@@ -2477,7 +2631,73 @@ export class DatabaseService {
     this.db.prepare('DELETE FROM tool_panels WHERE session_id = ?').run(sessionId);
   }
 
-  // Claude panel settings operations
+  // ========== UNIFIED PANEL SETTINGS OPERATIONS ==========
+  // These methods store all panel-specific settings as JSON in the tool_panels.settings column
+  // This provides a flexible, extensible way to store settings without schema changes
+
+  /**
+   * Get panel settings from the unified JSON storage
+   * Returns the parsed settings object or an empty object if none exist
+   */
+  getPanelSettings(panelId: string): Record<string, unknown> {
+    const row = this.db.prepare(`
+      SELECT settings FROM tool_panels WHERE id = ?
+    `).get(panelId) as { settings?: string } | undefined;
+
+    if (!row || !row.settings) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(row.settings);
+    } catch (e) {
+      console.error(`Failed to parse settings for panel ${panelId}:`, e);
+      return {};
+    }
+  }
+
+  /**
+   * Update panel settings in the unified JSON storage
+   * Merges the provided settings with existing ones
+   */
+  updatePanelSettings(panelId: string, settings: Record<string, unknown>): void {
+    // Get existing settings
+    const existingSettings = this.getPanelSettings(panelId);
+    
+    // Merge with new settings
+    const mergedSettings = {
+      ...existingSettings,
+      ...settings,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Update the database
+    this.db.prepare(`
+      UPDATE tool_panels
+      SET settings = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(JSON.stringify(mergedSettings), panelId);
+  }
+
+  /**
+   * Set panel settings (replaces all existing settings)
+   */
+  setPanelSettings(panelId: string, settings: Record<string, unknown>): void {
+    const settingsWithTimestamp = {
+      ...settings,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.db.prepare(`
+      UPDATE tool_panels
+      SET settings = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(JSON.stringify(settingsWithTimestamp), panelId);
+  }
+
+  // ========== LEGACY CLAUDE PANEL SETTINGS (for backward compatibility) ==========
+  // These will be deprecated but are kept for migration purposes
+
   createClaudePanelSettings(panelId: string, settings: {
     model?: string;
     commit_mode?: boolean;
@@ -2485,21 +2705,14 @@ export class DatabaseService {
     max_tokens?: number;
     temperature?: number;
   }): void {
-    // Get the default model from config if not provided
-    const { configManager } = require('../services/configManager');
-    const defaultModel = settings.model || configManager.getDefaultModel() || 'claude-3-opus-20240229';
-    
-    this.db.prepare(`
-      INSERT INTO claude_panel_settings (panel_id, model, commit_mode, system_prompt, max_tokens, temperature)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      panelId,
-      defaultModel,
-      settings.commit_mode ? 1 : 0,
-      settings.system_prompt || null,
-      settings.max_tokens || 4096,
-      settings.temperature || 0.7
-    );
+    // Use the new unified settings storage
+    this.updatePanelSettings(panelId, {
+      model: settings.model || 'auto',
+      commitMode: settings.commit_mode || false,
+      systemPrompt: settings.system_prompt || null,
+      maxTokens: settings.max_tokens || 4096,
+      temperature: settings.temperature || 0.7
+    });
   }
 
   getClaudePanelSettings(panelId: string): {
@@ -2512,21 +2725,23 @@ export class DatabaseService {
     created_at: string;
     updated_at: string;
   } | null {
-    const row = this.db.prepare(`
-      SELECT * FROM claude_panel_settings WHERE panel_id = ?
-    `).get(panelId) as any;
+    const settings = this.getPanelSettings(panelId);
+    
+    if (!settings || Object.keys(settings).length === 0) {
+      return null;
+    }
 
-    if (!row) return null;
-
+    // Convert from new format to old format for compatibility
+    const s = settings as Record<string, unknown>;
     return {
-      panel_id: row.panel_id,
-      model: row.model,
-      commit_mode: Boolean(row.commit_mode),
-      system_prompt: row.system_prompt,
-      max_tokens: row.max_tokens,
-      temperature: row.temperature,
-      created_at: row.created_at,
-      updated_at: row.updated_at
+      panel_id: panelId,
+      model: (typeof s.model === 'string' ? s.model : null) || 'auto',
+      commit_mode: (typeof s.commitMode === 'boolean' ? s.commitMode : null) || false,
+      system_prompt: (typeof s.systemPrompt === 'string' ? s.systemPrompt : null) || null,
+      max_tokens: (typeof s.maxTokens === 'number' ? s.maxTokens : null) || 4096,
+      temperature: (typeof s.temperature === 'number' ? s.temperature : null) || 0.7,
+      created_at: (typeof s.createdAt === 'string' ? s.createdAt : null) || new Date().toISOString(),
+      updated_at: (typeof s.updatedAt === 'string' ? s.updatedAt : null) || new Date().toISOString()
     };
   }
 
@@ -2537,44 +2752,15 @@ export class DatabaseService {
     max_tokens?: number;
     temperature?: number;
   }): void {
-    const setClauses: string[] = [];
-    const values: any[] = [];
-
-    if (settings.model !== undefined) {
-      setClauses.push('model = ?');
-      values.push(settings.model);
-    }
-
-    if (settings.commit_mode !== undefined) {
-      setClauses.push('commit_mode = ?');
-      values.push(settings.commit_mode ? 1 : 0);
-    }
-
-    if (settings.system_prompt !== undefined) {
-      setClauses.push('system_prompt = ?');
-      values.push(settings.system_prompt);
-    }
-
-    if (settings.max_tokens !== undefined) {
-      setClauses.push('max_tokens = ?');
-      values.push(settings.max_tokens);
-    }
-
-    if (settings.temperature !== undefined) {
-      setClauses.push('temperature = ?');
-      values.push(settings.temperature);
-    }
-
-    if (setClauses.length > 0) {
-      setClauses.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(panelId);
-
-      this.db.prepare(`
-        UPDATE claude_panel_settings
-        SET ${setClauses.join(', ')}
-        WHERE panel_id = ?
-      `).run(...values);
-    }
+    const updateObj: Record<string, unknown> = {};
+    
+    if (settings.model !== undefined) updateObj.model = settings.model;
+    if (settings.commit_mode !== undefined) updateObj.commitMode = settings.commit_mode;
+    if (settings.system_prompt !== undefined) updateObj.systemPrompt = settings.system_prompt;
+    if (settings.max_tokens !== undefined) updateObj.maxTokens = settings.max_tokens;
+    if (settings.temperature !== undefined) updateObj.temperature = settings.temperature;
+    
+    this.updatePanelSettings(panelId, updateObj);
   }
 
   deleteClaudePanelSettings(panelId: string): void {
@@ -2594,7 +2780,7 @@ export class DatabaseService {
       FROM session_outputs 
       WHERE session_id = ? AND type = 'json'
       ORDER BY timestamp ASC
-    `).all(sessionId);
+    `).all(sessionId) as { data: string }[];
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -2602,7 +2788,7 @@ export class DatabaseService {
     let totalCacheCreationTokens = 0;
     let messageCount = 0;
 
-    rows.forEach((row: any) => {
+    rows.forEach((row: { data: string }) => {
       try {
         const data = JSON.parse(row.data);
         if (data.input_tokens) {
@@ -2640,7 +2826,7 @@ export class DatabaseService {
       FROM session_outputs
       WHERE session_id = ?
       GROUP BY type
-    `).all(sessionId);
+    `).all(sessionId) as { type: string; count: number }[];
 
     const counts: { json: number; stdout: number; stderr: number } = {
       json: 0,
@@ -2648,7 +2834,7 @@ export class DatabaseService {
       stderr: 0
     };
 
-    result.forEach((row: any) => {
+    result.forEach((row: { type: string; count: number }) => {
       if (row.type in counts) {
         counts[row.type as keyof typeof counts] = row.count;
       }
@@ -2662,7 +2848,7 @@ export class DatabaseService {
       SELECT COUNT(*) as count 
       FROM conversation_messages 
       WHERE session_id = ?
-    `).get(sessionId) as any;
+    `).get(sessionId) as { count: number } | undefined;
     
     return result?.count || 0;
   }
@@ -2672,7 +2858,7 @@ export class DatabaseService {
       SELECT COUNT(*) as count 
       FROM conversation_messages 
       WHERE panel_id = ?
-    `).get(panelId) as any;
+    `).get(panelId) as { count: number } | undefined;
     
     return result?.count || 0;
   }
@@ -2694,7 +2880,7 @@ export class DatabaseService {
       FROM session_outputs 
       WHERE session_id = ? AND type = 'json'
       ORDER BY timestamp ASC
-    `).all(sessionId);
+    `).all(sessionId) as { data: string; timestamp: string }[];
 
     const toolStats = new Map<string, {
       count: number;
@@ -2708,17 +2894,18 @@ export class DatabaseService {
     let totalToolCalls = 0;
 
     // Process each message
-    toolUseRows.forEach((row: any, index: number) => {
+    toolUseRows.forEach((row: { data: string; timestamp: string }, index: number) => {
       try {
         const data = JSON.parse(row.data);
         
         // Check if this is a tool_use message
         if (data.type === 'assistant' && data.message?.content) {
-          data.message.content.forEach((content: any) => {
-            if (content.type === 'tool_use' && content.name) {
+          data.message.content.forEach((content: unknown) => {
+            const contentObj = content as { type?: string; name?: string; id?: string };
+            if (contentObj.type === 'tool_use' && contentObj.name) {
               totalToolCalls++;
-              const toolName = content.name;
-              const toolId = content.id;
+              const toolName = contentObj.name!;
+              const toolId = contentObj.id;
               
               if (!toolStats.has(toolName)) {
                 toolStats.set(toolName, {
@@ -2732,7 +2919,9 @@ export class DatabaseService {
               
               const stats = toolStats.get(toolName)!;
               stats.count++;
-              stats.pendingCalls.set(toolId, row.timestamp);
+              if (toolId) {
+                stats.pendingCalls.set(toolId, row.timestamp);
+              }
               
               // Add token usage if available
               if (data.message.usage) {
@@ -2745,13 +2934,14 @@ export class DatabaseService {
         
         // Check if this is a tool_result message
         if (data.type === 'user' && data.message?.content) {
-          data.message.content.forEach((content: any) => {
-            if (content.type === 'tool_result' && content.tool_use_id) {
+          data.message.content.forEach((content: unknown) => {
+            const contentObj = content as { type?: string; tool_use_id?: string };
+            if (contentObj.type === 'tool_result' && contentObj.tool_use_id) {
               // Find which tool this result belongs to
               for (const [toolName, stats] of toolStats.entries()) {
-                if (stats.pendingCalls.has(content.tool_use_id)) {
-                  const startTime = stats.pendingCalls.get(content.tool_use_id)!;
-                  stats.pendingCalls.delete(content.tool_use_id);
+                if (stats.pendingCalls.has(contentObj.tool_use_id)) {
+                  const startTime = stats.pendingCalls.get(contentObj.tool_use_id)!;
+                  stats.pendingCalls.delete(contentObj.tool_use_id);
                   
                   // Calculate duration in milliseconds
                   const start = new Date(startTime).getTime();

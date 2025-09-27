@@ -3,14 +3,15 @@ import { Card } from '../ui/Card';
 import { Checkbox } from '../ui/Input';
 import { Shield, ShieldOff, Sparkles, Brain, Target, Zap, Paperclip, X, FileText } from 'lucide-react';
 import FilePathAutocomplete from '../FilePathAutocomplete';
+import type { AttachedImage, AttachedText } from '../../types/session';
 
 export interface ClaudeCodeConfig {
   prompt?: string;
   model: 'auto' | 'sonnet' | 'opus' | 'haiku';
   permissionMode: 'ignore' | 'approve';
   ultrathink?: boolean;
-  attachedImages?: any[];
-  attachedTexts?: any[];
+  attachedImages?: AttachedImage[];
+  attachedTexts?: AttachedText[];
 }
 
 interface ClaudeCodeConfigProps {
@@ -34,7 +35,7 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const processFile = async (file: File): Promise<any | null> => {
+  const processFile = async (file: File): Promise<AttachedImage | null> => {
     const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     if (!file.type.startsWith('image/')) {

@@ -16,19 +16,19 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ panel, isActive }) => {
   // Listen for output events
   useEffect(() => {
     // TODO: Implement event listeners for logs panel output
-    // const handleOutput = (_: any, data: { panelId: string; content: string; type: string }) => {
+    // const handleOutput = (_: Electron.IpcRendererEvent, data: { panelId: string; content: string; type: string }) => {
     //   if (data.panelId === panel.id) {
     //     setOutput(prev => [...prev, data.content]);
     //   }
     // };
     
-    // const handleProcessEnd = (_: any, data: { panelId: string; exitCode: number | null }) => {
+    // const handleProcessEnd = (_: Electron.IpcRendererEvent, data: { panelId: string; exitCode: number | null }) => {
     //   if (data.panelId === panel.id) {
     //     setIsRunning(false);
     //   }
     // };
     
-    // const handleProcessStart = (_: any, data: { panelId: string }) => {
+    // const handleProcessStart = (_: Electron.IpcRendererEvent, data: { panelId: string }) => {
     //   if (data.panelId === panel.id) {
     //     setIsRunning(true);
     //     setOutput([]); // Clear output when starting new process

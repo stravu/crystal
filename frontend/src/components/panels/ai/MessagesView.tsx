@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API } from '../../../utils/api';
 import { cn } from '../../../utils/cn';
 import { ChevronRight, ChevronDown, Copy, Check, Terminal, FileText } from 'lucide-react';
+import { SessionOutput } from '../../../types/session';
 
 interface MessagesViewProps {
   panelId: string;
@@ -47,15 +48,15 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   useEffect(() => {
     const loadMessages = async () => {
       try {
-        let response: any;
+        let response: { success: boolean; data?: JSONMessage[] };
         
         // Use appropriate method based on agent type
         if (getMessagesHandler && window.electron) {
           // For Codex and other IPC-based panels
           const outputs = await window.electron.invoke(getMessagesHandler, panelId);
           const jsonMessages = outputs
-            .filter((output: any) => output.type === 'json')
-            .map((output: any) => ({
+            .filter((output: SessionOutput) => output.type === 'json')
+            .map((output: SessionOutput) => ({
               type: 'json' as const,
               data: typeof output.data === 'object' ? JSON.stringify(output.data) : output.data,
               timestamp: output.timestamp || new Date().toISOString()
@@ -71,10 +72,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           const regularMessages: JSONMessage[] = [];
           let foundSessionInfo: SessionInfo | null = null;
           
-          response.data.forEach((msg: any) => {
+          response.data.forEach((msg: JSONMessage) => {
             try {
               // Try to parse the message data to check its type
-              let msgData: any;
+              let msgData: unknown;
               if (typeof msg === 'string') {
                 try {
                   msgData = JSON.parse(msg);
@@ -95,13 +96,16 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               }
               
               // Check if this is a session_info message
-              if (msgData && msgData.type === 'session_info') {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- External protocol message with dynamic structure
+              if (msgData && typeof msgData === 'object' && 'type' in msgData && (msgData as any).type === 'session_info') {
                 foundSessionInfo = msgData as SessionInfo;
-              } else if (msgData && msgData.msg && msgData.msg.type === 'session_configured') {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex protocol messages have varying nested structures
+              } else if (msgData && typeof msgData === 'object' && 'msg' in msgData && typeof (msgData as any).msg === 'object' && (msgData as any).msg !== null && 'type' in (msgData as any).msg && (msgData as any).msg.type === 'session_configured') {
                 // Handle Codex session configuration
                 foundSessionInfo = {
                   type: 'session_info',
-                  model: msgData.msg.model || 'default',
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic Codex protocol field
+                  model: (msgData as any).msg.model || 'default',
                   timestamp: msg.timestamp || new Date().toISOString()
                 };
               } else {
@@ -138,12 +142,15 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
   // Subscribe to new messages
   useEffect(() => {
-    const handleOutput = (data: any) => {
-      const detail = data.detail || data;
-      if ((detail.panelId === panelId || detail.sessionId === panelId) && detail.type === 'json') {
+    const handleOutput = (data: CustomEvent<{ panelId?: string; sessionId?: string; type?: string; data?: unknown; timestamp?: string }> | { panelId?: string; sessionId?: string; type?: string; data?: unknown; timestamp?: string; detail?: { panelId?: string; sessionId?: string; type?: string; data?: unknown; timestamp?: string } }) => {
+      const detail = 'detail' in data ? data.detail : data;
+      if (!detail || (!detail.panelId && !detail.sessionId) || detail.type !== 'json') {
+        return;
+      }
+      if ((detail.panelId === panelId || detail.sessionId === panelId)) {
         try {
           // Check if this is a session_info message
-          let parsedData: any;
+          let parsedData: unknown;
           if (typeof detail.data === 'string') {
             try {
               parsedData = JSON.parse(detail.data);
@@ -151,7 +158,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               // If it's not valid JSON, treat as regular message
               setMessages(prev => [...prev, {
                 type: 'json',
-                data: detail.data,
+                data: String(detail.data || ''),
                 timestamp: detail.timestamp || new Date().toISOString()
               }]);
               return;
@@ -160,19 +167,22 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             parsedData = detail.data;
           }
           
-          if (parsedData && parsedData.type === 'session_info') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- External protocol message with dynamic structure
+          if (parsedData && typeof parsedData === 'object' && 'type' in parsedData && (parsedData as any).type === 'session_info') {
             setSessionInfo(parsedData as SessionInfo);
-          } else if (parsedData && parsedData.msg && parsedData.msg.type === 'session_configured') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex protocol messages have varying nested structures
+          } else if (parsedData && typeof parsedData === 'object' && 'msg' in parsedData && typeof (parsedData as any).msg === 'object' && (parsedData as any).msg !== null && 'type' in (parsedData as any).msg && (parsedData as any).msg.type === 'session_configured') {
             // Handle Codex session configuration
             setSessionInfo({
               type: 'session_info',
-              model: parsedData.msg.model || 'default',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic Codex protocol field
+              model: (parsedData as any).msg.model || 'default',
               timestamp: detail.timestamp || new Date().toISOString()
             });
           } else {
             setMessages(prev => [...prev, {
               type: 'json',
-              data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data),
+              data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data || {}),
               timestamp: detail.timestamp || new Date().toISOString()
             }]);
             

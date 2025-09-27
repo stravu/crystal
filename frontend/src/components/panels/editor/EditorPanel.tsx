@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FileEditor } from './FileEditor';
 import { EditorPanelState, ToolPanel } from '../../../../../shared/types/panels';
 import { panelApi } from '../../../services/panelApi';
-import { debounce } from '../../../utils/debounce';
+import { debounce, type DebouncedFunction } from '../../../utils/debounce';
 
 interface EditorPanelProps {
   panel: ToolPanel;
@@ -49,10 +49,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   }, [isActive, isInitialized]);
   
   // Use ref to store the debounced function so it doesn't get recreated
-  const debouncedUpdateRef = useRef<any>(null);
+  const debouncedUpdateRef = useRef<DebouncedFunction<(panelId: string, newState: Partial<EditorPanelState>) => void> | null>(null);
   
-  // Initialize debounced function only once
-  useEffect(() => {
+  // Initialize debounced function immediately to prevent warning
+  if (!debouncedUpdateRef.current) {
     debouncedUpdateRef.current = debounce((panelId: string, newState: Partial<EditorPanelState>) => {
       console.log('[EditorPanel] Saving state to database:', {
         panelId,
@@ -78,12 +78,28 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         console.error('[EditorPanel] Failed to update editor panel state:', err);
       });
     }, 500);
-    
-    // Cleanup on unmount
+  }
+  
+  // Cleanup effect for debounced function - flush pending saves on unmount
+  useEffect(() => {
     return () => {
-      if (debouncedUpdateRef.current?.cancel) {
-        debouncedUpdateRef.current.cancel();
+      if (debouncedUpdateRef.current?.flush) {
+        debouncedUpdateRef.current.flush(); // Save any pending changes before unmount
       }
+    };
+  }, []); // Empty deps - only create once
+  
+  // Also flush pending saves when switching sessions
+  useEffect(() => {
+    const handleSessionSwitch = () => {
+      if (debouncedUpdateRef.current?.flush) {
+        debouncedUpdateRef.current.flush(); // Save before switching sessions
+      }
+    };
+    
+    window.addEventListener('session-switched', handleSessionSwitch);
+    return () => {
+      window.removeEventListener('session-switched', handleSessionSwitch);
     };
   }, []); // Empty deps - only create once
   

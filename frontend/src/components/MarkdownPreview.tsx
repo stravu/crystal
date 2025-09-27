@@ -3,6 +3,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MermaidRenderer } from './MermaidRenderer';
 
+interface CodeComponentProps extends React.HTMLAttributes<HTMLElement> {
+  node?: unknown;
+  className?: string;
+  children?: React.ReactNode;
+}
+
 interface MarkdownPreviewProps {
   content: string;
   className?: string;
@@ -22,7 +28,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content, class
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ node, className, children, ...props }: any) {
+          code({ node, className, children, ...props }: CodeComponentProps) {
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : '';
             const codeString = String(children).replace(/\n$/, '');

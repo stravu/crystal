@@ -1,6 +1,6 @@
 import Bull from 'bull';
 import { SimpleQueue } from './simpleTaskQueue';
-import type { SessionManager } from './sessionManager';
+import { SessionManager } from './sessionManager';
 import type { WorktreeManager } from './worktreeManager';
 import { WorktreeNameGenerator } from './worktreeNameGenerator';
 import type { AbstractCliManager } from './panels/cli/AbstractCliManager';
@@ -10,6 +10,10 @@ import { formatForDisplay } from '../utils/timestampUtils';
 import * as os from 'os';
 import { panelManager } from './panelManager';
 import { getCodexModelConfig } from '../../../shared/types/models';
+import type { Session } from '../types/session';
+import type { ToolPanel } from '../../../shared/types/panels';
+import type { DatabaseService } from '../database/database';
+import type { Project } from '../database/models';
 
 interface TaskQueueOptions {
   sessionManager: SessionManager;
@@ -40,6 +44,11 @@ interface CreateSessionJob {
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
     webSearch?: boolean;
     thinkingLevel?: 'low' | 'medium' | 'high';
+  };
+  claudeConfig?: {
+    model?: string;
+    permissionMode?: 'approve' | 'ignore';
+    ultrathink?: boolean;
   };
 }
 
@@ -109,19 +118,25 @@ export class TaskQueue {
     }
     
     // Add event handlers for debugging
-    this.sessionQueue.on('active', (job: any) => {
-      console.log(`[TaskQueue] Job ${job.id} is active`);
+    this.sessionQueue.on('active', (...args: unknown[]) => {
+      const job = args[0] as { id: string | number };
+      // Job active tracking removed - verbose debug logging
     });
     
-    this.sessionQueue.on('completed', (job: any, result: any) => {
-      console.log(`[TaskQueue] Job ${job.id} completed:`, result);
+    this.sessionQueue.on('completed', (...args: unknown[]) => {
+      const job = args[0] as { id: string | number };
+      const result = args[1];
+      // Job completion tracking removed - verbose debug logging
     });
     
-    this.sessionQueue.on('failed', (job: any, err: any) => {
+    this.sessionQueue.on('failed', (...args: unknown[]) => {
+      const job = args[0] as { id: string | number };
+      const err = args[1] as Error;
       console.error(`[TaskQueue] Job ${job.id} failed:`, err);
     });
     
-    this.sessionQueue.on('error', (error: any) => {
+    this.sessionQueue.on('error', (...args: unknown[]) => {
+      const error = args[0] as Error;
       console.error('[TaskQueue] Queue error:', error);
     });
 
@@ -136,10 +151,10 @@ export class TaskQueue {
     const sessionConcurrency = isLinux ? 1 : 5;
     
     this.sessionQueue.process(sessionConcurrency, async (job) => {
-      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig } = job.data;
+      const { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch, autoCommit, toolType, codexConfig, claudeConfig } = job.data;
       const { sessionManager, worktreeManager, claudeCodeManager } = this.options;
 
-      console.log(`[TaskQueue] Processing session creation job ${job.id}`, { prompt, worktreeTemplate, index, permissionMode, projectId, baseBranch });
+      // Processing session creation job - verbose debug logging removed
 
       try {
         let targetProject;
@@ -165,17 +180,16 @@ export class TaskQueue {
         if (!worktreeName || worktreeName.trim() === '') {
           // If this is part of a multi-session creation (has index), the base name should have been generated already
           if (index !== undefined && index >= 0) {
-            console.log(`[TaskQueue] Multi-session creation detected (index ${index}), using fallback name`);
+            // Multi-session creation detected - verbose debug logging removed
             worktreeName = 'session';
             sessionName = 'Session';
           } else {
-            console.log(`[TaskQueue] No worktree template provided, generating name from prompt...`);
+            // No worktree template provided - verbose debug logging removed
             // Use the AI-powered name generator to generate a session name with spaces
             sessionName = await this.options.worktreeNameGenerator.generateSessionName(prompt);
             // Convert the session name to a worktree name (spaces to hyphens)
             worktreeName = sessionName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            console.log(`[TaskQueue] Generated session name: ${sessionName}`);
-            console.log(`[TaskQueue] Generated worktree name: ${worktreeName}`);
+            // Generated names - verbose debug logging removed
           }
         } else {
           // If we have a worktree template, use it as the session name as-is
@@ -231,7 +245,12 @@ export class TaskQueue {
         
         // Attach codexConfig to the session object for the panel creation in events.ts
         if (codexConfig) {
-          (session as any).codexConfig = codexConfig;
+          (session as Session & { codexConfig?: typeof codexConfig }).codexConfig = codexConfig;
+        }
+        
+        // Attach claudeConfig to the session object for the panel creation in events.ts
+        if (claudeConfig) {
+          (session as Session & { claudeConfig?: typeof claudeConfig }).claudeConfig = claudeConfig;
         }
 
         // Only add prompt-related data if there's actually a prompt
@@ -299,7 +318,7 @@ export class TaskQueue {
               await new Promise(resolve => setTimeout(resolve, 200));
               const { panelManager } = require('./panelManager');
               const existingPanels = panelManager.getPanelsForSession(session.id);
-              codexPanel = existingPanels.find((p: any) => p.type === 'codex');
+              codexPanel = existingPanels.find((p: ToolPanel) => p.type === 'codex');
               attempts++;
             }
 
@@ -353,7 +372,7 @@ export class TaskQueue {
               await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
               const { panelManager } = require('./panelManager');
               const existingPanels = panelManager.getPanelsForSession(session.id);
-              claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+              claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
               attempts++;
             }
             
@@ -392,7 +411,6 @@ export class TaskQueue {
               }
             } else {
               console.error(`[TaskQueue] No Claude panel found for session ${session.id} after ${maxAttempts} attempts`);
-              console.error(`[TaskQueue] This indicates the panel creation failed in events.ts. Cannot proceed without a real panel.`);
               throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
             }
           } else {
@@ -415,7 +433,7 @@ export class TaskQueue {
       // Find the Claude panel for this session
       const { panelManager } = require('./panelManager');
       const existingPanels = panelManager.getPanelsForSession(sessionId);
-      const claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+      const claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
       
       if (!claudePanel) {
         throw new Error(`No Claude panel found for session ${sessionId}`);
@@ -443,7 +461,7 @@ export class TaskQueue {
       // Find the Claude panel for this session
       const { panelManager } = require('./panelManager');
       const existingPanels = panelManager.getPanelsForSession(sessionId);
-      const claudePanel = existingPanels.find((p: any) => p.type === 'claude');
+      const claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
       
       if (!claudePanel) {
         throw new Error(`No Claude panel found for session ${sessionId}`);
@@ -465,7 +483,7 @@ export class TaskQueue {
     });
   }
 
-  async createSession(data: CreateSessionJob): Promise<Bull.Job<CreateSessionJob> | any> {
+  async createSession(data: CreateSessionJob): Promise<Bull.Job<CreateSessionJob> | { id: string; data: CreateSessionJob; status: string }> {
     console.log('[TaskQueue] Adding session creation job to queue:', data);
     const job = await this.sessionQueue.add(data);
     console.log('[TaskQueue] Job added successfully with ID:', job.id);
@@ -490,8 +508,13 @@ export class TaskQueue {
       sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
       webSearch?: boolean;
       thinkingLevel?: 'low' | 'medium' | 'high';
+    },
+    claudeConfig?: {
+      model?: string;
+      permissionMode?: 'approve' | 'ignore';
+      ultrathink?: boolean;
     }
-  ): Promise<(Bull.Job<CreateSessionJob> | any)[]> {
+  ): Promise<(Bull.Job<CreateSessionJob> | { id: string; data: CreateSessionJob; status: string })[]> {
     let folderId: string | undefined;
     let generatedBaseName: string | undefined;
     
@@ -510,7 +533,7 @@ export class TaskQueue {
     if (count > 1 && projectId) {
       try {
         const { sessionManager } = this.options;
-        const db = (sessionManager as any).db;
+        const db = sessionManager.db as DatabaseService;
         const folderName = worktreeTemplate || generatedBaseName || 'Multi-session prompt';
         
         console.log(`[TaskQueue] Creating folder for multi-session prompt. ProjectId: ${projectId}, type: ${typeof projectId}`);
@@ -548,22 +571,22 @@ export class TaskQueue {
     for (let i = 0; i < count; i++) {
       // Use the generated base name if no template was provided
       const templateToUse = worktreeTemplate || generatedBaseName || '';
-      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, toolType, commitMode, commitModeSettings, codexConfig }));
+      jobs.push(this.sessionQueue.add({ prompt, worktreeTemplate: templateToUse, index: i, permissionMode, projectId, folderId, baseBranch, autoCommit, toolType, commitMode, commitModeSettings, codexConfig, claudeConfig }));
     }
     return Promise.all(jobs);
   }
 
-  async sendInput(sessionId: string, input: string): Promise<Bull.Job<SendInputJob> | any> {
+  async sendInput(sessionId: string, input: string): Promise<Bull.Job<SendInputJob> | { id: string; data: SendInputJob; status: string }> {
     return this.inputQueue.add({ sessionId, input });
   }
 
-  async continueSession(sessionId: string, prompt: string): Promise<Bull.Job<ContinueSessionJob> | any> {
+  async continueSession(sessionId: string, prompt: string): Promise<Bull.Job<ContinueSessionJob> | { id: string; data: ContinueSessionJob; status: string }> {
     return this.continueQueue.add({ sessionId, prompt });
   }
 
   private async ensureUniqueSessionName(baseName: string, index?: number): Promise<string> {
     const { sessionManager } = this.options;
-    const db = (sessionManager as any).db;
+    const db = sessionManager.db;
     
     let candidateName = baseName;
     
@@ -578,13 +601,7 @@ export class TaskQueue {
     
     while (true) {
       // Check both active and archived sessions
-      const existingSession = db.db.prepare(`
-        SELECT id FROM sessions 
-        WHERE (name = ? OR worktree_name = ?)
-        LIMIT 1
-      `).get(uniqueName, uniqueName);
-      
-      if (!existingSession) {
+      if (!db.checkSessionNameExists(uniqueName)) {
         break;
       }
       
@@ -600,9 +617,9 @@ export class TaskQueue {
     return uniqueName;
   }
 
-  private async ensureUniqueNames(baseSessionName: string, baseWorktreeName: string, project: any, index?: number): Promise<{ sessionName: string; worktreeName: string }> {
+  private async ensureUniqueNames(baseSessionName: string, baseWorktreeName: string, project: Project, index?: number): Promise<{ sessionName: string; worktreeName: string }> {
     const { sessionManager, worktreeManager } = this.options;
-    const db = (sessionManager as any).db;
+    const db = sessionManager.db;
     
     let candidateSessionName = baseSessionName;
     let candidateWorktreeName = baseWorktreeName;
@@ -619,20 +636,11 @@ export class TaskQueue {
     let uniqueWorktreeName = candidateWorktreeName;
     
     while (true) {
-      // Check session name and worktree name separately
+      // Check session name and worktree name separately using public methods
       // This is important because different session names could map to the same worktree name
       // e.g., "Fix Auth Bug" and "Fix-Auth-Bug" both become "fix-auth-bug"
-      const sessionNameExists = db.db.prepare(`
-        SELECT id FROM sessions 
-        WHERE name = ?
-        LIMIT 1
-      `).get(uniqueSessionName);
-      
-      const worktreeNameExists = db.db.prepare(`
-        SELECT id FROM sessions 
-        WHERE worktree_name = ?
-        LIMIT 1
-      `).get(uniqueWorktreeName);
+      const sessionNameExists = db.checkSessionNameExists(uniqueSessionName);
+      const worktreeNameExists = db.checkSessionNameExists(uniqueWorktreeName);
       
       // Check if worktree directory exists on filesystem
       // This handles cases where a worktree was created outside of Crystal

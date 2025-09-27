@@ -233,7 +233,6 @@ function processPackage(packagePath, packageName, licenses, processedPaths) {
   
   // Skip packages that don't require attribution
   if (!requiresAttribution(packageInfo.license)) {
-    console.log(`Skipping ${packageInfo.name}@${packageInfo.version} (${packageInfo.license} - no attribution required)`);
     return;
   }
   
@@ -242,7 +241,6 @@ function processPackage(packagePath, packageName, licenses, processedPaths) {
   // Skip if we already have this exact version
   if (licenses.has(key)) return;
   
-  console.log(`Processing ${key} (${packageInfo.license})`);
   
   const { licenseText, licenseType } = getLicenseInfo(packagePath);
   if (licenseText) {

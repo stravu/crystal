@@ -1,5 +1,21 @@
 import { MessageTransformer, UnifiedMessage, ToolCall, ToolResult } from './MessageTransformer';
 
+// Interface for raw outputs from Codex (typically from database)
+interface CodexRawOutput {
+  type: 'json' | 'stdout' | 'stderr';
+  data: string | unknown;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+// Interface for text items from Codex user input
+interface CodexTextItem {
+  type: 'text';
+  text: string;
+}
+
+// Codex message structures are complex and dynamic, so we'll use 'any' for flexibility
+
 export class CodexMessageTransformer implements MessageTransformer {
   private messageIdCounter = 0;
   private toolCalls = new Map<string, ToolCall>();
@@ -17,7 +33,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return `tool_${this.toolCallIdCounter}`;
   }
 
-  private registerToolCall(providedId: string | undefined, name: string, input: any): ToolCall {
+  private registerToolCall(providedId: string | undefined, name: string, input: Record<string, unknown>): ToolCall {
     const id = providedId || this.createToolCallId();
     let toolCall = this.toolCalls.get(id);
 
@@ -114,7 +130,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return false;
   }
 
-  transform(rawOutputs: any[]): UnifiedMessage[] {
+  transform(rawOutputs: CodexRawOutput[]): UnifiedMessage[] {
     const messages: UnifiedMessage[] = [];
     this.resetToolCallState();
 
@@ -128,7 +144,7 @@ export class CodexMessageTransformer implements MessageTransformer {
     return messages;
   }
 
-  private parseOutput(output: any): UnifiedMessage | null {
+  private parseOutput(output: CodexRawOutput): UnifiedMessage | null {
     // Data should already be parsed when coming from database
     // Only parse if it's still a string (shouldn't happen with current setup)
     let parsedData = output.data;
@@ -159,14 +175,14 @@ export class CodexMessageTransformer implements MessageTransformer {
       }
       
       // Only return if there's actual content
-      if (parsedData && parsedData.trim()) {
+      if (parsedData && typeof parsedData === 'string' && parsedData.trim()) {
         return {
           id: `msg_${++this.messageIdCounter}`,
           role: 'system',
           timestamp: this.normalizeTimestamp(output.timestamp),
           segments: [{
             type: 'text',
-            content: parsedData
+            content: parsedData as string
           }],
           metadata: {
             agent: 'codex',
@@ -186,16 +202,26 @@ export class CodexMessageTransformer implements MessageTransformer {
     return null;
   }
 
-  private parseJsonMessage(message: any, timestamp?: string | Date): UnifiedMessage | null {
+  private parseJsonMessage(message: unknown, timestamp?: string | Date): UnifiedMessage | null {
+    // Type guard: ensure message is an object
+    if (typeof message !== 'object' || message === null) {
+      return null;
+    }
+    
+    // Cast message to a basic object type for property access
+    // We'll use type assertions with proper checks for each specific property
+    const msg = message as Record<string, unknown>;
     
     // Handle Codex protocol operations (user input)
-    if (message.op) {
-      const op = message.op;
+    if ('op' in msg) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex protocol operations have dynamic structure
+      const messageObj = message as { op: any };
+      const op = messageObj.op;
       
       if (op.type === 'user_input' && op.items) {
         // Extract text from items array
-        const textItems = op.items.filter((item: any) => item.type === 'text');
-        const content = textItems.map((item: any) => item.text).join('\n');
+        const textItems = op.items.filter((item: CodexTextItem) => item.type === 'text');
+        const content = textItems.map((item: CodexTextItem) => item.text).join('\n');
         
         // Use original prompt if available (for structured commit mode), otherwise use content as-is
         const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
@@ -217,26 +243,29 @@ export class CodexMessageTransformer implements MessageTransformer {
       }
     }
     
-    // Handle session info blocks that provide initial context
-    if (message.type === 'session_info') {
+    // Handle session info blocks that provide initial context  
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Session info messages from external CLI have varying structures
+    if (typeof message === 'object' && message !== null && 'type' in message && (message as any).type === 'session_info') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Need to access dynamic session info fields
+      const sessionInfoMessage = message as any;
       // Capture the original prompt for later use in user input messages
-      if (message.original_prompt || message.initial_prompt) {
-        this.originalPrompt = message.original_prompt || message.initial_prompt;
+      if (sessionInfoMessage.original_prompt || sessionInfoMessage.initial_prompt) {
+        this.originalPrompt = sessionInfoMessage.original_prompt || sessionInfoMessage.initial_prompt;
       }
       
       const sessionInfo = {
         type: 'session_info',
-        initialPrompt: message.initial_prompt,
-        codexCommand: message.codex_command,
-        claudeCommand: message.claude_command,
-        worktreePath: message.worktree_path,
-        model: message.model,
-        modelProvider: message.model_provider,
-        approvalPolicy: message.approval_policy ?? message.approval,
-        sandboxMode: message.sandbox_mode ?? message.sandbox,
-        permissionMode: message.permission_mode,
-        resumeSessionId: message.resume_session_id ?? message.resumeSessionId,
-        isResume: message.is_resume ?? message.isResume,
+        initialPrompt: sessionInfoMessage.initial_prompt,
+        codexCommand: sessionInfoMessage.codex_command,
+        claudeCommand: sessionInfoMessage.claude_command,
+        worktreePath: sessionInfoMessage.worktree_path,
+        model: sessionInfoMessage.model,
+        modelProvider: sessionInfoMessage.model_provider,
+        approvalPolicy: sessionInfoMessage.approval_policy ?? sessionInfoMessage.approval,
+        sandboxMode: sessionInfoMessage.sandbox_mode ?? sessionInfoMessage.sandbox,
+        permissionMode: sessionInfoMessage.permission_mode,
+        resumeSessionId: sessionInfoMessage.resume_session_id ?? sessionInfoMessage.resumeSessionId,
+        isResume: sessionInfoMessage.is_resume ?? sessionInfoMessage.isResume,
         timestamp: this.normalizeTimestamp(timestamp)
       };
 
@@ -257,8 +286,10 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     // Handle Codex protocol messages (responses)
-    if (message.msg) {
-      const msg = message.msg;
+    if (typeof message === 'object' && message !== null && 'msg' in message) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Codex response messages have dynamic structure
+      const messageObj = message as { msg: any };
+      const msg = messageObj.msg;
       
       // Filter out delta messages (streaming updates)
       if (msg.type === 'agent_reasoning_delta' || msg.type === 'agent_message_delta') {
@@ -640,13 +671,13 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
     
     // Filter out delta messages at the top level
-    if (message.type === 'agent_reasoning_delta' || message.type === 'agent_message_delta') {
+    if (msg.type === 'agent_reasoning_delta' || msg.type === 'agent_message_delta') {
       return null;
     }
     
     // Handle frontend-generated messages or direct protocol messages
-    if (message.type === 'user_input' || message.type === 'user') {
-      const content = message.content || message.text || JSON.stringify(message);
+    if (msg.type === 'user_input' || msg.type === 'user') {
+      const content = (typeof msg.content === 'string' ? msg.content : '') || (typeof msg.text === 'string' ? msg.text : '') || JSON.stringify(message);
       
       // Use original prompt if available (for structured commit mode), otherwise use content as-is
       const displayContent = this.originalPrompt && this.isEnhancedPrompt(content) 
@@ -667,14 +698,14 @@ export class CodexMessageTransformer implements MessageTransformer {
       };
     }
     
-    if (message.type === 'assistant_response' || message.type === 'assistant' || message.type === 'text') {
+    if (msg.type === 'assistant_response' || msg.type === 'assistant' || msg.type === 'text') {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'assistant',
         timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
-          content: message.content || message.text || JSON.stringify(message)
+          content: (typeof msg.content === 'string' ? msg.content : '') || (typeof msg.text === 'string' ? msg.text : '') || JSON.stringify(message)
         }],
         metadata: {
           agent: 'codex',
@@ -683,8 +714,12 @@ export class CodexMessageTransformer implements MessageTransformer {
       };
     }
 
-    if (message.type === 'tool_call') {
-      const toolCall = this.registerToolCall(message.call_id || message.id, message.name || 'unknown', message.arguments || message);
+    if (msg.type === 'tool_call') {
+      const toolCall = this.registerToolCall(
+        (typeof msg.call_id === 'string' ? msg.call_id : '') || (typeof msg.id === 'string' ? msg.id : ''), 
+        (typeof msg.name === 'string' ? msg.name : '') || 'unknown', 
+        (msg.arguments as Record<string, unknown>) || (message as Record<string, unknown>)
+      );
 
       return {
         id: `msg_${++this.messageIdCounter}`,
@@ -700,14 +735,14 @@ export class CodexMessageTransformer implements MessageTransformer {
       };
     }
     
-    if (message.type === 'system') {
+    if (msg.type === 'system') {
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: this.normalizeTimestamp(timestamp),
         segments: [{
           type: 'text',
-          content: message.message || JSON.stringify(message)
+          content: (typeof msg.message === 'string' ? msg.message : '') || JSON.stringify(message)
         }],
         metadata: {
           agent: 'codex'
@@ -716,16 +751,16 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     // Handle Codex runtime configuration summaries that don't include a type field
-    if (!message.type && (message.provider || message.model_provider) && message.model) {
+    if (!msg.type && (msg.provider || msg.model_provider) && msg.model) {
       const runtimeInfo = {
         type: 'session_runtime',
-        provider: message.provider || message.model_provider,
-        model: message.model,
-        sandboxMode: message.sandbox_mode ?? message.sandbox,
-        approvalPolicy: message.approval_policy ?? message.approval,
-        reasoningEffort: message['reasoning effort'] ?? message.reasoning_effort ?? message.reasoningEffort,
-        reasoningSummaries: message['reasoning summaries'] ?? message.reasoning_summaries ?? message.reasoningSummaries,
-        workdir: message.workdir || message.cwd,
+        provider: msg.provider || msg.model_provider,
+        model: msg.model,
+        sandboxMode: msg.sandbox_mode ?? msg.sandbox,
+        approvalPolicy: msg.approval_policy ?? msg.approval,
+        reasoningEffort: msg['reasoning effort'] ?? msg.reasoning_effort ?? msg.reasoningEffort,
+        reasoningSummaries: msg['reasoning summaries'] ?? msg.reasoning_summaries ?? msg.reasoningSummaries,
+        workdir: msg.workdir || msg.cwd,
         raw: message
       };
 
@@ -745,11 +780,11 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     // Handle plain prompt objects to show as user messages
-    if (typeof message.prompt === 'string' && message.prompt.trim()) {
+    if (typeof msg.prompt === 'string' && typeof msg.prompt === 'string' && msg.prompt.trim()) {
       // Use original prompt if available (for structured commit mode), otherwise use prompt as-is
-      const displayContent = this.originalPrompt && this.isEnhancedPrompt(message.prompt) 
+      const displayContent = this.originalPrompt && this.isEnhancedPrompt(msg.prompt as string) 
         ? this.originalPrompt 
-        : message.prompt;
+        : (msg.prompt as string);
       
       return {
         id: `msg_${++this.messageIdCounter}`,
@@ -767,14 +802,18 @@ export class CodexMessageTransformer implements MessageTransformer {
     }
 
     // Handle session messages (e.g., errors, status updates)
-    if (message.type === 'session' && message.data) {
-      const data = message.data;
+    if (msg.type === 'session' && msg.data) {
+      const data = msg.data as Record<string, unknown>;
+      
+      // Type guard helpers
+      const toString = (value: unknown): string => typeof value === 'string' ? value : '';
+      
       // Check if it's an error message
       if (data.status === 'error') {
         // Build the error message
-        let content = data.message || 'Session error';
+        let content = toString(data.message) || 'Session error';
         if (data.details) {
-          content = data.details; // The details field contains the full error message with instructions
+          content = toString(data.details); // The details field contains the full error message with instructions
         }
         
         return {
@@ -784,13 +823,13 @@ export class CodexMessageTransformer implements MessageTransformer {
           segments: [{
             type: 'error',
             error: {
-              message: data.message || 'Error',
+              message: toString(data.message) || 'Error',
               details: content
             }
           }],
           metadata: {
             agent: 'codex',
-            sessionStatus: data.status
+            sessionStatus: toString(data.status)
           }
         };
       }
@@ -804,14 +843,14 @@ export class CodexMessageTransformer implements MessageTransformer {
           type: 'system_info',
           info: {
             type: 'session_status',
-            status: data.status,
-            message: data.message || '',
-            details: data.details
+            status: toString(data.status),
+            message: toString(data.message) || '',
+            details: toString(data.details)
           }
         }],
         metadata: {
           agent: 'codex',
-          sessionStatus: data.status
+          sessionStatus: toString(data.status)
         }
       };
     }
@@ -828,13 +867,20 @@ export class CodexMessageTransformer implements MessageTransformer {
       metadata: {
         agent: 'codex',
         raw: true,
-        messageType: message.type || message.msg?.type || 'unknown'
+        messageType: (typeof message === 'object' && message !== null && 'type' in message) 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Extracting type from dynamic message structure
+          ? (message as any).type
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Extracting nested type from Codex protocol message
+          : (typeof message === 'object' && message !== null && 'msg' in message && typeof (message as any).msg === 'object' && (message as any).msg !== null && 'type' in (message as any).msg)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Accessing nested message type field
+            ? (message as any).msg.type
+            : 'unknown'
       }
     };
   }
 
-  parseMessage(raw: any): UnifiedMessage | null {
-    return this.parseOutput(raw);
+  parseMessage(raw: unknown): UnifiedMessage | null {
+    return this.parseOutput(raw as CodexRawOutput);
   }
 
   supportsStreaming(): boolean {

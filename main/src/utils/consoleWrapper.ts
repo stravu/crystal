@@ -1,7 +1,7 @@
 // Simple console wrapper to reduce logging in production
 // This follows the existing pattern in the codebase
 
-const isDevelopment = process.env.NODE_ENV !== 'production' && !(global as any).isPackaged;
+const isDevelopment = process.env.NODE_ENV !== 'production' && !((global as { isPackaged?: boolean }).isPackaged);
 
 // Store original console methods
 const originalConsole = {
@@ -13,7 +13,7 @@ const originalConsole = {
 };
 
 // Helper to check if a message should be logged
-function shouldLog(level: 'log' | 'info' | 'debug', args: any[]): boolean {
+function shouldLog(level: 'log' | 'info' | 'debug', args: unknown[]): boolean {
   if (args.length === 0) return false;
   const firstArg = args[0];
   if (typeof firstArg === 'string') {
@@ -51,19 +51,19 @@ function shouldLog(level: 'log' | 'info' | 'debug', args: any[]): boolean {
 
 // Override console methods
 export function setupConsoleWrapper() {
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     if (shouldLog('log', args)) {
       originalConsole.log(...args);
     }
   };
   
-  console.info = (...args: any[]) => {
+  console.info = (...args: unknown[]) => {
     if (shouldLog('info', args)) {
       originalConsole.info(...args);
     }
   };
   
-  console.debug = (...args: any[]) => {
+  console.debug = (...args: unknown[]) => {
     if (shouldLog('debug', args)) {
       originalConsole.debug(...args);
     }

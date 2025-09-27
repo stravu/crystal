@@ -13,7 +13,7 @@ export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState;
+  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | Record<string, unknown>;
 }
 
 export interface TerminalPanelState {
@@ -23,7 +23,7 @@ export interface TerminalPanelState {
   shellType?: string;            // bash, zsh, etc.
   
   // Enhanced persistence (can be added incrementally)
-  scrollbackBuffer?: string[];   // Full terminal output history
+  scrollbackBuffer?: string | string[];   // Full terminal output history (string for new format, array for legacy)
   commandHistory?: string[];     // Commands entered by user
   environmentVars?: Record<string, string>; // Modified env vars
   dimensions?: { cols: number; rows: number }; // Terminal size
@@ -50,32 +50,36 @@ export interface DiffPanelState {
   commitSha?: string;               // Specific commit being viewed
 }
 
-export interface ClaudePanelState {
-  // Basic state
-  isInitialized?: boolean;       // Whether Claude process has been started
-  claudeResumeId?: string;       // Claude's internal resume ID for session continuation
-  
-  // Enhanced persistence (can be added incrementally)
+// Base interface for AI panel states (Claude, Codex, etc.)
+export interface BaseAIPanelState {
+  // Common state for all AI tools
+  isInitialized?: boolean;       // Whether AI process has been started
   lastPrompt?: string;           // Last user prompt
-  model?: string;                // Model being used (sonnet, opus, haiku)
-  permissionMode?: 'approve' | 'ignore'; // Permission mode
+  model?: string;                // Model being used
   lastActivityTime?: string;     // For "idle since" indicators
+  lastInput?: string;            // Last input sent to the AI
+  
+  // Generic agent session ID for resume functionality (used by all AI agents)
+  agentSessionId?: string;        // The AI agent's session ID for resuming conversations
+  
+  // Legacy fields for backward compatibility (will be migrated to agentSessionId)
+  claudeSessionId?: string;       // Deprecated: Use agentSessionId instead
+  codexSessionId?: string;        // Deprecated: Use agentSessionId instead
+  claudeResumeId?: string;        // Deprecated: Claude's old resume ID
+  codexResumeId?: string;         // Deprecated: Codex's old resume ID
 }
 
-export interface CodexPanelState {
-  // Basic state
-  isInitialized?: boolean;       // Whether Codex process has been started
-  codexResumeId?: string;        // Codex's internal resume ID for session continuation (deprecated)
-  codexSessionId?: string;       // Codex's session ID for resuming conversations
-  
-  // Enhanced persistence
-  lastPrompt?: string;           // Last user prompt
-  model?: string;                // Model being used (gpt-5, gpt-4-turbo, etc.)
+export interface ClaudePanelState extends BaseAIPanelState {
+  // Claude-specific state
+  permissionMode?: 'approve' | 'ignore'; // Permission mode for Claude
+}
+
+export interface CodexPanelState extends BaseAIPanelState {
+  // Codex-specific state
   modelProvider?: string;        // Provider (openai, anthropic, etc.)
   approvalPolicy?: 'auto' | 'manual'; // Approval policy for tool calls
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; // Sandbox mode
   webSearch?: boolean;           // Whether web search is enabled
-  lastActivityTime?: string;     // For "idle since" indicators
   
   // Settings to remember for new tabs
   codexConfig?: {
@@ -124,7 +128,7 @@ export interface DashboardPanelState {
   lastRefresh?: string;           // Last time dashboard was refreshed
   filterType?: 'all' | 'stale' | 'changes' | 'pr'; // Current filter
   isRefreshing?: boolean;          // Whether dashboard is currently refreshing
-  cachedData?: any;                // Cached dashboard data
+  cachedData?: Record<string, unknown>;                // Cached dashboard data
 }
 
 export interface ToolPanelMetadata {
@@ -138,7 +142,7 @@ export interface CreatePanelRequest {
   sessionId: string;
   type: ToolPanelType;
   title?: string;                // Optional custom title
-  initialState?: any;
+  initialState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | { customState?: unknown };
   metadata?: Partial<ToolPanelMetadata>; // Optional metadata overrides
 }
 
@@ -155,7 +159,7 @@ export interface PanelEvent {
     panelType: ToolPanelType;
     sessionId: string;
   };
-  data: any;
+  data: unknown;
   timestamp: string;
 }
 

@@ -1,15 +1,55 @@
 import { MessageTransformer, UnifiedMessage, MessageSegment, ToolCall, ToolResult } from './MessageTransformer';
 
+// Content block types
+interface ContentBlock {
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking';
+  text?: string;
+  thinking?: string;
+  content?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  tool_use_id?: string;
+  is_error?: boolean;
+}
+
+// Tool definition types
+interface ToolDefinition {
+  name: string;
+  description?: string;
+  input_schema?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// MCP server definition types
+interface McpServerDefinition {
+  name: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 // Claude-specific message format
 interface ClaudeRawMessage {
   id?: string;
   type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'result';
   role?: 'user' | 'assistant' | 'system';
-  content?: string | any;
-  message?: { content?: string | any; [key: string]: any };
+  content?: string | object;
+  message?: { 
+    content?: string | ContentBlock[]; 
+    model?: string;
+    duration?: number;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cost?: number;
+    };
+    [key: string]: unknown;
+  };
   timestamp: string;
   name?: string;
-  input?: any;
+  input?: Record<string, unknown>;
   tool_use_id?: string;
   parent_tool_use_id?: string;
   session_id?: string;
@@ -17,8 +57,8 @@ interface ClaudeRawMessage {
   subtype?: string;
   cwd?: string;
   model?: string;
-  tools?: any[];
-  mcp_servers?: any[];
+  tools?: ToolDefinition[];
+  mcp_servers?: McpServerDefinition[];
   permissionMode?: string;
   summary?: string;
   error?: string;
@@ -28,7 +68,7 @@ interface ClaudeRawMessage {
   result?: string;
   duration_ms?: number;
   total_cost_usd?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export class ClaudeMessageTransformer implements MessageTransformer {
@@ -81,17 +121,17 @@ export class ClaudeMessageTransformer implements MessageTransformer {
           if (block.type === 'tool_use') {
             const isTaskAgent = block.name === 'Task';
             const toolCall: ToolCall = {
-              id: block.id,
-              name: block.name,
+              id: block.id || '',
+              name: block.name || '',
               input: block.input,
-              status: toolResults.has(block.id) ? 'success' : 'pending',
-              result: toolResults.get(block.id),
+              status: toolResults.has(block.id || '') ? 'success' : 'pending',
+              result: toolResults.get(block.id || ''),
               isSubAgent: isTaskAgent,
-              subAgentType: isTaskAgent ? block.input?.subagent_type : undefined,
-              parentToolId: parentToolMap.get(block.id),
+              subAgentType: isTaskAgent && block.input && typeof block.input === 'object' && 'subagent_type' in block.input ? String(block.input.subagent_type) : undefined,
+              parentToolId: parentToolMap.get(block.id || ''),
               childToolCalls: []
             };
-            allToolCalls.set(block.id, toolCall);
+            allToolCalls.set(block.id || '', toolCall);
           }
         }
       }
@@ -190,7 +230,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
             segments.push({ type: 'thinking', content: thinkingContent.trim() });
           }
         } else if (block.type === 'tool_use' && allToolCalls) {
-          const toolCall = allToolCalls.get(block.id);
+          const toolCall = allToolCalls.get(block.id || '');
           // Only add top-level tools (those without parents)
           if (toolCall && !toolCall.parentToolId) {
             segments.push({ type: 'tool_call', tool: toolCall });
@@ -344,8 +384,8 @@ export class ClaudeMessageTransformer implements MessageTransformer {
     // Handle Claude format: message.content as array of content blocks
     if (msg.message?.content && Array.isArray(msg.message.content)) {
       return msg.message.content
-        .filter((block: any) => block.type === 'text')
-        .map((block: any) => block.text || '')
+        .filter((block: ContentBlock) => block.type === 'text')
+        .map((block: ContentBlock) => block.text || '')
         .join('\n')
         .trim();
     }

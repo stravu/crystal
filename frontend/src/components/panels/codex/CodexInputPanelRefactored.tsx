@@ -1,25 +1,16 @@
 import React from 'react';
-import { AbstractInputPanel, AbstractInputPanelState, InputOptions } from '../ai/AbstractInputPanel';
-import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../../../shared/types/models';
-import type { Session } from '../../../types/session';
+import { AbstractInputPanel, AbstractInputPanelState, InputOptions, AbstractInputPanelProps } from '../ai/AbstractInputPanel';
+import { CODEX_MODELS, DEFAULT_CODEX_MODEL, type OpenAICodexModel, type CodexInputOptions } from '../../../../../shared/types/models';
 import { CommitModePill } from '../../CommitModeToggle';
 
 const LAST_CODEX_MODEL_KEY = 'codex.lastSelectedModel';
 
-interface CodexInputPanelProps {
-  session: Session;
-  panelId: string;
-  onSendMessage: (message: string, options?: any) => Promise<void>;
+interface CodexInputPanelProps extends AbstractInputPanelProps {
   disabled?: boolean;
   initialModel?: string;
 }
 
-interface CodexInputOptions extends InputOptions {
-  model: OpenAICodexModel;
-  modelProvider: 'openai';
-  sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
-  webSearch: boolean;
-}
+// Using shared CodexInputOptions interface from models.ts
 
 interface CodexInputPanelState extends AbstractInputPanelState {
   options: CodexInputOptions;
@@ -39,7 +30,7 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
     if (initialModel && initialModel in CODEX_MODELS) {
       return {
         model: initialModel as OpenAICodexModel,
-        modelProvider: 'openai',
+        modelProvider: 'openai' as const,
         sandboxMode: 'workspace-write',
         webSearch: false,
       };
@@ -50,7 +41,7 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
     if (saved && saved in CODEX_MODELS) {
       return {
         model: saved as OpenAICodexModel,
-        modelProvider: 'openai',
+        modelProvider: 'openai' as const,
         sandboxMode: 'workspace-write',
         webSearch: false,
       };
@@ -143,7 +134,7 @@ class CodexInputPanelClass extends AbstractInputPanel<CodexInputPanelProps, Code
           <select
             value={options.sandboxMode}
             onChange={(e) => this.setState({ 
-              options: { ...options, sandboxMode: e.target.value as any }
+              options: { ...options, sandboxMode: e.target.value as 'read-only' | 'workspace-write' | 'danger-full-access' }
             })}
             className="px-2 py-1 bg-bg-primary border border-border-primary rounded text-text-primary"
           >

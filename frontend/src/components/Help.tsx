@@ -225,6 +225,14 @@ export default function Help({ isOpen, onClose }: HelpProps) {
                   <span className="text-text-secondary">Open Prompt History</span>
                   <kbd className="px-2 py-1 bg-surface-tertiary rounded text-sm">Cmd/Ctrl + P</kbd>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-text-secondary">Navigate Back in Session History</span>
+                  <kbd className="px-2 py-1 bg-surface-tertiary rounded text-sm">Cmd/Ctrl + Option/Alt + ←</kbd>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-text-secondary">Navigate Forward in Session History</span>
+                  <kbd className="px-2 py-1 bg-surface-tertiary rounded text-sm">Cmd/Ctrl + Option/Alt + →</kbd>
+                </div>
               </div>
             </section>
 

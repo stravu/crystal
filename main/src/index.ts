@@ -9,7 +9,7 @@ if (process.platform === 'linux') {
 }
 
 // Now import the rest of electron
-import { BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { BrowserWindow, ipcMain, shell, dialog, IpcMainInvokeEvent } from 'electron';
 import * as path from 'path';
 import { TaskQueue } from './services/taskQueue';
 import { SessionManager } from './services/sessionManager';
@@ -48,7 +48,6 @@ function setAppTitle() {
     const worktreeName = getCurrentWorktreeName(process.cwd());
     if (worktreeName) {
       const title = `Crystal [${worktreeName}]`;
-      console.log('🎯 [APP TITLE] Setting development title:', title);
       if (mainWindow) {
         mainWindow.setTitle(title);
       }
@@ -117,7 +116,6 @@ for (let i = 0; i < args.length; i++) {
 // Install Devtron in development
 if (isDevelopment) {
   // Devtron can be installed manually in DevTools console with: require('devtron').install()
-  console.log('[Main] Development mode - Devtron can be installed in DevTools console');
 }
 
 async function createWindow() {
@@ -145,18 +143,15 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
     
     // Enable IPC debugging in development
-    console.log('[Main] 🔍 IPC debugging enabled - check DevTools console for IPC call logs');
     
     // Log all IPC calls in main process
     const originalHandle = ipcMain.handle;
-    ipcMain.handle = function(channel: string, listener: any) {
-      const wrappedListener = async (event: any, ...args: any[]) => {
+    ipcMain.handle = function(channel: string, listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown> | unknown) {
+      const wrappedListener = async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
         if (channel.startsWith('stravu:')) {
-          console.log(`[IPC] 📞 ${channel}`, args.length > 0 ? args : '(no args)');
         }
         const result = await listener(event, ...args);
         if (channel.startsWith('stravu:')) {
-          console.log(`[IPC] 📤 ${channel} response:`, result);
         }
         return result;
       };
@@ -217,7 +212,6 @@ async function createWindow() {
       const logMessage = `[${timestamp}] [FRONTEND ${levelName.toUpperCase()}] ${message}`;
       
       // Always log to main console
-      console.log(`[Renderer ${levelName}] ${message} (${sourceId}:${line})`);
       
       // Also write to debug log file for Claude Code to read
       const debugLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
@@ -232,13 +226,12 @@ async function createWindow() {
     } else {
       // In production, only log errors and warnings from renderer
       if (level >= 2) { // 2 = warning, 3 = error
-        console.log(`[Renderer] ${message} (${sourceId}:${line})`);
       }
     }
   });
 
   // Override console methods to forward to renderer and logger
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     // Format the message
     const message = args.map(arg =>
       typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
@@ -262,13 +255,13 @@ async function createWindow() {
     }
   };
 
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     // Prevent infinite recursion by checking if we're already in an error handler
-    if ((console.error as any).__isHandlingError) {
+    if ((console.error as typeof console.error & { __isHandlingError?: boolean }).__isHandlingError) {
       return originalError.apply(console, args);
     }
     
-    (console.error as any).__isHandlingError = true;
+    (console.error as typeof console.error & { __isHandlingError?: boolean }).__isHandlingError = true;
     
     try {
       // If logger is not initialized or we're in the logger itself, use original console
@@ -278,7 +271,7 @@ async function createWindow() {
       }
 
       const message = args.map(arg => {
-        if (typeof arg === 'object') {
+        if (typeof arg === 'object' && arg !== null) {
           if (arg instanceof Error) {
             return `Error: ${arg.message}\nStack: ${arg.stack}`;
           }
@@ -310,13 +303,13 @@ async function createWindow() {
       // If anything fails in the error handler, fall back to original
       originalError.apply(console, args);
     } finally {
-      (console.error as any).__isHandlingError = false;
+      (console.error as typeof console.error & { __isHandlingError?: boolean }).__isHandlingError = false;
     }
   };
 
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const message = args.map(arg => {
-      if (typeof arg === 'object') {
+      if (typeof arg === 'object' && arg !== null) {
         if (arg instanceof Error) {
           return `Error: ${arg.message}\nStack: ${arg.stack}`;
         }
@@ -349,9 +342,9 @@ async function createWindow() {
     }
   };
 
-  console.info = (...args: any[]) => {
+  console.info = (...args: unknown[]) => {
     const message = args.map(arg => {
-      if (typeof arg === 'object') {
+      if (typeof arg === 'object' && arg !== null) {
         if (arg instanceof Error) {
           return `Error: ${arg.message}\nStack: ${arg.stack}`;
         }
@@ -386,7 +379,7 @@ async function createWindow() {
     console.error('Renderer process crashed:', details);
   });
 
-  // Handle window focus/blur for smart git status polling
+  // Handle window focus/blur/minimize for smart git status polling
   mainWindow.on('focus', () => {
     if (gitStatusManager) {
       gitStatusManager.handleVisibilityChange(false); // false = visible/focused
@@ -396,6 +389,18 @@ async function createWindow() {
   mainWindow.on('blur', () => {
     if (gitStatusManager) {
       gitStatusManager.handleVisibilityChange(true); // true = hidden/blurred
+    }
+  });
+
+  mainWindow.on('minimize', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(true); // true = hidden/minimized
+    }
+  });
+
+  mainWindow.on('restore', () => {
+    if (gitStatusManager) {
+      gitStatusManager.handleVisibilityChange(false); // false = visible/restored
     }
   });
 }
