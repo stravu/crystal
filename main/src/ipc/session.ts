@@ -60,9 +60,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
 
   ipcMain.handle('sessions:get', async (_event, sessionId: string) => {
     try {
-      console.log('[IPC] sessions:get called for sessionId:', sessionId);
       const session = await sessionManager.getSession(sessionId);
-      console.log('[IPC] sessions:get result:', session ? `Found session ${session.id}` : 'Session not found');
 
       if (!session) {
         return { success: false, error: 'Session not found' };
@@ -113,21 +111,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   });
 
   ipcMain.handle('sessions:create', async (_event, request: CreateSessionRequest) => {
-    console.log('[IPC] sessions:create handler called with request:', {
-      ...request,
-      prompt: request.prompt ? `${request.prompt.substring(0, 200)}... (${request.prompt.length} chars total)` : 'no prompt'
-    });
-    
-    // Log if prompt contains attachments
-    if (request.prompt && request.prompt.includes('<attachments>')) {
-      console.log('[IPC] Prompt contains <attachments> tag');
-      const attachmentStart = request.prompt.indexOf('<attachments>');
-      const attachmentEnd = request.prompt.indexOf('</attachments>');
-      if (attachmentStart !== -1 && attachmentEnd !== -1) {
-        const attachmentSection = request.prompt.substring(attachmentStart, attachmentEnd + '</attachments>'.length);
-        console.log('[IPC] Attachment section preview:', attachmentSection.substring(0, 300) + '...');
-      }
-    }
     try {
       let targetProject;
 
@@ -152,10 +135,8 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       }
 
       const count = request.count || 1;
-      console.log(`[IPC] Creating ${count} session(s) with prompt: "${request.prompt}"`);
 
       if (count > 1) {
-        console.log('[IPC] Creating multiple sessions...');
         const jobs = await taskQueue.createMultipleSessions(
           request.prompt,
           request.worktreeTemplate || '',
@@ -170,13 +151,11 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           request.codexConfig,
           request.claudeConfig
         );
-        console.log(`[IPC] Created ${jobs.length} jobs:`, jobs.map(job => job.id));
         
         // Note: Model is now stored at panel level, not session level
         
         return { success: true, data: { jobIds: jobs.map(job => job.id) } };
       } else {
-        console.log('[IPC] Creating single session...');
         const job = await taskQueue.createSession({
           prompt: request.prompt,
           worktreeTemplate: request.worktreeTemplate || '',
@@ -190,7 +169,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           codexConfig: request.codexConfig,
           claudeConfig: request.claudeConfig
         });
-        console.log('[IPC] Created job with ID:', job.id);
         
         // Note: Model is now stored at panel level, not session level
         
@@ -271,8 +249,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           const project = databaseService.getProject(dbSession.project_id);
           if (project) {
             try {
-              console.log(`[Main] Removing worktree ${dbSession.worktree_name} for session ${sessionId} (queued)`);
-              
               // Update progress: removing worktree
               if (archiveProgressManager) {
                 archiveProgressManager.updateTaskStatus(sessionId, 'removing-worktree');
@@ -280,7 +256,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
               
               await worktreeManager.removeWorktree(project.path, dbSession.worktree_name, project.worktree_folder);
               
-              console.log(`[Main] Successfully removed worktree ${dbSession.worktree_name}`);
               cleanupMessage += `\x1b[32m✓ Worktree removed successfully\x1b[0m\r\n`;
             } catch (worktreeError) {
               // Log the error but don't fail
@@ -299,9 +274,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         const artifactsDir = getCrystalSubdirectory('artifacts', sessionId);
         if (existsSync(artifactsDir)) {
           try {
-            console.log('[IPC] Routing panels:send-input to ClaudePanelManager.sendInputToPanel');
-            console.log(`[Main] Removing artifacts directory for session ${sessionId} (queued)`);
-            
             // Update progress: cleaning artifacts
             if (archiveProgressManager) {
               archiveProgressManager.updateTaskStatus(sessionId, 'cleaning-artifacts');
@@ -309,7 +281,6 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
             
             await fs.rm(artifactsDir, { recursive: true, force: true });
             
-            console.log(`[Main] Successfully removed artifacts for session ${sessionId}`);
             cleanupMessage += `\x1b[32m✓ Artifacts removed successfully\x1b[0m\r\n`;
           } catch (artifactsError) {
             console.error(`[Main] Failed to remove artifacts for session ${sessionId}:`, artifactsError);
@@ -330,15 +301,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       // Queue the cleanup task if we have worktree cleanup to do
       if (dbSession.worktree_name && dbSession.project_id && !dbSession.is_main_repo) {
         const project = databaseService.getProject(dbSession.project_id);
-        console.log('[Main] Archive progress tracking:', {
-          hasWorktree: !!dbSession.worktree_name,
-          projectId: dbSession.project_id,
-          isMainRepo: dbSession.is_main_repo,
-          project: !!project,
-          archiveProgressManager: !!archiveProgressManager
-        });
         if (project && archiveProgressManager) {
-          console.log('[Main] Adding archive task to queue for session:', sessionId);
           archiveProgressManager.addTask(
             sessionId,
             dbSession.name,

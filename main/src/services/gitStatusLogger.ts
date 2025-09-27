@@ -29,7 +29,7 @@ export class GitStatusLogger {
   logSessionFetch(sessionId: string, cached: boolean): void {
     // Only log cache hits in verbose mode
     if (cached && this.logger) {
-      this.logger.verbose(`[GitStatus] Using cached status for ${sessionId}`);
+      // Removed debug cache logging for production
     }
   }
 
