@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useNavigationStore } from '../stores/navigationStore';
+import { useSessionHistoryStore } from '../stores/sessionHistoryStore';
 import { EmptyState } from './EmptyState';
 // import CombinedDiffView from './panels/diff/CombinedDiffView'; // Removed - now in panels
 import { StravuFileSearch } from './StravuFileSearch';
@@ -46,6 +47,8 @@ export const SessionView = memo(() => {
     // Otherwise look in regular sessions
     return state.sessions.find(session => session.id === state.activeSessionId);
   });
+  
+  const setActiveSession = useSessionStore(state => state.setActiveSession);
 
   // Panel store state and actions
   const {
@@ -57,6 +60,9 @@ export const SessionView = memo(() => {
     removePanel,
     updatePanelState,
   } = usePanelStore();
+  
+  // History store for navigation
+  const { addToHistory, navigateBack, navigateForward } = useSessionHistoryStore();
 
   // Load panels when session changes
   useEffect(() => {
@@ -143,6 +149,50 @@ export const SessionView = memo(() => {
     [sessionPanels]
   );
   
+  // Track current session/panel in history when they change
+  useEffect(() => {
+    if (activeSession?.id && currentActivePanel?.id) {
+      addToHistory(activeSession.id, currentActivePanel.id);
+    }
+  }, [activeSession?.id, currentActivePanel?.id, addToHistory]);
+  
+  // Keyboard shortcuts for navigating history
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + Option/Alt + Left/Right arrows for navigation
+      if ((e.metaKey || e.ctrlKey) && e.altKey) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const previousEntry = navigateBack();
+          if (previousEntry) {
+            // Navigate to the previous session/panel
+            setActiveSession(previousEntry.sessionId);
+            // Small delay to ensure session is set before panel
+            setTimeout(() => {
+              setActivePanelInStore(previousEntry.sessionId, previousEntry.panelId);
+              panelApi.setActivePanel(previousEntry.sessionId, previousEntry.panelId);
+            }, 50);
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const nextEntry = navigateForward();
+          if (nextEntry) {
+            // Navigate to the next session/panel
+            setActiveSession(nextEntry.sessionId);
+            // Small delay to ensure session is set before panel
+            setTimeout(() => {
+              setActivePanelInStore(nextEntry.sessionId, nextEntry.panelId);
+              panelApi.setActivePanel(nextEntry.sessionId, nextEntry.panelId);
+            }, 50);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigateBack, navigateForward, setActiveSession, setActivePanelInStore]);
+  
   // Debug logging - only in development with verbose enabled
   renderLog('[SessionView] Session panels:', sessionPanels);
   renderLog('[SessionView] Active panel ID:', activePanels[activeSession?.id || '']);
@@ -153,10 +203,14 @@ export const SessionView = memo(() => {
   const handlePanelSelect = useCallback(
     async (panel: ToolPanel) => {
       if (!activeSession) return;
+      
+      // Add to history when panel is selected
+      addToHistory(activeSession.id, panel.id);
+      
       setActivePanelInStore(activeSession.id, panel.id);
       await panelApi.setActivePanel(activeSession.id, panel.id);
     },
-    [activeSession, setActivePanelInStore]
+    [activeSession, setActivePanelInStore, addToHistory]
   );
 
   const handlePanelClose = useCallback(
