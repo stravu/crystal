@@ -7,13 +7,13 @@ export interface ToolPanel {
   metadata: ToolPanelMetadata;   // Creation time, position, etc.
 }
 
-export type ToolPanelType = 'terminal' | 'claude' | 'codex' | 'diff' | 'editor' | 'logs' | 'dashboard'; // Will expand later
+export type ToolPanelType = 'terminal' | 'claude' | 'codex' | 'diff' | 'editor' | 'logs' | 'dashboard' | 'setup-tasks'; // Will expand later
 
 export interface ToolPanelState {
   isActive: boolean;
   isPinned?: boolean;
   hasBeenViewed?: boolean;       // Track if panel has ever been viewed
-  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | Record<string, unknown>;
+  customState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | SetupTasksPanelState | Record<string, unknown>;
 }
 
 export interface TerminalPanelState {
@@ -131,6 +131,12 @@ export interface DashboardPanelState {
   cachedData?: Record<string, unknown>;                // Cached dashboard data
 }
 
+export interface SetupTasksPanelState {
+  lastCheck?: string;              // Last time tasks were checked
+  tasksCompleted?: Record<string, boolean>; // Track which tasks are done
+  dismissedTasks?: string[];       // Tasks the user has dismissed
+}
+
 export interface ToolPanelMetadata {
   createdAt: string;
   lastActiveAt: string;
@@ -142,7 +148,7 @@ export interface CreatePanelRequest {
   sessionId: string;
   type: ToolPanelType;
   title?: string;                // Optional custom title
-  initialState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | { customState?: unknown };
+  initialState?: TerminalPanelState | ClaudePanelState | CodexPanelState | DiffPanelState | EditorPanelState | LogsPanelState | DashboardPanelState | SetupTasksPanelState | { customState?: unknown };
   metadata?: Partial<ToolPanelMetadata>; // Optional metadata overrides
 }
 
@@ -272,5 +278,14 @@ export const PANEL_CAPABILITIES: Record<ToolPanelType, PanelCapabilities> = {
     permanent: true,                 // Cannot be closed (like diff panel)
     canAppearInProjects: true,       // Dashboard ONLY in projects
     canAppearInWorktrees: false      // Dashboard NOT in worktrees
+  },
+  'setup-tasks': {
+    canEmit: [],                     // Setup tasks doesn't emit events
+    canConsume: ['files:changed'],   // Refresh when files change (e.g., gitignore)
+    requiresProcess: false,          // No background process
+    singleton: true,                 // Only one setup tasks panel
+    permanent: true,                 // Cannot be closed (like dashboard)
+    canAppearInProjects: true,       // Setup tasks ONLY in projects
+    canAppearInWorktrees: false      // Setup tasks NOT in worktrees
   }
 };

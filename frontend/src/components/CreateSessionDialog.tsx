@@ -74,14 +74,15 @@ interface CreateSessionDialogProps {
   onClose: () => void;
   projectName?: string;
   projectId?: number;
+  initialPrompt?: string;
 }
 
-export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }: CreateSessionDialogProps) {
+export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, initialPrompt }: CreateSessionDialogProps) {
   const [sessionName, setSessionName] = useState<string>('');
   const [sessionCount, setSessionCount] = useState<number>(1);
-  const [toolType, setToolType] = useState<'claude' | 'codex' | 'none'>('none');
+  const [toolType, setToolType] = useState<'claude' | 'codex' | 'none'>(initialPrompt ? 'claude' : 'none');
   const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
-    prompt: '',
+    prompt: initialPrompt || '',
     model: 'auto',
     permissionMode: 'ignore',
     ultrathink: false,
@@ -89,7 +90,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     attachedTexts: []
   });
   const [codexConfig, setCodexConfig] = useState<CodexConfig>({
-    prompt: '',
+    prompt: initialPrompt || '',
     model: DEFAULT_CODEX_MODEL,
     modelProvider: 'openai',
     approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
@@ -100,7 +101,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
     attachedTexts: []
   });
   const [formData, setFormData] = useState<CreateSessionRequest>({
-    prompt: '',
+    prompt: initialPrompt || '',
     worktreeTemplate: '',
     count: 1,
     permissionMode: 'ignore'
@@ -205,11 +206,17 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId }:
       setSessionName('');
       setSessionCount(1);
       setFormData(prev => ({ ...prev, count: 1 }));
-      syncPromptAcrossConfigs('', 'none');
+      // Only clear prompts if there's no initialPrompt
+      if (!initialPrompt) {
+        syncPromptAcrossConfigs('', 'none');
+      } else {
+        // If we have an initialPrompt, sync it to all configs
+        syncPromptAcrossConfigs(initialPrompt, 'none');
+      }
       syncImageAttachments(() => []);
       syncTextAttachments(() => []);
     }
-  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments]);
+  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments, initialPrompt]);
 
   useEffect(() => {
     if (!isOpen) {

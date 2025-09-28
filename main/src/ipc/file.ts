@@ -711,4 +711,141 @@ EOF
       };
     }
   });
+
+  // Read file from project directory (not worktree)
+  ipcMain.handle('file:read-project', async (_, request: { projectId: number; filePath: string }) => {
+    console.log('[file:read-project] Request:', request);
+    try {
+      const project = databaseService.getProject(request.projectId);
+      if (!project) {
+        console.error('[file:read-project] Project not found:', request.projectId);
+        throw new Error(`Project not found: ${request.projectId}`);
+      }
+
+      console.log('[file:read-project] Project path:', project.path);
+
+      // Ensure the file path is relative and safe
+      const normalizedPath = path.normalize(request.filePath);
+      if (normalizedPath.startsWith('..') || path.isAbsolute(normalizedPath)) {
+        throw new Error('Invalid file path');
+      }
+
+      const fullPath = path.join(project.path, normalizedPath);
+      console.log('[file:read-project] Full path:', fullPath);
+      
+      // Check if file exists
+      try {
+        await fs.access(fullPath);
+        console.log('[file:read-project] File exists');
+      } catch {
+        // File doesn't exist, return null
+        console.log('[file:read-project] File does not exist');
+        return { success: true, data: null };
+      }
+
+      // Read the file
+      const content = await fs.readFile(fullPath, 'utf-8');
+      console.log('[file:read-project] Read', content.length, 'bytes');
+      return { success: true, data: content };
+    } catch (error) {
+      console.error('[file:read-project] Error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  });
+
+  // Write file to project directory (not worktree)
+  ipcMain.handle('file:write-project', async (_, request: { projectId: number; filePath: string; content: string }) => {
+    console.log('[file:write-project] Request:', { projectId: request.projectId, filePath: request.filePath, contentLength: request.content.length });
+    try {
+      const project = databaseService.getProject(request.projectId);
+      if (!project) {
+        console.error('[file:write-project] Project not found:', request.projectId);
+        throw new Error(`Project not found: ${request.projectId}`);
+      }
+
+      console.log('[file:write-project] Project path:', project.path);
+
+      // Ensure the file path is relative and safe
+      const normalizedPath = path.normalize(request.filePath);
+      if (normalizedPath.startsWith('..') || path.isAbsolute(normalizedPath)) {
+        throw new Error('Invalid file path');
+      }
+
+      const fullPath = path.join(project.path, normalizedPath);
+      console.log('[file:write-project] Full path:', fullPath);
+      
+      // Ensure directory exists
+      const dir = path.dirname(fullPath);
+      await fs.mkdir(dir, { recursive: true });
+      
+      // Write the file
+      await fs.writeFile(fullPath, request.content, 'utf-8');
+      console.log('[file:write-project] Successfully wrote', request.content.length, 'bytes to', fullPath);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[file:write-project] Error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  });
+
+  // Execute git command in project directory
+  ipcMain.handle('git:execute-project', async (_, request: { projectId: number; args: string[] }) => {
+    console.log('[git:execute-project] Request:', request);
+    try {
+      const project = databaseService.getProject(request.projectId);
+      if (!project) {
+        console.error('[git:execute-project] Project not found:', request.projectId);
+        throw new Error(`Project not found: ${request.projectId}`);
+      }
+
+      console.log('[git:execute-project] Project path:', project.path);
+      console.log('[git:execute-project] Git command:', 'git', request.args.join(' '));
+
+      // Import execSync from child_process
+      const { execSync } = require('child_process');
+      
+      // Execute git command
+      const result = execSync(`git ${request.args.map(arg => {
+        // Properly escape arguments for shell
+        if (arg.includes(' ') || arg.includes('\n') || arg.includes('"')) {
+          return `"${arg.replace(/"/g, '\\"')}"`;
+        }
+        return arg;
+      }).join(' ')}`, {
+        cwd: project.path,
+        encoding: 'utf-8',
+        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+      });
+
+      console.log('[git:execute-project] Command successful');
+      return { success: true, output: result };
+    } catch (error) {
+      console.error('[git:execute-project] Error:', error);
+      
+      // Extract error message from execSync error
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // If it's an execSync error, it may have stderr
+        const execError = error as any;
+        if (execError.stderr) {
+          errorMessage = execError.stderr.toString();
+        } else if (execError.stdout) {
+          errorMessage = execError.stdout.toString();
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage
+      };
+    }
+  });
 }

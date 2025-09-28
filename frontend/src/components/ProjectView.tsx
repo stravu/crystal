@@ -47,6 +47,10 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
         
         // Check if dashboard panel exists, create if not
         const dashboardPanel = loadedPanels.find(p => p.type === 'dashboard');
+        const setupTasksPanel = loadedPanels.find(p => p.type === 'setup-tasks');
+        
+        let panelsCreated = false;
+        
         if (!dashboardPanel) {
           console.log('[ProjectView] Creating dashboard panel for project');
           await panelApi.createPanel({
@@ -55,27 +59,42 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
             title: 'Dashboard',
             metadata: { permanent: true }
           });
-          // Reload panels after creating dashboard
-          const updatedPanels = await panelApi.loadPanelsForSession(mainRepoSessionId);
-          setPanels(mainRepoSessionId, updatedPanels);
-          
-          // Set dashboard as active if it's the only panel
-          const newDashboard = updatedPanels.find(p => p.type === 'dashboard');
-          if (newDashboard && updatedPanels.length === 1) {
-            setActivePanelInStore(mainRepoSessionId, newDashboard.id);
-            await panelApi.setActivePanel(mainRepoSessionId, newDashboard.id);
+          panelsCreated = true;
+        }
+        
+        if (!setupTasksPanel) {
+          console.log('[ProjectView] Creating setup-tasks panel for project');
+          await panelApi.createPanel({
+            sessionId: mainRepoSessionId,
+            type: 'setup-tasks',
+            title: 'Setup',
+            metadata: { permanent: true }
+          });
+          panelsCreated = true;
+        }
+        
+        // Reload panels if any were created
+        const finalPanels = panelsCreated 
+          ? await panelApi.loadPanelsForSession(mainRepoSessionId)
+          : loadedPanels;
+        
+        setPanels(mainRepoSessionId, finalPanels);
+        
+        // Determine which panel should be active
+        const activePanel = await panelApi.getActivePanel(mainRepoSessionId);
+        const setupPanel = finalPanels.find(p => p.type === 'setup-tasks');
+        const dashPanel = finalPanels.find(p => p.type === 'dashboard');
+        
+        if (!activePanel) {
+          // No active panel - prioritize setup-tasks if it exists, otherwise dashboard
+          const panelToActivate = setupPanel || dashPanel;
+          if (panelToActivate) {
+            setActivePanelInStore(mainRepoSessionId, panelToActivate.id);
+            await panelApi.setActivePanel(mainRepoSessionId, panelToActivate.id);
           }
         } else {
-          setPanels(mainRepoSessionId, loadedPanels);
-          
-          // If no active panel but dashboard exists, activate it
-          const activePanel = await panelApi.getActivePanel(mainRepoSessionId);
-          if (!activePanel && dashboardPanel) {
-            setActivePanelInStore(mainRepoSessionId, dashboardPanel.id);
-            await panelApi.setActivePanel(mainRepoSessionId, dashboardPanel.id);
-          } else if (activePanel) {
-            setActivePanelInStore(mainRepoSessionId, activePanel.id);
-          }
+          // There's already an active panel, use it
+          setActivePanelInStore(mainRepoSessionId, activePanel.id);
         }
       });
     }
@@ -106,9 +125,9 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     async (panel: ToolPanel) => {
       if (!mainRepoSessionId) return;
       
-      // Don't allow closing dashboard panel
-      if (panel.type === 'dashboard') {
-        console.log('[ProjectView] Cannot close dashboard panel');
+      // Don't allow closing dashboard or setup-tasks panels
+      if (panel.type === 'dashboard' || panel.type === 'setup-tasks') {
+        console.log('[ProjectView] Cannot close permanent panel:', panel.type);
         return;
       }
       

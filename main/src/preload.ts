@@ -255,6 +255,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   git: {
     detectBranch: (path: string): Promise<IPCResponse<string>> => ipcRenderer.invoke('projects:detect-branch', path),
     cancelStatusForProject: (projectId: number): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('git:cancel-status-for-project', projectId),
+    executeProject: (projectId: number, args: string[]): Promise<IPCResponse> => ipcRenderer.invoke('git:execute-project', { projectId, args }),
   },
 
   // Folders
@@ -286,6 +287,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   file: {
     listProject: (projectId: number, path?: string): Promise<IPCResponse> => ipcRenderer.invoke('file:list-project', { projectId, path }),
     readProject: (projectId: number, filePath: string): Promise<IPCResponse> => ipcRenderer.invoke('file:read-project', { projectId, filePath }),
+    writeProject: (projectId: number, filePath: string, content: string): Promise<IPCResponse> => ipcRenderer.invoke('file:write-project', { projectId, filePath, content }),
   },
 
   // Dialog

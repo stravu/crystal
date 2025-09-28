@@ -150,6 +150,7 @@ interface ElectronAPI {
   git: {
     detectBranch: (path: string) => Promise<IPCResponse<string>>;
     cancelStatusForProject: (projectId: number) => Promise<{ success: boolean; error?: string }>;
+    executeProject: (projectId: number, args: string[]) => Promise<IPCResponse>;
   };
 
   // Folders
@@ -181,6 +182,7 @@ interface ElectronAPI {
   file: {
     listProject: (projectId: number, path?: string) => Promise<IPCResponse>;
     readProject: (projectId: number, filePath: string) => Promise<IPCResponse>;
+    writeProject: (projectId: number, filePath: string, content: string) => Promise<IPCResponse>;
   };
 
   // Dialog
