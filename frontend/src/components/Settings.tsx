@@ -40,6 +40,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [devMode, setDevMode] = useState(false);
   const [additionalPathsText, setAdditionalPathsText] = useState('');
   const [platform, setPlatform] = useState<string>('darwin');
+  const [enableCrystalFooter, setEnableCrystalFooter] = useState(true);
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: true,
     playSound: true,
@@ -75,6 +76,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setDefaultPermissionMode(data.defaultPermissionMode || 'ignore');
       setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
       setDevMode(data.devMode || false);
+      setEnableCrystalFooter(data.enableCrystalFooter !== false); // Default to true
       
       // Load additional paths
       const paths = data.additionalPaths || [];
@@ -111,6 +113,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         defaultPermissionMode,
         autoCheckUpdates,
         devMode,
+        enableCrystalFooter,
         additionalPaths: parsedPaths,
         notifications: notificationSettings
       });
@@ -300,6 +303,21 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                   fullWidth
                   helperText="These instructions will be added to every Claude session across all projects."
                 />
+              </SettingsSection>
+
+              <SettingsSection
+                title="Crystal Attribution"
+                description="Add Crystal branding to commit messages"
+                icon={<FileText className="w-4 h-4" />}
+              >
+                <Checkbox
+                  label="Include Crystal footer in commits"
+                  checked={enableCrystalFooter}
+                  onChange={(e) => setEnableCrystalFooter(e.target.checked)}
+                />
+                <p className="text-xs text-text-tertiary mt-1">
+                  When enabled, commits made through Crystal will include a footer crediting Crystal. This helps others know you're using Crystal for AI-powered development.
+                </p>
               </SettingsSection>
             </CollapsibleCard>
 

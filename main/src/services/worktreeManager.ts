@@ -4,6 +4,7 @@ import { join } from 'path';
 import { mkdir } from 'fs/promises';
 import { getShellPath } from '../utils/shellPath';
 import { withLock } from '../utils/mutex';
+import type { ConfigManager } from './configManager';
 
 // Interface for raw commit data
 interface RawCommitData {
@@ -33,7 +34,7 @@ async function execWithShellPath(command: string, options?: { cwd?: string }): P
 export class WorktreeManager {
   private projectsCache: Map<string, { baseDir: string }> = new Map();
 
-  constructor() {
+  constructor(private configManager?: ConfigManager) {
     // No longer initialized with a single repo path
   }
 
@@ -537,8 +538,19 @@ export class WorktreeManager {
       const resetResult = await execWithShellPath(command, { cwd: worktreePath });
       lastOutput = resetResult.stdout || resetResult.stderr || '';
       
+      // Get config to check if Crystal footer is enabled (default: true)
+      const config = this.configManager?.getConfig();
+      const enableCrystalFooter = config?.enableCrystalFooter !== false;
+      
+      // Add Crystal footer if enabled
+      const fullMessage = enableCrystalFooter ? `${commitMessage}
+
+💎 Built using [Crystal](https://github.com/stravu/crystal)
+
+Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
+      
       // Properly escape commit message for cross-platform compatibility
-      const escapedMessage = commitMessage.replace(/"/g, '\\"');
+      const escapedMessage = fullMessage.replace(/"/g, '\\"');
       command = `git commit -m "${escapedMessage}"`;
       executedCommands.push(`git commit -m "..." (in ${worktreePath})`);
       const commitResult = await execWithShellPath(command, { cwd: worktreePath });

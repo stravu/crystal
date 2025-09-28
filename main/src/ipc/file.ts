@@ -47,7 +47,7 @@ interface FileSearchRequest {
 }
 
 export function registerFileHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { sessionManager, databaseService, gitStatusManager } = services;
+  const { sessionManager, databaseService, gitStatusManager, configManager } = services;
 
   // Read file contents from a session's worktree
   ipcMain.handle('file:read', async (_, request: FileReadRequest) => {
@@ -232,12 +232,16 @@ export function registerFileHandlers(ipcMain: IpcMain, services: AppServices): v
         // Stage all changes
         await execAsync('git add -A', { cwd: session.worktreePath });
 
-        // Create the commit with Crystal signature
-        const commitMessage = `${request.message}
+        // Check if Crystal footer is enabled (default: true)
+        const config = configManager.getConfig();
+        const enableCrystalFooter = config?.enableCrystalFooter !== false;
 
-🤖 Generated with [Crystal](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1)
+        // Create the commit with Crystal signature if enabled
+        const commitMessage = enableCrystalFooter ? `${request.message}
 
-Co-Authored-By: Crystal <noreply@stravu.com>`;
+💎 Built using [Crystal](https://github.com/stravu/crystal)
+
+Co-Authored-By: Crystal <crystal@stravu.com>` : request.message;
 
         // Use a here document to handle multi-line commit messages
         const command = `git commit -m "$(cat <<'EOF'
@@ -262,12 +266,19 @@ EOF
           // Try to commit again in case the pre-commit hook made changes
           try {
             await execAsync('git add -A', { cwd: session.worktreePath });
+            
+            // Check if Crystal footer is enabled (default: true)
+            const config = configManager.getConfig();
+            const enableCrystalFooter = config?.enableCrystalFooter !== false;
+            
+            const retryMessage = enableCrystalFooter ? `${request.message}
+
+💎 Built using [Crystal](https://github.com/stravu/crystal)
+
+Co-Authored-By: Crystal <crystal@stravu.com>` : request.message;
+            
             const command = `git commit -m "$(cat <<'EOF'
-${request.message}
-
-🤖 Generated with [Crystal](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1)
-
-Co-Authored-By: Crystal <noreply@stravu.com>
+${retryMessage}
 EOF
 )"`;
             await execAsync(command, { cwd: session.worktreePath });

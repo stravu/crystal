@@ -27,6 +27,7 @@ import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
 import { ArchiveProgressManager } from './services/archiveProgressManager';
+import { initializeCommitManager } from './services/commitManager';
 import { setCrystalDirectory } from './utils/crystalDirectory';
 import { getCurrentWorktreeName } from './utils/worktreeUtils';
 import { registerIpcHandlers } from './ipc';
@@ -412,6 +413,9 @@ async function initializeServices() {
   // Initialize logger early so it can capture all logs
   logger = new Logger(configManager);
   console.log('[Main] Logger initialized with file logging to ~/.crystal/logs');
+  
+  // Initialize commitManager with configManager
+  initializeCommitManager(configManager, logger);
 
   // Use the same database path as the original backend
   const dbPath = configManager.getDatabasePath();
@@ -440,8 +444,8 @@ async function initializeServices() {
     permissionIpcServer = null;
   }
 
-  // Create worktree manager without a specific path
-  worktreeManager = new WorktreeManager();
+  // Create worktree manager with configManager
+  worktreeManager = new WorktreeManager(configManager);
 
   // Initialize the active project's worktree directory if one exists
   const activeProject = sessionManager.getActiveProject();

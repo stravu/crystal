@@ -28,15 +28,16 @@ export function escapeShellArg(arg: string): string {
 /**
  * Build a safe git commit command with proper escaping
  * @param message The commit message
+ * @param enableCrystalFooter If true (default), add the Crystal footer
  * @returns The safe commit command
  */
-export function buildGitCommitCommand(message: string): string {
+export function buildGitCommitCommand(message: string, enableCrystalFooter: boolean = true): string {
   // Create the full commit message with signature
-  const fullMessage = `${message}
+  const fullMessage = enableCrystalFooter ? `${message}
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+💎 Built using [Crystal](https://github.com/stravu/crystal)
 
-Co-Authored-By: Claude <noreply@anthropic.com>`;
+Co-Authored-By: Crystal <crystal@stravu.com>` : message;
   
   // For Windows, use a different approach
   if (process.platform === 'win32') {

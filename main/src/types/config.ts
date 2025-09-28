@@ -56,6 +56,8 @@ export interface AppConfig {
       checkpointPrefix?: string;
     };
   };
+  // Crystal commit footer setting (enabled by default)
+  enableCrystalFooter?: boolean;
 }
 
 export interface UpdateConfigRequest {
@@ -102,4 +104,5 @@ export interface UpdateConfigRequest {
       checkpointPrefix?: string;
     };
   };
+  disableCrystalFooter?: boolean;
 }
