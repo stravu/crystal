@@ -173,7 +173,8 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         databaseService.deleteProjectRunCommands(projectIdNum);
 
         // Add new run commands from the multiline script
-        if (updates.run_script) {
+        // Treat empty string and null the same - both mean no commands
+        if (updates.run_script && updates.run_script.trim()) {
           const commands = updates.run_script.split('\n').filter((cmd: string) => cmd.trim());
           commands.forEach((command: string, index: number) => {
             databaseService.createRunCommand(
