@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings } from 'lucide-react';
 import { ToolPanel } from '../../../../../shared/types/panels';
 import { AIViewMode, RichOutputSettings } from '../ai/AbstractAIPanel';
 import { RichOutputWithSidebar } from '../claude/RichOutputWithSidebar';
@@ -22,7 +21,6 @@ export const CodexPanel: React.FC<CodexPanelProps> = React.memo(({ panel, isActi
   const [viewMode, setViewMode] = useState<AIViewMode>('richOutput');
   
   // Settings state for Rich Output view
-  const [showRichOutputSettings, setShowRichOutputSettings] = useState(false);
   const [richOutputSettings, setRichOutputSettings] = useState<RichOutputSettings>(() => {
     const saved = localStorage.getItem('codexRichOutputSettings');
     return saved ? JSON.parse(saved) : {
@@ -136,47 +134,13 @@ export const CodexPanel: React.FC<CodexPanelProps> = React.memo(({ panel, isActi
             </div>
           </div>
 
-          {/* Model indicator and settings button */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-tertiary">
-              Model: <span className="text-text-secondary font-medium">{model}</span>
-            </span>
-            
-            {viewMode === 'richOutput' && (
-              <button
-                onClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
-                className={`px-2 py-1 rounded-md text-xs transition-all flex items-center gap-1.5 ${
-                  showRichOutputSettings
-                    ? 'bg-surface-hover text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
-                }`}
-                title="Configure display settings"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Settings</span>
-              </button>
-            )}
-          </div>
+          {/* Empty div for spacing */}
+          <div></div>
         </div>
       )}
 
       {/* Main Content Area */}
       <div className="flex-1 relative min-h-0 overflow-hidden">
-        {!showDebugTabs && (
-          <div className="absolute top-3 right-3 z-10 flex items-center gap-3 rounded border border-border-primary bg-surface-secondary px-3 py-1.5 shadow-sm">
-            <span className="text-xs text-text-tertiary">
-              Model: <span className="text-text-secondary font-medium">{model}</span>
-            </span>
-            <button
-              onClick={() => setShowRichOutputSettings(!showRichOutputSettings)}
-              className="p-1.5 rounded hover:bg-surface-hover transition-colors"
-              title="Configure display settings"
-              aria-label="Open Codex display settings"
-            >
-              <Settings className="w-4 h-4 text-text-secondary" />
-            </button>
-          </div>
-        )}
         {viewMode === 'richOutput' && (
           <div className="h-full block w-full">
             <RichOutputWithSidebar

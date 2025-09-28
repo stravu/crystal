@@ -112,7 +112,6 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-text-secondary">Claude</span>
               {activeView === 'richOutput' && (
                 <button
                   onClick={toggleSettings}
@@ -130,11 +129,10 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
       {/* Main content area */}
       <div className="flex-1 overflow-hidden relative">
         {!showDebugTabs && (
-          <div className="absolute top-3 right-3 z-10 flex items-center gap-2 rounded border border-border-primary bg-surface-secondary px-3 py-1 shadow-sm">
-            <span className="text-xs text-text-secondary">Claude</span>
+          <div className="absolute top-3 right-3 z-10">
             <button
               onClick={toggleSettings}
-              className="p-1.5 rounded hover:bg-surface-hover transition-colors"
+              className="p-2 rounded border border-border-primary bg-surface-secondary shadow-sm hover:bg-surface-hover transition-colors"
               title="Display settings"
               aria-label="Open Claude settings"
             >
