@@ -4,6 +4,7 @@ import { useNavigationStore } from '../stores/navigationStore';
 import { StatusIndicator } from './StatusIndicator';
 import { GitStatusIndicator } from './GitStatusIndicator';
 import { ConfirmDialog } from './ConfirmDialog';
+import { RunScriptConfigDialog } from './RunScriptConfigDialog';
 import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
 import type { Session, GitStatus } from '../types/session';
@@ -30,6 +31,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   const [gitStatus, setGitStatus] = useState<GitStatus | undefined>(session.gitStatus);
   const { menuState, openMenu, closeMenu, isMenuOpen } = useContextMenu();
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showRunScriptConfig, setShowRunScriptConfig] = useState(false);
   const [gitStatusLoading, setGitStatusLoading] = useState(false);
   
   
@@ -163,7 +165,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     e.stopPropagation();
     
     if (!hasRunScript) {
-      alert('No run script configured for this project.\n\nRun scripts are the commands needed to run your application so you can easily test changes.\n\nTo configure a run script:\n1. Click the settings icon (⚙️) next to your project (only shows on hover)\n\n2. Enter your \'Build Script\' to run at worktree creation (Optional)\n\n3. Enter your run script command(s) to run your application for testing');
+      setShowRunScriptConfig(true);
       return;
     }
 
@@ -507,6 +509,11 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
         confirmText="Archive"
         confirmButtonClass="bg-amber-600 hover:bg-amber-700 text-white"
         icon={<Archive className="w-6 h-6 text-amber-500 flex-shrink-0" />}
+      />
+      
+      <RunScriptConfigDialog
+        isOpen={showRunScriptConfig}
+        onClose={() => setShowRunScriptConfig(false)}
       />
     </>
   );
