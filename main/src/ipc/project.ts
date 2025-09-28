@@ -203,8 +203,18 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
     try {
       const projectIdNum = parseInt(projectId);
       
-      // Get all sessions for this project to check for running scripts
+      // Get the project to access its path
+      const project = databaseService.getProject(projectIdNum);
+      if (!project) {
+        console.error(`[Main] Project ${projectIdNum} not found`);
+        return { success: false, error: 'Project not found' };
+      }
+      
+      // Get all sessions for this project (including archived) to clean up worktrees
+      const allProjectSessions = databaseService.getAllSessionsIncludingArchived().filter(s => s.project_id === projectIdNum);
       const projectSessions = databaseService.getAllSessions(projectIdNum);
+      
+      console.log(`[Main] Deleting project ${project.name} with ${allProjectSessions.length} total sessions`);
       
       // Check if any session from this project has a running script
       const currentRunningSessionId = sessionManager.getCurrentRunningSessionId();
@@ -223,6 +233,26 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
           await sessionManager.closeTerminalSession(session.id);
         }
       }
+      
+      // Clean up all worktrees for this project (including archived sessions)
+      let worktreeCleanupCount = 0;
+      for (const session of allProjectSessions) {
+        // Skip sessions that are main repo or don't have worktrees
+        if (session.is_main_repo || !session.worktree_name) {
+          continue;
+        }
+        
+        try {
+          console.log(`[Main] Removing worktree '${session.worktree_name}' for session ${session.id}`);
+          await worktreeManager.removeWorktree(project.path, session.worktree_name, project.worktree_folder || undefined);
+          worktreeCleanupCount++;
+        } catch (error) {
+          // Log error but continue with other worktrees
+          console.error(`[Main] Failed to remove worktree '${session.worktree_name}' for session ${session.id}:`, error);
+        }
+      }
+      
+      console.log(`[Main] Cleaned up ${worktreeCleanupCount} worktrees for project ${project.name}`);
       
       // Now safe to delete the project
       const success = databaseService.deleteProject(projectIdNum);
