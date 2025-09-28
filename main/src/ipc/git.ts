@@ -742,10 +742,10 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         mainBranch
       });
 
-      // Refresh git status for this session after rebasing from main
+      // Update git status directly after rebasing from main (more efficient than refresh)
       // Don't let this block the response - run it in background
-      refreshGitStatusForSession(sessionId).catch(error => {
-        console.error(`[IPC:git] Failed to refresh git status for session ${sessionId}:`, error);
+      gitStatusManager.updateGitStatusAfterRebase(sessionId, 'from_main').catch(error => {
+        console.error(`[IPC:git] Failed to update git status for session ${sessionId}:`, error);
       });
 
       return { success: true, data: { message: `Successfully rebased ${mainBranch} into worktree` } };
@@ -932,11 +932,11 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         mainBranch
       });
 
-      // Refresh git status for ALL sessions in the project since main was updated
+      // Update git status for ALL sessions in the project since main was updated
       // Don't let this block the response - run it in background
       if (session.projectId !== undefined) {
-        refreshGitStatusForProject(session.projectId).catch(error => {
-          console.error(`[IPC:git] Failed to refresh git status for project ${session.projectId}:`, error);
+        gitStatusManager.updateProjectGitStatusAfterMainUpdate(session.projectId, sessionId).catch(error => {
+          console.error(`[IPC:git] Failed to update git status for project ${session.projectId}:`, error);
         });
       }
       
@@ -1015,6 +1015,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         data: successMessage,
         timestamp: new Date()
       });
+
+      // Update git status for ALL sessions in the project since main was updated
+      // Don't let this block the response - run it in background
+      if (session.projectId !== undefined) {
+        gitStatusManager.updateProjectGitStatusAfterMainUpdate(session.projectId, sessionId).catch(error => {
+          console.error(`[IPC:git] Failed to update git status for project ${session.projectId}:`, error);
+        });
+      }
 
       return { success: true, data: { message: `Successfully rebased worktree to ${mainBranch}` } };
     } catch (error: unknown) {
