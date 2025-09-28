@@ -27,6 +27,14 @@ export class LogsManager {
     if (existingLogs) {
       // Clear existing panel output
       await this.clearPanel(existingLogs.id);
+      
+      // Emit panel:created event to ensure frontend adds it back if it was closed
+      // This is necessary because closing a panel in the frontend removes it from the store
+      // but doesn't delete it from the backend database
+      if (mainWindow) {
+        mainWindow.webContents.send('panel:created', existingLogs);
+      }
+      
       return existingLogs;
     }
     
