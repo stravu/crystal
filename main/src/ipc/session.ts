@@ -254,7 +254,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
                 archiveProgressManager.updateTaskStatus(sessionId, 'removing-worktree');
               }
               
-              await worktreeManager.removeWorktree(project.path, dbSession.worktree_name, project.worktree_folder);
+              await worktreeManager.removeWorktree(project.path, dbSession.worktree_name, project.worktree_folder || undefined);
               
               cleanupMessage += `\x1b[32m✓ Worktree removed successfully\x1b[0m\r\n`;
             } catch (worktreeError) {

@@ -212,7 +212,7 @@ export class TaskQueue {
         worktreeName = uniqueWorktreeName;
         
 
-        const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder);
+        const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder || undefined);
         
         const session = await sessionManager.createSession(
           sessionName,

@@ -2,15 +2,15 @@ export interface Project {
   id: number;
   name: string;
   path: string;
-  system_prompt?: string;
-  run_script?: string;
-  build_script?: string;
+  system_prompt?: string | null;
+  run_script?: string | null;
+  build_script?: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
-  open_ide_command?: string;
+  open_ide_command?: string | null;
   displayOrder?: number;
-  worktree_folder?: string;
+  worktree_folder?: string | null;
   lastUsedModel?: string;
   commit_mode?: 'structured' | 'checkpoint' | 'disabled';
   commit_structured_prompt_template?: string;
@@ -41,12 +41,12 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   path?: string;
-  system_prompt?: string;
-  run_script?: string;
-  build_script?: string;
+  system_prompt?: string | null;
+  run_script?: string | null;
+  build_script?: string | null;
   active?: boolean;
-  open_ide_command?: string;
-  worktree_folder?: string;
+  open_ide_command?: string | null;
+  worktree_folder?: string | null;
   lastUsedModel?: string;
   commit_mode?: 'structured' | 'checkpoint' | 'disabled';
   commit_structured_prompt_template?: string;

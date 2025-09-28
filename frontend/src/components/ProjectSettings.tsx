@@ -56,15 +56,17 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate, on
     setError(null);
 
     try {
-      const response = await API.projects.update(project.id.toString(), {
+      const updates: Partial<Project> = {
         name,
         path,
-        system_prompt: systemPrompt || undefined,
-        run_script: runScript || undefined,
-        build_script: buildScript || undefined,
-        open_ide_command: openIdeCommand || undefined,
-        worktree_folder: worktreeFolder || undefined
-      });
+        system_prompt: systemPrompt || null,
+        run_script: runScript || null,
+        build_script: buildScript || null,
+        open_ide_command: openIdeCommand || null,
+        worktree_folder: worktreeFolder || null
+      };
+      
+      const response = await API.projects.update(project.id.toString(), updates);
 
       if (!response.success) {
         throw new Error(response.error || 'Failed to update project');
