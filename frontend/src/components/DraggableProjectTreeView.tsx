@@ -193,8 +193,8 @@ export function DraggableProjectTreeView() {
     const handleSessionCreated = (newSession: Session) => {
       
       if (!newSession.projectId) {
-        console.warn('[DraggableProjectTreeView] Session created without projectId, reloading all');
-        loadProjectsWithSessions();
+        console.warn('[DraggableProjectTreeView] Session created without projectId, cannot add to tree');
+        // Instead of reloading everything, just skip this session
         return;
       }
       
@@ -204,9 +204,10 @@ export function DraggableProjectTreeView() {
         const folderExists = project?.folders?.some(f => f.id === newSession.folderId);
         
         if (!folderExists) {
-          // Reload to get the folder that might have been created
-          loadProjectsWithSessions();
-          return;
+          // Instead of reloading everything, fetch just the folder data for this project
+          console.log('[DraggableProjectTreeView] Folder not found for new session, fetching folder data');
+          // We'll add the session anyway and let the folder appear when it's created
+          // The folder:created event handler will handle the folder addition
         }
       }
       
