@@ -200,6 +200,165 @@ export class GitStatusManager extends EventEmitter {
   }
 
   /**
+   * Refresh git status for all sessions in a project
+   * @param projectId - The project ID to refresh sessions for
+   */
+  private async refreshGitStatusForProject(projectId: number): Promise<void> {
+    try {
+      const sessions = await this.sessionManager.getAllSessions();
+      const projectSessions = sessions.filter(s => s.projectId === projectId && !s.archived && s.status !== 'error');
+      
+      // Refresh all sessions in parallel
+      await Promise.all(projectSessions.map(session => 
+        this.refreshSessionGitStatus(session.id, false).catch(() => {
+          // Individual failures are logged by GitStatusManager
+        })
+      ));
+    } catch (error) {
+      this.logger?.error(`[GitStatus] Failed to refresh git status for project ${projectId}:`, error as Error);
+    }
+  }
+
+  /**
+   * Update git status for all sessions in a project after main branch was updated
+   * @param projectId - The project ID to update sessions for
+   * @param updatedBySessionId - The session ID that caused the update (e.g. rebased to main)
+   */
+  async updateProjectGitStatusAfterMainUpdate(projectId: number, updatedBySessionId?: string): Promise<void> {
+    try {
+      const sessions = await this.sessionManager.getAllSessions();
+      const projectSessions = sessions.filter(s => s.projectId === projectId && !s.archived && s.status !== 'error');
+      
+      // Update all sessions in parallel
+      await Promise.all(projectSessions.map(async (session) => {
+        if (session.id === updatedBySessionId) {
+          // The session that rebased to main is now in sync with main
+          await this.updateGitStatusAfterRebase(session.id, 'to_main');
+        } else {
+          // Other sessions may now be behind main
+          const cached = this.cache[session.id];
+          if (cached && session.worktreePath) {
+            try {
+              // Quick check for new ahead/behind status
+              const project = this.sessionManager.getProjectForSession(session.id);
+              if (project?.path) {
+                const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
+                const { ahead, behind } = fastGetAheadBehind(session.worktreePath, mainBranch);
+                
+                const updatedStatus = { ...cached.status };
+                updatedStatus.ahead = ahead;
+                updatedStatus.behind = behind;
+                
+                // Update cache and emit
+                this.updateCache(session.id, updatedStatus);
+                this.emitThrottled(session.id, 'updated', updatedStatus);
+              }
+            } catch {
+              // Fall back to full refresh on error
+              await this.refreshSessionGitStatus(session.id, false);
+            }
+          } else {
+            // No cache, do a full refresh
+            await this.refreshSessionGitStatus(session.id, false);
+          }
+        }
+      }));
+      
+      this.logger?.info(`[GitStatus] Updated all sessions in project ${projectId} after main branch update`);
+    } catch (error) {
+      this.logger?.error(`[GitStatus] Error updating project statuses after main update:`, error as Error);
+      // Fall back to refreshing all
+      await this.refreshGitStatusForProject(projectId);
+    }
+  }
+
+  /**
+   * Update git status after a rebase operation without running git commands
+   * @param sessionId - The session ID to update
+   * @param rebaseType - 'from_main' or 'to_main' 
+   */
+  async updateGitStatusAfterRebase(sessionId: string, rebaseType: 'from_main' | 'to_main'): Promise<void> {
+    try {
+      const cached = this.cache[sessionId];
+      if (!cached) {
+        // No cached status, fall back to refresh
+        await this.refreshSessionGitStatus(sessionId, false);
+        return;
+      }
+
+      const session = await this.sessionManager.getSession(sessionId);
+      if (!session || !session.worktreePath) {
+        return;
+      }
+
+      const project = this.sessionManager.getProjectForSession(sessionId);
+      if (!project?.path) {
+        return;
+      }
+
+      const mainBranch = await this.worktreeManager.getProjectMainBranch(project.path);
+      
+      // Create updated status based on rebase type
+      const updatedStatus = { ...cached.status };
+      
+      if (rebaseType === 'from_main') {
+        // After rebasing from main, we're no longer behind
+        updatedStatus.behind = 0;
+        // ahead count stays the same or might change if there were conflicts resolved
+        // hasUncommittedChanges might be true if there were conflicts
+        // We'll do a quick check for uncommitted changes
+        try {
+          const quickStatus = fastCheckWorkingDirectory(session.worktreePath);
+          updatedStatus.hasUncommittedChanges = quickStatus.hasModified || quickStatus.hasStaged;
+          updatedStatus.hasUntrackedFiles = quickStatus.hasUntracked;
+          // Update state based on conflicts
+          if (quickStatus.hasConflicts) {
+            updatedStatus.state = 'conflict';
+          }
+          
+          if (updatedStatus.hasUncommittedChanges) {
+            // Get updated diff stats
+            const quickStats = fastGetDiffStats(session.worktreePath);
+            updatedStatus.additions = quickStats.additions;
+            updatedStatus.deletions = quickStats.deletions;
+            updatedStatus.filesChanged = quickStats.filesChanged;
+          } else {
+            updatedStatus.additions = 0;
+            updatedStatus.deletions = 0;
+            updatedStatus.filesChanged = 0;
+          }
+        } catch {
+          // If quick check fails, fall back to full refresh
+          await this.refreshSessionGitStatus(sessionId, false);
+          return;
+        }
+      } else if (rebaseType === 'to_main') {
+        // After rebasing to main, we're ahead of main with our changes
+        // and no longer behind (since we just rebased onto it)
+        updatedStatus.behind = 0;
+        // ahead count would be the number of commits we have
+        // hasUncommittedChanges should be false (we just rebased cleanly)
+        updatedStatus.hasUncommittedChanges = false;
+        updatedStatus.hasUntrackedFiles = false;
+        updatedStatus.state = 'ahead'; // We're ahead after rebasing to main
+        updatedStatus.additions = 0;
+        updatedStatus.deletions = 0;
+        updatedStatus.filesChanged = 0;
+      }
+
+      // Update cache and emit
+      this.updateCache(sessionId, updatedStatus);
+      this.emitThrottled(sessionId, 'updated', updatedStatus);
+      
+      this.logger?.info(`[GitStatus] Updated status after ${rebaseType} rebase for session ${sessionId}`);
+    } catch (error) {
+      this.logger?.error(`[GitStatus] Error updating status after rebase for session ${sessionId}:`, error as Error);
+      // Fall back to full refresh on error
+      await this.refreshSessionGitStatus(sessionId, false);
+    }
+  }
+
+  /**
    * Force refresh git status for a specific session (with debouncing)
    * @param sessionId - The session ID to refresh
    * @param isUserInitiated - Whether this refresh was triggered by user action (shows loading spinner)
