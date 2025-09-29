@@ -15,7 +15,11 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "electron"
+      "electron",
+      "better-sqlite3",
+      "@homebridge/node-pty-prebuilt-multiarch",
+      "esbuild",
+      "msgpackr-extract"
     ]
   },
   "scripts": {
