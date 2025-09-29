@@ -204,10 +204,11 @@ export function DraggableProjectTreeView() {
         const folderExists = project?.folders?.some(f => f.id === newSession.folderId);
         
         if (!folderExists) {
-          // Instead of reloading everything, fetch just the folder data for this project
-          console.log('[DraggableProjectTreeView] Folder not found for new session, fetching folder data');
-          // We'll add the session anyway and let the folder appear when it's created
-          // The folder:created event handler will handle the folder addition
+          // If the folder doesn't exist in our local state, we need to refresh the data
+          // This can happen when multiple sessions are created quickly in a new folder
+          console.log('[DraggableProjectTreeView] Folder not found for new session, reloading project data');
+          loadProjectsWithSessions();
+          return;
         }
       }
       

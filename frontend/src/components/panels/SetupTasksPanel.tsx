@@ -77,7 +77,7 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
     
     try {
       // First, update the project's run script to "crystal-run.sh"
-      const updateResponse = await API.projects.update(parseInt(projectId), {
+      const updateResponse = await API.projects.update(projectId, {
         run_script: 'crystal-run.sh'
       });
       
