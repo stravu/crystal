@@ -4,17 +4,22 @@ import { getShellPath } from './shellPath';
 
 const nodeExecAsync = promisify(exec);
 
+/**
+ * Extended ExecSyncOptions that includes a custom 'silent' flag
+ * to suppress command execution logging
+ */
+export interface ExtendedExecSyncOptions extends ExecSyncOptions {
+  silent?: boolean;
+}
+
 class CommandExecutor {
   execSync(command: string, options: ExecSyncOptionsWithStringEncoding): string;
   execSync(command: string, options?: ExecSyncOptionsWithBufferEncoding): Buffer;
   execSync(command: string, options?: ExecSyncOptions): string | Buffer {
     // Log the command being executed (unless silent mode requested)
     const cwd = options?.cwd || process.cwd();
-    
-    interface ExtendedOptions extends ExecSyncOptions {
-      silent?: boolean;
-    }
-    const extendedOptions = options as ExtendedOptions;
+
+    const extendedOptions = options as ExtendedExecSyncOptions;
     const silentMode = extendedOptions?.silent === true;
     
     if (!silentMode) {

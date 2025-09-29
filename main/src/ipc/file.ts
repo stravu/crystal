@@ -828,22 +828,26 @@ EOF
       return { success: true, output: result };
     } catch (error) {
       console.error('[git:execute-project] Error:', error);
-      
+
       // Extract error message from execSync error
       let errorMessage = 'Unknown error';
       if (error instanceof Error) {
         errorMessage = error.message;
-        // If it's an execSync error, it may have stderr
-        const execError = error as any;
+        // If it's an execSync error, it may have stderr/stdout buffers
+        interface ExecSyncError extends Error {
+          stderr?: Buffer;
+          stdout?: Buffer;
+        }
+        const execError = error as ExecSyncError;
         if (execError.stderr) {
           errorMessage = execError.stderr.toString();
         } else if (execError.stdout) {
           errorMessage = execError.stdout.toString();
         }
       }
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: errorMessage
       };
     }

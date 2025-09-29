@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { watch, FSWatcher } from 'fs';
 import { join, relative } from 'path';
-import { execSync } from '../utils/commandExecutor';
+import { execSync, ExtendedExecSyncOptions } from '../utils/commandExecutor';
 import type { Logger } from '../utils/logger';
 
 interface WatchedSession {
@@ -214,19 +214,19 @@ export class GitFileWatcher extends EventEmitter {
     try {
       // First, refresh the index to ensure it's up to date
       // This is very fast and updates git's internal cache
-      execSync('git update-index --refresh --ignore-submodules', { cwd: worktreePath, silent: true } as any);
-      
+      execSync('git update-index --refresh --ignore-submodules', { cwd: worktreePath, silent: true } as ExtendedExecSyncOptions);
+
       // Check for unstaged changes (modified files)
       try {
-        execSync('git diff-files --quiet --ignore-submodules', { cwd: worktreePath, silent: true } as any);
+        execSync('git diff-files --quiet --ignore-submodules', { cwd: worktreePath, silent: true } as ExtendedExecSyncOptions);
       } catch {
         // Non-zero exit means there are unstaged changes
         return true;
       }
-      
+
       // Check for staged changes
       try {
-        execSync('git diff-index --cached --quiet HEAD --ignore-submodules', { cwd: worktreePath, silent: true } as any);
+        execSync('git diff-index --cached --quiet HEAD --ignore-submodules', { cwd: worktreePath, silent: true } as ExtendedExecSyncOptions);
       } catch {
         // Non-zero exit means there are staged changes
         return true;
