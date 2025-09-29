@@ -64,7 +64,7 @@
     "better-sqlite3": "^11.7.0",
     "bull": "^4.16.3",
     "dotenv": "^16.4.7",
-    "electron-updater": "^6.6.2",
+    "electron-updater": "^6.6.8",
     "glob": "^11.0.0",
     "openai": "^5.1.1",
     "web-streams-polyfill": "^3.3.3"
@@ -72,8 +72,8 @@
   "devDependencies": {
     "@playwright/test": "^1.52.0",
     "concurrently": "^9.1.0",
-    "electron": "^37.6.0",
-    "electron-builder": "^26.0.12",
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.20",
     "@electron/rebuild": "^4.0.1",
     "node-abi": "^4.14.0",
     "playwright": "^1.52.0",
