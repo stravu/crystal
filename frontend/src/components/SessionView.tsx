@@ -69,15 +69,12 @@ export const SessionView = memo(() => {
     if (activeSession?.id) {
       devLog.debug('[SessionView] Loading panels for session:', activeSession.id);
       
-      // Check if panels are already loaded for this session
-      const existingPanels = panels[activeSession.id] || [];
-      if (existingPanels.length === 0) {
-        // Only load panels if they're not already in the store
-        panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
-          devLog.debug('[SessionView] Loaded panels:', loadedPanels);
-          setPanels(activeSession.id, loadedPanels);
-        });
-      }
+      // Always reload panels from database when switching sessions
+      // to ensure we get the latest saved state
+      panelApi.loadPanelsForSession(activeSession.id).then(loadedPanels => {
+        devLog.debug('[SessionView] Loaded panels:', loadedPanels);
+        setPanels(activeSession.id, loadedPanels);
+      });
       
       panelApi.getActivePanel(activeSession.id).then(activePanel => {
         console.log('[SessionView] Active panel from backend:', activePanel);
@@ -86,7 +83,7 @@ export const SessionView = memo(() => {
         }
       });
     }
-  }, [activeSession?.id, panels, setPanels, setActivePanelInStore]);
+  }, [activeSession?.id, setPanels, setActivePanelInStore]); // Remove panels from deps to avoid skipping reload
   
   // Listen for panel updates from the backend
   useEffect(() => {
