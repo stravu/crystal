@@ -72,7 +72,7 @@
   "devDependencies": {
     "@playwright/test": "^1.52.0",
     "concurrently": "^9.1.0",
-    "electron": "^38.2.0",
+    "electron": "^37.6.0",
     "electron-builder": "^26.0.12",
     "@electron/rebuild": "^4.0.1",
     "node-abi": "^4.14.0",

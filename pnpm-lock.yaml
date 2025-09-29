@@ -52,8 +52,8 @@ importers:
         specifier: ^9.1.0
         version: 9.2.0
       electron:
-        specifier: ^38.2.0
-        version: 38.2.0
+        specifier: ^37.6.0
+        version: 37.6.0
       electron-builder:
         specifier: ^26.0.12
         version: 26.0.12
@@ -294,8 +294,8 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(vitest@2.1.9(@types/node@22.16.5))
       electron:
-        specifier: ^38.2.0
-        version: 38.2.0
+        specifier: ^37.6.0
+        version: 37.6.0
       eslint:
         specifier: ^9.17.0
         version: 9.31.0(jiti@1.21.7)
@@ -2687,8 +2687,8 @@ packages:
   electron-updater@6.6.2:
     resolution: {integrity: sha512-Cr4GDOkbAUqRHP5/oeOmH/L2Bn6+FQPxVLZtPbcmKZC63a1F3uu5EefYOssgZXG3u/zBlubbJ5PJdITdMVggbw==}
 
-  electron@38.2.0:
-    resolution: {integrity: sha512-Cw5Mb+N5NxsG0Hc1qr8I65Kt5APRrbgTtEEn3zTod30UNJRnAE1xbGk/1NOaDn3ODzI/MYn6BzT9T9zreP7xWA==}
+  electron@37.6.0:
+    resolution: {integrity: sha512-8AANcn6irYQ7cTAJRY7r0CovWckcGCHUniQecyGhw/jJ25vWwitVhF97skF+EyDztiEI6YBoF0G6tx1s37bO3g==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -7676,7 +7676,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@38.2.0:
+  electron@37.6.0:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 22.16.5
