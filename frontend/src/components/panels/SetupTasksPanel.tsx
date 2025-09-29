@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, ChevronRight, GitBranch, FileCode } from 'lucide-
 import { useSession } from '../../contexts/SessionContext';
 import { panelApi } from '../../services/panelApi';
 import { API } from '../../utils/api';
-import type { SetupTasksPanelState, ToolPanelState } from '../../../../shared/types/panels';
+import type { SetupTasksPanelState } from '../../../../shared/types/panels';
 import { CreateSessionDialog } from '../CreateSessionDialog';
 
 interface SetupTask {
@@ -273,7 +273,7 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
       state: {
         isActive: true,
         customState: panelState
-      } as Partial<ToolPanelState>
+      }
     });
   }, [isActive, projectId, panelId, checkGitignore, checkRunScript]);
 

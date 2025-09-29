@@ -13,9 +13,9 @@ export interface ExtendedExecSyncOptions extends ExecSyncOptions {
 }
 
 class CommandExecutor {
-  execSync(command: string, options: ExecSyncOptionsWithStringEncoding): string;
-  execSync(command: string, options?: ExecSyncOptionsWithBufferEncoding): Buffer;
-  execSync(command: string, options?: ExecSyncOptions): string | Buffer {
+  execSync(command: string, options: ExecSyncOptionsWithStringEncoding & { silent?: boolean }): string;
+  execSync(command: string, options?: ExecSyncOptionsWithBufferEncoding & { silent?: boolean }): Buffer;
+  execSync(command: string, options?: ExtendedExecSyncOptions): string | Buffer {
     // Log the command being executed (unless silent mode requested)
     const cwd = options?.cwd || process.cwd();
 

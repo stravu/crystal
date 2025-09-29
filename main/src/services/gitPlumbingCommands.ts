@@ -27,21 +27,21 @@ export function fastCheckWorkingDirectory(cwd: string): GitIndexStatus {
   try {
     // 1. Refresh the index first (very fast, updates git's cache)
     try {
-      execSync('git update-index --refresh --ignore-submodules', { cwd, silent: true } as ExtendedExecSyncOptions);
+      execSync('git update-index --refresh --ignore-submodules', { cwd, encoding: 'utf8', silent: true });
     } catch {
       // Some files may have been modified, that's ok
     }
 
     // 2. Check for unstaged changes (modified files in working directory)
     try {
-      execSync('git diff-files --quiet --ignore-submodules', { cwd, silent: true } as ExtendedExecSyncOptions);
+      execSync('git diff-files --quiet --ignore-submodules', { cwd, encoding: 'utf8', silent: true });
     } catch {
       result.hasModified = true;
     }
 
     // 3. Check for staged changes (in index)
     try {
-      execSync('git diff-index --cached --quiet HEAD --ignore-submodules', { cwd, silent: true } as ExtendedExecSyncOptions);
+      execSync('git diff-index --cached --quiet HEAD --ignore-submodules', { cwd, encoding: 'utf8', silent: true });
     } catch {
       result.hasStaged = true;
     }
@@ -131,7 +131,7 @@ export function fastGetDiffStats(cwd: string): { additions: number; deletions: n
  */
 export function isPathModified(cwd: string, path: string): boolean {
   try {
-    execSync(`git diff-files --quiet --ignore-submodules -- "${path}"`, { cwd, silent: true } as ExtendedExecSyncOptions);
+    execSync(`git diff-files --quiet --ignore-submodules -- "${path}"`, { cwd, encoding: 'utf8', silent: true });
     return false;
   } catch {
     return true;
