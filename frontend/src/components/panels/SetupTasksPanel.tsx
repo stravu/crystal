@@ -457,6 +457,7 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
         projectId={parseInt(projectId)}
         projectName={sessionContext?.projectName}
         initialPrompt="Create a new file crystal-run.sh that launches this project. Before launching, the script should safely kill any other running instances of the project."
+        initialSessionName="build-run-script"
       />
     </div>
   );

@@ -75,10 +75,11 @@ interface CreateSessionDialogProps {
   projectName?: string;
   projectId?: number;
   initialPrompt?: string;
+  initialSessionName?: string;
 }
 
-export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, initialPrompt }: CreateSessionDialogProps) {
-  const [sessionName, setSessionName] = useState<string>('');
+export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, initialPrompt, initialSessionName }: CreateSessionDialogProps) {
+  const [sessionName, setSessionName] = useState<string>(initialSessionName || '');
   const [sessionCount, setSessionCount] = useState<number>(1);
   const [toolType, setToolType] = useState<'claude' | 'codex' | 'none'>(initialPrompt ? 'claude' : 'none');
   const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
@@ -202,8 +203,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
   useEffect(() => {
     if (isOpen) {
       loadPreferences();
-      // Always clear session name and prompts when dialog opens
-      setSessionName('');
+      // Only clear session name if there's no initialSessionName
+      if (!initialSessionName) {
+        setSessionName('');
+      } else {
+        setSessionName(initialSessionName);
+      }
       setSessionCount(1);
       setFormData(prev => ({ ...prev, count: 1 }));
       // Only clear prompts if there's no initialPrompt
@@ -216,7 +221,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
       syncImageAttachments(() => []);
       syncTextAttachments(() => []);
     }
-  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments, initialPrompt]);
+  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments, initialPrompt, initialSessionName]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -233,7 +238,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
   // Apply loaded preferences to state
   useEffect(() => {
     if (preferences) {
-      setToolType(preferences.toolType);
+      // If we have an initialPrompt, ensure tool type is not 'none'
+      if (initialPrompt && preferences.toolType === 'none') {
+        setToolType('claude');
+      } else {
+        setToolType(preferences.toolType);
+      }
       setClaudeConfig(prev => ({
         ...prev,
         model: preferences.claudeConfig.model,
@@ -253,7 +263,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
       setCommitModeSettings(preferences.commitModeSettings);
       // Note: we don't apply baseBranch as it should be project-specific
     }
-  }, [preferences]);
+  }, [preferences, initialPrompt]);
 
   // Save preferences when certain settings change
   const savePreferences = async (updates: Partial<typeof preferences>) => {
