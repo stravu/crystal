@@ -293,7 +293,7 @@ export class TaskQueue {
             let codexPanel = null;
             let attempts = 0;
             const maxAttempts = 15;
-            
+
             while (!codexPanel && attempts < maxAttempts) {
               await new Promise(resolve => setTimeout(resolve, 200));
               const { panelManager } = require('./panelManager');
@@ -314,9 +314,9 @@ export class TaskQueue {
                   }
 
                   await codexPanelManager.startPanel(
-                    codexPanel.id, 
-                    session.worktreePath, 
-                    prompt, 
+                    codexPanel.id,
+                    session.worktreePath,
+                    prompt,
                     codexConfig?.model,
                     codexConfig?.modelProvider,
                     codexConfig?.approvalPolicy,
@@ -342,7 +342,7 @@ export class TaskQueue {
             let claudePanel = null;
             let attempts = 0;
             const maxAttempts = 15; // Increased attempts for better reliability
-            
+
             while (!claudePanel && attempts < maxAttempts) {
               await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
               const { panelManager } = require('./panelManager');
@@ -350,11 +350,11 @@ export class TaskQueue {
               claudePanel = existingPanels.find((p: ToolPanel) => p.type === 'claude');
               attempts++;
             }
-            
+
             if (claudePanel) {
               // Import the claude panel manager to start Claude properly
               const { claudePanelManager } = require('../ipc/claudePanel');
-              
+
               if (claudePanelManager) {
                 try {
                   // Record the initial prompt in panel conversation history
@@ -379,9 +379,29 @@ export class TaskQueue {
               console.error(`[TaskQueue] No Claude panel found for session ${session.id} after ${maxAttempts} attempts`);
               throw new Error('No Claude panel found - cannot start Claude without a real panel ID');
             }
-          } else {
+          } else if (resolvedToolType === 'none') {
+            // No AI tool selected - update session status to stopped
+            console.log(`[TaskQueue] Session ${session.id} has no AI tool configured, marking as stopped`);
+            await sessionManager.updateSession(session.id, { status: 'stopped' });
+
+            // Add an informational message to the output
+            const timestamp = formatForDisplay(new Date());
+            const noToolMessage = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[90m ℹ️  NO AI TOOL CONFIGURED \x1b[0m\r\n` +
+                                  `\x1b[90mThis session was created without an AI tool.\x1b[0m\r\n` +
+                                  `\x1b[90mYou can use the terminal and other features without AI assistance.\x1b[0m\r\n\r\n`;
+            await sessionManager.addSessionOutput(session.id, {
+              type: 'stdout',
+              data: noToolMessage,
+              timestamp: new Date()
+            });
           }
         } else {
+          // No prompt provided - update session status to stopped if toolType is 'none'
+          const resolvedToolType: 'claude' | 'codex' | 'none' = toolType || 'claude';
+          if (resolvedToolType === 'none') {
+            console.log(`[TaskQueue] Session ${session.id} has no prompt and no AI tool, marking as stopped`);
+            await sessionManager.updateSession(session.id, { status: 'stopped' });
+          }
         }
 
         return { sessionId: session.id };
