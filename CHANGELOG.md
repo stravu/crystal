@@ -1,6 +1,47 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.3.1] - 2025-09-30
+
+### Major Changes
+- **Setup Tasks Panel**: New guided setup panel on project pane with auto-navigation to incomplete tasks
+- **Major Performance Improvements**: 40%+ CPU reduction through git status polling optimizations and terminal output processing enhancements
+- **Tool calls collapsed by default**: Cleaner output view with expandable tool call details
+- **Attribution messages in commits**: "Co-Authored-By: Crystal" attribution footer for commits made through Crystal. These can be disabled in the settings menu.
+- **Slash Commands in Claude Code**: You can now use commands such as /context in Claude Code panels
+
+### Added
+- **Keyboard navigation between panels**: Use Cmd+Option+Arrow to quickly jump between panels
+- **Tool calls collapsed by default**: Cleaner output view with expandable tool call details
+- **Copy to clipboard for messages**: Copy individual messages directly from the output view
+- **New renderer for TODO lists**: Display Claude's todo lists directly in the output
+- **Cmd+Click for quick session creation**: Quick way to create new sessions without opening dialog
+- **GitHub status loading indicator**: Shows when GitHub integration is loading
+
+### Changed
+- **Claude Code SDK updated to 2.0.0**: Latest SDK version with improved features
+- **Electron temporarily upgraded to 37.6.0** (Previous version had performance issues on OSX Tahoe)
+- **Reduced logging**: Less verbose console output for cleaner logs
+- **Panel state saving improvements**: Better persistence of panel states across sessions
+- **Library updates**: Updated dependencies based on Dependabot security warnings
+
+### Fixed
+- **Run scripts don't auto-start on startup**: Prevents unwanted script execution on app launch
+- **Critical session bugs**: Fixed new sessions stuck on initializing, multiple sessions not appearing, and worktree deletion failures
+- **UI/UX fixes**: Slash command rendering, panel navigation, missing session IDs, and project settings clearing
+- **Performance fixes**: Fixed 2800ms+ frame drops, EventEmitter memory leaks, React infinite loops, and unnecessary re-renders
+- **Editor tab state persistence**: Editor now properly reloads state when switching sessions
+- **Terminal state preservation**: Terminal state no longer lost when switching between sessions
+- **Logs panel disappearing**: Fixed bug where closed logs panel wouldn't reappear
+- **Build fixes**: Multiple GitHub build fixes, Electron version mismatch, type errors, and linting errors
+- **Git operations**: Optimized git status refresh, reduced unnecessary checks, and centralized PATH management
+
+### Performance
+- **Reduced CPU usage by 40%+**: Through git status polling optimizations with smart polling system
+- **Eliminated frame drops**: Fixed 2800ms+ frame drops during terminal output processing
+- **Memory leak fixes**: Fixed EventEmitter leaks in session list
+- **Optimized rendering**: Prevented unnecessary re-renders and improved terminal processing with adaptive debouncing
+
 ## [0.3.0] - 2025-09-21
 
 ### Major Changes
