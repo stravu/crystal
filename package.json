@@ -48,7 +48,7 @@
     "typecheck": "pnpm run -r typecheck",
     "postinstall": "electron-builder install-app-deps",
     "electron:rebuild": "pnpm exec electron-rebuild -f -w better-sqlite3 -m ./main",
-    "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild",
+    "setup": "pnpm install && pnpm run electron:rebuild && pnpm run build:main",
     "generate-notices": "node scripts/generate-notices.js",
     "test": "playwright test",
     "test:ci": "playwright test --config=playwright.ci.config.ts",
