@@ -124,7 +124,7 @@
         }
       ],
       "artifactName": "${productName}-${version}-macOS-universal.${ext}",
-      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-code/vendor/**/*"
+      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/{**/*.node,**/*.dylib,@anthropic-ai/claude-code/vendor/**/*}"
     },
     "linux": {
       "target": [
