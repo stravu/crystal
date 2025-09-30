@@ -332,13 +332,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
     loadMessages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelId]); // Only depend on panelId, not loadMessages - we want this to run only on panel change
-  
-  // Call loadMessages when it changes (but don't reset scroll position)
-  useEffect(() => {
-    if (!isFirstLoadRef.current && panelId) {
-      loadMessages();
-    }
-  }, [loadMessages, panelId]);
+
+  // Removed redundant effect that was calling loadMessages on every parent re-render
+  // Messages are loaded via the initial effect above and real-time updates via the output event listener
 
   // Track if user is at bottom - set up as soon as possible
   useLayoutEffect(() => {

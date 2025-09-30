@@ -21,7 +21,7 @@ interface RichOutputWithSidebarProps {
   showSystemMessages?: boolean;
 }
 
-export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
+export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = React.memo(({
   panelId,
   sessionId,
   sessionStatus,
@@ -119,4 +119,4 @@ export const RichOutputWithSidebar: React.FC<RichOutputWithSidebarProps> = ({
       </div>
     </div>
   );
-};
+});

@@ -287,8 +287,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     ? (activeSession.isRunning ? "Script is running..." : (activeSession.status === 'waiting' ? "Enter your response..." : "Enter terminal command..."))
     : (activeSession.status === 'waiting' ? "Enter your response..." : "Write a command...");
 
-  // Determine button config based on state
-  const getButtonConfig = () => {
+  // Memoize button config to prevent recalculation on every render
+  const buttonConfig = React.useMemo(() => {
     if (viewMode === 'terminal' && !activeSession.isRunning && activeSession.status !== 'waiting') {
       return { text: 'Execute', icon: Play, color: 'green', isPrimary: false };
     } else if (activeSession.status === 'waiting') {
@@ -296,13 +296,12 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     } else {
       return { text: 'Continue', icon: ChevronRight, color: 'blue', isPrimary: true };
     }
-  };
+  }, [viewMode, activeSession.isRunning, activeSession.status]);
 
-  const buttonConfig = getButtonConfig();
   const ButtonIcon = buttonConfig.icon;
 
-  // Get session status
-  const getSessionStatus = () => {
+  // Memoize session status to prevent recalculation on every render
+  const sessionStatus = React.useMemo(() => {
     switch (activeSession.status) {
       case 'initializing':
         return { color: 'bg-status-warning', pulse: true };
@@ -321,19 +320,24 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
       default:
         return { color: 'bg-text-tertiary', pulse: false };
     }
-  };
+  }, [activeSession.status]);
 
-  const sessionStatus = getSessionStatus();
-
-  // Auto-resize textarea
+  // Auto-resize textarea with requestAnimationFrame for better performance
   useEffect(() => {
-    if (textareaRef.current) {
-      // Reset height to auto to allow proper shrinking
-      textareaRef.current.style.height = 'auto';
-      const scrollHeight = textareaRef.current.scrollHeight;
-      const newHeight = Math.min(Math.max(scrollHeight, 52), 200);
-      setTextareaHeight(newHeight);
-    }
+    if (!textareaRef.current) return;
+
+    // Use requestAnimationFrame to batch DOM reads/writes
+    const rafId = requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        // Reset height to auto to allow proper shrinking
+        textareaRef.current.style.height = 'auto';
+        const scrollHeight = textareaRef.current.scrollHeight;
+        const newHeight = Math.min(Math.max(scrollHeight, 52), 200);
+        setTextareaHeight(newHeight);
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [input, textareaRef]);
 
   const handleFocus = useCallback(() => {

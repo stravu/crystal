@@ -173,14 +173,8 @@ export const useClaudePanel = (
     }
   }, [panelId, activeSession?.status]);
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const { scrollHeight } = textareaRef.current;
-      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, 42), 200)}px`;
-    }
-  }, [input]);
+  // Auto-resize textarea is now handled in ClaudeInputWithImages component
+  // Removed duplicate effect to prevent performance issues
 
   // Check Stravu connection status
   useEffect(() => {

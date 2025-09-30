@@ -242,36 +242,52 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
     const cursorPos = e.target.selectionStart || 0;
 
     onChange(newValue);
-    setCursorPosition(cursorPos);
 
-    // Check for @ pattern (file paths) or / pattern (slash commands)
-    const pattern = detectPattern(newValue, cursorPos);
-    setActivePattern(pattern);
+    // Only check for pattern if value contains "@" or "/" - performance optimization
+    if (newValue.includes('@') || newValue.includes('/')) {
+      setCursorPosition(cursorPos);
 
-    if (pattern) {
-      // Clear existing timeout
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
+      // Check for @ pattern (file paths) or / pattern (slash commands)
+      const pattern = detectPattern(newValue, cursorPos);
+      setActivePattern(pattern);
 
-      // Debounce the search
-      searchTimeoutRef.current = setTimeout(() => {
-        if (pattern.type === 'slash') {
-          console.log('[slash-debug] Searching slash commands with pattern:', pattern.pattern);
-          searchSlashCommands(pattern.pattern);
-        } else {
-          searchFiles(pattern.pattern);
+      if (pattern) {
+        // Clear existing timeout
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
         }
-        setShowSuggestions(true);
-      }, 200);
+
+        // Debounce the search
+        searchTimeoutRef.current = setTimeout(() => {
+          if (pattern.type === 'slash') {
+            console.log('[slash-debug] Searching slash commands with pattern:', pattern.pattern);
+            searchSlashCommands(pattern.pattern);
+          } else {
+            searchFiles(pattern.pattern);
+          }
+          setShowSuggestions(true);
+        }, 200);
+      } else {
+        setShowSuggestions(false);
+        setSuggestions([]);
+      }
     } else {
-      setShowSuggestions(false);
-      setSuggestions([]);
+      // No @ or / in text, clear autocomplete state
+      if (showSuggestions) {
+        setShowSuggestions(false);
+        setSuggestions([]);
+        setActivePattern(null);
+      }
     }
   };
 
   // Handle selection change (cursor movement)
   const handleSelectionChange = (e: React.SyntheticEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // Only process cursor movement if autocomplete is active - performance optimization
+    if (!showSuggestions && !value.includes('@') && !value.includes('/')) {
+      return;
+    }
+
     const target = e.target as HTMLInputElement | HTMLTextAreaElement;
     const cursorPos = target.selectionStart || 0;
     setCursorPosition(cursorPos);

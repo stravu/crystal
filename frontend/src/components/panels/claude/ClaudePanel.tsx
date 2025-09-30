@@ -25,7 +25,8 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
     };
   });
 
-  const transformer = new ClaudeMessageTransformer();
+  // Create transformer once and memoize it
+  const transformer = React.useMemo(() => new ClaudeMessageTransformer(), []);
   const activeSession = hook.activeSession;
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
@@ -156,39 +157,17 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
       )}
 
       {/* Main content area */}
-      <div className="flex-1 overflow-hidden relative">
-        {!showDebugTabs && (
-          <div className="absolute top-3 right-3 z-10">
-            <button
-              onClick={toggleSettings}
-              className="p-2 rounded border border-border-primary bg-surface-secondary shadow-sm hover:bg-surface-hover transition-colors"
-              title="Display settings"
-              aria-label="Open Claude settings"
-            >
-              <Settings className="w-4 h-4 text-text-secondary" />
-            </button>
-          </div>
-        )}
-        {activeView === 'richOutput' && (
-          <RichOutputWithSidebar 
-            panelId={panel.id}
-            sessionStatus={activeSession.status}
-            settings={richOutputSettings}
-            onSettingsChange={handleRichOutputSettingsChange}
-            transformer={transformer}
-          />
-        )}
-        {devModeEnabled && activeView === 'messages' && (
-          <MessagesView 
-            panelId={panel.id}
-            agentType="claude"
-            outputEventName="session:output"
-          />
-        )}
-        {devModeEnabled && activeView === 'stats' && (
-          <SessionStats sessionId={activeSession.id} />
-        )}
-      </div>
+      <ClaudeMainContent
+        panelId={panel.id}
+        activeView={activeView}
+        showDebugTabs={showDebugTabs}
+        devModeEnabled={devModeEnabled}
+        activeSession={activeSession}
+        richOutputSettings={richOutputSettings}
+        handleRichOutputSettingsChange={handleRichOutputSettingsChange}
+        transformer={transformer}
+        toggleSettings={toggleSettings}
+      />
 
       {/* Settings Panel */}
       {showSettings && (
@@ -234,6 +213,69 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
 });
 
 ClaudePanel.displayName = 'ClaudePanel';
+
+// Memoized main content component to prevent unnecessary re-renders when input changes
+const ClaudeMainContent = React.memo<{
+  panelId: string;
+  activeView: string;
+  showDebugTabs: boolean;
+  devModeEnabled: boolean;
+  activeSession: { id: string; status: string };
+  richOutputSettings: RichOutputSettings;
+  handleRichOutputSettingsChange: (settings: RichOutputSettings) => void;
+  transformer: ClaudeMessageTransformer;
+  toggleSettings: () => void;
+}>(({ panelId, activeView, showDebugTabs, devModeEnabled, activeSession, richOutputSettings, handleRichOutputSettingsChange, transformer, toggleSettings }) => {
+  return (
+    <div className="flex-1 overflow-hidden relative">
+      {!showDebugTabs && (
+        <div className="absolute top-3 right-3 z-10">
+          <button
+            onClick={toggleSettings}
+            className="p-2 rounded border border-border-primary bg-surface-secondary shadow-sm hover:bg-surface-hover transition-colors"
+            title="Display settings"
+            aria-label="Open Claude settings"
+          >
+            <Settings className="w-4 h-4 text-text-secondary" />
+          </button>
+        </div>
+      )}
+      {activeView === 'richOutput' && (
+        <RichOutputWithSidebar
+          panelId={panelId}
+          sessionStatus={activeSession.status}
+          settings={richOutputSettings}
+          onSettingsChange={handleRichOutputSettingsChange}
+          transformer={transformer}
+        />
+      )}
+      {devModeEnabled && activeView === 'messages' && (
+        <MessagesView
+          panelId={panelId}
+          agentType="claude"
+          outputEventName="session:output"
+        />
+      )}
+      {devModeEnabled && activeView === 'stats' && (
+        <SessionStats sessionId={activeSession.id} />
+      )}
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function - only re-render if these specific props change
+  return (
+    prevProps.panelId === nextProps.panelId &&
+    prevProps.activeView === nextProps.activeView &&
+    prevProps.showDebugTabs === nextProps.showDebugTabs &&
+    prevProps.devModeEnabled === nextProps.devModeEnabled &&
+    prevProps.activeSession.id === nextProps.activeSession.id &&
+    prevProps.activeSession.status === nextProps.activeSession.status &&
+    prevProps.richOutputSettings === nextProps.richOutputSettings &&
+    prevProps.transformer === nextProps.transformer
+  );
+});
+
+ClaudeMainContent.displayName = 'ClaudeMainContent';
 
 // Default export for lazy loading
 export default ClaudePanel;
