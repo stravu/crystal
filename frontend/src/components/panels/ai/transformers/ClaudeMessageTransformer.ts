@@ -176,10 +176,33 @@ export class ClaudeMessageTransformer implements MessageTransformer {
   }
   
   private parseUserMessage(msg: ClaudeRawMessage): UnifiedMessage | null {
+    // First, extract the text content to check for slash command results
+    const textContent = this.extractTextContent(msg);
+
+    // Check if this is a slash command result (contains <local-command-stdout> tags)
+    if (textContent && textContent.includes('<local-command-stdout>')) {
+      // Extract content and remove tags
+      const slashCommandContent = textContent
+        .replace(/<local-command-stdout>/g, '')
+        .replace(/<\/local-command-stdout>/g, '')
+        .trim();
+
+      return {
+        id: msg.id || `slash_result_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: msg.timestamp,
+        segments: [{ type: 'text', content: slashCommandContent }],
+        metadata: {
+          agent: 'claude',
+          systemSubtype: 'slash_command_result'
+        }
+      };
+    }
+
     // Check if this is a tool result message
     let hasToolResult = false;
     let hasOnlyText = true;
-    
+
     if (msg.message?.content && Array.isArray(msg.message.content)) {
       const content = msg.message.content;
       for (let j = 0; j < content.length; j++) {
@@ -193,11 +216,9 @@ export class ClaudeMessageTransformer implements MessageTransformer {
         }
       }
     }
-    
+
     // Only show real user prompts (text-only messages without tool results)
     if (!hasToolResult && hasOnlyText) {
-      const textContent = this.extractTextContent(msg);
-      
       if (textContent) {
         return {
           id: msg.id || `user_msg_${++this.messageIdCounter}`,
@@ -208,7 +229,7 @@ export class ClaudeMessageTransformer implements MessageTransformer {
         };
       }
     }
-    
+
     return null;
   }
   

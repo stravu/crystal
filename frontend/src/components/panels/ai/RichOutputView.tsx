@@ -223,6 +223,12 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
         if (conversationResponse.success && Array.isArray(conversationResponse.data)) {
           conversationResponse.data.forEach((msg: ConversationMessage) => {
             if (msg.message_type === 'user') {
+              // Skip slash command tool results (they contain <local-command-stdout> tags)
+              if (msg.content && typeof msg.content === 'string' && msg.content.includes('<local-command-stdout>')) {
+                // This is a slash command result, skip it - it will be shown from JSON messages
+                return;
+              }
+
               userPrompts.push({
                 type: 'user',
                 message: {
@@ -631,9 +637,11 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
             />
           )}
           
-          {/* Group consecutive tools, but break on TodoWrite */}
+          {/* Group consecutive tools, but break on TodoWrite and filter out SlashCommand */}
           {settings.showToolCalls && (() => {
-            const toolSegments = message.segments.filter(seg => seg.type === 'tool_call');
+            const toolSegments = message.segments.filter(seg =>
+              seg.type === 'tool_call' && seg.tool.name !== 'SlashCommand'
+            );
             if (toolSegments.length === 0) return null;
             
             const groups: { tools: typeof message.segments, isTodoWrite: boolean }[] = [];
@@ -1136,6 +1144,37 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 <div className="text-sm text-text-primary">
                   <span className="font-medium">Ready to continue!</span> {helpMessage}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (message.metadata?.systemSubtype === 'slash_command_result') {
+      // Render slash command result with subtle styling
+      return (
+        <div
+          key={message.id}
+          className={`
+            rounded-lg transition-all border bg-surface-tertiary/50 border-border-primary
+            ${settings.compactMode ? 'p-3' : 'p-4'}
+            ${needsExtraSpacing ? 'mt-4' : ''}
+          `}
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-full p-2 bg-surface-secondary text-text-secondary">
+              <Terminal className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-semibold text-text-primary">
+                  Result
+                </span>
+                <span className="text-sm text-text-tertiary">
+                  {formatDistanceToNow(parseTimestamp(message.timestamp))}
+                </span>
+              </div>
+              <div className="bg-surface-secondary rounded-lg p-3 text-sm text-text-primary whitespace-pre-wrap font-mono">
+                {textContent}
               </div>
             </div>
           </div>
