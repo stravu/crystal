@@ -30,6 +30,35 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
 
+  // Extract and store slash commands when we get JSON messages with init
+  useEffect(() => {
+    if (!activeSession) return;
+
+    const handleSlashCommandsFromMessages = () => {
+      const jsonMessages = activeSession.jsonMessages || [];
+
+      // Look for init message with slash_commands
+      const initMessage = jsonMessages.find((msg: { type?: string; subtype?: string; slash_commands?: string[] }) =>
+        msg.type === 'system' && msg.subtype === 'init' && msg.slash_commands
+      );
+
+      if (initMessage && Array.isArray(initMessage.slash_commands)) {
+        console.log('[slash-debug] Found init message with slash commands for Crystal session:', activeSession.id);
+        console.log('[slash-debug] Commands:', initMessage.slash_commands);
+
+        try {
+          const slashCommandsKey = `slashCommands_${activeSession.id}`;
+          localStorage.setItem(slashCommandsKey, JSON.stringify(initMessage.slash_commands));
+          console.log('[slash-debug] Stored slash commands for Crystal session:', activeSession.id);
+        } catch (e) {
+          console.warn('[slash-debug] Failed to store slash commands for Crystal session:', e);
+        }
+      }
+    };
+
+    handleSlashCommandsFromMessages();
+  }, [activeSession?.jsonMessages, activeSession?.id]);
+
   const handleRichOutputSettingsChange = (newSettings: RichOutputSettings) => {
     setRichOutputSettings(newSettings);
     localStorage.setItem('richOutputSettings', JSON.stringify(newSettings));

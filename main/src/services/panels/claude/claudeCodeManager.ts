@@ -166,6 +166,40 @@ export class ClaudeCodeManager extends AbstractCliManager {
       const jsonMessage = JSON.parse(data.trim());
       this.logger?.verbose(`JSON message from panel ${panelId} (session ${sessionId}): ${JSON.stringify(jsonMessage)}`);
 
+      // Check for system init message with available slash commands
+      if (jsonMessage.type === 'system' && jsonMessage.subtype === 'init') {
+        // Check if SlashCommand tool is available
+        if (jsonMessage.tools && Array.isArray(jsonMessage.tools)) {
+          const hasSlashCommandTool = jsonMessage.tools.includes('SlashCommand');
+          console.log(`[slash-debug] SlashCommand tool ${hasSlashCommandTool ? 'IS' : 'IS NOT'} available in this session`);
+        }
+
+        // Log available slash commands
+        if (jsonMessage.slash_commands) {
+          const slashCommands = jsonMessage.slash_commands;
+          console.log(`[slash-debug] Claude Code initialized with slash commands:`, slashCommands);
+          console.log(`[slash-debug] Available commands: ${Array.isArray(slashCommands) ? slashCommands.join(', ') : 'none'}`);
+        }
+      }
+
+      // Check for SlashCommand tool usage in assistant messages
+      if (jsonMessage.type === 'assistant' && jsonMessage.message?.content) {
+        const content = jsonMessage.message.content;
+        if (Array.isArray(content)) {
+          const slashCommandTools = content.filter((item: { type?: string; name?: string; input?: { command?: string } }) =>
+            item.type === 'tool_use' && item.name === 'SlashCommand'
+          );
+
+          if (slashCommandTools.length > 0) {
+            slashCommandTools.forEach((tool: { input?: { command?: string } }) => {
+              const command = tool.input?.command || 'unknown';
+              console.log(`[slash-debug] Detected SlashCommand in assistant message: ${command}`);
+              console.log(`[slash-debug] Full tool data:`, JSON.stringify(tool, null, 2));
+            });
+          }
+        }
+      }
+
       // Emit JSON message - terminal formatting will be done on the fly
       events.push({
         panelId,

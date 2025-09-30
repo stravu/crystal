@@ -149,7 +149,15 @@ export function formatToolInteraction(
   }
   
   // Format the tool call header
-  let output = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[33m🔧 Tool: ${toolCall.name}\x1b[0m\r\n`;
+  // Special header for slash commands
+  let output: string;
+  if (toolCall.name === 'SlashCommand') {
+    const command = toolCall.input.command || 'unknown';
+    console.log(`[slash-debug] Formatting SlashCommand tool: ${command}`);
+    output = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[45m\x1b[97m ⚡ SLASH COMMAND \x1b[0m \x1b[1m\x1b[95m${command}\x1b[0m\r\n`;
+  } else {
+    output = `\r\n\x1b[36m[${timestamp}]\x1b[0m \x1b[1m\x1b[33m🔧 Tool: ${toolCall.name}\x1b[0m\r\n`;
+  }
   
   // Format parameters based on tool type
   if (toolCall.input && Object.keys(toolCall.input).length > 0) {
@@ -209,6 +217,11 @@ export function formatToolInteraction(
       }
     } else if (toolCall.name === 'TodoRead') {
       output += `\x1b[90m│  Reading current task list...\x1b[0m\r\n`;
+    } else if (toolCall.name === 'SlashCommand' && toolCall.input.command) {
+      // Special logging for slash commands with [slash-debug] prefix
+      console.log(`[slash-debug] SlashCommand tool invoked: ${toolCall.input.command}`);
+      output += `\x1b[90m│  \x1b[0m\x1b[95mCommand: ${toolCall.input.command}\x1b[0m\r\n`;
+      console.log(`[slash-debug] SlashCommand details:`, JSON.stringify(toolCall.input, null, 2));
     } else {
       // Generic parameter display
       const paramStr = JSON.stringify(toolCall.input, null, 2);

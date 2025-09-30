@@ -277,19 +277,36 @@ export class ClaudeMessageTransformer implements MessageTransformer {
   
   private parseSystemMessage(msg: ClaudeRawMessage): UnifiedMessage | null {
     if (msg.subtype === 'init') {
+      // Extract slash commands if available
+      if (msg.slash_commands && Array.isArray(msg.slash_commands)) {
+        console.log('[slash-debug] Detected slash commands in init message:', msg.slash_commands);
+        // Store slash commands in localStorage keyed by session_id
+        // We'll update this to use panel context later
+        if (msg.session_id) {
+          try {
+            const slashCommandsKey = `slashCommands_${msg.session_id}`;
+            localStorage.setItem(slashCommandsKey, JSON.stringify(msg.slash_commands));
+            console.log('[slash-debug] Stored slash commands for session:', msg.session_id);
+          } catch (e) {
+            console.warn('[slash-debug] Failed to store slash commands:', e);
+          }
+        }
+      }
+
       return {
         id: msg.id || `system_init_msg_${++this.messageIdCounter}`,
         role: 'system',
         timestamp: msg.timestamp,
-        segments: [{ 
-          type: 'system_info', 
+        segments: [{
+          type: 'system_info',
           info: {
             cwd: msg.cwd,
             model: msg.model,
             tools: msg.tools,
             mcp_servers: msg.mcp_servers,
             permissionMode: msg.permissionMode,
-            session_id: msg.session_id
+            session_id: msg.session_id,
+            slash_commands: msg.slash_commands
           }
         }],
         metadata: {

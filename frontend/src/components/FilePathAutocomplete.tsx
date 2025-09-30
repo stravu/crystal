@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FileText, Folder } from 'lucide-react';
+import { FileText, Folder, Zap } from 'lucide-react';
 
 interface FileItem {
   path: string;
@@ -48,7 +48,7 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [activePattern, setActivePattern] = useState<{ start: number; pattern: string } | null>(null);
+  const [activePattern, setActivePattern] = useState<{ start: number; pattern: string; type: 'file' | 'slash' } | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ 
     left?: number; 
     right?: number; 
@@ -69,13 +69,20 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
     return inputRef.current;
   };
 
-  // Detect @ pattern in the text
+  // Detect @ pattern (file paths) or / pattern (slash commands) in the text
   const detectPattern = useCallback((text: string, cursorPos: number) => {
-    // Find the last @ before the cursor
-    let lastAtIndex = -1;
+    // Find the last @ or / before the cursor
+    let lastPatternIndex = -1;
+    let patternType: 'file' | 'slash' | null = null;
+
     for (let i = cursorPos - 1; i >= 0; i--) {
       if (text[i] === '@') {
-        lastAtIndex = i;
+        lastPatternIndex = i;
+        patternType = 'file';
+        break;
+      } else if (text[i] === '/') {
+        lastPatternIndex = i;
+        patternType = 'slash';
         break;
       }
       // Stop if we hit whitespace or newline
@@ -84,12 +91,12 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
       }
     }
 
-    if (lastAtIndex !== -1) {
-      // Extract the pattern from @ to cursor
-      const pattern = text.substring(lastAtIndex + 1, cursorPos);
-      // Check if there's no whitespace after the @
+    if (lastPatternIndex !== -1 && patternType) {
+      // Extract the pattern from @ or / to cursor
+      const pattern = text.substring(lastPatternIndex + 1, cursorPos);
+      // Check if there's no whitespace after the trigger
       if (!pattern.includes(' ') && !pattern.includes('\n')) {
-        return { start: lastAtIndex, pattern };
+        return { start: lastPatternIndex, pattern, type: patternType };
       }
     }
     return null;
@@ -173,6 +180,40 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
     });
   }, []);
 
+  // Get available slash commands for the current session
+  const getSlashCommands = useCallback((): FileItem[] => {
+    if (!sessionId) return [];
+
+    try {
+      const slashCommandsKey = `slashCommands_${sessionId}`;
+      const stored = localStorage.getItem(slashCommandsKey);
+      if (stored) {
+        const commands: string[] = JSON.parse(stored);
+        console.log('[slash-debug] Retrieved slash commands from localStorage:', commands);
+        return commands.map(cmd => ({
+          path: cmd,
+          isDirectory: false,
+          name: cmd
+        }));
+      }
+    } catch (e) {
+      console.warn('[slash-debug] Failed to retrieve slash commands:', e);
+    }
+
+    return [];
+  }, [sessionId]);
+
+  // Search for slash commands
+  const searchSlashCommands = useCallback((pattern: string) => {
+    const commands = getSlashCommands();
+    const filtered = commands.filter(cmd =>
+      cmd.path.toLowerCase().includes(pattern.toLowerCase())
+    );
+    console.log('[slash-debug] Filtered slash commands:', filtered);
+    setSuggestions(filtered);
+    setSelectedIndex(0);
+  }, [getSlashCommands]);
+
   // Search for files
   const searchFiles = useCallback(async (pattern: string) => {
     if (!sessionId && !projectId) return;
@@ -199,11 +240,11 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart || 0;
-    
+
     onChange(newValue);
     setCursorPosition(cursorPos);
 
-    // Check for @ pattern
+    // Check for @ pattern (file paths) or / pattern (slash commands)
     const pattern = detectPattern(newValue, cursorPos);
     setActivePattern(pattern);
 
@@ -215,7 +256,12 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
 
       // Debounce the search
       searchTimeoutRef.current = setTimeout(() => {
-        searchFiles(pattern.pattern);
+        if (pattern.type === 'slash') {
+          console.log('[slash-debug] Searching slash commands with pattern:', pattern.pattern);
+          searchSlashCommands(pattern.pattern);
+        } else {
+          searchFiles(pattern.pattern);
+        }
         setShowSuggestions(true);
       }, 200);
     } else {
@@ -243,11 +289,12 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
   const selectSuggestion = (suggestion: FileItem) => {
     if (!activePattern) return;
 
-    // Replace the pattern with the selected file path
+    // Replace the pattern with the selected path
     const before = value.substring(0, activePattern.start);
     const after = value.substring(cursorPosition);
-    const newValue = before + '@' + suggestion.path + after;
-    
+    const prefix = activePattern.type === 'slash' ? '/' : '@';
+    const newValue = before + prefix + suggestion.path + after;
+
     onChange(newValue);
     setShowSuggestions(false);
     setSuggestions([]);
@@ -266,6 +313,10 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
     // Call onSelect callback if provided
     if (onSelect) {
       onSelect(suggestion.path);
+    }
+
+    if (activePattern.type === 'slash') {
+      console.log('[slash-debug] Selected slash command:', suggestion.path);
     }
   };
 
@@ -385,25 +436,34 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
             })
           }}
         >
-          {suggestions.map((suggestion, index) => (
-            <div
-              key={suggestion.path}
-              className={`flex items-center px-4 py-2.5 cursor-pointer min-w-0 transition-colors ${
-                index === selectedIndex
-                  ? 'bg-interactive text-on-interactive'
-                  : 'text-text-secondary hover:bg-surface-hover'
-              }`}
-              onClick={() => selectSuggestion(suggestion)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              {suggestion.isDirectory ? (
-                <Folder className="w-4 h-4 mr-3 flex-shrink-0" />
-              ) : (
-                <FileText className="w-4 h-4 mr-3 flex-shrink-0" />
-              )}
-              <span className="text-sm truncate pr-2" title={suggestion.path}>{suggestion.path}</span>
-            </div>
-          ))}
+          {suggestions.map((suggestion, index) => {
+            // Check if this is a slash command (activePattern will be set)
+            const isSlashCommand = activePattern?.type === 'slash';
+
+            return (
+              <div
+                key={suggestion.path}
+                className={`flex items-center px-4 py-2.5 cursor-pointer min-w-0 transition-colors ${
+                  index === selectedIndex
+                    ? 'bg-interactive text-on-interactive'
+                    : 'text-text-secondary hover:bg-surface-hover'
+                }`}
+                onClick={() => selectSuggestion(suggestion)}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                {isSlashCommand ? (
+                  <Zap className="w-4 h-4 mr-3 flex-shrink-0 text-purple-500" />
+                ) : suggestion.isDirectory ? (
+                  <Folder className="w-4 h-4 mr-3 flex-shrink-0" />
+                ) : (
+                  <FileText className="w-4 h-4 mr-3 flex-shrink-0" />
+                )}
+                <span className="text-sm truncate pr-2" title={suggestion.path}>
+                  {isSlashCommand ? '/' : ''}{suggestion.path}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
