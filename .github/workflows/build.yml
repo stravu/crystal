@@ -108,7 +108,7 @@ jobs:
     - name: Rebuild native modules (if needed)
       run: |
         # Only rebuild if native modules cache missed or build files changed
-        if [ ! -f "main/node_modules/.bin/electron-rebuild" ] || [ ! -f "main/build/Release/better_sqlite3.node" ]; then
+        if [ ! -f "main/build/Release/better_sqlite3.node" ]; then
           echo "Rebuilding native modules..."
           pnpm run electron:rebuild
         else

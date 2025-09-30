@@ -47,7 +47,7 @@
     "lint": "pnpm run -r lint",
     "typecheck": "pnpm run -r typecheck",
     "postinstall": "electron-builder install-app-deps",
-    "electron:rebuild": "cd main && npx @electron/rebuild -f -w better-sqlite3",
+    "electron:rebuild": "pnpm exec electron-rebuild -f -w better-sqlite3 -m ./main",
     "setup": "pnpm install && pnpm run build:main && pnpm run electron:rebuild",
     "generate-notices": "node scripts/generate-notices.js",
     "test": "playwright test",

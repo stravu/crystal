@@ -36,10 +36,13 @@ The following packages are licensed under the MIT license:
   - @braintree/sanitize-url (7.1.1)
   - @develar/schema-utils (2.6.5) - webpack Contrib (https://github.com/webpack-contrib)
   - @electron/asar (3.4.1)
+  - @electron/fuses (1.8.0) - Electron Community
   - @electron/get (2.0.3) - Samuel Attard
+  - @electron/node-gyp (10.2.0-electron.1) - Nathan Rajlich <nathan@tootallnate.net> (http://tootallnate.net)
   - @electron/notarize (2.5.0) - Samuel Attard
-  - @electron/rebuild (3.6.1) - Paul Betts <paul@paulbetts.org>
-  - @electron/universal (2.0.1) - Samuel Attard
+  - @electron/rebuild (3.7.2)
+  - @electron/rebuild (4.0.1)
+  - @electron/universal (2.0.3) - Samuel Attard
   - @emotion/babel-plugin (11.13.5) - Kye Hohenberger
   - @emotion/cache (11.14.0)
   - @emotion/css (11.13.5) - Kye Hohenberger
@@ -113,8 +116,8 @@ The following packages are licensed under the MIT license:
   - ansi-styles (6.2.1) - Sindre Sorhus
   - ansi-to-html (0.7.2) - Rob Burns
   - any-promise (1.3.0) - Kevin Beaty
-  - app-builder-bin (5.0.0-alpha.10)
-  - app-builder-lib (25.1.8) - Vladimir Krivosheev
+  - app-builder-bin (5.0.0-alpha.12)
+  - app-builder-lib (26.0.20) - Vladimir Krivosheev
   - arg (5.0.2) - Josh Junon <junon@wavetilt.com>
   - aria-hidden (1.2.6) - Anton Korzunov <thekashey@gmail.com>
   - assert-plus (1.0.0) - Mark Cavage <mcavage@gmail.com>
@@ -132,8 +135,6 @@ The following packages are licensed under the MIT license:
   - binary-extensions (2.3.0) - Sindre Sorhus
   - bindings (1.5.0) - Nathan Rajlich <nathan@tootallnate.net> (http://tootallnate.net)
   - bl (4.1.0)
-  - bluebird (3.7.2) - Petka Antonov
-  - bluebird-lst (1.0.9) - Vladimir Krivosheev
   - body-parser (2.2.0)
   - boolean (3.2.0)
   - brace-expansion (1.1.12) - Julian Gruber
@@ -143,9 +144,8 @@ The following packages are licensed under the MIT license:
   - buffer (5.7.1) - Feross Aboukhadijeh
   - buffer-crc32 (0.2.13) - Brian J. Brennan <brianloveswords@gmail.com>
   - buffer-from (1.1.2)
-  - builder-util (25.1.7) - Vladimir Krivosheev
-  - builder-util-runtime (9.2.10) - Vladimir Krivosheev
-  - builder-util-runtime (9.3.1) - Vladimir Krivosheev
+  - builder-util (26.0.20) - Vladimir Krivosheev
+  - builder-util-runtime (9.4.0) - Vladimir Krivosheev
   - bull (4.16.5) - OptimalBits
   - bytes (3.1.2) - TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)
   - cac (6.7.14) - egoist <0x142857@gmail.com>
@@ -166,7 +166,7 @@ The following packages are licensed under the MIT license:
   - chevrotain-allstar (0.3.1) - TypeFox
   - chokidar (3.6.0) - Paul Miller (https://paulmillr.com)
   - chromium-pickle-js (0.2.0)
-  - ci-info (3.9.0) - Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)
+  - ci-info (4.3.0) - Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)
   - classnames (2.5.1) - Jed Watson
   - clean-stack (2.2.0) - Sindre Sorhus
   - cli-cursor (3.1.0) - Sindre Sorhus
@@ -185,10 +185,9 @@ The following packages are licensed under the MIT license:
   - commander (8.3.0) - TJ Holowaychuk <tj@vision-media.ca>
   - compare-version (0.1.2) - Kevin Mårtensson
   - concat-map (0.0.1) - James Halliday
-  - conf (14.0.0) - Sindre Sorhus
+  - conf (15.0.0) - Sindre Sorhus
   - confbox (0.1.8)
   - confbox (0.2.2)
-  - config-file-ts (0.2.8-rc1) - lee mighdoll
   - content-disposition (1.0.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - content-type (1.0.5) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - convert-source-map (1.9.0) - Thorsten Lorenz
@@ -223,7 +222,6 @@ The following packages are licensed under the MIT license:
   - define-data-property (1.1.4) - Jordan Harband <ljharb@gmail.com>
   - define-properties (1.2.1) - Jordan Harband <ljharb@gmail.com>
   - delayed-stream (1.0.0) - Felix Geisendörfer <felix@debuggable.com> (http://debuggable.com/)
-  - delegates (1.0.0)
   - depd (2.0.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - dequal (2.0.3) - Luke Edwards
   - detect-node (2.1.0) - Ilya Kantor
@@ -231,16 +229,16 @@ The following packages are licensed under the MIT license:
   - devlop (1.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - dir-compare (4.2.0) - Liviu Grigorescu
   - dlv (1.1.3) - Jason Miller <jason@developit.ca> (http://jasonformat.com)
-  - dmg-builder (25.1.8) - Vladimir Krivosheev
+  - dmg-builder (26.0.20) - Vladimir Krivosheev
   - dmg-license (1.0.11) - argvminusone
-  - dot-prop (9.0.0) - Sindre Sorhus
+  - dot-prop (10.0.0) - Sindre Sorhus
   - dunder-proto (1.0.1) - Jordan Harband <ljharb@gmail.com>
   - eastasianwidth (0.2.0) - Masaki Komagata
   - ee-first (1.1.1) - Jonathan Ong
-  - electron (36.9.0) - Electron Community
-  - electron-publish (25.1.7) - Vladimir Krivosheev
-  - electron-store (10.1.0) - Sindre Sorhus
-  - electron-updater (6.6.2) - Vladimir Krivosheev
+  - electron (37.6.0) - Electron Community
+  - electron-publish (26.0.20) - Vladimir Krivosheev
+  - electron-store (11.0.0) - Sindre Sorhus
+  - electron-updater (6.6.8) - Vladimir Krivosheev
   - emoji-regex (8.0.0) - Mathias Bynens
   - emoji-regex (9.2.2) - Mathias Bynens
   - encodeurl (2.0.0)
@@ -342,7 +340,6 @@ The following packages are licensed under the MIT license:
   - is-alphanumerical (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - is-arrayish (0.2.1) - Qix (http://github.com/qix-)
   - is-binary-path (2.1.0) - Sindre Sorhus
-  - is-ci (3.0.1) - Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)
   - is-core-module (2.16.1) - Jordan Harband <ljharb@gmail.com>
   - is-decimal (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - is-extglob (2.1.1) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -358,6 +355,7 @@ The following packages are licensed under the MIT license:
   - isbinaryfile (4.0.10)
   - isbinaryfile (5.0.4)
   - jiti (1.21.7)
+  - jiti (2.6.0)
   - js-tokens (4.0.0) - Simon Lydell
   - js-yaml (4.1.0) - Vladimir Zapparov <dervus.grim@gmail.com>
   - jsbn (1.1.0) - Tom Wu
@@ -395,7 +393,6 @@ The following packages are licensed under the MIT license:
   - loupe (3.1.4) - Veselin Todorov <hi@vesln.com>
   - lowercase-keys (2.0.0) - Sindre Sorhus
   - luxon (3.7.1) - Isaac Cambron
-  - lzma-native (8.0.6) - Anna Henningsen
   - magic-string (0.30.17) - Rich Harris
   - magicast (0.3.5)
   - make-dir (4.0.0) - Sindre Sorhus
@@ -463,7 +460,9 @@ The following packages are licensed under the MIT license:
   - mimic-response (3.1.0) - Sindre Sorhus
   - minimist (1.2.8) - James Halliday
   - minipass-fetch (2.1.2) - GitHub Inc.
+  - minipass-fetch (4.0.1) - GitHub Inc.
   - minizlib (2.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - minizlib (3.1.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - mlly (1.7.4)
   - monaco-editor (0.52.2) - Microsoft Corporation
   - ms (2.1.3)
@@ -475,14 +474,12 @@ The following packages are licensed under the MIT license:
   - natural-compare (1.4.0) - Lauri Rooden (https://github.com/litejs/natural-compare-lite)
   - negotiator (0.6.4)
   - negotiator (1.0.0)
-  - node-abi (3.75.0) - Lukas Geiger
+  - node-abi (3.77.0) - Lukas Geiger
+  - node-abi (4.14.0) - Lukas Geiger
   - node-addon-api (1.7.2)
-  - node-addon-api (3.2.1)
   - node-addon-api (7.1.1)
-  - node-api-version (0.1.4) - Tim Fish <tim@timfish.uk>
   - node-api-version (0.2.1) - Tim Fish <tim@timfish.uk>
-  - node-gyp (9.4.1) - Nathan Rajlich <nathan@tootallnate.net> (http://tootallnate.net)
-  - node-gyp-build (4.8.4) - Mathias Buus (@mafintosh)
+  - node-gyp (11.4.2) - Nathan Rajlich <nathan@tootallnate.net> (http://tootallnate.net)
   - node-gyp-build-optional-packages (5.2.2) - Mathias Buus (@mafintosh)
   - node-releases (2.0.19) - Sergey Rubanov <chi187@gmail.com>
   - normalize-path (3.0.0) - Jon Schlinkert (https://github.com/jonschlinkert)
@@ -500,6 +497,7 @@ The following packages are licensed under the MIT license:
   - p-limit (3.1.0) - Sindre Sorhus
   - p-locate (5.0.0) - Sindre Sorhus
   - p-map (4.0.0) - Sindre Sorhus
+  - p-map (7.0.3) - Sindre Sorhus
   - package-manager-detector (1.3.0) - Anthony Fu <anthonyfu117@hotmail.com>
   - parent-module (1.0.1) - Sindre Sorhus
   - parse-entities (4.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -594,6 +592,7 @@ The following packages are licensed under the MIT license:
   - smart-buffer (4.2.0) - Josh Glazebrook
   - socks (2.8.6) - Josh Glazebrook
   - socks-proxy-agent (7.0.0) - Nathan Rajlich
+  - socks-proxy-agent (8.0.5) - Nathan Rajlich
   - source-map-support (0.5.21)
   - space-separated-tokens (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - stackback (0.0.2) - Roman Shtylman <shtylman@gmail.com>
@@ -619,12 +618,14 @@ The following packages are licensed under the MIT license:
   - supports-color (7.2.0) - Sindre Sorhus
   - supports-color (8.1.1) - Sindre Sorhus
   - supports-preserve-symlinks-flag (1.0.0) - Jordan Harband <ljharb@gmail.com>
+  - tagged-tag (1.0.0) - Sindre Sorhus
   - tailwind-merge (2.6.0) - Dany Castillo
   - tar-fs (2.1.3) - Mathias Buus
   - tar-stream (2.2.0) - Mathias Buus <mathiasbuus@gmail.com>
   - temp-file (3.4.0) - Vladimir Krivosheev
   - thenify (3.3.1) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - thenify-all (1.6.0) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
+  - tiny-async-pool (1.3.0) - Rafael Xavier de Souza
   - tiny-typed-emitter (2.1.0) - Zurab Benashvili <zura.benashvili@gmail.com>
   - tinybench (2.9.0)
   - tinyexec (0.3.2) - James Garbutt (https://github.com/43081j)
@@ -645,7 +646,7 @@ The following packages are licensed under the MIT license:
   - type-check (0.4.0) - George Zahariev <z@georgezahariev.com>
   - type-is (2.0.1)
   - ufo (1.6.1)
-  - uint8array-extras (1.4.0) - Sindre Sorhus
+  - uint8array-extras (1.5.0) - Sindre Sorhus
   - undici-types (6.21.0)
   - unified (11.0.5) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - unist-util-is (6.0.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -702,19 +703,20 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 The following packages are licensed under the ISC license:
 
   - @isaacs/cliui (8.0.2) - Ben Coe <ben@npmjs.com>
+  - @isaacs/fs-minipass (4.0.1) - Isaac Z. Schlueter
+  - @npmcli/agent (3.0.0) - GitHub Inc.
   - @npmcli/fs (2.1.2) - GitHub Inc.
+  - @npmcli/fs (4.0.0) - GitHub Inc.
   - @ungap/structured-clone (1.3.0) - Andrea Giammarchi
   - abbrev (1.1.1) - Isaac Z. Schlueter <i@izs.me>
+  - abbrev (3.0.1) - GitHub Inc.
   - anymatch (3.1.3) - Elan Shanker
-  - aproba (2.1.0) - Rebecca Turner <me@re-becca.org>
-  - are-we-there-yet (3.0.1) - GitHub Inc.
   - at-least-node (1.0.0) - Ryan Zimmerman <opensrc@ryanzim.com>
   - cacache (16.1.3) - GitHub Inc.
+  - cacache (19.0.1) - GitHub Inc.
   - chownr (1.1.4) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - chownr (2.0.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - cliui (8.0.1) - Ben Coe <ben@npmjs.com>
-  - color-support (1.1.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
-  - console-control-strings (1.1.0) - Rebecca Turner <me@re-becca.org> (http://re-becca.org/)
   - d3 (7.9.0) - Mike Bostock
   - d3-array (3.2.4) - Mike Bostock
   - d3-axis (3.0.0) - Mike Bostock
@@ -751,8 +753,8 @@ The following packages are licensed under the ISC license:
   - flatted (3.3.3) - Andrea Giammarchi
   - foreground-child (3.3.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - fs-minipass (2.1.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - fs-minipass (3.0.3) - GitHub Inc.
   - fs.realpath (1.0.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
-  - gauge (4.0.4) - GitHub Inc.
   - get-caller-file (2.0.5) - Stefan Penner
   - glob (10.4.5) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
   - glob (11.0.3) - Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)
@@ -761,7 +763,6 @@ The following packages are licensed under the ISC license:
   - glob-parent (5.1.2) - Gulp Team <team@gulpjs.com> (https://gulpjs.com/)
   - glob-parent (6.0.2) - Gulp Team <team@gulpjs.com> (https://gulpjs.com/)
   - graceful-fs (4.2.11)
-  - has-unicode (2.0.1) - Rebecca Turner <me@re-becca.org>
   - hosted-git-info (4.1.0) - Rebecca Turner <me@re-becca.org> (http://re-becca.org)
   - infer-owner (1.0.4) - Isaac Z. Schlueter <i@izs.me> (https://izs.me)
   - inflight (1.0.6) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
@@ -770,6 +771,7 @@ The following packages are licensed under the ISC license:
   - internmap (1.0.1) - Mike Bostock
   - internmap (2.0.3) - Mike Bostock
   - isexe (2.0.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - isexe (3.1.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - json-stringify-safe (5.0.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - lru-cache (10.4.3) - Isaac Z. Schlueter <i@izs.me>
   - lru-cache (11.1.0) - Isaac Z. Schlueter <i@izs.me>
@@ -778,6 +780,7 @@ The following packages are licensed under the ISC license:
   - lru-cache (7.18.3) - Isaac Z. Schlueter <i@izs.me>
   - lucide-react (0.468.0) - Eric Fennis
   - make-fetch-happen (10.2.1) - GitHub Inc.
+  - make-fetch-happen (14.0.3) - GitHub Inc.
   - minimatch (10.0.3) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (3.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
   - minimatch (5.1.6) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
@@ -786,29 +789,36 @@ The following packages are licensed under the ISC license:
   - minipass (5.0.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - minipass (7.1.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - minipass-collect (1.0.2) - Isaac Z. Schlueter <i@izs.me> (https://izs.me)
+  - minipass-collect (2.0.1) - Isaac Z. Schlueter <i@izs.me> (https://izs.me)
   - minipass-flush (1.0.5) - Isaac Z. Schlueter <i@izs.me> (https://izs.me)
   - minipass-pipeline (1.2.4) - Isaac Z. Schlueter <i@izs.me> (https://izs.me)
   - minipass-sized (1.0.3) - Isaac Z. Schlueter <i@izs.me> (https://izs.me)
   - nopt (6.0.0) - GitHub Inc.
-  - npmlog (6.0.2) - GitHub Inc.
+  - nopt (8.1.0) - GitHub Inc.
   - once (1.4.0) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - picocolors (1.1.1) - Alexey Raspopov
+  - proc-log (2.0.1) - GitHub Inc.
+  - proc-log (5.0.0) - GitHub Inc.
   - promise-inflight (1.0.1) - Rebecca Turner <me@re-becca.org> (http://re-becca.org/)
   - sax (1.4.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+  - semver (5.7.2) - GitHub Inc.
   - semver (6.3.1) - GitHub Inc.
   - semver (7.7.2) - GitHub Inc.
-  - set-blocking (2.0.0) - Ben Coe <ben@npmjs.com>
   - setprototypeof (1.2.0) - Wes Todd
   - siginfo (2.0.0) - Emil Bay <github@tixz.dk>
   - signal-exit (3.0.7) - Ben Coe <ben@npmjs.com>
   - signal-exit (4.1.0) - Ben Coe <ben@npmjs.com>
+  - ssri (12.0.0) - GitHub Inc.
   - ssri (9.0.1) - GitHub Inc.
   - tar (6.2.1) - GitHub Inc.
+  - tar (7.5.1) - Isaac Z. Schlueter
   - test-exclude (7.0.1) - Ben Coe <ben@npmjs.com>
   - unique-filename (2.0.1) - GitHub Inc.
+  - unique-filename (4.0.0) - GitHub Inc.
   - unique-slug (3.0.0) - GitHub Inc.
+  - unique-slug (5.0.0) - GitHub Inc.
   - which (2.0.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
-  - wide-align (1.1.5) - Rebecca Turner <me@re-becca.org> (http://re-becca.org/)
+  - which (5.0.0) - GitHub Inc.
   - wrappy (1.0.2) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
   - y18n (5.0.8) - Ben Coe <bencoe@gmail.com>
   - yallist (3.1.1) - Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
@@ -1902,7 +1912,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following packages are licensed under the BSD-2-Clause license:
 
-  - @electron/osx-sign (1.3.1) - electron
+  - @electron/osx-sign (1.3.3) - electron
   - dotenv (16.6.1)
   - dotenv-expand (11.0.7) - motdotla
   - entities (2.2.0) - Felix Boehm <me@feedic.com>
@@ -1943,6 +1953,77 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ================================================================================
 ## BlueOak-1.0.0 LICENSE
 ================================================================================
+
+Package: chownr
+Version: 3.0.0
+Author: Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+Repository: git://github.com/isaacs/chownr.git
+
+All packages under `src/` are licensed according to the terms in
+their respective `LICENSE` or `LICENSE.md` files.
+
+The remainder of this project is licensed under the Blue Oak
+Model License, as follows:
+
+-----
+
+# Blue Oak Model License
+
+Version 1.0.0
+
+## Purpose
+
+This license gives everyone as much permission to work with
+this software as possible, while protecting contributors
+from liability.
+
+## Acceptance
+
+In order to receive this license, you must agree to its
+rules.  The rules of this license are both obligations
+under that agreement and conditions to your license.
+You must not do anything with this software that triggers
+a rule that you cannot or will not follow.
+
+## Copyright
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe that contributor's
+copyright in it.
+
+## Notices
+
+You must ensure that everyone who gets a copy of
+any part of this software from you, with or without
+changes, also gets the text of this license or a link to
+<https://blueoakcouncil.org/license/1.0.0>.
+
+## Excuse
+
+If anyone notifies you in writing that you have not
+complied with [Notices](#notices), you can keep your
+license by taking all practical steps to comply within 30
+days after the notice.  If you do not do so, your license
+ends immediately.
+
+## Patent
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe any patent claims
+they can license or become able to license.
+
+## Reliability
+
+No contributor can revoke this license.
+
+## No Liability
+
+***As far as the law allows, this software comes as is,
+without any warranty or condition, and no contributor
+will be liable to anyone for any damages related to this
+software or this license, under any kind of legal claim.***
+
+--------------------------------------------------------------------------------
 
 Package: jackspeak
 Version: 3.4.3
@@ -2208,6 +2289,77 @@ Package: path-scurry
 Version: 2.0.0
 Author: Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me)
 Repository: git+https://github.com/isaacs/path-scurry
+
+# Blue Oak Model License
+
+Version 1.0.0
+
+## Purpose
+
+This license gives everyone as much permission to work with
+this software as possible, while protecting contributors
+from liability.
+
+## Acceptance
+
+In order to receive this license, you must agree to its
+rules.  The rules of this license are both obligations
+under that agreement and conditions to your license.
+You must not do anything with this software that triggers
+a rule that you cannot or will not follow.
+
+## Copyright
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe that contributor's
+copyright in it.
+
+## Notices
+
+You must ensure that everyone who gets a copy of
+any part of this software from you, with or without
+changes, also gets the text of this license or a link to
+<https://blueoakcouncil.org/license/1.0.0>.
+
+## Excuse
+
+If anyone notifies you in writing that you have not
+complied with [Notices](#notices), you can keep your
+license by taking all practical steps to comply within 30
+days after the notice.  If you do not do so, your license
+ends immediately.
+
+## Patent
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe any patent claims
+they can license or become able to license.
+
+## Reliability
+
+No contributor can revoke this license.
+
+## No Liability
+
+***As far as the law allows, this software comes as is,
+without any warranty or condition, and no contributor
+will be liable to anyone for any damages related to this
+software or this license, under any kind of legal claim.***
+
+--------------------------------------------------------------------------------
+
+Package: yallist
+Version: 5.0.0
+Author: Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)
+Repository: git+https://github.com/isaacs/yallist.git
+
+All packages under `src/` are licensed according to the terms in
+their respective `LICENSE` or `LICENSE.md` files.
+
+The remainder of this project is licensed under the Blue Oak
+Model License, as follows:
+
+-----
 
 # Blue Oak Model License
 
@@ -3660,7 +3812,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ================================================================================
 
 Package: @anthropic-ai/claude-code
-Version: 1.0.115
+Version: 2.0.0
 Author: Anthropic <support@anthropic.com>
 Homepage: https://github.com/anthropics/claude-code
 
