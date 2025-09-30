@@ -2443,27 +2443,53 @@ export class DatabaseService {
     state?: unknown;
     metadata?: unknown;
   }): void {
+    // Get existing panel first to merge state
+    const existingPanel = this.getPanel(panelId);
+
     // Add debug logging to track panel state changes
     if (updates.state !== undefined) {
       console.log(`[DB-DEBUG] updatePanel called for ${panelId} with state:`, JSON.stringify(updates.state));
-      const existingPanel = this.getPanel(panelId);
       if (existingPanel) {
         console.log(`[DB-DEBUG] Existing panel state before update:`, JSON.stringify(existingPanel.state));
       }
     }
-    
+
     this.transaction(() => {
       const setClauses: string[] = [];
       const values: (string | number | boolean | null)[] = [];
-      
+
       if (updates.title !== undefined) {
         setClauses.push('title = ?');
         values.push(updates.title);
       }
-      
+
       if (updates.state !== undefined) {
+        // Merge with existing state instead of replacing
+        const existingState = existingPanel?.state || {};
+        const mergedState = {
+          ...existingState,
+          ...updates.state
+        };
+
+        // If there's a customState in either, merge that too
+        if (typeof existingState === 'object' && existingState !== null && 'customState' in existingState) {
+          const existingCustomState = (existingState as { customState?: unknown }).customState;
+          const updatesCustomState = typeof updates.state === 'object' && updates.state !== null && 'customState' in updates.state
+            ? (updates.state as { customState?: unknown }).customState
+            : undefined;
+
+          if (existingCustomState !== undefined || updatesCustomState !== undefined) {
+            (mergedState as { customState: unknown }).customState = {
+              ...(typeof existingCustomState === 'object' && existingCustomState !== null ? existingCustomState : {}),
+              ...(typeof updatesCustomState === 'object' && updatesCustomState !== null ? updatesCustomState : {})
+            };
+          }
+        }
+
+        console.log(`[DB-DEBUG] Merged state:`, JSON.stringify(mergedState));
+
         setClauses.push('state = ?');
-        values.push(JSON.stringify(updates.state));
+        values.push(JSON.stringify(mergedState));
       }
       
       if (updates.metadata !== undefined) {
