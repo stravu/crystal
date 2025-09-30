@@ -6,17 +6,11 @@ import { TerminalPanelProps } from '../../types/panelComponents';
 import { renderLog, devLog } from '../../utils/console';
 import '@xterm/xterm/css/xterm.css';
 
-// Define window extensions for terminal state restoration
+// Type for terminal state restoration
 interface TerminalRestoreState {
   scrollbackBuffer: string | string[];
   cursorX?: number;
   cursorY?: number;
-}
-
-declare global {
-  interface Window {
-    __terminalRestoreState?: TerminalRestoreState;
-  }
 }
 
 export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, isActive }) => {
@@ -44,7 +38,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
   // Keep it alive even when switching sessions
   useEffect(() => {
     devLog.debug('[TerminalPanel] Initialization useEffect running, terminalRef:', terminalRef.current);
-    
+
     if (!terminalRef.current) {
       devLog.debug('[TerminalPanel] Missing terminal ref, skipping initialization');
       return;
@@ -57,11 +51,14 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
     const initializeTerminal = async () => {
       try {
         devLog.debug('[TerminalPanel] Starting initialization for panel:', panel.id);
-        
+
         // Check if already initialized on backend
         const initialized = await window.electronAPI.invoke('panels:checkInitialized', panel.id);
         console.log('[TerminalPanel] Panel already initialized?', initialized);
-        
+
+        // Store terminal state for THIS panel only (not in global variable)
+        let terminalStateForThisPanel: TerminalRestoreState | null = null;
+
         if (!initialized) {
           // Initialize backend PTY process
           console.log('[TerminalPanel] Initializing backend PTY process...');
@@ -78,8 +75,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
           if (terminalState && terminalState.scrollbackBuffer) {
             // We'll restore this to the terminal after it's created
             console.log('[TerminalPanel] Found scrollback buffer with', terminalState.scrollbackBuffer.length, 'lines');
-            // Store for restoration after terminal is created
-            window.__terminalRestoreState = terminalState;
+            // Store for restoration after terminal is created - LOCAL to this initialization
+            terminalStateForThisPanel = terminalState;
           }
         }
 
@@ -102,7 +99,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
         fitAddon = new FitAddon();
         terminal.loadAddon(fitAddon);
         console.log('[TerminalPanel] FitAddon loaded');
-        
+
         // FIX: Additional check before DOM manipulation
         if (terminalRef.current && !disposed) {
           console.log('[TerminalPanel] Opening terminal in DOM element:', terminalRef.current);
@@ -110,31 +107,29 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
           console.log('[TerminalPanel] Terminal opened in DOM');
           fitAddon.fit();
           console.log('[TerminalPanel] FitAddon fitted');
-          
+
           xtermRef.current = terminal;
           fitAddonRef.current = fitAddon;
-          
-          // Restore scrollback if we have saved state
-          const restoreState = window.__terminalRestoreState;
-          if (restoreState && restoreState.scrollbackBuffer) {
+
+          // Restore scrollback if we have saved state FOR THIS PANEL
+          if (terminalStateForThisPanel && terminalStateForThisPanel.scrollbackBuffer) {
             // Handle both string and array formats
             let restoredContent: string;
-            if (typeof restoreState.scrollbackBuffer === 'string') {
-              restoredContent = restoreState.scrollbackBuffer;
+            if (typeof terminalStateForThisPanel.scrollbackBuffer === 'string') {
+              restoredContent = terminalStateForThisPanel.scrollbackBuffer;
               console.log('[TerminalPanel] Restoring', restoredContent.length, 'chars of scrollback');
-            } else if (Array.isArray(restoreState.scrollbackBuffer)) {
-              restoredContent = restoreState.scrollbackBuffer.join('\n');
-              console.log('[TerminalPanel] Restoring', restoreState.scrollbackBuffer.length, 'lines of scrollback');
+            } else if (Array.isArray(terminalStateForThisPanel.scrollbackBuffer)) {
+              restoredContent = terminalStateForThisPanel.scrollbackBuffer.join('\n');
+              console.log('[TerminalPanel] Restoring', terminalStateForThisPanel.scrollbackBuffer.length, 'lines of scrollback');
             } else {
               restoredContent = '';
             }
-            
+
             if (restoredContent) {
               terminal.write(restoredContent);
             }
-            delete window.__terminalRestoreState;
           }
-          
+
           setIsInitialized(true);
           console.log('[TerminalPanel] Terminal initialization complete, isInitialized set to true');
 
