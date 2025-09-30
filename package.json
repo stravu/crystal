@@ -143,10 +143,12 @@
       "category": "Development",
       "icon": "main/assets/icon.png",
       "desktop": {
-        "Name": "Crystal",
-        "Comment": "Claude Code Commander for managing multiple Claude Code instances",
-        "Categories": "Development;IDE;",
-        "StartupWMClass": "crystal"
+        "entry": {
+          "Name": "Crystal",
+          "Comment": "Claude Code Commander for managing multiple Claude Code instances",
+          "Categories": "Development;IDE;",
+          "StartupWMClass": "crystal"
+        }
       }
     },
     "deb": {
