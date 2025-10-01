@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <!-- Created with Vectornator (http://vectornator.io/) -->
-<svg height="100%" stroke-miterlimit="10" style="fill-rule:nonzero;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;" version="1.1" viewBox="45.701 47 370 370" width="100%" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:vectornator="http://vectornator.io" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg height="100%" stroke-miterlimit="10" style="fill-rule:nonzero;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;" version="1.1" viewBox="0 0 1024 1024" width="100%" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:vectornator="http://vectornator.io" xmlns:xlink="http://www.w3.org/1999/xlink">
 <defs/>
-<g id="Layer" transform="translate(230.701, 232) scale(0.95) translate(-230.701, -232)">
+<g id="Layer" transform="translate(512, 512) scale(2.768) translate(-230.701, -232) translate(230.701, 232) scale(0.95) translate(-230.701, -232)">
 <path d="M143.037 153.443C146.554 144.09 239.477 50 248.365 50C257.253 50 318.863 181.261 318.863 186.399C318.863 191.537 294.32 314.555 288.973 341.468C283.619 349.37 231.54 414 224.5 414C217.46 414 160.866 339.727 159.136 333.181C155.638 266.494 139.521 162.795 143.037 153.443Z" fill="none" opacity="1" stroke="#01cbf1" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
 <path d="M224.5 164.338C230.701 170.523 277.164 219.005 277.164 219.005C277.164 219.005 287.883 204.908 294.054 193.633C304.23 189.294 313.666 186.471 318.863 186.654" fill="none" opacity="1" stroke="#01cbf1" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
 <path d="M248.626 50C241.938 64.3018 224.458 143.259 224.458 165.065C212.859 171.413 185.182 192.459 177.485 198.132C166.81 192.68 142.82 158.294 142.82 154.213" fill="none" opacity="1" stroke="#01cbf1" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
