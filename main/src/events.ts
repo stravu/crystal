@@ -205,6 +205,15 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
             databaseService.updatePanelSettings(panel.id, customState.codexConfig);
           }
 
+          // For Claude panels, also save the config to the settings column for persistence
+          if (panelType === 'claude' && customState && 'model' in customState) {
+            const claudeState = customState as ClaudePanelState;
+            databaseService.updatePanelSettings(panel.id, {
+              model: claudeState.model,
+              permissionMode: claudeState.permissionMode
+            });
+          }
+
           // Register with the appropriate panel manager
           try {
             if (panelType === 'codex') {
