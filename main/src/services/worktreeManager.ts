@@ -669,19 +669,13 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
   }
 
   async gitPull(worktreePath: string): Promise<{ output: string }> {
-    const currentDir = process.cwd();
-    
     try {
-      process.chdir(worktreePath);
-      
-      // Run git pull
-      const { stdout, stderr } = await execWithShellPath('git pull');
+      const { stdout, stderr } = await execWithShellPath('git pull', { cwd: worktreePath });
       const output = stdout || stderr || 'Pull completed successfully';
       
       return { output };
     } catch (error: unknown) {
       const err = error as Error & { stderr?: string; stdout?: string };
-      // Create enhanced error with git details
       const gitError = new Error(err.message || 'Git pull failed') as Error & {
         gitOutput?: string;
         workingDirectory?: string;
@@ -689,25 +683,17 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
       gitError.gitOutput = err.stderr || err.stdout || err.message || '';
       gitError.workingDirectory = worktreePath;
       throw gitError;
-    } finally {
-      process.chdir(currentDir);
     }
   }
 
   async gitPush(worktreePath: string): Promise<{ output: string }> {
-    const currentDir = process.cwd();
-    
     try {
-      process.chdir(worktreePath);
-      
-      // Run git push
-      const { stdout, stderr } = await execWithShellPath('git push');
+      const { stdout, stderr } = await execWithShellPath('git push', { cwd: worktreePath });
       const output = stdout || stderr || 'Push completed successfully';
       
       return { output };
     } catch (error: unknown) {
       const err = error as Error & { stderr?: string; stdout?: string };
-      // Create enhanced error with git details
       const gitError = new Error(err.message || 'Git push failed') as Error & {
         gitOutput?: string;
         workingDirectory?: string;
@@ -715,23 +701,16 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
       gitError.gitOutput = err.stderr || err.stdout || err.message || '';
       gitError.workingDirectory = worktreePath;
       throw gitError;
-    } finally {
-      process.chdir(currentDir);
     }
   }
 
   async getLastCommits(worktreePath: string, count: number = 20): Promise<RawCommitData[]> {
-    const currentDir = process.cwd();
-
     try {
-      process.chdir(worktreePath);
-      
-      // Get the last N commits with stats
       const { stdout } = await execWithShellPath(
-        `git log -${count} --pretty=format:'%H|%s|%ai|%an' --shortstat`
+        `git log -${count} --pretty=format:'%H|%s|%ai|%an' --shortstat`,
+        { cwd: worktreePath }
       );
       
-      // Parse the output
       const commits: RawCommitData[] = [];
       const lines = stdout.split('\n');
       let i = 0;
@@ -756,7 +735,6 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           author: author || 'Unknown'
         };
         
-        // Check if next line contains stats
         if (i + 1 < lines.length && lines[i + 1].trim()) {
           const statsLine = lines[i + 1].trim();
           const statsMatch = statsLine.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
@@ -765,7 +743,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
             commit.filesChanged = parseInt(statsMatch[1]) || 0;
             commit.additions = parseInt(statsMatch[2]) || 0;
             commit.deletions = parseInt(statsMatch[3]) || 0;
-            i++; // Skip the stats line
+            i++;
           }
         }
         
@@ -776,7 +754,6 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
       return commits;
     } catch (error: unknown) {
       const err = error as Error & { stderr?: string; stdout?: string };
-      // Create enhanced error with git details
       const gitError = new Error(err.message || 'Failed to get commits') as Error & {
         gitOutput?: string;
         workingDirectory?: string;
@@ -784,22 +761,15 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
       gitError.gitOutput = err.stderr || err.stdout || err.message || '';
       gitError.workingDirectory = worktreePath;
       throw gitError;
-    } finally {
-      process.chdir(currentDir);
     }
   }
 
   async getOriginBranch(worktreePath: string, branch: string): Promise<string | null> {
-    const currentDir = process.cwd();
-
     try {
-      process.chdir(worktreePath);
-      await execWithShellPath(`git rev-parse --verify origin/${branch}`);
+      await execWithShellPath(`git rev-parse --verify origin/${branch}`, { cwd: worktreePath });
       return `origin/${branch}`;
     } catch {
       return null;
-    } finally {
-      process.chdir(currentDir);
     }
   }
 }
