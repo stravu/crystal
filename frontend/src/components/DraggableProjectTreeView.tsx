@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, Play } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, Play, FolderPlus } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -1763,6 +1763,19 @@ export function DraggableProjectTreeView() {
                 </button>
 
                 <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProjectForFolder(project);
+                    setShowCreateFolderDialog(true);
+                    setNewFolderName('');
+                  }}
+                  className="p-1 hover:bg-surface-hover rounded transition-all opacity-0 group-hover:opacity-100"
+                  title="Add folder"
+                >
+                  <FolderPlus className="w-3 h-3 text-text-tertiary hover:text-text-primary" />
+                </button>
+
+                <button
                   onClick={(e) => handleRefreshProjectGitStatus(project, e)}
                   disabled={refreshingProjects.has(project.id)}
                   className={`p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-all opacity-0 group-hover:opacity-100 ${
@@ -1867,21 +1880,6 @@ export function DraggableProjectTreeView() {
                       })}
                   </div>
                   
-                  {/* Add folder button */}
-                  <div className="ml-6 mt-2 border-t border-border-primary pt-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProjectForFolder(project);
-                        setShowCreateFolderDialog(true);
-                        setNewFolderName('');
-                      }}
-                      className="w-full px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors flex items-center space-x-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Add Folder</span>
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
