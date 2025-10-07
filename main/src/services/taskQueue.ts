@@ -366,7 +366,8 @@ export class TaskQueue {
 
                   // Use the claude panel manager directly instead of calling IPC handlers
                   // Model is now managed at panel level
-                  await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode);
+                  const modelToUse = claudeConfig?.model || 'auto';
+                  await claudePanelManager.startPanel(claudePanel.id, session.worktreePath, prompt, permissionMode, modelToUse);
                 } catch (error) {
                   console.error(`[TaskQueue] Failed to start Claude via panel manager:`, error);
                   throw new Error(`Failed to start Claude panel: ${error}`);
