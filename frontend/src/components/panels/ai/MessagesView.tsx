@@ -59,7 +59,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             .map((output: SessionOutput) => ({
               type: 'json' as const,
               data: typeof output.data === 'object' ? JSON.stringify(output.data) : output.data,
-              timestamp: output.timestamp || new Date().toISOString()
+              timestamp: output.timestamp
             }));
           response = { success: true, data: jsonMessages };
         } else {
@@ -81,11 +81,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   msgData = JSON.parse(msg);
                 } catch {
                   // If it's a string but not valid JSON, treat as regular message
-                  regularMessages.push({
-                    type: 'json' as const,
-                    data: msg,
-                    timestamp: new Date().toISOString()
-                  });
+                  // This case shouldn't have timestamps - skip adding to avoid "just now" issue
+                  console.warn('Received raw string message without timestamp:', msg);
                   return;
                 }
               } else if (msg.data) {
@@ -106,7 +103,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   type: 'session_info',
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic Codex protocol field
                   model: (msgData as any).msg.model || 'default',
-                  timestamp: msg.timestamp || new Date().toISOString()
+                  timestamp: msg.timestamp || ''
                 };
               } else {
                 // Regular JSON message
@@ -114,7 +111,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   type: 'json' as const,
                   data: msg.data ? (typeof msg.data === 'string' ? msg.data : JSON.stringify(msg.data)) :
                         (typeof msg === 'string' ? msg : JSON.stringify(msg)),
-                  timestamp: msg.timestamp || new Date().toISOString()
+                  timestamp: msg.timestamp || ''
                 });
               }
             } catch (error) {
@@ -124,13 +121,18 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 type: 'json' as const,
                 data: msg.data ? (typeof msg.data === 'string' ? msg.data : JSON.stringify(msg.data)) :
                       (typeof msg === 'string' ? msg : JSON.stringify(msg)),
-                timestamp: msg.timestamp || new Date().toISOString()
+                timestamp: msg.timestamp || ''
               });
             }
           });
           
           setSessionInfo(foundSessionInfo);
-          setMessages(regularMessages);
+          // Sort messages by timestamp if available
+          const sortedMessages = regularMessages.sort((a, b) => {
+            if (!a.timestamp || !b.timestamp) return 0;
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+          });
+          setMessages(sortedMessages);
         }
       } catch (error) {
         console.error('Failed to load messages:', error);
@@ -159,7 +161,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               setMessages(prev => [...prev, {
                 type: 'json',
                 data: String(detail.data || ''),
-                timestamp: detail.timestamp || new Date().toISOString()
+                timestamp: detail.timestamp || ''
               }]);
               return;
             }
@@ -177,13 +179,13 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               type: 'session_info',
               // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic Codex protocol field
               model: (parsedData as any).msg.model || 'default',
-              timestamp: detail.timestamp || new Date().toISOString()
+              timestamp: detail.timestamp || ''
             });
           } else {
             setMessages(prev => [...prev, {
               type: 'json',
               data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data || {}),
-              timestamp: detail.timestamp || new Date().toISOString()
+              timestamp: detail.timestamp || ''
             }]);
             
             // Auto-scroll to bottom if enabled
@@ -199,7 +201,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           setMessages(prev => [...prev, {
             type: 'json',
             data: typeof detail.data === 'string' ? detail.data : JSON.stringify(detail.data),
-            timestamp: detail.timestamp || new Date().toISOString()
+            timestamp: detail.timestamp || ''
           }]);
         }
       }
@@ -339,9 +341,11 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   <Terminal className="w-4 h-4" />
                   Session Information
                 </span>
-                <span className="text-text-quaternary text-xs">
-                  {new Date(sessionInfo.timestamp).toLocaleTimeString()}
-                </span>
+                {sessionInfo.timestamp && (
+                  <span className="text-text-quaternary text-xs">
+                    {new Date(sessionInfo.timestamp).toLocaleTimeString()}
+                  </span>
+                )}
               </div>
               <button
                 onClick={(e) => {
@@ -444,9 +448,11 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     }
                   </button>
                   <span className="text-text-primary font-medium">{preview}</span>
-                  <span className="text-text-quaternary text-xs">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
+                  {message.timestamp && (
+                    <span className="text-text-quaternary text-xs">
+                      {new Date(message.timestamp).toLocaleTimeString()}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={(e) => {
