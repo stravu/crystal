@@ -807,7 +807,11 @@ export class SessionManager extends EventEmitter {
       sessionId: dbOutput.session_id || '', // For compatibility, though panels use panel_id
       type: dbOutput.type as 'stdout' | 'stderr' | 'json' | 'error',
       data: (dbOutput.type === 'json' || dbOutput.type === 'error') ? JSON.parse(dbOutput.data) : dbOutput.data,
-      timestamp: new Date(dbOutput.timestamp)
+      // SQLite timestamps are in UTC but stored without timezone indicator
+      // Append 'Z' to ensure proper UTC parsing as per project documentation
+      timestamp: dbOutput.timestamp.includes('T') || dbOutput.timestamp.includes('Z')
+        ? new Date(dbOutput.timestamp)  // Already ISO format
+        : new Date(dbOutput.timestamp + 'Z')  // SQLite format, append Z for UTC
     }));
   }
 
