@@ -918,24 +918,28 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('panels:get-json-messages', async (_event, panelId: string) => {
     try {
       console.log(`[IPC] panels:get-json-messages called for panel: ${panelId}`);
-      
+
       if (!sessionManager.getPanelOutputs) {
         console.error('[IPC] Panel-based output methods not available on sessionManager');
         return { success: false, error: 'Panel-based output methods not available' };
       }
-      
+
       // Get all outputs and filter for JSON messages only
       const outputs = await sessionManager.getPanelOutputs(panelId);
       const jsonMessages = outputs
         .filter(output => output.type === 'json')
         .map(output => {
-          // Ensure each message has a timestamp for consistent ordering in the UI
-          if (output && output.data && typeof output.data === 'object') {
-            return { ...output.data, timestamp: output.timestamp.toISOString() };
-          }
-          return output.data;
+          // Return a consistent structure with data and timestamp at the top level
+          return {
+            type: 'json' as const,
+            data: typeof output.data === 'object' ? JSON.stringify(output.data) : output.data,
+            // Ensure timestamp is always an ISO string for consistent frontend handling
+            timestamp: output.timestamp instanceof Date
+              ? output.timestamp.toISOString()
+              : (typeof output.timestamp === 'string' ? output.timestamp : '')
+          };
         });
-      
+
       console.log(`[IPC] Returning ${jsonMessages.length} JSON messages for panel ${panelId}`);
       return { success: true, data: jsonMessages };
     } catch (error) {
