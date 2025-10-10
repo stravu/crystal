@@ -25,7 +25,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    console.error('Component stack:', errorInfo.componentStack);
     this.setState({ errorInfo });
+
+    // Log to file in development mode for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ErrorBoundary] Full error details:', {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack
+      });
+    }
   }
 
   render() {
@@ -37,21 +47,56 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       // Default error UI
       return (
-        <div className="flex items-center justify-center h-full p-8">
-          <div className="text-center">
-            <AlertCircle className="w-12 h-12 text-status-error mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-text-primary mb-2">
+        <div className="flex items-center justify-center h-screen p-8 bg-bg-primary">
+          <div className="text-center max-w-2xl">
+            <AlertCircle className="w-16 h-16 text-status-error mx-auto mb-6" />
+            <h2 className="text-2xl font-semibold text-text-primary mb-3">
               Something went wrong
             </h2>
-            <p className="text-text-secondary mb-4">
-              The editor encountered an error. Please try refreshing the page.
+            <p className="text-text-secondary mb-6">
+              Crystal encountered an unexpected error and needs to reload.
             </p>
-            <Button
-              onClick={() => window.location.reload()}
-              variant="primary"
-            >
-              Refresh Page
-            </Button>
+
+            {/* Error details */}
+            {this.state.error && (
+              <div className="bg-surface-secondary border border-border-primary rounded-lg p-4 mb-6 text-left">
+                <p className="font-mono text-sm text-status-error mb-2">
+                  {this.state.error.message}
+                </p>
+                {process.env.NODE_ENV === 'development' && this.state.error.stack && (
+                  <details className="text-xs text-text-muted mt-2">
+                    <summary className="cursor-pointer hover:text-text-secondary">
+                      Stack trace (dev only)
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">
+                      {this.state.error.stack}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-center">
+              <Button
+                onClick={() => window.location.reload()}
+                variant="primary"
+              >
+                Reload Application
+              </Button>
+              <Button
+                onClick={() => {
+                  // Try to reset state and recover
+                  this.setState({ hasError: false, error: null, errorInfo: null });
+                }}
+                variant="secondary"
+              >
+                Try to Continue
+              </Button>
+            </div>
+
+            <p className="text-xs text-text-muted mt-6">
+              If this keeps happening, please report it on GitHub
+            </p>
           </div>
         </div>
       );
