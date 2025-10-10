@@ -15,22 +15,21 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
     const renderChart = async () => {
       if (!elementRef.current || !chart) return;
 
+      // Create a unique ID for this render (define it outside try block)
+      const graphId = `mermaid-${id}-${Date.now()}`;
+
       try {
         // Clear any previous content
         elementRef.current.innerHTML = '';
         setHasError(false);
 
-        // Configure mermaid with error suppression
+        // Configure mermaid
         mermaid.initialize({
           startOnLoad: false,
           theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
           securityLevel: 'loose',
           fontFamily: 'monospace',
-          suppressErrors: true, // Prevent mermaid from rendering error SVGs
         });
-
-        // Create a unique ID for this render
-        const graphId = `mermaid-${id}-${Date.now()}`;
 
         // Render the chart
         const { svg } = await mermaid.render(graphId, chart);
