@@ -20,20 +20,21 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
         elementRef.current.innerHTML = '';
         setHasError(false);
 
-        // Configure mermaid if needed
+        // Configure mermaid with error suppression
         mermaid.initialize({
           startOnLoad: false,
           theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
           securityLevel: 'loose',
           fontFamily: 'monospace',
+          suppressErrors: true, // Prevent mermaid from rendering error SVGs
         });
 
         // Create a unique ID for this render
         const graphId = `mermaid-${id}-${Date.now()}`;
-        
+
         // Render the chart
         const { svg } = await mermaid.render(graphId, chart);
-        
+
         // Insert the SVG
         if (elementRef.current) {
           elementRef.current.innerHTML = svg;
@@ -41,8 +42,26 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
       } catch (error: unknown) {
         console.error('Mermaid rendering error:', error);
         setHasError(true);
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to render diagram');
-        
+
+        // Extract meaningful error message
+        let message = 'Failed to render diagram';
+        if (error instanceof Error) {
+          // Clean up the error message - remove version info and extra details
+          message = error.message
+            .replace(/mermaid version [\d.]+/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+        setErrorMessage(message);
+
+        // Clean up any error SVGs that mermaid may have inserted
+        const errorElements = document.querySelectorAll(`#${graphId}, [id^="mermaid-"]`);
+        errorElements.forEach(el => {
+          if (el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        });
+
         // Try to clean up mermaid's internal state
         try {
           // @ts-expect-error - Mermaid API types don't include reset method
@@ -63,9 +82,11 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
 
   if (hasError) {
     return (
-      <div className="border border-status-error/30 rounded p-4 bg-status-error/10">
-        <p className="text-status-error font-semibold">Failed to render diagram</p>
-        <pre className="text-xs text-status-error/80 mt-2">{errorMessage}</pre>
+      <div className="border border-status-error/30 rounded p-2 bg-status-error/5 text-sm">
+        <p className="text-status-error">
+          <span className="font-semibold">⚠ Diagram error:</span>{' '}
+          <span className="text-status-error/90">{errorMessage}</span>
+        </p>
       </div>
     );
   }
