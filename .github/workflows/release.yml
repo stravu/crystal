@@ -12,7 +12,7 @@ jobs:
         os: [macos-latest, ubuntu-latest]
         include:
           - os: macos-latest
-            release_cmd: release:mac
+            release_cmd: release:mac:universal
             artifact_name: crystal-macos
             artifact_path: |
               dist-electron/*.dmg
@@ -54,9 +54,6 @@ jobs:
 
     - name: Build main process
       run: pnpm run build:main
-
-    - name: Rebuild native modules
-      run: pnpm run electron:rebuild
 
     - name: Build and publish application
       run: pnpm run ${{ matrix.release_cmd }}
