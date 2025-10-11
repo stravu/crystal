@@ -1,6 +1,16 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.3.2] - 2025-10-10
+
+### Fixed
+- **Mermaid diagram error handling**: Application no longer crashes when Mermaid diagrams fail to render
+- **Error boundary improvements**: Better error boundaries throughout the application for more graceful error handling
+- **Tool panels database error**: Fixed "no such table: tool_panels" database error
+- **Claude panels model selection**: Fixed bug where Claude panels were not respecting the selected model choice
+- **Timestamp handling**: Fixed timestamp handling issues in messaging view
+- **Git operations**: Optimized git operations by removing unnecessary process.chdir() calls for better performance
+
 ## [0.3.1] - 2025-09-30
 
 ### Major Changes
