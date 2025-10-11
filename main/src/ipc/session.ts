@@ -906,9 +906,16 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
         console.error('[IPC] Panel-based conversation methods not available on sessionManager');
         return { success: false, error: 'Panel-based conversation methods not available' };
       }
-      
+
       const messages = await sessionManager.getPanelConversationMessages(panelId);
-      return { success: true, data: messages };
+      // Ensure timestamps are in ISO format for proper sorting with JSON messages
+      const messagesWithIsoTimestamps = messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp.includes('T') || msg.timestamp.includes('Z')
+          ? msg.timestamp  // Already ISO format
+          : msg.timestamp + 'Z'  // SQLite format, append Z for UTC
+      }));
+      return { success: true, data: messagesWithIsoTimestamps };
     } catch (error) {
       console.error('Failed to get panel conversation messages:', error);
       return { success: false, error: 'Failed to get panel conversation messages' };
@@ -929,15 +936,38 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
       const jsonMessages = outputs
         .filter(output => output.type === 'json')
         .map(output => {
-          // Return a consistent structure with data and timestamp at the top level
-          return {
-            type: 'json' as const,
-            data: typeof output.data === 'object' ? JSON.stringify(output.data) : output.data,
-            // Ensure timestamp is always an ISO string for consistent frontend handling
-            timestamp: output.timestamp instanceof Date
-              ? output.timestamp.toISOString()
-              : (typeof output.timestamp === 'string' ? output.timestamp : '')
-          };
+          // Return the unwrapped message data with timestamp
+          // The message transformer expects the actual message object, not wrapped in { type: 'json', data: ... }
+          if (output.data && typeof output.data === 'object') {
+            return {
+              ...output.data as Record<string, unknown>,
+              timestamp: output.timestamp instanceof Date
+                ? output.timestamp.toISOString()
+                : (typeof output.timestamp === 'string' ? output.timestamp : '')
+            };
+          }
+          // If data is a string, try to parse it
+          if (typeof output.data === 'string') {
+            try {
+              const parsed = JSON.parse(output.data);
+              return {
+                ...parsed,
+                timestamp: output.timestamp instanceof Date
+                  ? output.timestamp.toISOString()
+                  : (typeof output.timestamp === 'string' ? output.timestamp : '')
+              };
+            } catch {
+              // If parsing fails, return as-is with timestamp
+              return {
+                data: output.data,
+                timestamp: output.timestamp instanceof Date
+                  ? output.timestamp.toISOString()
+                  : (typeof output.timestamp === 'string' ? output.timestamp : '')
+              };
+            }
+          }
+          // Fallback
+          return output.data;
         });
 
       console.log(`[IPC] Returning ${jsonMessages.length} JSON messages for panel ${panelId}`);
