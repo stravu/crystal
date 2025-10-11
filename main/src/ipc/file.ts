@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { glob } from 'glob';
 import type { AppServices } from './types';
 import type { Session } from '../types/session';
@@ -243,13 +244,17 @@ export function registerFileHandlers(ipcMain: IpcMain, services: AppServices): v
 
 Co-Authored-By: Crystal <crystal@stravu.com>` : request.message;
 
-        // Use a here document to handle multi-line commit messages
-        const command = `git commit -m "$(cat <<'EOF'
-${commitMessage}
-EOF
-)"`;
-
-        await execAsync(command, { cwd: session.worktreePath });
+        // Use a temporary file to handle commit messages with special characters
+        const tmpFile = path.join(os.tmpdir(), `crystal-commit-${Date.now()}.txt`);
+        try {
+          await fs.writeFile(tmpFile, commitMessage, 'utf-8');
+          await execAsync(`git commit -F ${tmpFile}`, { cwd: session.worktreePath });
+        } finally {
+          // Clean up the temporary file
+          await fs.unlink(tmpFile).catch(() => {
+            // Ignore cleanup errors
+          });
+        }
 
         // Refresh git status for this session after commit
         try {
@@ -276,12 +281,18 @@ EOF
 💎 Built using [Crystal](https://github.com/stravu/crystal)
 
 Co-Authored-By: Crystal <crystal@stravu.com>` : request.message;
-            
-            const command = `git commit -m "$(cat <<'EOF'
-${retryMessage}
-EOF
-)"`;
-            await execAsync(command, { cwd: session.worktreePath });
+
+            // Use a temporary file for retry as well
+            const tmpFile = path.join(os.tmpdir(), `crystal-commit-retry-${Date.now()}.txt`);
+            try {
+              await fs.writeFile(tmpFile, retryMessage, 'utf-8');
+              await execAsync(`git commit -F ${tmpFile}`, { cwd: session.worktreePath });
+            } finally {
+              // Clean up the temporary file
+              await fs.unlink(tmpFile).catch(() => {
+                // Ignore cleanup errors
+              });
+            }
             
             // Refresh git status for this session after commit
             try {
