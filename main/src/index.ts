@@ -204,29 +204,66 @@ async function createWindow() {
     if (message.includes('Electron Security Warning') || sourceId.includes('electron/js2c')) {
       return;
     }
-    
+
     // In development, log ALL console messages to help with debugging
     if (isDevelopment) {
       const levelNames = ['verbose', 'info', 'warning', 'error'];
       const levelName = levelNames[level] || 'unknown';
-      const timestamp = new Date().toISOString();
-      const logMessage = `[${timestamp}] [FRONTEND ${levelName.toUpperCase()}] ${message}`;
-      
-      // Always log to main console
-      
+      const sourceInfo = `${path.basename(sourceId)}:${line}`;
+      const frontendMessage = `[FRONTEND ${levelName.toUpperCase()}] ${message} (${sourceInfo})`;
+
+      // Log to backend logger (which writes to both console and backend log files)
+      if (logger) {
+        // Use appropriate logger method based on level
+        switch (level) {
+          case 0: // verbose
+            logger.verbose(frontendMessage);
+            break;
+          case 1: // info
+            logger.info(frontendMessage);
+            break;
+          case 2: // warning
+            logger.warn(frontendMessage);
+            break;
+          case 3: // error
+            logger.error(frontendMessage);
+            break;
+          default:
+            logger.info(frontendMessage);
+        }
+      } else {
+        // Fallback if logger not initialized yet
+        originalLog(frontendMessage);
+      }
+
       // Also write to debug log file for Claude Code to read
+      const timestamp = new Date().toISOString();
       const debugLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
-      const logLine = `${logMessage} (${path.basename(sourceId)}:${line})\n`;
-      
+      const logLine = `[${timestamp}] ${frontendMessage}\n`;
+
       try {
         fs.appendFileSync(debugLogPath, logLine);
       } catch (error) {
         // Don't crash if we can't write to the log file
-        console.error('Failed to write to debug log:', error);
+        originalError('Failed to write to debug log:', error);
       }
     } else {
       // In production, only log errors and warnings from renderer
       if (level >= 2) { // 2 = warning, 3 = error
+        const levelNames = ['verbose', 'info', 'warning', 'error'];
+        const levelName = levelNames[level] || 'unknown';
+        const sourceInfo = `${path.basename(sourceId)}:${line}`;
+        const frontendMessage = `[FRONTEND ${levelName.toUpperCase()}] ${message} (${sourceInfo})`;
+
+        if (logger) {
+          if (level === 2) {
+            logger.warn(frontendMessage);
+          } else {
+            logger.error(frontendMessage);
+          }
+        } else {
+          originalLog(frontendMessage);
+        }
       }
     }
   });
@@ -516,18 +553,35 @@ async function initializeServices() {
     ipcMain.handle('console:log', (event, logData) => {
       const { level, args, timestamp, source } = logData;
       const message = args.join(' ');
-      const logLine = `[${timestamp}] [${source.toUpperCase()} ${level.toUpperCase()}] ${message}\n`;
-      
-      // Write to debug log file
+      const frontendMessage = `[${source.toUpperCase()} ${level.toUpperCase()}] ${message}`;
+
+      // Log to backend logger (which writes to both console and log files)
+      if (logger) {
+        switch (level.toLowerCase()) {
+          case 'log':
+          case 'info':
+            logger.info(frontendMessage);
+            break;
+          case 'warn':
+          case 'warning':
+            logger.warn(frontendMessage);
+            break;
+          case 'error':
+            logger.error(frontendMessage);
+            break;
+          default:
+            logger.info(frontendMessage);
+        }
+      }
+
+      // Also write to debug log file for easy access
+      const logLine = `[${timestamp}] ${frontendMessage}\n`;
       const debugLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
       try {
         fs.appendFileSync(debugLogPath, logLine);
       } catch (error) {
-        console.error('Failed to write console log to debug file:', error);
+        originalError('Failed to write console log to debug file:', error);
       }
-      
-      // Also log to main console with prefix
-      console.log(`[Frontend ${level}] ${message}`);
     });
   }
   
