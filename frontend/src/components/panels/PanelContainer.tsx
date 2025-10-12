@@ -42,13 +42,13 @@ export const PanelContainer: React.FC<PanelContainerProps> = React.memo(({
   
   const panelComponent = useMemo(() => {
     renderLog('[PanelContainer] Creating component for panel type:', panel.type);
-    
+
     // CLI panel types (including Claude and Codex) use the CLI panel factory
     const cliPanelTypes = ['claude', 'codex', 'aider', 'continue', 'cursor', 'generic-cli'];
     if (cliPanelTypes.includes(panel.type)) {
       return <CliPanelFactory panel={panel} isActive={isActive} />;
     }
-    
+
     // Non-CLI panel types use direct components
     switch (panel.type) {
       case 'terminal':
@@ -80,7 +80,7 @@ export const PanelContainer: React.FC<PanelContainerProps> = React.memo(({
           </div>
         );
     }
-  }, [panel.type, panel.id, isActive, isMainRepo]); // Include stable deps only
+  }, [panel, isActive, isMainRepo]); // Include panel to catch state changes
 
   return (
     <ErrorBoundary

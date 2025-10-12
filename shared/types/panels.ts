@@ -72,6 +72,11 @@ export interface BaseAIPanelState {
 export interface ClaudePanelState extends BaseAIPanelState {
   // Claude-specific state
   permissionMode?: 'approve' | 'ignore'; // Permission mode for Claude
+
+  // Automatic context tracking
+  contextUsage?: string | null;          // Latest context usage summary (e.g., "54k/200k tokens (27%)")
+  autoContextRunState?: 'idle' | 'running'; // Tracks whether an automatic /context run is in progress
+  lastAutoContextAt?: string;            // ISO timestamp of the most recent automatic context refresh
 }
 
 export interface CodexPanelState extends BaseAIPanelState {

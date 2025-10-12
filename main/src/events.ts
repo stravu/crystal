@@ -6,6 +6,8 @@ import { addSessionLog } from './ipc/logs';
 import { getCodexModelConfig } from '../../shared/types/models';
 import { panelManager } from './services/panelManager';
 import type { ToolPanel, CodexPanelState, ClaudePanelState } from '../../shared/types/panels';
+import type { ClaudePanelManager } from './services/panels/claude/claudePanelManager';
+import type { SessionOutput } from './types/session';
 import { 
   validateSessionExists, 
   validateEventContext, 
@@ -39,6 +41,228 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     const message = error instanceof Error ? error.message : String(error);
     (logger || console).warn?.(`[Main] Unable to load Codex manager for lifecycle events: ${message}`);
   }
+
+  let cachedClaudePanelManager: ClaudePanelManager | undefined;
+  let attemptedClaudeManagerResolve = false;
+
+  const resolveClaudePanelManager = (): ClaudePanelManager | undefined => {
+    if (cachedClaudePanelManager) {
+      return cachedClaudePanelManager;
+    }
+
+    try {
+      const { claudePanelManager: resolvedClaudeManager } = require('./ipc/claudePanel');
+      if (resolvedClaudeManager) {
+        cachedClaudePanelManager = resolvedClaudeManager as ClaudePanelManager;
+      }
+    } catch (error) {
+      if (!attemptedClaudeManagerResolve) {
+        const message = error instanceof Error ? error.message : String(error);
+        (logger || console).warn?.(`[Main] Unable to load Claude panel manager for lifecycle events: ${message}`);
+        attemptedClaudeManagerResolve = true;
+      }
+    }
+
+    return cachedClaudePanelManager;
+  };
+
+  // eslint-disable-next-line no-control-regex
+  const ANSI_ESCAPE_REGEX = /\x1B\[[0-9;]*m/g;
+  const CONTEXT_USAGE_REGEX = /([0-9]+(?:\.[0-9]+)?k?\s*\/\s*[0-9]+(?:\.[0-9]+)?k?\s+tokens?\s*\(\d+%[^)]*\))/i;
+
+  const extractCandidateStrings = (payload: unknown): string[] => {
+    const strings: string[] = [];
+    const stack: unknown[] = [payload];
+    const visited = new Set<object>();
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (current === undefined || current === null) {
+        continue;
+      }
+
+      if (typeof current === 'string') {
+        strings.push(current);
+        continue;
+      }
+
+      if (typeof current === 'number' || typeof current === 'boolean') {
+        strings.push(String(current));
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        for (const item of current) {
+          stack.push(item);
+        }
+        continue;
+      }
+
+      if (typeof current === 'object') {
+        const obj = current as Record<string, unknown>;
+        if (visited.has(obj)) {
+          continue;
+        }
+        visited.add(obj);
+        for (const value of Object.values(obj)) {
+          stack.push(value);
+        }
+      }
+    }
+
+    return strings;
+  };
+
+  const extractContextUsageFromOutputs = (outputs: SessionOutput[]): string | null => {
+    for (const output of outputs) {
+      if (output.type !== 'stdout' || typeof output.data !== 'string') {
+        if (output.type === 'json' && output.data && typeof output.data === 'object') {
+          const candidates = extractCandidateStrings(output.data);
+          for (const candidate of candidates) {
+            const match = typeof candidate === 'string' ? candidate.match(CONTEXT_USAGE_REGEX) : null;
+            if (match) {
+              return match[1].replace(/\s+/g, ' ').trim();
+            }
+          }
+        }
+        continue;
+      }
+
+      const cleanedLines = output.data
+        .replace(ANSI_ESCAPE_REGEX, '')
+        .split(/\r?\n/);
+
+      for (const line of cleanedLines) {
+        const match = line.match(CONTEXT_USAGE_REGEX);
+        if (match) {
+          return match[1].replace(/\s+/g, ' ').trim();
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const updateClaudePanelCustomState = async (
+    panelId: string,
+    mutator: (state: ClaudePanelState) => ClaudePanelState
+  ): Promise<ClaudePanelState | undefined> => {
+    const panel = panelManager.getPanel(panelId);
+    if (!panel) {
+      return undefined;
+    }
+
+    const existing = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+    const baseState: ClaudePanelState = {
+      ...existing,
+      autoContextRunState: existing.autoContextRunState ?? 'idle'
+    };
+
+    if (!('contextUsage' in baseState)) {
+      baseState.contextUsage = null;
+    }
+
+    const nextCustomState = mutator({ ...baseState });
+    const nextPanelState = {
+      ...panel.state,
+      customState: nextCustomState
+    };
+
+    await panelManager.updatePanel(panelId, { state: nextPanelState });
+
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) {
+      try {
+        mw.webContents.send('panel:updated', {
+          ...panel,
+          state: nextPanelState
+        });
+      } catch (ipcError) {
+        console.error(`[Main] Failed to send panel:updated event for panel ${panelId}:`, ipcError);
+      }
+    }
+
+    return nextCustomState;
+  };
+
+  const finalizeAutoContextRun = async (panelId: string): Promise<void> => {
+    try {
+      const bufferedOutputs = sessionManager.consumeAutoContextCapture(panelId);
+      const outputs = bufferedOutputs.length > 0
+        ? bufferedOutputs
+        : (typeof sessionManager.getPanelOutputs === 'function'
+            ? sessionManager.getPanelOutputs(panelId, 200)
+            : []);
+      const contextUsage = extractContextUsageFromOutputs(outputs);
+      const timestamp = new Date().toISOString();
+
+      await updateClaudePanelCustomState(panelId, (state) => ({
+        ...state,
+        autoContextRunState: 'idle',
+        lastAutoContextAt: timestamp,
+        contextUsage: contextUsage ?? state.contextUsage ?? null
+      }));
+    } catch (error) {
+      console.error(`[Main] Failed to finalize automatic context run for panel ${panelId}:`, error);
+      sessionManager.clearAutoContextCapture(panelId);
+      await updateClaudePanelCustomState(panelId, (state) => ({
+        ...state,
+        autoContextRunState: 'idle'
+      }));
+    }
+  };
+
+  const startAutoContextRun = async (panelId: string, sessionId: string): Promise<void> => {
+    const claudeManager = resolveClaudePanelManager();
+    if (!claudeManager) {
+      return;
+    }
+
+    const session = sessionManager.getSession(sessionId);
+    if (!session || session.archived || !session.worktreePath) {
+      return;
+    }
+
+    const panel = panelManager.getPanel(panelId);
+    if (!panel) {
+      return;
+    }
+
+    sessionManager.clearAutoContextCapture(panelId);
+    sessionManager.beginAutoContextCapture(panelId);
+
+    let modelOverride: string | undefined;
+    const currentState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+    if (typeof currentState.model === 'string' && currentState.model.trim().length > 0) {
+      modelOverride = currentState.model;
+    }
+
+    const conversationHistory = sessionManager.getPanelConversationMessages
+      ? sessionManager.getPanelConversationMessages(panelId)
+      : [];
+
+    await updateClaudePanelCustomState(panelId, (state) => ({
+      ...state,
+      autoContextRunState: 'running'
+    }));
+
+    try {
+      await claudeManager.continuePanel(
+        panelId,
+        session.worktreePath,
+        '/context',
+        conversationHistory,
+        modelOverride
+      );
+    } catch (error) {
+      (logger || console).warn?.(`[Main] Failed to run automatic /context for panel ${panelId}: ${error instanceof Error ? error.message : String(error)}`);
+      sessionManager.clearAutoContextCapture(panelId);
+      await updateClaudePanelCustomState(panelId, (state) => ({
+        ...state,
+        autoContextRunState: 'idle'
+      }));
+    }
+  };
 
   const attachProcessLifecycleHandlers = (
     manager: AbstractCliManager | undefined,
@@ -473,6 +697,31 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       return;
     }
 
+    let skipSessionSummary = false;
+
+    if (panelId) {
+      try {
+        const panel = panelManager.getPanel(panelId);
+        if (panel) {
+          const customState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+          const autoState = customState.autoContextRunState ?? 'idle';
+
+          if (autoState === 'running') {
+            skipSessionSummary = true;
+            await finalizeAutoContextRun(panelId);
+          } else if (exitCode === 0) {
+            await startAutoContextRun(panelId, sessionId);
+          }
+        }
+      } catch (autoContextError) {
+        console.error(`[Main] Failed to handle automatic context usage for panel ${panelId}:`, autoContextError);
+      }
+    }
+
+    if (skipSessionSummary) {
+      return;
+    }
+
 
     // Add commit information when session ends
     try {
@@ -576,6 +825,24 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     if (!validation.valid) {
       logValidationFailure('claudeCodeManager error event', validation);
       return; // Don't process invalid events
+    }
+
+    if (panelId) {
+      try {
+        const panel = panelManager.getPanel(panelId);
+        if (panel) {
+          const customState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+          if ((customState.autoContextRunState ?? 'idle') === 'running') {
+            sessionManager.clearAutoContextCapture(panelId);
+            await updateClaudePanelCustomState(panelId, (state) => ({
+              ...state,
+              autoContextRunState: 'idle'
+            }));
+          }
+        }
+      } catch (autoContextCleanupError) {
+        console.error(`[Main] Failed to clean up automatic context run after error for panel ${panelId}:`, autoContextCleanupError);
+      }
     }
 
     if (panelId) {

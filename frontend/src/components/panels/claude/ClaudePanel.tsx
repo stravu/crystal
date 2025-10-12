@@ -9,6 +9,7 @@ import { ClaudeSettingsPanel } from './ClaudeSettingsPanel';
 import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransformer';
 import { Settings } from 'lucide-react';
 import { useConfigStore } from '../../../stores/configStore';
+import type { ClaudePanelState } from '../../../../../shared/types/panels';
 
 export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive }) => {
   const hook = useClaudePanel(panel.id, isActive);
@@ -30,6 +31,12 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
   const activeSession = hook.activeSession;
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
   const showDebugTabs = devModeEnabled;
+
+  const claudePanelState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+  const contextUsage = claudePanelState.contextUsage ?? null;
+  const autoContextRunState = claudePanelState.autoContextRunState ?? 'idle';
+  const isContextUpdating = autoContextRunState === 'running';
+  const contextDisplay = contextUsage ?? '-- tokens (--%)';
 
   // Extract and store slash commands when we get JSON messages with init
   useEffect(() => {
@@ -198,6 +205,8 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
           hasConversationHistory={hook.hasConversationHistory}
           contextCompacted={hook.contextCompacted}
           handleCancelRequest={hook.handleStopSession}
+          contextUsageDisplay={contextDisplay}
+          contextUpdating={isContextUpdating}
           panelId={panel.id}
         />
       )}
@@ -208,6 +217,7 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
           This session is archived. Unarchive it to continue the conversation.
         </div>
       )}
+
     </div>
   );
 });

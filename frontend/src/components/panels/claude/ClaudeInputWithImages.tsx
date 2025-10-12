@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Session, GitCommands } from '../../../types/session';
 // ViewMode removed - no longer needed
-import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square, FileText } from 'lucide-react';
+import { X, Cpu, Send, Play, Terminal, ChevronRight, AtSign, Paperclip, Zap, Brain, Target, CheckCircle, Square, FileText, Loader2 } from 'lucide-react';
 import FilePathAutocomplete from '../../FilePathAutocomplete';
 import { API } from '../../../utils/api';
 import { CommitModePill } from '../../CommitModeToggle';
@@ -49,6 +49,8 @@ interface SessionInputWithImagesProps {
   contextCompacted?: boolean;
   handleCancelRequest?: () => void;
   panelId?: string; // Add optional panel ID for panel-specific model settings
+  contextUsageDisplay?: string;
+  contextUpdating?: boolean;
 }
 
 export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = memo(({
@@ -72,6 +74,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   contextCompacted = false,
   handleCancelRequest,
   panelId,
+  contextUsageDisplay,
+  contextUpdating,
 }) => {
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [attachedTexts, setAttachedTexts] = useState<AttachedText[]>([]);
@@ -322,6 +326,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
     }
   }, [activeSession.status]);
 
+  const resolvedContextDisplay = contextUsageDisplay ?? '-- tokens (--%)';
+
   // Auto-resize textarea with requestAnimationFrame for better performance
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -401,13 +407,21 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 </div>
               )}
             </div>
-            {/* Mode indicator */}
-            {viewMode === 'terminal' && (
-              <div className="flex items-center gap-1 text-text-secondary">
-                <Terminal className="w-3 h-3" />
-                <span>Terminal Mode</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                {contextUpdating && (
+                  <Loader2 className="w-3 h-3 animate-spin text-interactive" aria-hidden="true" />
+                )}
+                <span>{resolvedContextDisplay}</span>
               </div>
-            )}
+              {/* Mode indicator */}
+              {viewMode === 'terminal' && (
+                <div className="flex items-center gap-1 text-text-secondary">
+                  <Terminal className="w-3 h-3" />
+                  <span>Terminal Mode</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

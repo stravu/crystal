@@ -50,6 +50,7 @@ export class SessionManager extends EventEmitter {
   private currentRunningSessionId: string | null = null;
   private activeProject: Project | null = null;
   private terminalSessionManager: TerminalSessionManager;
+  private autoContextBuffers: Map<string, SessionOutput[]> = new Map();
 
   constructor(public db: DatabaseService) {
     super();
@@ -120,6 +121,31 @@ export class SessionManager extends EventEmitter {
     } catch (e) {
       return undefined;
     }
+  }
+
+  beginAutoContextCapture(panelId: string): void {
+    this.autoContextBuffers.set(panelId, []);
+  }
+
+  collectAutoContextOutput(panelId: string, output: SessionOutput): void {
+    const buffer = this.autoContextBuffers.get(panelId);
+    if (buffer) {
+      buffer.push(output);
+    }
+  }
+
+  consumeAutoContextCapture(panelId: string): SessionOutput[] {
+    const buffer = this.autoContextBuffers.get(panelId) ?? [];
+    this.autoContextBuffers.delete(panelId);
+    return buffer;
+  }
+
+  clearAutoContextCapture(panelId: string): void {
+    this.autoContextBuffers.delete(panelId);
+  }
+
+  hasAutoContextCapture(panelId: string): boolean {
+    return this.autoContextBuffers.has(panelId);
   }
   
   // Generic method for getting agent session ID (works for any AI panel)
@@ -691,6 +717,20 @@ export class SessionManager extends EventEmitter {
 
   // Panel-based methods for Claude panels (use panel_id instead of session_id)
   addPanelOutput(panelId: string, output: Omit<SessionOutput, 'sessionId'>): void {
+    const panel = this.db.getPanel(panelId);
+
+    if (this.hasAutoContextCapture(panelId)) {
+      const bufferedOutput: SessionOutput = {
+        sessionId: panel?.sessionId || '',
+        panelId,
+        type: output.type,
+        data: output.data,
+        timestamp: output.timestamp instanceof Date ? output.timestamp : new Date(output.timestamp)
+      };
+      this.collectAutoContextOutput(panelId, bufferedOutput);
+      return;
+    }
+
     // Check for JSON message type and store appropriately
     const existingOutputs = this.db.getPanelOutputs(panelId, 1);
     const isContinuing = existingOutputs.length > 0 && 
@@ -707,11 +747,8 @@ export class SessionManager extends EventEmitter {
       if (output.type === 'json' && output.data && typeof output.data === 'object') {
         const data = output.data as GenericMessageData;
         const sessionIdFromMsg = (data.type === 'system' && data.subtype === 'init' && data.session_id) || data.session_id;
-        if (sessionIdFromMsg) {
-          const panel = this.db.getPanel(panelId);
-          if (panel?.sessionId) {
-            this.db.updateSession(panel.sessionId, { claude_session_id: sessionIdFromMsg });
-          }
+        if (sessionIdFromMsg && panel?.sessionId) {
+          this.db.updateSession(panel.sessionId, { claude_session_id: sessionIdFromMsg });
         }
       }
     } catch (e) {
