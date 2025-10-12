@@ -335,6 +335,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveExpanded: (projectIds: number[], folderIds: string[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded', projectIds, folderIds),
     saveExpandedProjects: (projectIds: number[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded-projects', projectIds),
     saveExpandedFolders: (folderIds: string[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded-folders', folderIds),
+    saveSessionSortAscending: (ascending: boolean): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-session-sort-ascending', ascending),
   },
 
   // Event listeners for real-time updates

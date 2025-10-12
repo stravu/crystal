@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings } from './Settings';
 import { DraggableProjectTreeView } from './DraggableProjectTreeView';
 import { ArchiveProgress } from './ArchiveProgress';
-import { Info, Clock, Check, Edit, CircleArrowDown, AlertTriangle, GitMerge } from 'lucide-react';
+import { Info, Clock, Check, Edit, CircleArrowDown, AlertTriangle, GitMerge, ArrowUpDown } from 'lucide-react';
 import crystalLogo from '../assets/crystal-logo.svg';
 import { IconButton } from './ui/Button';
 import { Modal, ModalHeader, ModalBody } from './ui/Modal';
@@ -21,9 +21,10 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
   const [version, setVersion] = useState<string>('');
   const [gitCommit, setGitCommit] = useState<string>('');
   const [worktreeName, setWorktreeName] = useState<string>('');
+  const [sessionSortAscending, setSessionSortAscending] = useState<boolean>(false); // Default to descending (newest first)
 
   useEffect(() => {
-    // Fetch version info on component mount
+    // Fetch version info and UI state on component mount
     const fetchVersion = async () => {
       try {
         console.log('[Sidebar Debug] Fetching version info...');
@@ -50,9 +51,33 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
         console.error('Failed to fetch version:', error);
       }
     };
-    
+
+    const loadUIState = async () => {
+      try {
+        const result = await window.electronAPI.uiState.getExpanded();
+        if (result.success && result.data) {
+          setSessionSortAscending(result.data.sessionSortAscending ?? false);
+        }
+      } catch (error) {
+        console.error('Failed to load UI state:', error);
+      }
+    };
+
     fetchVersion();
+    loadUIState();
   }, []);
+
+  const toggleSessionSortOrder = async () => {
+    const newValue = !sessionSortAscending;
+    setSessionSortAscending(newValue);
+
+    // Save to database via electronAPI
+    try {
+      await window.electronAPI.uiState.saveSessionSortAscending(newValue);
+    } catch (error) {
+      console.error('Failed to save session sort order:', error);
+    }
+  };
 
   return (
     <>
@@ -116,6 +141,12 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
             <span className="truncate text-text-tertiary">Projects & Sessions</span>
             <div className="flex items-center space-x-1">
               <IconButton
+                aria-label={sessionSortAscending ? "Sort sessions: Oldest first (click to reverse)" : "Sort sessions: Newest first (click to reverse)"}
+                size="sm"
+                onClick={toggleSessionSortOrder}
+                icon={<ArrowUpDown className="w-4 h-4" />}
+              />
+              <IconButton
                 aria-label="View Prompt History (Cmd/Ctrl + P)"
                 size="sm"
                 onClick={onPromptHistoryClick}
@@ -129,7 +160,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
               />
             </div>
           </div>
-          <DraggableProjectTreeView />
+          <DraggableProjectTreeView sessionSortAscending={sessionSortAscending} />
         </div>
         
         {/* Bottom section - always visible */}

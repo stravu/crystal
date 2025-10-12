@@ -38,7 +38,11 @@ interface DragState {
   overFolderId: string | null;
 }
 
-export function DraggableProjectTreeView() {
+interface DraggableProjectTreeViewProps {
+  sessionSortAscending: boolean;
+}
+
+export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProjectTreeViewProps) {
   const [projectsWithSessions, setProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
   const [archivedProjectsWithSessions, setArchivedProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
@@ -668,17 +672,18 @@ export function DraggableProjectTreeView() {
     debounce(() => {
       setShowArchivedSessions(prev => {
         const newShowArchived = !prev;
-        
+
         // Load archived sessions when first expanding
         if (newShowArchived && archivedProjectsWithSessions.length === 0 && !isLoadingArchived) {
           loadArchivedSessions();
         }
-        
+
         return newShowArchived;
       });
     }, 300),
     [archivedProjectsWithSessions.length, isLoadingArchived]
   );
+
   const handleDeleteFolder = async (folder: Folder, projectId: number) => {
     // Check if folder has sessions
     const project = projectsWithSessions.find(p => p.id === projectId);
@@ -1744,7 +1749,10 @@ export function DraggableProjectTreeView() {
             
             {/* Then render sessions in this folder */}
             {folderSessions
-              .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+              .sort((a, b) => {
+                const order = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+                return sessionSortAscending ? order : -order;
+              })
               .map((session, sessionIndex, sessionArray) => {
                 const isDraggingOverSession = dragState.overType === 'session' && 
                                              dragState.overSessionId === session.id &&
@@ -1968,8 +1976,11 @@ export function DraggableProjectTreeView() {
                       }))
                     ];
 
-                    // Sort by displayOrder
-                    rootItems.sort((a, b) => a.displayOrder - b.displayOrder);
+                    // Sort by displayOrder, respecting user's sort preference
+                    rootItems.sort((a, b) => {
+                      const order = a.displayOrder - b.displayOrder;
+                      return sessionSortAscending ? order : -order;
+                    });
 
                     // Render each item based on its type
                     return rootItems.map((item, index, array) => {
