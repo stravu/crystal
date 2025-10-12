@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Download, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
 import { Button } from './ui/Button';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface UpdateDialogProps {
   isOpen: boolean;
@@ -353,9 +355,39 @@ export function UpdateDialog({ isOpen, onClose, versionInfo }: UpdateDialogProps
             <div className="mt-6">
               <h3 className="text-lg font-medium text-text-primary mb-3">Release Notes</h3>
               <div className="bg-surface-secondary rounded-lg p-4 max-h-64 overflow-y-auto">
-                <pre className="text-sm text-text-secondary whitespace-pre-wrap font-sans">
-                  {versionInfo.releaseNotes}
-                </pre>
+                <div className="text-sm">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => <h1 className="text-2xl font-bold mt-4 mb-3 text-text-primary">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-xl font-bold mt-3 mb-2 text-text-primary">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-lg font-bold mt-2 mb-2 text-text-primary">{children}</h3>,
+                      h4: ({ children }) => <h4 className="text-base font-bold mt-2 mb-1 text-text-primary">{children}</h4>,
+                      p: ({ children }) => <p className="mb-3 text-text-primary">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc mb-3 ml-6 text-text-primary">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal mb-3 ml-6 text-text-primary">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1 text-text-primary">{children}</li>,
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-border-secondary pl-4 italic my-3 text-text-tertiary">
+                          {children}
+                        </blockquote>
+                      ),
+                      a: ({ href, children }) => (
+                        <a href={href} className="text-interactive hover:text-interactive-hover underline" target="_blank" rel="noopener noreferrer">
+                          {children}
+                        </a>
+                      ),
+                      code: ({ children }) => (
+                        <code className="bg-surface-tertiary px-1 py-0.5 rounded text-text-primary font-mono text-xs">
+                          {children}
+                        </code>
+                      ),
+                      hr: () => <hr className="my-4 border-border-primary" />,
+                    }}
+                  >
+                    {versionInfo.releaseNotes}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
           )}
