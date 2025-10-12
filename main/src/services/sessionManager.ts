@@ -232,10 +232,11 @@ export class SessionManager extends EventEmitter {
     switch (dbStatus) {
       case 'pending': return 'initializing';
       case 'running': return 'running';
-      case 'stopped': 
+      case 'stopped':
       case 'completed': {
-        // If session is completed but hasn't been viewed since last update, show as unviewed
-        if (!lastViewedAt || (updatedAt && new Date(lastViewedAt) < new Date(updatedAt))) {
+        // Only show as unviewed if session was viewed before AND has been updated since that view
+        // Don't show unviewed just because a session has never been clicked on
+        if (lastViewedAt && updatedAt && new Date(lastViewedAt) < new Date(updatedAt)) {
           return 'completed_unviewed';
         }
         return 'stopped';
