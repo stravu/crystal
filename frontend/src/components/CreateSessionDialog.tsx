@@ -447,20 +447,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check if at least one tool is selected
-    if (!selectedTools.claude && !selectedTools.codex) {
-      showError({
-        title: 'No Tool Selected',
-        error: 'Please select at least one AI tool (Claude Code or Codex) to create a session.'
-      });
-      return;
-    }
-
     // Check if session name is required
-    if (!hasApiKey && !sessionName) {
+    // Session name is always required when no tools are selected OR when there's no API key
+    if (!sessionName && (!hasApiKey || (!selectedTools.claude && !selectedTools.codex))) {
       showError({
         title: 'Session Name Required',
-        error: 'Please provide a session name or add an Anthropic API key in Settings to enable auto-naming.'
+        error: !selectedTools.claude && !selectedTools.codex
+          ? 'Please provide a session name when creating a session without AI tools.'
+          : 'Please provide a session name or add an Anthropic API key in Settings to enable auto-naming.'
       });
       return;
     }
@@ -533,9 +527,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
       }
 
       // Determine which tools to create sessions for
-      const toolsToCreate: Array<'claude' | 'codex'> = [];
+      const toolsToCreate: Array<'claude' | 'codex' | 'none'> = [];
       if (selectedTools.claude) toolsToCreate.push('claude');
       if (selectedTools.codex) toolsToCreate.push('codex');
+
+      // If no tools selected, create a session with no agent
+      if (toolsToCreate.length === 0) {
+        toolsToCreate.push('none');
+      }
 
       // Determine if we need to create a folder
       // Create folder when: multiple sessions (sessionCount > 1) OR multiple tools selected
@@ -571,6 +570,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
           }
           toolPermissionMode = claudeConfig.permissionMode;
         } else if (toolType === 'codex') {
+          toolPermissionMode = formData.permissionMode || 'ignore';
+        } else if (toolType === 'none') {
+          // For sessions with no agent, use default permission mode
           toolPermissionMode = formData.permissionMode || 'ignore';
         }
 
@@ -674,7 +676,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
                 {/* Session Name */}
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
-                    Session Name {hasApiKey ? '(Optional)' : '(Required)'}
+                    Session Name {(!selectedTools.claude && !selectedTools.codex) || !hasApiKey ? '(Required)' : '(Optional)'}
                   </label>
                   <div className="flex gap-2">
                     <Input
@@ -732,12 +734,14 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
                     </Button>
                   )}
                 </div>
-                  {!hasApiKey && !sessionName && (
+                  {!sessionName && (!hasApiKey || (!selectedTools.claude && !selectedTools.codex)) && (
                   <p className="text-xs text-status-warning mt-1">
-                    Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.
+                    {(!selectedTools.claude && !selectedTools.codex)
+                      ? 'Session name is required when creating sessions without AI tools.'
+                      : 'Session name is required. Add an Anthropic API key in Settings to enable AI-powered auto-naming.'}
                   </p>
                 )}
-                  {!worktreeError && !(!hasApiKey && !sessionName) && (
+                  {!worktreeError && (sessionName || (hasApiKey && (selectedTools.claude || selectedTools.codex))) && (
                   <p className="text-xs text-text-tertiary mt-1">
                     The name for your session and worktree folder.
                   </p>
@@ -826,7 +830,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
                     value={sharedPrompt}
                     onChange={(value) => syncPromptAcrossConfigs(value)}
                     projectId={projectId?.toString()}
-                    placeholder={!selectedTools.claude && !selectedTools.codex ? "Select at least one tool below to enter a prompt..." : "Describe your task... (use @ to reference files)"}
+                    placeholder={!selectedTools.claude && !selectedTools.codex ? "Prompt disabled (no AI tools selected)" : "Describe your task... (use @ to reference files)"}
                     className="w-full px-3 py-2 pr-10 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-interactive text-text-primary bg-surface-secondary placeholder-text-tertiary"
                     isTextarea={true}
                     rows={3}
@@ -873,7 +877,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
               {/* Tool Type Selection - Checkboxes */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Select Tools (one or both)
+                  Select Tools (optional - select one, both, or none)
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <Card
@@ -1006,7 +1010,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
 
               {!selectedTools.claude && !selectedTools.codex && (
                 <Card variant="bordered" className="p-4 text-center text-text-tertiary">
-                  <p className="text-sm">Select at least one AI tool above to configure its settings.</p>
+                  <p className="text-sm">No AI tools selected. The session will be created without an AI agent.</p>
+                  <p className="text-xs mt-2 opacity-75">You can use the terminal and git features without an AI assistant.</p>
                 </Card>
               )}
               
@@ -1203,20 +1208,21 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
             disabled={
               isSubmitting ||
               !!worktreeError ||
-              (!hasApiKey && !sessionName) ||
-              (!selectedTools.claude && !selectedTools.codex)
+              (!sessionName && (!hasApiKey || (!selectedTools.claude && !selectedTools.codex)))
             }
             loading={isSubmitting}
             title={
               isSubmitting ? 'Creating session...' :
               worktreeError ? 'Please fix the session name error' :
-              (!hasApiKey && !sessionName) ? 'Please enter a session name (required without API key)' :
-              (!selectedTools.claude && !selectedTools.codex) ? 'Please select at least one AI tool' :
+              (!sessionName && (!hasApiKey || (!selectedTools.claude && !selectedTools.codex))) ?
+                (!selectedTools.claude && !selectedTools.codex)
+                  ? 'Please enter a session name (required for sessions without AI tools)'
+                  : 'Please enter a session name (required without API key)' :
               undefined
             }
           >
             {isSubmitting ? 'Creating...' : (() => {
-              const toolCount = (selectedTools.claude ? 1 : 0) + (selectedTools.codex ? 1 : 0);
+              const toolCount = Math.max(1, (selectedTools.claude ? 1 : 0) + (selectedTools.codex ? 1 : 0));
               const totalSessions = toolCount * sessionCount;
               return `Create ${totalSessions > 1 ? totalSessions + ' Sessions' : 'Session'}`;
             })()}
