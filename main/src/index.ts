@@ -93,6 +93,20 @@ const originalInfo: typeof console.info = console.info;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 
+// Reset debug log files at startup in development mode
+if (isDevelopment) {
+  const frontendLogPath = path.join(process.cwd(), 'crystal-frontend-debug.log');
+  const backendLogPath = path.join(process.cwd(), 'crystal-backend-debug.log');
+
+  try {
+    fs.writeFileSync(frontendLogPath, '');
+    fs.writeFileSync(backendLogPath, '');
+  } catch (error) {
+    // Don't crash if we can't reset the log files
+    console.error('Failed to reset debug log files:', error);
+  }
+}
+
 // Set up console wrapper to reduce logging in production
 setupConsoleWrapper();
 
@@ -245,6 +259,21 @@ async function createWindow() {
       originalLog.apply(console, args);
     }
 
+    // In development, also write to backend debug log file
+    if (isDevelopment) {
+      const timestamp = new Date().toISOString();
+      const logMessage = `[${timestamp}] [BACKEND LOG] ${message}`;
+      const debugLogPath = path.join(process.cwd(), 'crystal-backend-debug.log');
+      const logLine = `${logMessage}\n`;
+
+      try {
+        fs.appendFileSync(debugLogPath, logLine);
+      } catch (error) {
+        // Don't crash if we can't write to the log file
+        originalLog('[Main] Failed to write to backend debug log:', error);
+      }
+    }
+
     // Forward to renderer
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
@@ -292,6 +321,21 @@ async function createWindow() {
       // Use logger but with recursion protection
       logger.error(message, errorObj);
 
+      // In development, also write to backend debug log file
+      if (isDevelopment) {
+        const timestamp = new Date().toISOString();
+        const logMessage = `[${timestamp}] [BACKEND ERROR] ${message}`;
+        const debugLogPath = path.join(process.cwd(), 'crystal-backend-debug.log');
+        const logLine = `${logMessage}\n`;
+
+        try {
+          fs.appendFileSync(debugLogPath, logLine);
+        } catch (error) {
+          // Don't crash if we can't write to the log file
+          originalError('[Main] Failed to write to backend debug log:', error);
+        }
+      }
+
       if (mainWindow && !mainWindow.isDestroyed()) {
         try {
           mainWindow.webContents.send('main-log', 'error', message);
@@ -333,6 +377,21 @@ async function createWindow() {
       originalWarn.apply(console, args);
     }
 
+    // In development, also write to backend debug log file
+    if (isDevelopment) {
+      const timestamp = new Date().toISOString();
+      const logMessage = `[${timestamp}] [BACKEND WARNING] ${message}`;
+      const debugLogPath = path.join(process.cwd(), 'crystal-backend-debug.log');
+      const logLine = `${logMessage}\n`;
+
+      try {
+        fs.appendFileSync(debugLogPath, logLine);
+      } catch (error) {
+        // Don't crash if we can't write to the log file
+        originalWarn('[Main] Failed to write to backend debug log:', error);
+      }
+    }
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         mainWindow.webContents.send('main-log', 'warn', message);
@@ -365,12 +424,68 @@ async function createWindow() {
       originalInfo.apply(console, args);
     }
 
+    // In development, also write to backend debug log file
+    if (isDevelopment) {
+      const timestamp = new Date().toISOString();
+      const logMessage = `[${timestamp}] [BACKEND INFO] ${message}`;
+      const debugLogPath = path.join(process.cwd(), 'crystal-backend-debug.log');
+      const logLine = `${logMessage}\n`;
+
+      try {
+        fs.appendFileSync(debugLogPath, logLine);
+      } catch (error) {
+        // Don't crash if we can't write to the log file
+        originalInfo('[Main] Failed to write to backend debug log:', error);
+      }
+    }
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         mainWindow.webContents.send('main-log', 'info', message);
       } catch (e) {
         // If sending to renderer fails, use original console to avoid recursion
         originalInfo('[Main] Failed to send info to renderer:', e);
+      }
+    }
+  };
+
+  console.debug = (...args: unknown[]) => {
+    const message = args.map(arg => {
+      if (typeof arg === 'object' && arg !== null) {
+        if (arg instanceof Error) {
+          return `Error: ${arg.message}\nStack: ${arg.stack}`;
+        }
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (e) {
+          // Handle circular structure
+          return `[Object with circular structure: ${arg.constructor?.name || 'Object'}]`;
+        }
+      }
+      return String(arg);
+    }).join(' ');
+
+    // In development, also write to backend debug log file
+    if (isDevelopment) {
+      const timestamp = new Date().toISOString();
+      const logMessage = `[${timestamp}] [BACKEND DEBUG] ${message}`;
+      const debugLogPath = path.join(process.cwd(), 'crystal-backend-debug.log');
+      const logLine = `${logMessage}\n`;
+
+      try {
+        fs.appendFileSync(debugLogPath, logLine);
+      } catch (error) {
+        // Don't crash if we can't write to the log file
+        console.error('[Main] Failed to write to backend debug log:', error);
+      }
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.webContents.send('main-log', 'debug', message);
+      } catch (e) {
+        // If sending to renderer fails, use original console to avoid recursion
+        console.error('[Main] Failed to send debug to renderer:', e);
       }
     }
   };

@@ -766,25 +766,18 @@ Enable verbose logging in Settings to see detailed logs for troubleshooting.
 
 In development mode, Crystal automatically captures all frontend console logs and writes them to a file that Claude Code can read for debugging purposes.
 
-**Location**: `crystal-frontend-debug.log` in the project root directory
+**Location**: `crystal-frontend-debug.log` and `crystal-backend-debug.log`in the project root directory
 
-**What gets logged**:
-- All `console.log`, `console.warn`, `console.error`, `console.info`, and `console.debug` calls from the React frontend
-- Automatic console messages from Electron's webContents (warnings, errors)
-- Timestamp, log level, and source information for each message
-
-**Example log format**:
-```
-[2024-07-21T15:30:45.123Z] [RENDERER LOG] User clicked session creation button
-[2024-07-21T15:30:45.234Z] [FRONTEND WARNING] Session validation failed: missing prompt
-[2024-07-21T15:30:45.345Z] [FRONTEND ERROR] Failed to create session (SessionView.tsx:123)
-```
 
 **Usage for Claude Code debugging**:
 1. Add debug console.log statements to frontend components
 2. Reproduce the issue in the Crystal app
-3. Read `crystal-frontend-debug.log` to see what happened
+3. Read `crystal-frontend-debug.log` and `crystal-backend-debug.log` to see what happened
 4. No need to manually check Chrome DevTools or ask humans to copy logs
+
+`crystal-frontend-debug.log` and `crystal-backend-debug.log` are reset every time the user runs in development mode, so if they report that a change is not working, you can look at those logs and they will represent the session they tested the change.
+
+**IMPORTANT** Logs are best investigated in a sub-agent
 
 **File rotation**: The log file grows continuously during development. Delete or truncate it manually if it gets too large.
 
