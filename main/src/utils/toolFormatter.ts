@@ -413,16 +413,23 @@ export function formatToolInteraction(
  * Enhanced JSON to output formatter that unifies tool calls and responses
  */
 export function formatJsonForOutputEnhanced(jsonMessage: Record<string, unknown>, gitRepoPath?: string): string {
+  // CODEX COMPATIBILITY: Unwrap old Codex format {"id":"0","msg":{...}}
+  let unwrappedMessage = jsonMessage;
+  if (jsonMessage.id !== undefined && jsonMessage.msg && typeof jsonMessage.msg === 'object') {
+    console.log('[Codex] Detected old Codex format, unwrapping msg property');
+    unwrappedMessage = { ...jsonMessage.msg as Record<string, unknown>, timestamp: jsonMessage.timestamp };
+  }
+
   // Ensure we have a valid timestamp
   let timestamp: string;
   try {
-    if (jsonMessage.timestamp && typeof jsonMessage.timestamp === 'string') {
+    if (unwrappedMessage.timestamp && typeof unwrappedMessage.timestamp === 'string') {
       // Validate the provided timestamp
-      const date = new Date(jsonMessage.timestamp);
+      const date = new Date(unwrappedMessage.timestamp);
       if (isNaN(date.getTime())) {
         throw new Error('Invalid timestamp');
       }
-      timestamp = jsonMessage.timestamp;
+      timestamp = unwrappedMessage.timestamp;
     } else {
       // Use current time if no timestamp provided
       timestamp = new Date().toISOString();
@@ -431,10 +438,109 @@ export function formatJsonForOutputEnhanced(jsonMessage: Record<string, unknown>
     // Fallback to current time if timestamp is invalid
     timestamp = new Date().toISOString();
   }
-  
-  // Handle messages from assistant
-  if (jsonMessage.type === 'assistant') {
-    const messageObj = jsonMessage.message as {content?: unknown} | undefined;
+
+  // CODEX COMPATIBILITY: Handle new Codex protocol message types
+  const messageType = unwrappedMessage.type as string;
+
+  // Handle thread lifecycle messages
+  if (messageType === 'thread.started' || messageType === 'turn.started') {
+    // Don't display thread/turn lifecycle messages - they're internal
+    return '';
+  }
+
+  // Handle item messages (reasoning, command execution, etc.)
+  if (messageType === 'item.started' || messageType === 'item.completed') {
+    const item = unwrappedMessage.item as Record<string, unknown> | undefined;
+    if (!item) return '';
+
+    const itemType = item.type as string;
+    const time = new Date(timestamp).toLocaleTimeString();
+
+    if (itemType === 'reasoning') {
+      const reasoningText = item.text as string || '';
+      return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[96m🧠 ${reasoningText}\x1b[0m\r\n`;
+    }
+
+    if (itemType === 'command_execution') {
+      const command = item.command as string || '';
+      const status = item.status as string || '';
+      const exitCode = item.exit_code as number | undefined;
+      const aggregatedOutput = item.aggregated_output as string || '';
+
+      if (messageType === 'item.started') {
+        return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[33m🔧 Executing: ${command}\x1b[0m\r\n`;
+      } else {
+        // item.completed
+        const isError = exitCode !== undefined && exitCode !== 0;
+        const statusSymbol = isError ? '✗' : '✓';
+        const statusColor = isError ? '\x1b[91m' : '\x1b[32m';
+
+        let output = `\r\n\x1b[36m[${time}]\x1b[0m ${statusColor}${statusSymbol}\x1b[0m \x1b[33m${command}\x1b[0m`;
+        if (exitCode !== undefined) {
+          output += ` \x1b[90m(exit: ${exitCode})\x1b[0m`;
+        }
+        output += '\r\n';
+
+        if (aggregatedOutput && aggregatedOutput.trim()) {
+          const lines = aggregatedOutput.split('\n');
+          const maxLines = 15;
+          lines.slice(0, maxLines).forEach(line => {
+            output += `\x1b[90m│  \x1b[37m${line}\x1b[0m\r\n`;
+          });
+          if (lines.length > maxLines) {
+            output += `\x1b[90m│  ... (${lines.length - maxLines} more lines)\x1b[0m\r\n`;
+          }
+        }
+
+        return output + '\r\n';
+      }
+    }
+
+    if (itemType === 'text_delta') {
+      const text = item.text as string || '';
+      if (!text.trim()) return '';
+
+      return `\x1b[37m${text}\x1b[0m`;
+    }
+
+    if (itemType === 'message') {
+      const text = item.text as string || '';
+      if (!text.trim()) return '';
+
+      const time = new Date(timestamp).toLocaleTimeString();
+      return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[35m🤖 ${text}\x1b[0m\r\n\r\n`;
+    }
+  }
+
+  // Handle old Codex message types (after unwrapping)
+  if (messageType === 'task_started') {
+    return ''; // Silent, no output needed
+  }
+
+  if (messageType === 'agent_reasoning') {
+    const reasoningText = unwrappedMessage.text as string || '';
+    const time = new Date(timestamp).toLocaleTimeString();
+    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[96m🧠 ${reasoningText}\x1b[0m\r\n`;
+  }
+
+  if (messageType === 'agent_message') {
+    const messageText = unwrappedMessage.message as string || '';
+    const time = new Date(timestamp).toLocaleTimeString();
+    return `\r\n\x1b[36m[${time}]\x1b[0m \x1b[1m\x1b[35m🤖 ${messageText}\x1b[0m\r\n\r\n`;
+  }
+
+  if (messageType === 'agent_reasoning_section_break') {
+    return ''; // Silent separator, no visual output needed
+  }
+
+  if (messageType === 'token_count') {
+    // Optional: Could display token usage, but for now keep it silent
+    return '';
+  }
+
+  // Handle messages from assistant (Claude Code format)
+  if (unwrappedMessage.type === 'assistant') {
+    const messageObj = unwrappedMessage.message as {content?: unknown} | undefined;
     const content = messageObj?.content;
     
     if (Array.isArray(content)) {
@@ -510,10 +616,10 @@ export function formatJsonForOutputEnhanced(jsonMessage: Record<string, unknown>
       }
     }
   }
-  
+
   // Handle tool results from user
-  if (jsonMessage.type === 'user') {
-    const messageObj = jsonMessage.message as {content?: unknown} | undefined;
+  if (unwrappedMessage.type === 'user') {
+    const messageObj = unwrappedMessage.message as {content?: unknown} | undefined;
     const content = messageObj?.content;
     
     if (Array.isArray(content)) {
@@ -589,11 +695,11 @@ export function formatJsonForOutputEnhanced(jsonMessage: Record<string, unknown>
       }
     }
   }
-  
-  
+
+
   // Handle session messages (like errors)
-  if (jsonMessage.type === 'session') {
-    const data = (jsonMessage.data as {status?: string; message?: string; details?: string}) || {};
+  if (unwrappedMessage.type === 'session') {
+    const data = (unwrappedMessage.data as {status?: string; message?: string; details?: string}) || {};
     const time = (() => {
       try {
         const date = new Date(timestamp);
@@ -613,7 +719,7 @@ export function formatJsonForOutputEnhanced(jsonMessage: Record<string, unknown>
   }
   
   // Fall back to original formatter for other message types
-  return formatJsonForOutput(jsonMessage as ClaudeJsonMessage);
+  return formatJsonForOutput(unwrappedMessage as ClaudeJsonMessage);
 }
 
 // Re-export the original formatter for backwards compatibility
