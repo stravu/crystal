@@ -718,12 +718,19 @@ export class SessionManager extends EventEmitter {
       console.warn('[SessionManager] Failed to capture Claude session_id from panel output:', e);
     }
 
+    // Check if this is a system result message indicating panel execution has completed
+    if (output.type === 'json' && isJSONMessage(output.data as Record<string, unknown>, 'system', 'result')) {
+      // Update the completion timestamp for the most recent prompt marker for this panel
+      const completionTimestamp = output.timestamp instanceof Date ? output.timestamp.toISOString() : output.timestamp;
+      this.db.updatePanelPromptMarkerCompletion(panelId, completionTimestamp);
+    }
+
     // Handle assistant conversation message extraction for Claude panels (same logic as sessions)
     if (output.type === 'json' && (output.data as GenericMessageData).type === 'assistant' && (output.data as GenericMessageData).message?.content) {
       // Extract text content from assistant messages
       const content = (output.data as GenericMessageData).message?.content;
       let assistantText = '';
-      
+
       if (Array.isArray(content)) {
         // Concatenate all text content from the array
         assistantText = content
@@ -733,7 +740,7 @@ export class SessionManager extends EventEmitter {
       } else if (typeof content === 'string') {
         assistantText = content;
       }
-      
+
       if (assistantText) {
         // Add to panel conversation messages for continuation support
         // Use the sessionManager method instead of db method directly to ensure event emission
@@ -829,12 +836,16 @@ export class SessionManager extends EventEmitter {
 
   addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string): void {
     this.db.addPanelConversationMessage(panelId, messageType, content);
-    
+
     // Emit event when a user message is added (new prompt)
     if (messageType === 'user') {
+      // Also add to prompt markers so the commit manager can track the latest prompt
+      const outputs = this.db.getPanelOutputs(panelId);
+      this.db.addPanelPromptMarker(panelId, content, outputs.length);
+
       this.emit('panel-prompt-added', { panelId, content });
     }
-    
+
     // Emit event when an assistant message is added (response received)
     if (messageType === 'assistant') {
       this.emit('panel-response-added', { panelId, content });
