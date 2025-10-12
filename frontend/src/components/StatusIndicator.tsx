@@ -32,7 +32,7 @@ export const StatusIndicator = React.memo(({
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
-  const getStatusConfig = (status: Session['status']) => {
+  const getStatusConfig = (status: Session['status'], statusMessage?: string) => {
     switch (status) {
       case 'initializing':
         return {
@@ -40,8 +40,8 @@ export const StatusIndicator = React.memo(({
           badgeVariant: 'success' as const,
           dotStatus: 'running' as const,
           icon: Loader2,
-          text: 'Initializing',
-          tooltip: 'Setting up git worktree and environment',
+          text: statusMessage || 'Initializing',
+          tooltip: statusMessage || 'Setting up git worktree and environment',
           spin: true,
           animated: true
         };
@@ -133,7 +133,7 @@ export const StatusIndicator = React.memo(({
     }
   };
 
-  const config = getStatusConfig(currentStatus);
+  const config = getStatusConfig(currentStatus, session.statusMessage);
   const badgeSize = getBadgeSize(size);
   const dotSize = getDotSize(size);
   

@@ -213,7 +213,7 @@ export class TaskQueue {
         
 
         const { worktreePath, baseCommit, baseBranch: actualBaseBranch } = await worktreeManager.createWorktree(targetProject.path, worktreeName, undefined, baseBranch, targetProject.worktree_folder || undefined);
-        
+
         const session = await sessionManager.createSession(
           sessionName,
           worktreePath,
@@ -263,14 +263,17 @@ export class TaskQueue {
         
         // Ensure diff panel exists for this session
         await panelManager.ensureDiffPanel(session.id);
-        
+
         // Emit the session-created event BEFORE running build script so UI shows immediately
         sessionManager.emitSessionCreated(session);
-        
+
         // Run build script after session is visible in UI
         if (targetProject.build_script) {
           console.log(`[TaskQueue] Running build script for session ${session.id}`);
-          
+
+          // Update status message
+          sessionManager.updateSessionStatus(session.id, 'initializing', 'Running build script...');
+
           // Add a "waiting for build" message to output
           const buildWaitingMessage = `\x1b[36m[${formatForDisplay(new Date())}]\x1b[0m \x1b[1m\x1b[33m⏳ Waiting for build script to complete...\x1b[0m\r\n\r\n`;
           await sessionManager.addSessionOutput(session.id, {
@@ -278,7 +281,7 @@ export class TaskQueue {
             data: buildWaitingMessage,
             timestamp: new Date()
           });
-          
+
           const buildCommands = targetProject.build_script.split('\n').filter(cmd => cmd.trim());
           const buildResult = await sessionManager.runBuildScript(session.id, buildCommands, worktreePath);
           console.log(`[TaskQueue] Build script completed. Success: ${buildResult.success}`);
@@ -289,6 +292,9 @@ export class TaskQueue {
           const resolvedToolType: 'claude' | 'codex' | 'none' = toolType || 'claude';
 
           if (resolvedToolType === 'codex') {
+            // Update status message
+            sessionManager.updateSessionStatus(session.id, 'initializing', 'Starting Codex...');
+
             // Wait for the Codex panel to be created by the session-created event handler in events.ts
             let codexPanel = null;
             let attempts = 0;
@@ -338,6 +344,9 @@ export class TaskQueue {
               throw new Error('No Codex panel found - cannot start Codex without a real panel ID');
             }
           } else if (resolvedToolType === 'claude') {
+            // Update status message
+            sessionManager.updateSessionStatus(session.id, 'initializing', 'Starting Claude Code...');
+
             // Wait for the Claude panel to be created by the session-created event handler in events.ts
             let claudePanel = null;
             let attempts = 0;
@@ -383,7 +392,7 @@ export class TaskQueue {
           } else if (resolvedToolType === 'none') {
             // No AI tool selected - update session status to stopped
             console.log(`[TaskQueue] Session ${session.id} has no AI tool configured, marking as stopped`);
-            await sessionManager.updateSession(session.id, { status: 'stopped' });
+            await sessionManager.updateSession(session.id, { status: 'stopped', statusMessage: undefined });
 
             // Add an informational message to the output
             const timestamp = formatForDisplay(new Date());
@@ -401,7 +410,7 @@ export class TaskQueue {
           const resolvedToolType: 'claude' | 'codex' | 'none' = toolType || 'claude';
           if (resolvedToolType === 'none') {
             console.log(`[TaskQueue] Session ${session.id} has no prompt and no AI tool, marking as stopped`);
-            await sessionManager.updateSession(session.id, { status: 'stopped' });
+            await sessionManager.updateSession(session.id, { status: 'stopped', statusMessage: undefined });
           }
         }
 

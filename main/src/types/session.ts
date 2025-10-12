@@ -4,6 +4,7 @@ export interface Session {
   worktreePath: string;
   prompt: string;
   status: 'initializing' | 'ready' | 'running' | 'waiting' | 'stopped' | 'completed_unviewed' | 'error';
+  statusMessage?: string;
   pid?: number;
   createdAt: Date;
   lastActivity?: Date;
@@ -81,6 +82,7 @@ export interface CreateSessionRequest {
 
 export interface SessionUpdate {
   status?: Session['status'];
+  statusMessage?: string;
   lastActivity?: Date;
   error?: string;
   run_started_at?: string | null;

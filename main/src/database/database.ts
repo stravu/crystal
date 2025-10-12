@@ -134,11 +134,17 @@ export class DatabaseService {
     const hasArchivedColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'archived');
     const hasInitialPromptColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'initial_prompt');
     const hasLastViewedAtColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'last_viewed_at');
-    
+    const hasStatusMessageColumn = tableInfo.some((col: SqliteTableInfo) => col.name === 'status_message');
+
     if (!hasArchivedColumn) {
       // Run migration to add archived column
       this.db.prepare("ALTER TABLE sessions ADD COLUMN archived BOOLEAN DEFAULT 0").run();
       this.db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived)").run();
+    }
+
+    if (!hasStatusMessageColumn) {
+      // Run migration to add status_message column
+      this.db.prepare("ALTER TABLE sessions ADD COLUMN status_message TEXT").run();
     }
 
     // Check if we need to rename prompt to initial_prompt
@@ -1659,6 +1665,10 @@ export class DatabaseService {
     if (data.status !== undefined) {
       updates.push('status = ?');
       values.push(data.status);
+    }
+    if (data.status_message !== undefined) {
+      updates.push('status_message = ?');
+      values.push(data.status_message);
     }
     if (data.folder_id !== undefined) {
       console.log(`[Database] Setting folder_id to: ${data.folder_id}`);

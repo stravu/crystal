@@ -44,6 +44,7 @@ export interface Session {
   worktree_name: string;
   worktree_path: string;
   status: 'pending' | 'running' | 'stopped' | 'completed' | 'failed';
+  status_message?: string;
   created_at: string;
   updated_at: string;
   last_output?: string;
@@ -107,6 +108,7 @@ export interface CreateSessionData {
 export interface UpdateSessionData {
   name?: string;
   status?: Session['status'];
+  status_message?: string;
   last_output?: string;
   exit_code?: number;
   pid?: number;

@@ -176,6 +176,7 @@ export class SessionManager extends EventEmitter {
       worktreePath: dbSession.worktree_path,
       prompt: dbSession.initial_prompt,
       status: this.mapDbStatusToSessionStatus(dbSession.status, dbSession.last_viewed_at, dbSession.updated_at),
+      statusMessage: dbSession.status_message,
       pid: dbSession.pid,
       createdAt: new Date(dbSession.created_at),
       lastActivity: new Date(dbSession.updated_at),
@@ -407,27 +408,34 @@ export class SessionManager extends EventEmitter {
   }
 
   updateSession(id: string, update: SessionUpdate): void {
-    
+
     // Add log entry for important status changes
     if (update.status) {
       addSessionLog(id, 'info', `Session status changed to: ${update.status}`, 'SessionManager');
     }
+    if (update.statusMessage) {
+      addSessionLog(id, 'info', `Status: ${update.statusMessage}`, 'SessionManager');
+    }
     if (update.error) {
       addSessionLog(id, 'error', `Session error: ${update.error}`, 'SessionManager');
     }
-    
+
     const dbUpdate: UpdateSessionData = {};
-    
+
     if (update.status !== undefined) {
       dbUpdate.status = this.mapSessionStatusToDbStatus(update.status);
     }
-    
+
+    if (update.statusMessage !== undefined) {
+      dbUpdate.status_message = update.statusMessage;
+    }
+
     // Model is now managed at panel level, not session level
-    
+
     if (update.skip_continue_next !== undefined) {
       dbUpdate.skip_continue_next = update.skip_continue_next;
     }
-    
+
     const updatedDbSession = this.db.updateSession(id, dbUpdate);
     if (!updatedDbSession) {
       console.error(`[SessionManager] Session ${id} not found in database`);
@@ -435,18 +443,22 @@ export class SessionManager extends EventEmitter {
     }
 
     const session = this.convertDbSessionToSession(updatedDbSession);
-    
+
     // Don't override the status if convertDbSessionToSession determined it should be completed_unviewed
     // This allows the blue dot indicator to work properly when a session completes
     if (update.status !== undefined && session.status === 'completed_unviewed') {
       delete update.status; // Remove status from update to preserve completed_unviewed
     }
-    
+
     // Apply any additional updates not stored in DB
     Object.assign(session, update);
-    
+
     this.activeSessions.set(id, session);
     this.emit('session-updated', session);
+  }
+
+  updateSessionStatus(id: string, status: Session['status'], statusMessage?: string): void {
+    this.updateSession(id, { status, statusMessage });
   }
 
   addSessionError(id: string, error: string, details?: string): void {
