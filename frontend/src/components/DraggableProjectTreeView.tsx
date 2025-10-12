@@ -1239,7 +1239,6 @@ export function DraggableProjectTreeView() {
         rootItems.sort((a, b) => a.displayOrder - b.displayOrder);
 
         // Find where to insert the dragged session
-        const targetDisplayOrder = targetSession.displayOrder ?? 0;
         const insertIndex = rootItems.findIndex(item => item.type === 'session' && item.id === targetSession.id);
 
         // Remove the source session from the list
