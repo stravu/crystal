@@ -507,88 +507,156 @@ export class WorktreeManager {
     return await withLock(`git-squash-rebase-${worktreePath}`, async () => {
       const executedCommands: string[] = [];
       let lastOutput = '';
-      
+
       try {
-      console.log(`[WorktreeManager] Squashing and rebasing worktree to ${mainBranch}: ${worktreePath}`);
-      
-      // Get current branch name in worktree
-      let command = `git branch --show-current`;
-      executedCommands.push(`git branch --show-current (in ${worktreePath})`);
-      const { stdout: currentBranch, stderr: stderr1 } = await execWithShellPath(command, { cwd: worktreePath });
-      lastOutput = currentBranch || stderr1 || '';
-      const branchName = currentBranch.trim();
-      
-      // Get the base commit (where the worktree branch diverged from main)
-      command = `git merge-base ${mainBranch} HEAD`;
-      executedCommands.push(`git merge-base ${mainBranch} HEAD (in ${worktreePath})`);
-      const { stdout: baseCommit, stderr: stderr2 } = await execWithShellPath(command, { cwd: worktreePath });
-      lastOutput = baseCommit || stderr2 || '';
-      const base = baseCommit.trim();
-      
-      // Check if there are any changes to squash
-      command = `git log --oneline ${base}..HEAD`;
-      const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
-      if (!commits.trim()) {
-        throw new Error(`No commits to squash. The branch is already up to date with ${mainBranch}.`);
-      }
-      
-      // Squash all commits since base into one
-      command = `git reset --soft ${base}`;
-      executedCommands.push(`git reset --soft ${base} (in ${worktreePath})`);
-      const resetResult = await execWithShellPath(command, { cwd: worktreePath });
-      lastOutput = resetResult.stdout || resetResult.stderr || '';
-      
-      // Get config to check if Crystal footer is enabled (default: true)
-      const config = this.configManager?.getConfig();
-      const enableCrystalFooter = config?.enableCrystalFooter !== false;
-      
-      // Add Crystal footer if enabled
-      const fullMessage = enableCrystalFooter ? `${commitMessage}
+        console.log(`[WorktreeManager] Squashing and rebasing worktree to ${mainBranch}: ${worktreePath}`);
+
+        // Get current branch name in worktree
+        let command = `git branch --show-current`;
+        executedCommands.push(`git branch --show-current (in ${worktreePath})`);
+        const { stdout: currentBranch, stderr: stderr1 } = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = currentBranch || stderr1 || '';
+        const branchName = currentBranch.trim();
+
+        // Get the base commit (where the worktree branch diverged from main)
+        command = `git merge-base ${mainBranch} HEAD`;
+        executedCommands.push(`git merge-base ${mainBranch} HEAD (in ${worktreePath})`);
+        const { stdout: baseCommit, stderr: stderr2 } = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = baseCommit || stderr2 || '';
+        const base = baseCommit.trim();
+
+        // Check if there are any changes to squash
+        command = `git log --oneline ${base}..HEAD`;
+        const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
+        if (!commits.trim()) {
+          throw new Error(`No commits to squash. The branch is already up to date with ${mainBranch}.`);
+        }
+
+        // SAFETY CHECK 1: Check if origin exists and if main is behind origin
+        try {
+          // Check if origin remote exists
+          command = `git remote get-url origin`;
+          executedCommands.push(`git remote get-url origin (in ${projectPath})`);
+          await execWithShellPath(command, { cwd: projectPath });
+
+          // Fetch from origin to get latest refs
+          command = `git fetch origin ${mainBranch}`;
+          executedCommands.push(`git fetch origin ${mainBranch} (in ${projectPath})`);
+          await execWithShellPath(command, { cwd: projectPath });
+
+          // Check if local main is behind origin/main
+          command = `git rev-list --count ${mainBranch}..origin/${mainBranch}`;
+          const { stdout: behindCount } = await execWithShellPath(command, { cwd: projectPath });
+          const mainIsBehindOrigin = parseInt(behindCount.trim()) > 0;
+
+          if (mainIsBehindOrigin) {
+            throw new Error(
+              `Cannot squash and rebase to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
+              `Please update ${mainBranch} first:\n` +
+              `  1. Go to the main repo session\n` +
+              `  2. Run: git pull origin ${mainBranch}\n` +
+              `  3. Then try this operation again`
+            );
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          // If error message contains our custom message, re-throw it
+          if (err.message.includes('Cannot squash and rebase to')) {
+            throw err;
+          }
+          // Otherwise, origin doesn't exist or fetch failed - that's okay, continue
+          console.log(`[WorktreeManager] No origin remote or fetch failed, continuing with local ${mainBranch}`);
+        }
+
+        // SAFETY CHECK 2: Rebase worktree onto main FIRST before squashing
+        command = `git rebase ${mainBranch}`;
+        executedCommands.push(`git rebase ${mainBranch} (in ${worktreePath})`);
+        try {
+          const rebaseWorktreeResult = await execWithShellPath(command, { cwd: worktreePath });
+          lastOutput = rebaseWorktreeResult.stdout || rebaseWorktreeResult.stderr || '';
+          console.log(`[WorktreeManager] Successfully rebased worktree onto ${mainBranch} before squashing`);
+        } catch (error: unknown) {
+          const err = error as Error & { stderr?: string; stdout?: string };
+          // If rebase fails, abort it in the worktree
+          try {
+            await execWithShellPath(`git rebase --abort`, { cwd: worktreePath });
+          } catch {
+            // Ignore abort errors
+          }
+
+          throw new Error(
+            `Failed to rebase worktree onto ${mainBranch} before squashing. Conflicts must be resolved first.\n\n` +
+            `Git output: ${err.stderr || err.stdout || err.message}`
+          );
+        }
+
+        // Now squash all commits since base into one
+        command = `git reset --soft ${base}`;
+        executedCommands.push(`git reset --soft ${base} (in ${worktreePath})`);
+        const resetResult = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = resetResult.stdout || resetResult.stderr || '';
+
+        // Get config to check if Crystal footer is enabled (default: true)
+        const config = this.configManager?.getConfig();
+        const enableCrystalFooter = config?.enableCrystalFooter !== false;
+
+        // Add Crystal footer if enabled
+        const fullMessage = enableCrystalFooter ? `${commitMessage}
 
 💎 Built using [Crystal](https://github.com/stravu/crystal)
 
 Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
-      
-      // Properly escape commit message for cross-platform compatibility
-      const escapedMessage = fullMessage.replace(/"/g, '\\"');
-      command = `git commit -m "${escapedMessage}"`;
-      executedCommands.push(`git commit -m "..." (in ${worktreePath})`);
-      const commitResult = await execWithShellPath(command, { cwd: worktreePath });
-      lastOutput = commitResult.stdout || commitResult.stderr || '';
-      
-      // Switch to main branch in the main repository
-      command = `git checkout ${mainBranch}`;
-      executedCommands.push(`git checkout ${mainBranch} (in ${projectPath})`);
-      const checkoutResult = await execWithShellPath(command, { cwd: projectPath });
-      lastOutput = checkoutResult.stdout || checkoutResult.stderr || '';
-      
-      // Rebase the squashed commit onto main
-      command = `git rebase ${branchName}`;
-      executedCommands.push(`git rebase ${branchName} (in ${projectPath})`);
-      const rebaseResult = await execWithShellPath(command, { cwd: projectPath });
-      lastOutput = rebaseResult.stdout || rebaseResult.stderr || '';
-      console.log(`[WorktreeManager] Successfully rebased ${branchName} onto ${mainBranch}`);
-      
-      console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
-    } catch (error: unknown) {
-      const err = error as Error & { stderr?: string; stdout?: string };
-      console.error(`[WorktreeManager] Failed to squash and rebase worktree to ${mainBranch}:`, err);
-      
-      // Create detailed error with git command output
-      const gitError = new Error(`Failed to squash and rebase worktree to ${mainBranch}`) as Error & {
-        gitCommands?: string[];
-        gitOutput?: string;
-        workingDirectory?: string;
-        projectPath?: string;
-        originalError?: Error;
-      };
-      gitError.gitCommands = executedCommands;
-      gitError.gitOutput = err.stderr || err.stdout || lastOutput || err.message || '';
-      gitError.workingDirectory = worktreePath;
-      gitError.projectPath = projectPath;
-      gitError.originalError = err;
-      
-      throw gitError;
+
+        // Properly escape commit message for cross-platform compatibility
+        const escapedMessage = fullMessage.replace(/"/g, '\\"');
+        command = `git commit -m "${escapedMessage}"`;
+        executedCommands.push(`git commit -m "..." (in ${worktreePath})`);
+        const commitResult = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = commitResult.stdout || commitResult.stderr || '';
+
+        // Switch to main branch in the main repository
+        command = `git checkout ${mainBranch}`;
+        executedCommands.push(`git checkout ${mainBranch} (in ${projectPath})`);
+        const checkoutResult = await execWithShellPath(command, { cwd: projectPath });
+        lastOutput = checkoutResult.stdout || checkoutResult.stderr || '';
+
+        // SAFETY CHECK 3: Use --ff-only merge instead of rebase to prevent history rewriting
+        command = `git merge --ff-only ${branchName}`;
+        executedCommands.push(`git merge --ff-only ${branchName} (in ${projectPath})`);
+        try {
+          const mergeResult = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = mergeResult.stdout || mergeResult.stderr || '';
+          console.log(`[WorktreeManager] Successfully fast-forwarded ${mainBranch} to ${branchName}`);
+        } catch (error: unknown) {
+          const err = error as Error & { stderr?: string; stdout?: string };
+          throw new Error(
+            `Failed to fast-forward ${mainBranch} to ${branchName}.\n\n` +
+            `This usually means ${mainBranch} has commits that ${branchName} doesn't have.\n` +
+            `Please ensure ${mainBranch} is up to date and try again.\n\n` +
+            `Git output: ${err.stderr || err.stdout || err.message}`
+          );
+        }
+
+        console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
+      } catch (error: unknown) {
+        const err = error as Error & { stderr?: string; stdout?: string };
+        console.error(`[WorktreeManager] Failed to squash and rebase worktree to ${mainBranch}:`, err);
+
+        // Create detailed error with git command output
+        const gitError = new Error(`Failed to squash and rebase worktree to ${mainBranch}`) as Error & {
+          gitCommands?: string[];
+          gitOutput?: string;
+          workingDirectory?: string;
+          projectPath?: string;
+          originalError?: Error;
+        };
+        gitError.gitCommands = executedCommands;
+        gitError.gitOutput = err.stderr || err.stdout || lastOutput || err.message || '';
+        gitError.workingDirectory = worktreePath;
+        gitError.projectPath = projectPath;
+        gitError.originalError = err;
+
+        throw gitError;
       }
     });
   }
@@ -597,42 +665,115 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
     return await withLock(`git-rebase-worktree-${worktreePath}`, async () => {
       const executedCommands: string[] = [];
       let lastOutput = '';
-      
+
       try {
         console.log(`[WorktreeManager] Rebasing worktree to ${mainBranch} (without squashing): ${worktreePath}`);
-        
+
         // Get current branch name in worktree
         let command = `git branch --show-current`;
         executedCommands.push(`git branch --show-current (in ${worktreePath})`);
         const { stdout: currentBranch, stderr: stderr1 } = await execWithShellPath(command, { cwd: worktreePath });
         lastOutput = currentBranch || stderr1 || '';
         const branchName = currentBranch.trim();
-        
+
         // Check if there are any changes to rebase
         command = `git log --oneline ${mainBranch}..HEAD`;
         const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
         if (!commits.trim()) {
           throw new Error(`No commits to rebase. The branch is already up to date with ${mainBranch}.`);
         }
-        
+
+        // SAFETY CHECK 1: Check if origin exists and if main is behind origin
+        let hasOrigin = false;
+        let mainIsBehindOrigin = false;
+
+        try {
+          // Check if origin remote exists
+          command = `git remote get-url origin`;
+          executedCommands.push(`git remote get-url origin (in ${projectPath})`);
+          await execWithShellPath(command, { cwd: projectPath });
+          hasOrigin = true;
+
+          // Fetch from origin to get latest refs
+          command = `git fetch origin ${mainBranch}`;
+          executedCommands.push(`git fetch origin ${mainBranch} (in ${projectPath})`);
+          await execWithShellPath(command, { cwd: projectPath });
+
+          // Check if local main is behind origin/main
+          command = `git rev-list --count ${mainBranch}..origin/${mainBranch}`;
+          const { stdout: behindCount } = await execWithShellPath(command, { cwd: projectPath });
+          mainIsBehindOrigin = parseInt(behindCount.trim()) > 0;
+
+          if (mainIsBehindOrigin) {
+            throw new Error(
+              `Cannot rebase to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
+              `Please update ${mainBranch} first:\n` +
+              `  1. Go to the main repo session\n` +
+              `  2. Run: git pull origin ${mainBranch}\n` +
+              `  3. Then try this operation again`
+            );
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          // If error message contains our custom message, re-throw it
+          if (err.message.includes('Cannot rebase to')) {
+            throw err;
+          }
+          // Otherwise, origin doesn't exist or fetch failed - that's okay, continue
+          console.log(`[WorktreeManager] No origin remote or fetch failed, continuing with local ${mainBranch}`);
+        }
+
+        // SAFETY CHECK 2: Rebase worktree onto main FIRST (resolves conflicts in worktree, not main)
+        command = `git rebase ${mainBranch}`;
+        executedCommands.push(`git rebase ${mainBranch} (in ${worktreePath})`);
+        try {
+          const rebaseWorktreeResult = await execWithShellPath(command, { cwd: worktreePath });
+          lastOutput = rebaseWorktreeResult.stdout || rebaseWorktreeResult.stderr || '';
+          console.log(`[WorktreeManager] Successfully rebased worktree onto ${mainBranch}`);
+        } catch (error: unknown) {
+          const err = error as Error & { stderr?: string; stdout?: string };
+          // If rebase fails, abort it in the worktree
+          try {
+            await execWithShellPath(`git rebase --abort`, { cwd: worktreePath });
+          } catch {
+            // Ignore abort errors
+          }
+
+          throw new Error(
+            `Failed to rebase worktree onto ${mainBranch}. Conflicts must be resolved first.\n\n` +
+            `Git output: ${err.stderr || err.stdout || err.message}`
+          );
+        }
+
         // Switch to main branch in the main repository
         command = `git checkout ${mainBranch}`;
         executedCommands.push(`git checkout ${mainBranch} (in ${projectPath})`);
         const checkoutResult = await execWithShellPath(command, { cwd: projectPath });
         lastOutput = checkoutResult.stdout || checkoutResult.stderr || '';
-        
-        // Rebase the branch onto main (preserving all commits)
-        command = `git rebase ${branchName}`;
-        executedCommands.push(`git rebase ${branchName} (in ${projectPath})`);
-        const rebaseResult = await execWithShellPath(command, { cwd: projectPath });
-        lastOutput = rebaseResult.stdout || rebaseResult.stderr || '';
-        console.log(`[WorktreeManager] Successfully rebased ${branchName} onto ${mainBranch}`);
-        
+
+        // SAFETY CHECK 3: Use --ff-only merge instead of rebase to prevent history rewriting
+        // This will ONLY succeed if it's a clean fast-forward (main hasn't moved ahead)
+        command = `git merge --ff-only ${branchName}`;
+        executedCommands.push(`git merge --ff-only ${branchName} (in ${projectPath})`);
+        try {
+          const mergeResult = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = mergeResult.stdout || mergeResult.stderr || '';
+          console.log(`[WorktreeManager] Successfully fast-forwarded ${mainBranch} to ${branchName}`);
+        } catch (error: unknown) {
+          const err = error as Error & { stderr?: string; stdout?: string };
+          throw new Error(
+            `Failed to fast-forward ${mainBranch} to ${branchName}.\n\n` +
+            `This usually means ${mainBranch} has commits that ${branchName} doesn't have.\n` +
+            `Please ensure ${mainBranch} is up to date and try again.\n\n` +
+            `Git output: ${err.stderr || err.stdout || err.message}`
+          );
+        }
+
         console.log(`[WorktreeManager] Successfully rebased worktree to ${mainBranch} (without squashing)`);
       } catch (error: unknown) {
         const err = error as Error & { stderr?: string; stdout?: string };
         console.error(`[WorktreeManager] Failed to rebase worktree to ${mainBranch}:`, err);
-        
+
         // Create detailed error with git command output
         const gitError = new Error(`Failed to rebase worktree to ${mainBranch}`) as Error & {
           gitCommands?: string[];
@@ -646,7 +787,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
         gitError.workingDirectory = worktreePath;
         gitError.projectPath = projectPath;
         gitError.originalError = err;
-        
+
         throw gitError;
       }
     });

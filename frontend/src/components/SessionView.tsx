@@ -396,15 +396,15 @@ export const SessionView = memo(() => {
       },
       {
         id: 'rebase-to-main',
-        label: `Rebase to ${hook.gitCommands?.mainBranch || 'main'}`,
+        label: `Merge to ${hook.gitCommands?.mainBranch || 'main'}`,
         icon: GitMerge,
         onClick: hook.handleSquashAndRebaseToMain,
-        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' || 
+        disabled: hook.isMerging || activeSession.status === 'running' || activeSession.status === 'initializing' ||
                   (!activeSession.gitStatus?.totalCommits || activeSession.gitStatus?.totalCommits === 0 || activeSession.gitStatus?.ahead === 0),
         variant: 'success' as const,
-        description: (!activeSession.gitStatus?.totalCommits || activeSession.gitStatus?.totalCommits === 0 || activeSession.gitStatus?.ahead === 0) ? 
-                     'No commits to rebase' : 
-                     (hook.gitCommands?.getSquashAndRebaseToMainCommand ? hook.gitCommands.getSquashAndRebaseToMainCommand() : `Squashes all commits and rebases onto ${hook.gitCommands?.mainBranch || 'main'}`)
+        description: (!activeSession.gitStatus?.totalCommits || activeSession.gitStatus?.totalCommits === 0 || activeSession.gitStatus?.ahead === 0) ?
+                     'No commits to merge' :
+                     (hook.gitCommands?.getSquashAndRebaseToMainCommand ? hook.gitCommands.getSquashAndRebaseToMainCommand() : `Merges all commits to ${hook.gitCommands?.mainBranch || 'main'} (with safety checks)`)
       },
       {
         id: 'open-ide',
