@@ -577,12 +577,13 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
         }
 
         // Determine session name:
-        // - If multiple tools selected, add tool suffix
+        // - If multiple tools selected, add tool prefix (e.g., 'CC-' for Claude Code or 'CX-' for Codex)
         // - If both sessionCount > 1 AND multiple tools, the count suffix will be added by taskQueue
         let finalSessionName: string | undefined;
         if (sessionName) {
           if (toolsToCreate.length > 1) {
-            finalSessionName = `${sessionName}-${toolType}`;
+            const prefix = toolType === 'claude' ? 'CC' : toolType === 'codex' ? 'CX' : toolType;
+            finalSessionName = `${prefix}-${sessionName}`;
           } else {
             finalSessionName = sessionName;
           }
