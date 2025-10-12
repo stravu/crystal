@@ -505,9 +505,10 @@ export class TaskQueue {
       model?: string;
       permissionMode?: 'approve' | 'ignore';
       ultrathink?: boolean;
-    }
+    },
+    providedFolderId?: string
   ): Promise<(Bull.Job<CreateSessionJob> | { id: string; data: CreateSessionJob; status: string })[]> {
-    let folderId: string | undefined;
+    let folderId: string | undefined = providedFolderId;
     let generatedBaseName: string | undefined;
     
     // Generate a name if no template provided
@@ -520,8 +521,8 @@ export class TaskQueue {
       }
     }
     
-    // Create a folder for multi-session prompts
-    if (count > 1 && projectId) {
+    // Create a folder for multi-session prompts (only if not already provided)
+    if (!providedFolderId && count > 1 && projectId) {
       try {
         const { sessionManager } = this.options;
         const db = sessionManager.db as DatabaseService;

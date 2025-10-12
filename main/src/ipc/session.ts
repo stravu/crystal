@@ -149,11 +149,12 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           request.commitMode,
           request.commitModeSettings,
           request.codexConfig,
-          request.claudeConfig
+          request.claudeConfig,
+          request.folderId
         );
-        
+
         // Note: Model is now stored at panel level, not session level
-        
+
         return { success: true, data: { jobIds: jobs.map(job => job.id) } };
       } else {
         const job = await taskQueue.createSession({
@@ -161,6 +162,7 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           worktreeTemplate: request.worktreeTemplate || '',
           permissionMode: request.permissionMode,
           projectId: targetProject.id,
+          folderId: request.folderId,
           baseBranch: request.baseBranch,
           autoCommit: request.autoCommit,
           toolType: request.toolType,
@@ -169,9 +171,9 @@ export function registerSessionHandlers(ipcMain: IpcMain, services: AppServices)
           codexConfig: request.codexConfig,
           claudeConfig: request.claudeConfig
         });
-        
+
         // Note: Model is now stored at panel level, not session level
-        
+
         return { success: true, data: { jobId: job.id } };
       }
     } catch (error) {

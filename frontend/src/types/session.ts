@@ -134,6 +134,7 @@ export interface CreateSessionRequest {
   count?: number;
   permissionMode?: 'approve' | 'ignore';
   projectId?: number;
+  folderId?: string;
   isMainRepo?: boolean;
   baseBranch?: string;
   autoCommit?: boolean;

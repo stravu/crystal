@@ -59,6 +59,7 @@ export interface CreateSessionRequest {
   count?: number;
   permissionMode?: 'approve' | 'ignore';
   projectId?: number;
+  folderId?: string;
   baseBranch?: string;
   autoCommit?: boolean;
   model?: string;

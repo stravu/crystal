@@ -34,10 +34,10 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
   onRemoveText
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const processFile = async (file: File): Promise<AttachedImage | null> => {
     const generateImageId = () => `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     if (!file.type.startsWith('image/')) {
       console.warn('File is not an image:', file.name);
       return null;
@@ -70,8 +70,8 @@ export const ClaudeCodeConfigComponent: React.FC<ClaudeCodeConfigProps> = ({
   };
   return (
     <div className="space-y-4">
-      {/* Prompt Field */}
-      <div>
+      {/* Prompt Field - Hidden since it's now at the top level */}
+      <div className="hidden">
         <label htmlFor="claude-prompt" className="block text-sm font-medium text-text-secondary mb-2">
           Initial Prompt
         </label>

@@ -73,8 +73,8 @@ export const CodexConfigComponent: React.FC<CodexConfigProps> = ({
   };
   return (
     <div className="space-y-4">
-      {/* Prompt Field */}
-      <div>
+      {/* Prompt Field - Hidden since it's now at the top level */}
+      <div className="hidden">
         <label htmlFor="codex-prompt" className="block text-sm font-medium text-text-secondary mb-2">
           Initial Prompt
         </label>
