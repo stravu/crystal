@@ -1094,11 +1094,20 @@ export function DraggableProjectTreeView() {
   const handleSessionDragOver = (e: React.DragEvent, session: Session, projectId: number) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Only allow session reordering within the same project
-    if (dragState.type === 'session' && 
-        dragState.projectId === projectId && 
+
+    // Allow both sessions and folders to be reordered relative to sessions
+    if (dragState.type === 'session' &&
+        dragState.projectId === projectId &&
         dragState.sessionId !== session.id) {
+      setDragState(prev => ({
+        ...prev,
+        overType: 'session',
+        overProjectId: projectId,
+        overSessionId: session.id
+      }));
+    } else if (dragState.type === 'folder' &&
+               dragState.projectId === projectId) {
+      // Allow folders to be dropped on sessions for reordering
       setDragState(prev => ({
         ...prev,
         overType: 'session',
@@ -1192,53 +1201,196 @@ export function DraggableProjectTreeView() {
   const handleSessionDrop = async (e: React.DragEvent, targetSession: Session, projectId: number) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (dragState.type === 'session' && 
-        dragState.sessionId && 
-        dragState.projectId === projectId && 
-        dragState.sessionId !== targetSession.id) {
-      // Reorder sessions within the same project
-      const project = projectsWithSessions.find(p => p.id === projectId);
-      if (!project) return;
-      
-      const sourceIndex = project.sessions.findIndex(s => s.id === dragState.sessionId);
-      const targetIndex = project.sessions.findIndex(s => s.id === targetSession.id);
-      
-      if (sourceIndex !== -1 && targetIndex !== -1) {
-        const newSessions = [...project.sessions];
-        const [removed] = newSessions.splice(sourceIndex, 1);
-        newSessions.splice(targetIndex, 0, removed);
-        
-        // Update display order for all sessions in this project
-        const sessionOrders = newSessions.map((session, index) => ({
-          id: session.id,
-          displayOrder: index
-        }));
-        
+
+    const project = projectsWithSessions.find(p => p.id === projectId);
+    if (!project) return;
+
+    // Handle both session-to-session and folder-to-session reordering
+    if (dragState.type === 'session' &&
+        dragState.sessionId &&
+        dragState.projectId === projectId &&
+        dragState.sessionId !== targetSession.id &&
+        !targetSession.folderId && // Only reorder at root level
+        !dragState.folderId) { // Only if dragged session is also at root level
+
+      // Get root-level items only (sessions and folders without parents)
+      const rootSessions = project.sessions.filter(s => !s.folderId);
+      const rootFolders = project.folders ? buildFolderTree(project.folders) : [];
+
+      // Find indices in the root-level combined list
+      const sourceSessionIndex = rootSessions.findIndex(s => s.id === dragState.sessionId);
+      const targetSessionIndex = rootSessions.findIndex(s => s.id === targetSession.id);
+
+      if (sourceSessionIndex !== -1 && targetSessionIndex !== -1) {
+        // Reorder only the root sessions
+        const newRootSessions = [...rootSessions];
+        const [removed] = newRootSessions.splice(sourceSessionIndex, 1);
+        newRootSessions.splice(targetSessionIndex, 0, removed);
+
+        // Update display orders for root sessions and folders together
+        // Create a combined list to assign sequential displayOrder values
+        type RootItem = { type: 'session'; id: string; displayOrder: number } | { type: 'folder'; id: string; displayOrder: number };
+        const rootItems: RootItem[] = [
+          ...rootFolders.map(f => ({ type: 'folder' as const, id: f.id, displayOrder: f.displayOrder ?? 0 })),
+          ...rootSessions.map(s => ({ type: 'session' as const, id: s.id, displayOrder: s.displayOrder ?? 0 }))
+        ];
+
+        // Sort to get current order
+        rootItems.sort((a, b) => a.displayOrder - b.displayOrder);
+
+        // Find where to insert the dragged session
+        const targetDisplayOrder = targetSession.displayOrder ?? 0;
+        const insertIndex = rootItems.findIndex(item => item.type === 'session' && item.id === targetSession.id);
+
+        // Remove the source session from the list
+        const sourceItemIndex = rootItems.findIndex(item => item.type === 'session' && item.id === dragState.sessionId);
+        if (sourceItemIndex !== -1) {
+          const [removedItem] = rootItems.splice(sourceItemIndex, 1);
+          // Insert at target position
+          rootItems.splice(insertIndex, 0, removedItem);
+        }
+
+        // Reassign displayOrder values sequentially
+        rootItems.forEach((item, index) => {
+          item.displayOrder = index;
+        });
+
+        // Prepare updates for API
+        const sessionOrders = rootItems
+          .filter(item => item.type === 'session')
+          .map(item => ({ id: item.id, displayOrder: item.displayOrder }));
+        const folderOrders = rootItems
+          .filter(item => item.type === 'folder')
+          .map(item => ({ id: item.id, displayOrder: item.displayOrder }));
+
         try {
-          const response = await API.sessions.reorder(sessionOrders);
-          if (response.success) {
-            // Update local state
-            const newProjects = projectsWithSessions.map(p => 
-              p.id === projectId ? { ...p, sessions: newSessions } : p
-            );
-            setProjectsWithSessions(newProjects);
-          } else {
-            showError({
-              title: 'Failed to reorder sessions',
-              error: response.error || 'Unknown error occurred'
-            });
+          // Update sessions
+          const sessionResponse = await API.sessions.reorder(sessionOrders);
+          if (!sessionResponse.success) {
+            throw new Error(sessionResponse.error || 'Failed to reorder sessions');
           }
+
+          // Update folders if there are any
+          if (folderOrders.length > 0) {
+            // folders.reorder expects (projectId, orderedFolderIds[])
+            const orderedFolderIds = folderOrders
+              .sort((a, b) => a.displayOrder - b.displayOrder)
+              .map(f => f.id);
+            const folderResponse = await API.folders.reorder(projectId, orderedFolderIds);
+            if (!folderResponse.success) {
+              throw new Error(folderResponse.error || 'Failed to reorder folders');
+            }
+          }
+
+          // Update local state - update displayOrder for all sessions and folders
+          setProjectsWithSessions(prevProjects => prevProjects.map(p => {
+            if (p.id === projectId) {
+              return {
+                ...p,
+                sessions: p.sessions.map(s => {
+                  const newOrder = sessionOrders.find(o => o.id === s.id);
+                  return newOrder ? { ...s, displayOrder: newOrder.displayOrder } : s;
+                }),
+                folders: p.folders.map(f => {
+                  const newOrder = folderOrders.find(o => o.id === f.id);
+                  return newOrder ? { ...f, displayOrder: newOrder.displayOrder } : f;
+                })
+              };
+            }
+            return p;
+          }));
         } catch (error: unknown) {
-          console.error('Failed to reorder sessions:', error);
+          console.error('Failed to reorder items:', error);
           showError({
-            title: 'Failed to reorder sessions',
+            title: 'Failed to reorder items',
+            error: error instanceof Error ? error.message : 'Unknown error occurred'
+          });
+        }
+      }
+    } else if (dragState.type === 'folder' &&
+               dragState.folderId &&
+               dragState.projectId === projectId &&
+               !targetSession.folderId) { // Only reorder at root level
+
+      // Get root-level items only
+      const rootSessions = project.sessions.filter(s => !s.folderId);
+      const rootFolders = project.folders ? buildFolderTree(project.folders) : [];
+
+      // Create combined list with current display orders
+      type RootItem = { type: 'session'; id: string; displayOrder: number } | { type: 'folder'; id: string; displayOrder: number };
+      const rootItems: RootItem[] = [
+        ...rootFolders.map(f => ({ type: 'folder' as const, id: f.id, displayOrder: f.displayOrder ?? 0 })),
+        ...rootSessions.map(s => ({ type: 'session' as const, id: s.id, displayOrder: s.displayOrder ?? 0 }))
+      ];
+
+      // Sort to get current order
+      rootItems.sort((a, b) => a.displayOrder - b.displayOrder);
+
+      // Find indices
+      const sourceFolderIndex = rootItems.findIndex(item => item.type === 'folder' && item.id === dragState.folderId);
+      const targetSessionIndex = rootItems.findIndex(item => item.type === 'session' && item.id === targetSession.id);
+
+      if (sourceFolderIndex !== -1 && targetSessionIndex !== -1) {
+        // Move folder to session position
+        const [removedItem] = rootItems.splice(sourceFolderIndex, 1);
+        rootItems.splice(targetSessionIndex, 0, removedItem);
+
+        // Reassign displayOrder values sequentially
+        rootItems.forEach((item, index) => {
+          item.displayOrder = index;
+        });
+
+        // Prepare updates for API
+        const sessionOrders = rootItems
+          .filter(item => item.type === 'session')
+          .map(item => ({ id: item.id, displayOrder: item.displayOrder }));
+        const folderOrders = rootItems
+          .filter(item => item.type === 'folder')
+          .map(item => ({ id: item.id, displayOrder: item.displayOrder }));
+
+        try {
+          // Update both sessions and folders
+          const sessionResponse = await API.sessions.reorder(sessionOrders);
+          if (!sessionResponse.success) {
+            throw new Error(sessionResponse.error || 'Failed to reorder sessions');
+          }
+
+          // folders.reorder expects (projectId, orderedFolderIds[])
+          const orderedFolderIds = folderOrders
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map(f => f.id);
+          const folderResponse = await API.folders.reorder(projectId, orderedFolderIds);
+          if (!folderResponse.success) {
+            throw new Error(folderResponse.error || 'Failed to reorder folders');
+          }
+
+          // Update local state
+          setProjectsWithSessions(prevProjects => prevProjects.map(p => {
+            if (p.id === projectId) {
+              return {
+                ...p,
+                sessions: p.sessions.map(s => {
+                  const newOrder = sessionOrders.find(o => o.id === s.id);
+                  return newOrder ? { ...s, displayOrder: newOrder.displayOrder } : s;
+                }),
+                folders: p.folders.map(f => {
+                  const newOrder = folderOrders.find(o => o.id === f.id);
+                  return newOrder ? { ...f, displayOrder: newOrder.displayOrder } : f;
+                })
+              };
+            }
+            return p;
+          }));
+        } catch (error: unknown) {
+          console.error('Failed to reorder items:', error);
+          showError({
+            title: 'Failed to reorder items',
             error: error instanceof Error ? error.message : 'Unknown error occurred'
           });
         }
       }
     }
-    
+
     handleDragEnd();
   };
 
@@ -1792,27 +1944,47 @@ export function DraggableProjectTreeView() {
                 <div className="relative mt-1 space-y-1">
                   {/* Main vertical line from project to all children */}
                   <div className="absolute top-0 bottom-0 w-px bg-border-secondary" style={{ left: '8px' }} />
-                  {/* Render folders using recursive structure */}
-                  {project.folders && (() => {
-                    const folderTree = buildFolderTree(project.folders);
+                  {/* Render folders and sessions mixed together by displayOrder */}
+                  {(() => {
+                    // Get root folders (folders without a parent)
+                    const folderTree = project.folders ? buildFolderTree(project.folders) : [];
+                    // Get root sessions (sessions not in any folder)
                     const rootSessions = project.sessions.filter(s => !s.folderId);
-                    return folderTree.map((folder, index) => {
-                      const isLastFolder = index === folderTree.length - 1 && rootSessions.length === 0;
-                      return renderFolder(folder, project, 1, isLastFolder, [!isLastFolder]);
-                    });
-                  })()}
-                  
-                  {/* Render sessions without folders */}
-                  <div className="relative">
-                    {project.sessions
-                      .filter(s => !s.folderId)
-                      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-                      .map((session, sessionIndex, sessionArray) => {
-                        const isDraggingOverSession = dragState.overType === 'session' && 
+
+                    // Create a combined array with both folders and sessions
+                    type RootItem =
+                      | { type: 'folder'; data: Folder; displayOrder: number }
+                      | { type: 'session'; data: Session; displayOrder: number };
+
+                    const rootItems: RootItem[] = [
+                      ...folderTree.map(folder => ({
+                        type: 'folder' as const,
+                        data: folder,
+                        displayOrder: folder.displayOrder ?? 0
+                      })),
+                      ...rootSessions.map(session => ({
+                        type: 'session' as const,
+                        data: session,
+                        displayOrder: session.displayOrder ?? 0
+                      }))
+                    ];
+
+                    // Sort by displayOrder
+                    rootItems.sort((a, b) => a.displayOrder - b.displayOrder);
+
+                    // Render each item based on its type
+                    return rootItems.map((item, index, array) => {
+                      const isLastItem = index === array.length - 1;
+
+                      if (item.type === 'folder') {
+                        return renderFolder(item.data, project, 1, isLastItem, [!isLastItem]);
+                      } else {
+                        // Render session
+                        const session = item.data;
+                        const isDraggingOverSession = dragState.overType === 'session' &&
                                                      dragState.overSessionId === session.id &&
                                                      dragState.overProjectId === project.id;
-                        const isLastSession = sessionIndex === sessionArray.length - 1;
-                        
+
                         return (
                           <div
                             key={session.id}
@@ -1822,24 +1994,24 @@ export function DraggableProjectTreeView() {
                             {/* Tree lines for root sessions */}
                             <div className="absolute inset-0 pointer-events-none">
                               {/* Vertical line from parent if not last session */}
-                              {!isLastSession && (
+                              {!isLastItem && (
                                 <div
                                   className="absolute top-0 bottom-0 w-px bg-border-secondary"
                                   style={{ left: '8px' }}
                                 />
                               )}
-                              
+
                               {/* Horizontal connector line for root session */}
                               <div
                                 className="absolute h-px bg-border-secondary"
-                                style={{ 
+                                style={{
                                   left: '8px',
                                   right: 'calc(100% - 16px)',
                                   top: '16px'
                                 }}
                               />
                             </div>
-                            
+
                             <div
                               className={`relative group flex items-center ${
                                 isDraggingOverSession ? 'bg-interactive/20 rounded' : ''
@@ -1856,17 +2028,18 @@ export function DraggableProjectTreeView() {
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
                                 <GripVertical className="w-3 h-3 text-text-tertiary" />
                               </div>
-                              <SessionListItem 
-                                key={session.id} 
+                              <SessionListItem
+                                key={session.id}
                                 session={session}
                                 isNested
                               />
                             </div>
                           </div>
                         );
-                      })}
-                  </div>
-                  
+                      }
+                    });
+                  })()}
+
                   {/* Add folder button */}
                   <div className="ml-6 mt-2 border-t border-border-primary pt-2">
                     <button
