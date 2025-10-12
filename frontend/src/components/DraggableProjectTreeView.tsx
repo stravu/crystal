@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, Play } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
@@ -42,6 +42,52 @@ interface DraggableProjectTreeViewProps {
   sessionSortAscending: boolean;
 }
 
+type TreeItem =
+  | {
+      type: 'folder';
+      data: Folder;
+      id: string;
+      name: string;
+      displayOrder: number;
+      createdAtValue: number;
+    }
+  | {
+      type: 'session';
+      data: Session;
+      id: string;
+      name: string;
+      displayOrder: number;
+      createdAtValue: number;
+    };
+
+const parseCreatedAt = (value?: string | null): number => {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const createTreeItemComparator = (ascending: boolean) => {
+  const direction = ascending ? 1 : -1;
+  return (a: TreeItem, b: TreeItem): number => {
+    const orderDiff = a.displayOrder - b.displayOrder;
+    if (orderDiff !== 0) {
+      return direction * orderDiff;
+    }
+
+    const createdDiff = a.createdAtValue - b.createdAtValue;
+    if (createdDiff !== 0) {
+      return direction * createdDiff;
+    }
+
+    const nameDiff = a.name.localeCompare(b.name);
+    if (nameDiff !== 0) {
+      return direction * nameDiff;
+    }
+
+    return direction * a.id.localeCompare(b.id);
+  };
+};
+
 export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProjectTreeViewProps) {
   const [projectsWithSessions, setProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
   const [archivedProjectsWithSessions, setArchivedProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
@@ -77,6 +123,10 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const [parentFolderForCreate, setParentFolderForCreate] = useState<Folder | null>(null);
   const { showError } = useErrorStore();
   const { menuState, openMenu, closeMenu, isMenuOpen } = useContextMenu();
+  const treeComparator = useMemo(
+    () => createTreeItemComparator(sessionSortAscending),
+    [sessionSortAscending]
+  );
   
   // Folder rename state
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -1740,34 +1790,49 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         
         {isExpanded && hasChildren && (
           <div className="mt-1 space-y-1" style={{ marginLeft: '16px' }}>
-            {/* Render subfolders first */}
-            {folder.children && folder.children.map((childFolder, index, array) => {
-              const isLastChild = index === array.length - 1 && folderSessions.length === 0;
-              const newParentPath = [...parentPath, !isLastChild];
-              return renderFolder(childFolder, project, level + 1, isLastChild, newParentPath);
-            })}
-            
-            {/* Then render sessions in this folder */}
-            {folderSessions
-              .sort((a, b) => {
-                const order = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
-                return sessionSortAscending ? order : -order;
-              })
-              .map((session, sessionIndex, sessionArray) => {
-                const isDraggingOverSession = dragState.overType === 'session' && 
-                                             dragState.overSessionId === session.id &&
-                                             dragState.overProjectId === project.id;
-                const isLastSession = sessionIndex === sessionArray.length - 1;
-                
+            {(() => {
+              const childFolders = folder.children ?? [];
+              const combinedItems: TreeItem[] = [
+                ...childFolders.map(childFolder => ({
+                  type: 'folder' as const,
+                  data: childFolder,
+                  id: childFolder.id,
+                  name: childFolder.name,
+                  displayOrder: childFolder.displayOrder ?? 0,
+                  createdAtValue: parseCreatedAt(childFolder.createdAt)
+                })),
+                ...folderSessions.map(session => ({
+                  type: 'session' as const,
+                  data: session,
+                  id: session.id,
+                  name: session.name,
+                  displayOrder: session.displayOrder ?? 0,
+                  createdAtValue: parseCreatedAt(session.createdAt)
+                }))
+              ];
+
+              combinedItems.sort(treeComparator);
+
+              return combinedItems.map((item, index, array) => {
+                const isLastItem = index === array.length - 1;
+                const childParentPath = [...parentPath, !isLastItem];
+
+                if (item.type === 'folder') {
+                  return renderFolder(item.data, project, level + 1, isLastItem, childParentPath);
+                }
+
+                const session = item.data;
+                const isDraggingOverSession =
+                  dragState.overType === 'session' &&
+                  dragState.overSessionId === session.id &&
+                  dragState.overProjectId === project.id;
+
                 return (
-                  <div
-                    key={session.id}
-                    className="relative"
-                  >
+                  <div key={session.id} className="relative">
                     {/* Tree lines for sessions */}
                     <div className="absolute inset-0 pointer-events-none">
                       {/* Vertical lines for parent levels including this folder level */}
-                      {[...parentPath, !isLastSession].map((hasMoreSiblings, parentLevel) => (
+                      {childParentPath.map((hasMoreSiblings, parentLevel) => (
                         hasMoreSiblings && (
                           <div
                             key={parentLevel}
@@ -1776,18 +1841,18 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                           />
                         )
                       ))}
-                      
+
                       {/* Horizontal connector line for this session */}
                       <div
                         className="absolute h-px bg-border-secondary"
-                        style={{ 
+                        style={{
                           left: `${level * 16 + 8}px`,
                           right: `calc(100% - ${(level + 1) * 16}px)`,
                           top: '16px'
                         }}
                       />
                     </div>
-                    
+
                     <div
                       className={`relative group flex items-center ${
                         isDraggingOverSession ? 'bg-interactive/20 rounded' : ''
@@ -1804,15 +1869,16 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
                         <GripVertical className="w-3 h-3 text-text-tertiary" />
                       </div>
-                      <SessionListItem 
-                        key={session.id} 
+                      <SessionListItem
+                        key={session.id}
                         session={session}
                         isNested
                       />
                     </div>
                   </div>
                 );
-              })}
+              });
+            })()}
           </div>
         )}
       </div>
@@ -1958,29 +2024,26 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                     // Get root sessions (sessions not in any folder)
                     const rootSessions = project.sessions.filter(s => !s.folderId);
 
-                    // Create a combined array with both folders and sessions
-                    type RootItem =
-                      | { type: 'folder'; data: Folder; displayOrder: number }
-                      | { type: 'session'; data: Session; displayOrder: number };
-
-                    const rootItems: RootItem[] = [
+                    const rootItems: TreeItem[] = [
                       ...folderTree.map(folder => ({
                         type: 'folder' as const,
                         data: folder,
-                        displayOrder: folder.displayOrder ?? 0
+                        id: folder.id,
+                        name: folder.name,
+                        displayOrder: folder.displayOrder ?? 0,
+                        createdAtValue: parseCreatedAt(folder.createdAt)
                       })),
                       ...rootSessions.map(session => ({
                         type: 'session' as const,
                         data: session,
-                        displayOrder: session.displayOrder ?? 0
+                        id: session.id,
+                        name: session.name,
+                        displayOrder: session.displayOrder ?? 0,
+                        createdAtValue: parseCreatedAt(session.createdAt)
                       }))
                     ];
 
-                    // Sort by displayOrder, respecting user's sort preference
-                    rootItems.sort((a, b) => {
-                      const order = a.displayOrder - b.displayOrder;
-                      return sessionSortAscending ? order : -order;
-                    });
+                    rootItems.sort(treeComparator);
 
                     // Render each item based on its type
                     return rootItems.map((item, index, array) => {
