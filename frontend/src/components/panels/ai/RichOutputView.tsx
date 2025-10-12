@@ -158,7 +158,7 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
       const messageDiv = userMessageRefs.current.get(promptIndex);
       if (messageDiv && scrollContainerRef.current) {
         // Scroll to the message with some offset from top
-        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageDiv.scrollIntoView({ behavior: 'auto', block: 'center' });
         
         // Add a highlight effect
         messageDiv.classList.add('highlight-prompt');

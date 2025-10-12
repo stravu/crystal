@@ -18,7 +18,7 @@ interface PromptMarker {
 
 interface PromptNavigationProps {
   panelId: string;
-  onNavigateToPrompt: (marker: PromptMarker) => void;
+  onNavigateToPrompt: (marker: PromptMarker, index: number) => void;
 }
 
 export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigationProps) {
@@ -159,9 +159,9 @@ export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigati
     return () => cancelAnimationFrame(animationId);
   }, [prompts]);
 
-  const handlePromptClick = (marker: PromptMarker) => {
+  const handlePromptClick = (marker: PromptMarker, index: number) => {
     setSelectedPromptId(marker.id);
-    onNavigateToPrompt(marker);
+    onNavigateToPrompt(marker, index);
   };
 
   const handlePromptDoubleClick = (marker: PromptMarker, index: number) => {
@@ -195,7 +195,7 @@ export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigati
             {prompts.map((marker, index) => (
               <button
                 key={marker.id}
-                onClick={() => handlePromptClick(marker)}
+                onClick={() => handlePromptClick(marker, index)}
                 onDoubleClick={() => handlePromptDoubleClick(marker, index)}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${
                   selectedPromptId === marker.id
