@@ -86,6 +86,21 @@ interface CodexPanelSettings {
 // Increase max listeners for ipcRenderer to prevent warnings when many components listen to events
 ipcRenderer.setMaxListeners(50);
 
+// Bridge panel events from main process to renderer window as DOM CustomEvents
+// This allows React components to listen with `window.addEventListener('panel:event', ...)`
+try {
+  ipcRenderer.on('panel:event', (_event, data) => {
+    try {
+      window.dispatchEvent(new CustomEvent('panel:event', { detail: data }));
+    } catch (e) {
+      // Do not let event dispatch failures break the app
+      console.error('Failed to dispatch panel:event to window:', e);
+    }
+  });
+} catch (e) {
+  // Ignore if IPC is not available for some reason
+}
+
 // In development mode, capture console logs and send them to main process for Claude Code debugging
 if (process.env.NODE_ENV !== 'production') {
   const originalConsole = {
