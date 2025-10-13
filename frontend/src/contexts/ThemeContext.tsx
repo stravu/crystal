@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useConfigStore } from '../stores/configStore';
+import { API } from '../utils/api';
 
 type Theme = 'light' | 'dark';
 
@@ -10,8 +12,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { config } = useConfigStore();
   const [theme, setTheme] = useState<Theme>(() => {
-    // Check localStorage for saved preference
+    // Check localStorage for saved preference (for immediate access)
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') {
       return saved;
@@ -19,12 +22,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Default to dark theme
     return 'dark';
   });
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Sync theme from config when it loads
+  useEffect(() => {
+    if (config?.theme && (config.theme === 'light' || config.theme === 'dark')) {
+      setTheme(config.theme);
+      localStorage.setItem('theme', config.theme);
+      setConfigLoaded(true);
+    }
+  }, [config?.theme]);
 
   useEffect(() => {
     // Update document root and body classes
     const root = document.documentElement;
     const body = document.body;
-    
+
     if (theme === 'light') {
       root.classList.remove('dark');
       root.classList.add('light');
@@ -36,10 +49,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       body.classList.remove('light');
       body.classList.add('dark');
     }
-    
-    // Save preference
+
+    // Save preference to localStorage for immediate access
     localStorage.setItem('theme', theme);
-  }, [theme]);
+
+    // Only save to config after initial config has loaded
+    // This prevents overwriting the config with the initial state
+    if (configLoaded) {
+      API.config.update({ theme }).catch(err => {
+        console.error('Failed to save theme to config:', err);
+      });
+    }
+  }, [theme, configLoaded]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');

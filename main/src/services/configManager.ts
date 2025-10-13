@@ -109,18 +109,15 @@ export class ConfigManager extends EventEmitter {
   }
 
   getConfig(): AppConfig {
-    // Always return dark theme
-    return { ...this.config, theme: 'dark' };
+    return this.config;
   }
 
   async updateConfig(updates: Partial<AppConfig>): Promise<AppConfig> {
-    // Filter out theme updates - always dark mode
-    const { theme, ...filteredUpdates } = updates;
-    this.config = { ...this.config, ...filteredUpdates };
+    this.config = { ...this.config, ...updates };
     await this.saveConfig();
-    
+
     // Clear PATH cache if additional paths were updated
-    if ('additionalPaths' in filteredUpdates) {
+    if ('additionalPaths' in updates) {
       clearShellPathCache();
       console.log('[ConfigManager] Additional paths updated, cleared PATH cache');
     }
