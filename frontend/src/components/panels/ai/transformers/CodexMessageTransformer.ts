@@ -779,13 +779,96 @@ export class CodexMessageTransformer implements MessageTransformer {
       };
     }
 
+    // Handle new Codex protocol message types (without nested msg field)
+
+    // Thread started
+    if (msg.type === 'thread.started') {
+      return {
+        id: `msg_${++this.messageIdCounter}`,
+        role: 'system',
+        timestamp: this.normalizeTimestamp(timestamp),
+        segments: [{
+          type: 'system_info',
+          info: {
+            type: 'thread_started',
+            thread_id: msg.thread_id
+          }
+        }],
+        metadata: {
+          agent: 'codex',
+          systemSubtype: 'thread_started'
+        }
+      };
+    }
+
+    // Turn started - skip as it's just a delimiter
+    if (msg.type === 'turn.started') {
+      return null;
+    }
+
+    // Item completed - contains reasoning or agent messages
+    if (msg.type === 'item.completed' && msg.item) {
+      const item = msg.item as Record<string, unknown>;
+
+      // Handle reasoning items
+      if (item.type === 'reasoning') {
+        const content = typeof item.text === 'string' ? item.text : '';
+        if (!content.trim()) return null;
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'assistant',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'thinking',
+            content: content
+          }],
+          metadata: {
+            agent: 'codex',
+            itemId: typeof item.id === 'string' ? item.id : undefined
+          }
+        };
+      }
+
+      // Handle agent message items
+      if (item.type === 'agent_message') {
+        const content = typeof item.text === 'string' ? item.text : '';
+        if (!content.trim()) return null;
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'assistant',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'text',
+            content: content
+          }],
+          metadata: {
+            agent: 'codex',
+            itemId: typeof item.id === 'string' ? item.id : undefined
+          }
+        };
+      }
+
+      // Handle other item types if needed
+      // For now, skip unknown item types
+      return null;
+    }
+
+    // Turn completed - show token usage if available
+    if (msg.type === 'turn.completed') {
+      // Skip showing token usage telemetry in the output view
+      // (similar to how we skip token_count messages)
+      return null;
+    }
+
     // Handle plain prompt objects to show as user messages
     if (typeof msg.prompt === 'string' && typeof msg.prompt === 'string' && msg.prompt.trim()) {
       // Use original prompt if available (for structured commit mode), otherwise use prompt as-is
-      const displayContent = this.originalPrompt && this.isEnhancedPrompt(msg.prompt as string) 
-        ? this.originalPrompt 
+      const displayContent = this.originalPrompt && this.isEnhancedPrompt(msg.prompt as string)
+        ? this.originalPrompt
         : (msg.prompt as string);
-      
+
       return {
         id: `msg_${++this.messageIdCounter}`,
         role: 'user',
