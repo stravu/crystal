@@ -933,13 +933,16 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       });
 
       // Update git status for ALL sessions in the project since main was updated
-      // Don't let this block the response - run it in background
+      // Wait for this to complete before returning so UI sees the updated status immediately
       if (session.projectId !== undefined) {
-        gitStatusManager.updateProjectGitStatusAfterMainUpdate(session.projectId, sessionId).catch(error => {
+        try {
+          await gitStatusManager.updateProjectGitStatusAfterMainUpdate(session.projectId, sessionId);
+        } catch (error) {
           console.error(`[IPC:git] Failed to update git status for project ${session.projectId}:`, error);
-        });
+          // Continue even if status update fails - the merge succeeded
+        }
       }
-      
+
       return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
     } catch (error: unknown) {
       console.error(`[IPC:git] Failed to squash and rebase worktree to main for session ${sessionId}:`, error);
@@ -1017,11 +1020,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       });
 
       // Update git status for ALL sessions in the project since main was updated
-      // Don't let this block the response - run it in background
+      // Wait for this to complete before returning so UI sees the updated status immediately
       if (session.projectId !== undefined) {
-        gitStatusManager.updateProjectGitStatusAfterMainUpdate(session.projectId, sessionId).catch(error => {
+        try {
+          await gitStatusManager.updateProjectGitStatusAfterMainUpdate(session.projectId, sessionId);
+        } catch (error) {
           console.error(`[IPC:git] Failed to update git status for project ${session.projectId}:`, error);
-        });
+          // Continue even if status update fails - the merge succeeded
+        }
       }
 
       return { success: true, data: { message: `Successfully rebased worktree to ${mainBranch}` } };
