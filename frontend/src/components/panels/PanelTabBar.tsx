@@ -160,9 +160,13 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   };
 
   return (
-    <div className="panel-tab-bar bg-surface-secondary border-b border-border-secondary">
+    <div className="panel-tab-bar bg-surface-secondary border-b border-border-primary dark:border-border-hover">
       {/* Flex container that wraps when needed */}
-      <div className="flex flex-wrap items-center min-h-[2rem]">
+      <div
+        className="flex flex-wrap items-center min-h-[2rem] px-2 gap-x-1"
+        role="tablist"
+        aria-label="Panel Tabs"
+      >
         {/* Render panel tabs */}
         {panels.map((panel) => {
           const isPermanent = panel.metadata?.permanent === true;
@@ -174,13 +178,24 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
             <div
               key={panel.id}
               className={cn(
-                "flex items-center px-3 py-1 cursor-pointer border-r border-border-secondary h-8 whitespace-nowrap group text-text-secondary transition-colors duration-150",
+                "group relative inline-flex items-center h-8 px-3 text-sm whitespace-nowrap cursor-pointer select-none",
+                "rounded-t-md border border-border-primary dark:border-border-hover border-b-0 -mb-px",
                 activePanel?.id === panel.id
-                  ? "bg-surface-interactive text-text-primary"
-                  : "hover:bg-surface-hover hover:text-text-primary"
+                  ? "bg-surface-primary text-text-primary shadow-tactile"
+                  : "bg-surface-secondary text-text-secondary hover:bg-surface-hover hover:text-text-primary"
               )}
               onClick={() => !isEditing && handlePanelClick(panel)}
               title={isPermanent ? "This panel cannot be closed" : undefined}
+              role="tab"
+              aria-selected={activePanel?.id === panel.id}
+              tabIndex={activePanel?.id === panel.id ? 0 : -1}
+              onKeyDown={(e) => {
+                if (isEditing) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handlePanelClick(panel);
+                }
+              }}
             >
               {getPanelIcon(panel.type)}
               
@@ -192,7 +207,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
                   onChange={(e) => setEditingTitle(e.target.value)}
                   onKeyDown={handleRenameKeyDown}
                   onBlur={handleRenameSubmit}
-                  className="ml-2 px-1 text-sm bg-bg-primary border border-border-secondary rounded outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus text-text-primary"
+                  className="ml-2 px-1 text-sm bg-bg-primary border border-border-primary dark:border-border-hover rounded outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus text-text-primary"
                   onClick={(e) => e.stopPropagation()}
                   style={{ width: `${Math.max(50, editingTitle.length * 8)}px` }}
                 />
@@ -201,7 +216,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
                   <span className="ml-2 text-sm">{displayTitle}</span>
                   {!isPermanent && !isDiffPanel && (
                     <button
-                      className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity transition-colors text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                      className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity transition-colors text-text-muted hover:bg-surface-hover hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                       onClick={(e) => handleStartRename(e, panel)}
                       title="Rename panel"
                     >
@@ -213,7 +228,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
               
               {!isPermanent && !isEditing && (
                 <button
-                  className="ml-1 p-0.5 rounded transition-colors text-text-muted hover:bg-surface-hover hover:text-status-error"
+                  className="ml-1 p-0.5 rounded transition-colors text-text-muted hover:bg-surface-hover hover:text-status-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
                   onClick={(e) => handlePanelClose(e, panel)}
                 >
                   <X className="w-3 h-3" />
@@ -224,10 +239,12 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         })}
         
         {/* Add Panel dropdown button */}
-        <div className="relative h-8 flex items-center" ref={dropdownRef}>
+        <div className="relative h-8 flex items-center ml-1" ref={dropdownRef}>
           <button
-            className="flex items-center h-full px-3 py-1 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+            className="inline-flex items-center h-8 px-3 text-sm rounded-t-md border border-border-primary dark:border-border-hover border-b-0 -mb-px bg-surface-secondary text-text-secondary hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring-subtle"
             onClick={() => setShowDropdown(!showDropdown)}
+            aria-haspopup="menu"
+            aria-expanded={showDropdown}
           >
             <Plus className="w-4 h-4 mr-1" />
             Add Tool
@@ -235,7 +252,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
           </button>
           
           {showDropdown && (
-            <div className="absolute top-full left-0 mt-1 bg-surface-primary border border-border-secondary rounded shadow-dropdown z-10">
+            <div className="absolute top-full left-0 mt-1 bg-surface-primary border border-border-primary dark:border-border-hover rounded shadow-dropdown z-10 animate-dropdown-enter">
               {availablePanelTypes.map((type) => (
                 <button
                   key={type}
