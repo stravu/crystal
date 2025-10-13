@@ -1399,10 +1399,10 @@ export const useSessionView = (
     const defaultMessage = await generateDefaultCommitMessage();
     setCommitMessage(defaultMessage);
     setDialogType('squash');
-    setShouldSquash(true);
+    setShouldSquash(true); // Default to squashing for cleaner merge
     setShowCommitMessageDialog(true);
   };
-  
+
   const performSquashWithCommitMessage = async (message: string) => {
     if (!activeSession) return;
     setIsMerging(true);
@@ -1417,8 +1417,8 @@ export const useSessionView = (
         if (response.gitError) {
           const gitError = response.gitError;
           setGitErrorDetails({
-            title: shouldSquash ? 'Squash and Rebase Failed' : 'Rebase Failed',
-            message: response.error || `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`,
+            title: 'Merge Failed',
+            message: response.error || `Failed to merge to main`,
             commands: gitError.commands,
             output: gitError.output || 'No output available',
             workingDirectory: gitError.workingDirectory,
@@ -1426,7 +1426,7 @@ export const useSessionView = (
           });
           setShowGitErrorDialog(true);
         } else {
-          setMergeError(response.error || `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`);
+          setMergeError(response.error || `Failed to merge to main`);
         }
       } else {
         // Run this in the background and don't let it block the finally block
@@ -1438,7 +1438,7 @@ export const useSessionView = (
       }
     } catch (error) {
       console.error(`[performSquashWithCommitMessage] Error in try block`, error);
-      setMergeError(error instanceof Error ? error.message : `Failed to ${shouldSquash ? 'squash and ' : ''}rebase to main`);
+      setMergeError(error instanceof Error ? error.message : `Failed to merge to main`);
     } finally {
       setIsMerging(false);
     }

@@ -503,13 +503,13 @@ export class WorktreeManager {
     }
   }
 
-  async squashAndRebaseWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string, commitMessage: string): Promise<void> {
-    return await withLock(`git-squash-rebase-${worktreePath}`, async () => {
+  async squashAndMergeWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string, commitMessage: string): Promise<void> {
+    return await withLock(`git-squash-merge-${worktreePath}`, async () => {
       const executedCommands: string[] = [];
       let lastOutput = '';
 
       try {
-        console.log(`[WorktreeManager] Squashing and rebasing worktree to ${mainBranch}: ${worktreePath}`);
+        console.log(`[WorktreeManager] Squashing and merging worktree to ${mainBranch}: ${worktreePath}`);
 
         // Get current branch name in worktree
         let command = `git branch --show-current`;
@@ -551,7 +551,7 @@ export class WorktreeManager {
 
           if (mainIsBehindOrigin) {
             throw new Error(
-              `Cannot squash and rebase to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
+              `Cannot merge to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
               `Please update ${mainBranch} first:\n` +
               `  1. Go to the main repo session\n` +
               `  2. Run: git pull origin ${mainBranch}\n` +
@@ -561,7 +561,7 @@ export class WorktreeManager {
         } catch (error: unknown) {
           const err = error as Error;
           // If error message contains our custom message, re-throw it
-          if (err.message.includes('Cannot squash and rebase to')) {
+          if (err.message.includes('Cannot merge to')) {
             throw err;
           }
           // Otherwise, origin doesn't exist or fetch failed - that's okay, continue
@@ -637,13 +637,13 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           );
         }
 
-        console.log(`[WorktreeManager] Successfully squashed and rebased worktree to ${mainBranch}`);
+        console.log(`[WorktreeManager] Successfully squashed and merged worktree to ${mainBranch}`);
       } catch (error: unknown) {
         const err = error as Error & { stderr?: string; stdout?: string };
-        console.error(`[WorktreeManager] Failed to squash and rebase worktree to ${mainBranch}:`, err);
+        console.error(`[WorktreeManager] Failed to squash and merge worktree to ${mainBranch}:`, err);
 
         // Create detailed error with git command output
-        const gitError = new Error(`Failed to squash and rebase worktree to ${mainBranch}`) as Error & {
+        const gitError = new Error(`Failed to squash and merge worktree to ${mainBranch}`) as Error & {
           gitCommands?: string[];
           gitOutput?: string;
           workingDirectory?: string;
@@ -661,13 +661,13 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
     });
   }
 
-  async rebaseWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string): Promise<void> {
-    return await withLock(`git-rebase-worktree-${worktreePath}`, async () => {
+  async mergeWorktreeToMain(projectPath: string, worktreePath: string, mainBranch: string): Promise<void> {
+    return await withLock(`git-merge-worktree-${worktreePath}`, async () => {
       const executedCommands: string[] = [];
       let lastOutput = '';
 
       try {
-        console.log(`[WorktreeManager] Rebasing worktree to ${mainBranch} (without squashing): ${worktreePath}`);
+        console.log(`[WorktreeManager] Merging worktree to ${mainBranch} (without squashing): ${worktreePath}`);
 
         // Get current branch name in worktree
         let command = `git branch --show-current`;
@@ -676,11 +676,11 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
         lastOutput = currentBranch || stderr1 || '';
         const branchName = currentBranch.trim();
 
-        // Check if there are any changes to rebase
+        // Check if there are any changes to merge
         command = `git log --oneline ${mainBranch}..HEAD`;
         const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
         if (!commits.trim()) {
-          throw new Error(`No commits to rebase. The branch is already up to date with ${mainBranch}.`);
+          throw new Error(`No commits to merge. The branch is already up to date with ${mainBranch}.`);
         }
 
         // SAFETY CHECK 1: Check if origin exists and if main is behind origin
@@ -706,7 +706,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
 
           if (mainIsBehindOrigin) {
             throw new Error(
-              `Cannot rebase to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
+              `Cannot merge to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
               `Please update ${mainBranch} first:\n` +
               `  1. Go to the main repo session\n` +
               `  2. Run: git pull origin ${mainBranch}\n` +
@@ -716,7 +716,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
         } catch (error: unknown) {
           const err = error as Error;
           // If error message contains our custom message, re-throw it
-          if (err.message.includes('Cannot rebase to')) {
+          if (err.message.includes('Cannot merge to')) {
             throw err;
           }
           // Otherwise, origin doesn't exist or fetch failed - that's okay, continue
@@ -769,13 +769,13 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           );
         }
 
-        console.log(`[WorktreeManager] Successfully rebased worktree to ${mainBranch} (without squashing)`);
+        console.log(`[WorktreeManager] Successfully merged worktree to ${mainBranch} (without squashing)`);
       } catch (error: unknown) {
         const err = error as Error & { stderr?: string; stdout?: string };
-        console.error(`[WorktreeManager] Failed to rebase worktree to ${mainBranch}:`, err);
+        console.error(`[WorktreeManager] Failed to merge worktree to ${mainBranch}:`, err);
 
         // Create detailed error with git command output
-        const gitError = new Error(`Failed to rebase worktree to ${mainBranch}`) as Error & {
+        const gitError = new Error(`Failed to merge worktree to ${mainBranch}`) as Error & {
           gitCommands?: string[];
           gitOutput?: string;
           workingDirectory?: string;
@@ -801,11 +801,26 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
 
   generateSquashCommands(mainBranch: string, branchName: string): string[] {
     return [
-      `git merge-base ${mainBranch} HEAD`,
-      `git reset --soft <base-commit>`,
-      `git commit -m "Squashed commit message"`,
+      `# In worktree: Rebase onto ${mainBranch} to get latest changes`,
+      `git rebase ${mainBranch}`,
+      `# In worktree: Squash all commits into one`,
+      `git reset --soft $(git merge-base ${mainBranch} HEAD)`,
+      `git commit -m "Your commit message"`,
+      `# In main repo: Switch to ${mainBranch}`,
       `git checkout ${mainBranch}`,
-      `git rebase ${branchName}`
+      `# In main repo: Merge the worktree branch`,
+      `git merge --ff-only ${branchName}`
+    ];
+  }
+
+  generateMergeCommands(mainBranch: string, branchName: string): string[] {
+    return [
+      `# In worktree: Rebase onto ${mainBranch} to get latest changes`,
+      `git rebase ${mainBranch}`,
+      `# In main repo: Switch to ${mainBranch}`,
+      `git checkout ${mainBranch}`,
+      `# In main repo: Merge the worktree branch`,
+      `git merge --ff-only ${branchName}`
     ];
   }
 

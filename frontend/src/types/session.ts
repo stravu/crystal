@@ -167,6 +167,7 @@ export interface SessionOutput {
 export interface GitCommands {
   rebaseCommands: string[];
   squashCommands: string[];
+  mergeCommands: string[];
   mainBranch?: string;
   originBranch?: string;
   currentBranch?: string;

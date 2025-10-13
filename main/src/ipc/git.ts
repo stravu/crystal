@@ -913,22 +913,22 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       ]) as string;
 
       // Emit git operation started event to all sessions in project
-      const startMessage = `🔄 GIT OPERATION\nSquashing commits and rebasing to ${mainBranch}...\nCommit message: ${commitMessage.split('\n')[0]}${commitMessage.includes('\n') ? '...' : ''}`;
+      const startMessage = `🔄 GIT OPERATION\nSquashing commits and merging to ${mainBranch}...\nCommit message: ${commitMessage.split('\n')[0]}${commitMessage.includes('\n') ? '...' : ''}`;
       emitGitOperationToProject(sessionId, 'git:operation_started', startMessage, {
-        operation: 'squash_and_rebase',
+        operation: 'squash_and_merge',
         mainBranch,
         commitMessage: commitMessage.split('\n')[0]
       });
 
       await Promise.race([
-        worktreeManager.squashAndRebaseWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('squashAndRebaseWorktreeToMain timeout')), 180000))
+        worktreeManager.squashAndMergeWorktreeToMain(project.path, session.worktreePath, mainBranch, commitMessage),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('squashAndMergeWorktreeToMain timeout')), 180000))
       ]);
 
       // Emit git operation completed event to all sessions in project
-      const successMessage = `✓ Successfully squashed and rebased worktree to ${mainBranch}`;
+      const successMessage = `✓ Successfully squashed and merged worktree to ${mainBranch}`;
       emitGitOperationToProject(sessionId, 'git:operation_completed', successMessage, {
-        operation: 'squash_and_rebase',
+        operation: 'squash_and_merge',
         mainBranch
       });
 
@@ -943,18 +943,18 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         }
       }
 
-      return { success: true, data: { message: `Successfully squashed and rebased worktree to ${mainBranch}` } };
+      return { success: true, data: { message: `Successfully squashed and merged worktree to ${mainBranch}` } };
     } catch (error: unknown) {
-      console.error(`[IPC:git] Failed to squash and rebase worktree to main for session ${sessionId}:`, error);
+      console.error(`[IPC:git] Failed to squash and merge worktree to main for session ${sessionId}:`, error);
 
       // Emit git operation failed event
-      const errorMessage = `✗ Squash and rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+      const errorMessage = `✗ Merge failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
                           (error && typeof error === 'object' && 'gitOutput' in error && (error as GitError).gitOutput ? `\n\nGit output:\n${(error as GitError).gitOutput}` : '');
-      
+
       // Don't let this block the error response either
       try {
         emitGitOperationToProject(sessionId, 'git:operation_failed', errorMessage, {
-          operation: 'squash_and_rebase',
+          operation: 'squash_and_merge',
           error: error instanceof Error ? error.message : String(error),
           gitOutput: error && typeof error === 'object' && 'gitOutput' in error ? (error as GitError).gitOutput : undefined
         });
@@ -966,7 +966,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const gitError = error as GitError;
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to squash and rebase worktree to main',
+        error: error instanceof Error ? error.message : 'Failed to squash and merge worktree to main',
         gitError: {
           commands: gitError.gitCommands,
           output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
@@ -999,18 +999,18 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
 
       // Emit git operation started event to all sessions in project
-      const startMessage = `🔄 GIT OPERATION\nRebasing to ${mainBranch} (preserving all commits)...`;
+      const startMessage = `🔄 GIT OPERATION\nMerging to ${mainBranch} (preserving all commits)...`;
       emitGitOperationToProject(sessionId, 'git:operation_started', startMessage, {
-        operation: 'rebase_to_main',
+        operation: 'merge_to_main',
         mainBranch
       });
 
-      await worktreeManager.rebaseWorktreeToMain(project.path, session.worktreePath, mainBranch);
+      await worktreeManager.mergeWorktreeToMain(project.path, session.worktreePath, mainBranch);
 
       // Emit git operation completed event to all sessions in project
-      const successMessage = `✓ Successfully rebased worktree to ${mainBranch}`;
+      const successMessage = `✓ Successfully merged worktree to ${mainBranch}`;
       emitGitOperationToProject(sessionId, 'git:operation_completed', successMessage, {
-        operation: 'rebase_to_main',
+        operation: 'merge_to_main',
         mainBranch
       });
       sessionManager.addSessionOutput(sessionId, {
@@ -1030,14 +1030,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
         }
       }
 
-      return { success: true, data: { message: `Successfully rebased worktree to ${mainBranch}` } };
+      return { success: true, data: { message: `Successfully merged worktree to ${mainBranch}` } };
     } catch (error: unknown) {
-      console.error('Failed to rebase worktree to main:', error);
+      console.error('Failed to merge worktree to main:', error);
 
       const gitError = error as GitError;
-      
+
       // Add error message to session output
-      const errorMessage = `✗ Rebase failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
+      const errorMessage = `✗ Merge failed: ${error instanceof Error ? error.message : 'Unknown error'}` +
                           (gitError.gitOutput ? `\n\nGit output:\n${gitError.gitOutput}` : '');
       sessionManager.addSessionOutput(sessionId, {
         type: 'stderr',
@@ -1047,7 +1047,7 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       // Pass detailed git error information to frontend
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to rebase worktree to main',
+        error: error instanceof Error ? error.message : 'Failed to merge worktree to main',
         gitError: {
           commands: gitError.gitCommands,
           output: gitError.gitOutput || (error instanceof Error ? error.message : String(error)),
@@ -1300,12 +1300,14 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
 
       const rebaseCommands = worktreeManager.generateRebaseCommands(mainBranch);
       const squashCommands = worktreeManager.generateSquashCommands(mainBranch, currentBranch);
+      const mergeCommands = worktreeManager.generateMergeCommands(mainBranch, currentBranch);
 
       return {
         success: true,
         data: {
           rebaseCommands,
           squashCommands,
+          mergeCommands,
           mainBranch,
           originBranch: originBranch || undefined,
           currentBranch
