@@ -341,7 +341,23 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       const session = sessionManager.getSession(sessionId);
       if (session) {
         const dbSession = sessionManager.getDbSession(sessionId);
-        if (dbSession && dbSession.status !== 'completed') {
+
+        // If exit code is 0 (successful completion), mark as completed
+        // The updateSession method will handle converting to 'completed_unviewed' if not viewed
+        if (exitCode === 0 && dbSession && dbSession.status === 'running') {
+          // Update to 'stopped' which will be converted to 'completed_unviewed' by the mapping logic
+          // since the database status will be set to 'completed'
+          sessionManager.db.updateSession(sessionId, { status: 'completed' });
+
+          // Get the updated session with proper status mapping
+          const updatedSession = sessionManager.getSession(sessionId);
+          if (updatedSession) {
+            // Manually emit the event since we bypassed updateSession for direct DB access
+            sessionManager.emit('session-updated', updatedSession);
+          }
+        }
+        // For non-zero exit codes or already completed sessions
+        else if (dbSession && dbSession.status !== 'completed') {
           await sessionManager.updateSession(sessionId, { status: 'stopped' });
         }
       }
@@ -718,6 +734,14 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       }
     }
 
+    // Refresh git status after Claude exits, as it may have made commits
+    // This should always happen, even if we skip the session summary
+    try {
+      await gitStatusManager.refreshSessionGitStatus(sessionId);
+    } catch (error) {
+      console.error(`Failed to refresh git status for session ${sessionId} after exit:`, error);
+    }
+
     if (skipSessionSummary) {
       return;
     }
@@ -760,9 +784,9 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
           throw new Error('Project path not found for session');
         }
         const mainBranch = await worktreeManager.getProjectMainBranch(project.path);
-        
+
         // Verbose commit logging removed - details are in error cases if needed
-        
+
         let commits: GitCommit[] = [];
         try {
           commits = gitDiffManager.getCommitHistory(session.worktreePath, 10, mainBranch);
@@ -806,13 +830,6 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       }
     } catch (error) {
       console.error(`Failed to generate session summary for ${sessionId}:`, error);
-    }
-
-    // Refresh git status after Claude exits, as it may have made commits
-    try {
-      await gitStatusManager.refreshSessionGitStatus(sessionId);
-    } catch (error) {
-      console.error(`Failed to refresh git status for session ${sessionId} after exit:`, error);
     }
   });
 
