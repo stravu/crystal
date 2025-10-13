@@ -806,9 +806,112 @@ export class CodexMessageTransformer implements MessageTransformer {
       return null;
     }
 
+    // Item started - contains item initialization info
+    if (msg.type === 'item.started' && msg.item) {
+      const item = msg.item as Record<string, unknown>;
+
+      // Handle command execution started
+      if (item.type === 'command_execution') {
+        const command = typeof item.command === 'string' ? item.command : '';
+        if (!command) return null;
+
+        // Register this as a tool call so we can match it with the result later
+        const toolCall = this.registerToolCall(
+          typeof item.id === 'string' ? item.id : undefined,
+          'exec_command',
+          {
+            command,
+            status: item.status
+          }
+        );
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'assistant',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'tool_call',
+            tool: toolCall
+          }],
+          metadata: {
+            agent: 'codex',
+            itemId: typeof item.id === 'string' ? item.id : undefined
+          }
+        };
+      }
+
+      // Handle reasoning started
+      if (item.type === 'reasoning') {
+        // For reasoning start, we can skip it as we'll show the completed reasoning
+        return null;
+      }
+
+      // Handle agent message started
+      if (item.type === 'agent_message') {
+        // For message start, we can skip it as we'll show the completed message
+        return null;
+      }
+
+      // Handle text_delta started (streaming text updates)
+      if (item.type === 'text_delta') {
+        // Skip - we'll handle these as they stream
+        return null;
+      }
+
+      // Handle message started
+      if (item.type === 'message') {
+        // Skip - we'll handle the completed message
+        return null;
+      }
+
+      // Handle other item types if needed
+      return null;
+    }
+
     // Item completed - contains reasoning or agent messages
     if (msg.type === 'item.completed' && msg.item) {
       const item = msg.item as Record<string, unknown>;
+
+      // Handle command execution completion
+      if (item.type === 'command_execution') {
+        const command = typeof item.command === 'string' ? item.command : '';
+        const exitCode = typeof item.exit_code === 'number' ? item.exit_code : undefined;
+        const aggregatedOutput = typeof item.aggregated_output === 'string' ? item.aggregated_output : '';
+
+        const result = {
+          content: aggregatedOutput.trim() || 'Command completed',
+          isError: exitCode !== undefined && exitCode !== 0,
+          metadata: {
+            exitCode,
+            command
+          }
+        };
+
+        const toolCallId = this.applyResultToToolCall(
+          typeof item.id === 'string' ? item.id : undefined,
+          result,
+          result.isError ?? false
+        );
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'system',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'tool_result',
+            result: {
+              toolCallId,
+              content: result.content,
+              isError: result.isError,
+              metadata: result.metadata
+            }
+          }],
+          metadata: {
+            agent: 'codex',
+            itemId: typeof item.id === 'string' ? item.id : undefined
+          }
+        };
+      }
 
       // Handle reasoning items
       if (item.type === 'reasoning') {
@@ -832,6 +935,48 @@ export class CodexMessageTransformer implements MessageTransformer {
 
       // Handle agent message items
       if (item.type === 'agent_message') {
+        const content = typeof item.text === 'string' ? item.text : '';
+        if (!content.trim()) return null;
+
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'assistant',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'text',
+            content: content
+          }],
+          metadata: {
+            agent: 'codex',
+            itemId: typeof item.id === 'string' ? item.id : undefined
+          }
+        };
+      }
+
+      // Handle text_delta items (streaming text updates)
+      if (item.type === 'text_delta') {
+        const content = typeof item.text === 'string' ? item.text : '';
+        if (!content.trim()) return null;
+
+        // Return as text segment for streaming display
+        return {
+          id: `msg_${++this.messageIdCounter}`,
+          role: 'assistant',
+          timestamp: this.normalizeTimestamp(timestamp),
+          segments: [{
+            type: 'text',
+            content: content
+          }],
+          metadata: {
+            agent: 'codex',
+            itemId: typeof item.id === 'string' ? item.id : undefined,
+            isStreaming: true
+          }
+        };
+      }
+
+      // Handle message items
+      if (item.type === 'message') {
         const content = typeof item.text === 'string' ? item.text : '';
         if (!content.trim()) return null;
 
