@@ -2,8 +2,10 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { useSession } from '../../contexts/SessionContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { TerminalPanelProps } from '../../types/panelComponents';
 import { renderLog, devLog } from '../../utils/console';
+import { getTerminalTheme } from '../../utils/terminalTheme';
 import '@xterm/xterm/css/xterm.css';
 
 // Type for terminal state restoration
@@ -27,6 +29,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
   const sessionContext = useSession();
   const sessionId = sessionContext?.sessionId;
   const workingDirectory = sessionContext?.workingDirectory;
+  const { theme } = useTheme();
   
   if (sessionContext) {
     devLog.debug('[TerminalPanel] Session context:', sessionContext);
@@ -88,10 +91,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
         terminal = new Terminal({
           fontSize: 14,
           fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-          theme: {
-            background: '#1e1e1e',
-            foreground: '#d4d4d4'
-          },
+          theme: getTerminalTheme(),
           scrollback: 50000
         });
         console.log('[TerminalPanel] XTerm instance created:', !!terminal);
@@ -107,6 +107,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
           console.log('[TerminalPanel] Terminal opened in DOM');
           fitAddon.fit();
           console.log('[TerminalPanel] FitAddon fitted');
+          terminal.options.theme = getTerminalTheme();
 
           xtermRef.current = terminal;
           fitAddonRef.current = fitAddon;
@@ -233,6 +234,18 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
     }
   }, [isActive, panel.id]);
 
+  useEffect(() => {
+    if (!xtermRef.current) {
+      return;
+    }
+    const newTheme = getTerminalTheme();
+    xtermRef.current.options.theme = newTheme;
+    const rows = xtermRef.current.rows;
+    if (rows > 0) {
+      xtermRef.current.refresh(0, rows - 1);
+    }
+  }, [theme]);
+
   // Handle missing session context (show after all hooks have been called)
   if (!sessionContext) {
     return (
@@ -255,8 +268,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = React.memo(({ panel, 
     <div className="h-full w-full relative">
       <div ref={terminalRef} className="h-full w-full" />
       {!isInitialized && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75">
-          <div className="text-gray-400">Initializing terminal...</div>
+        <div className="absolute inset-0 flex items-center justify-center bg-surface-primary bg-opacity-80">
+          <div className="text-text-secondary">Initializing terminal...</div>
         </div>
       )}
     </div>

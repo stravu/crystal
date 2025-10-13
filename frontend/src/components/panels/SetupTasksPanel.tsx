@@ -324,34 +324,34 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
 
   if (!projectId) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-900">
-        <div className="text-gray-400">No project selected</div>
+      <div className="flex items-center justify-center h-full bg-bg-primary">
+        <div className="text-text-secondary">No project selected</div>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-gray-900 overflow-auto">
+    <div className="h-full bg-bg-primary text-text-primary overflow-auto">
       <div className="p-6">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">Setup Tasks</h2>
-          <p className="text-gray-400">Complete these tasks to get the best experience with Crystal</p>
+          <h2 className="text-2xl font-bold text-text-primary mb-2">Setup Tasks</h2>
+          <p className="text-text-secondary">Complete these tasks to get the best experience with Crystal</p>
         </div>
 
         {/* Progress indicator */}
-        <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+        <div className="mb-6 p-4 bg-surface-secondary border border-border-secondary rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-400">Progress</span>
-            <span className="text-sm text-gray-400">{completedCount} of {setupTasks.length} completed</span>
+            <span className="text-sm text-text-secondary">Progress</span>
+            <span className="text-sm text-text-secondary">{completedCount} of {setupTasks.length} completed</span>
           </div>
-          <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-border-secondary rounded-full h-2 overflow-hidden">
             <div 
-              className="bg-green-500 h-full transition-all duration-300"
+              className="bg-status-success h-full transition-all duration-300"
               style={{ width: `${(completedCount / setupTasks.length) * 100}%` }}
             />
           </div>
           {allTasksComplete && (
-            <div className="mt-2 text-sm text-green-400 flex items-center gap-1">
+            <div className="mt-2 text-sm text-status-success flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4" />
               All setup tasks complete!
             </div>
@@ -370,17 +370,17 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
                 className={`
                   border rounded-lg transition-all
                   ${isComplete 
-                    ? 'border-green-600 bg-green-950/20' 
-                    : 'border-gray-700 bg-gray-800'
+                    ? 'border-status-success bg-surface-secondary' 
+                    : 'border-border-secondary bg-surface-primary'
                   }
                 `}
               >
                 <button
                   onClick={() => setExpandedTask(isExpanded ? null : task.id)}
-                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-700/50 transition-colors rounded-t-lg"
+                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-hover transition-colors rounded-t-lg"
                 >
                   {/* Status icon */}
-                  <div className={`${isComplete ? 'text-green-500' : 'text-gray-500'}`}>
+                  <div className={`${isComplete ? 'text-status-success' : 'text-text-tertiary'}`}>
                     {isChecking ? (
                       <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                     ) : isComplete ? (
@@ -391,14 +391,14 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
                   </div>
 
                   {/* Task icon */}
-                  <div className={`${isComplete ? 'text-green-400' : 'text-gray-400'}`}>
+                  <div className={`${isComplete ? 'text-status-success' : 'text-text-secondary'}`}>
                     {task.icon}
                   </div>
 
                   {/* Task title */}
                   <span className={`
                     flex-1 text-left font-medium
-                    ${isComplete ? 'text-green-300' : 'text-white'}
+                    ${isComplete ? 'text-status-success' : 'text-text-primary'}
                   `}>
                     {task.title}
                   </span>
@@ -406,7 +406,7 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
                   {/* Expand icon */}
                   <ChevronRight 
                     className={`
-                      w-4 h-4 text-gray-500 transition-transform
+                      w-4 h-4 text-text-tertiary transition-transform
                       ${isExpanded ? 'rotate-90' : ''}
                     `}
                   />
@@ -414,15 +414,15 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
 
                 {/* Expanded content */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-gray-700">
-                    <p className="mt-3 text-sm text-gray-400">
+                  <div className="px-4 pb-4 border-t border-border-secondary">
+                    <p className="mt-3 text-sm text-text-secondary">
                       {task.description}
                     </p>
                     
                     {!isComplete && task.action && (
                       <button
                         onClick={task.action}
-                        className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
+                        className="mt-3 px-4 py-2 bg-interactive hover:bg-interactive-hover text-text-on-interactive text-sm font-medium rounded transition-colors"
                       >
                         {task.actionLabel}
                       </button>
@@ -439,7 +439,7 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
           <button
             onClick={checkAllTasks}
             disabled={isChecking}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded transition-colors bg-surface-secondary hover:bg-surface-hover text-text-primary disabled:bg-surface-secondary disabled:opacity-50"
           >
             {isChecking ? 'Checking...' : 'Refresh Status'}
           </button>

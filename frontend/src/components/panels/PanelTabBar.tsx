@@ -160,7 +160,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   };
 
   return (
-    <div className="panel-tab-bar bg-gray-800 border-b border-gray-700">
+    <div className="panel-tab-bar bg-surface-secondary border-b border-border-secondary">
       {/* Flex container that wraps when needed */}
       <div className="flex flex-wrap items-center min-h-[2rem]">
         {/* Render panel tabs */}
@@ -174,8 +174,10 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
             <div
               key={panel.id}
               className={cn(
-                "flex items-center px-3 py-1 cursor-pointer hover:bg-gray-700 border-r border-gray-700 h-8 whitespace-nowrap group",
-                activePanel?.id === panel.id && "bg-gray-700"
+                "flex items-center px-3 py-1 cursor-pointer border-r border-border-secondary h-8 whitespace-nowrap group text-text-secondary transition-colors duration-150",
+                activePanel?.id === panel.id
+                  ? "bg-surface-interactive text-text-primary"
+                  : "hover:bg-surface-hover hover:text-text-primary"
               )}
               onClick={() => !isEditing && handlePanelClick(panel)}
               title={isPermanent ? "This panel cannot be closed" : undefined}
@@ -190,7 +192,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
                   onChange={(e) => setEditingTitle(e.target.value)}
                   onKeyDown={handleRenameKeyDown}
                   onBlur={handleRenameSubmit}
-                  className="ml-2 px-1 text-sm bg-gray-900 border border-gray-600 rounded outline-none focus:border-blue-500"
+                  className="ml-2 px-1 text-sm bg-bg-primary border border-border-secondary rounded outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus text-text-primary"
                   onClick={(e) => e.stopPropagation()}
                   style={{ width: `${Math.max(50, editingTitle.length * 8)}px` }}
                 />
@@ -199,7 +201,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
                   <span className="ml-2 text-sm">{displayTitle}</span>
                   {!isPermanent && !isDiffPanel && (
                     <button
-                      className="ml-1 p-0.5 hover:bg-gray-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity transition-colors text-text-muted hover:bg-surface-hover hover:text-text-primary"
                       onClick={(e) => handleStartRename(e, panel)}
                       title="Rename panel"
                     >
@@ -211,7 +213,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
               
               {!isPermanent && !isEditing && (
                 <button
-                  className="ml-1 p-0.5 hover:bg-gray-600 rounded"
+                  className="ml-1 p-0.5 rounded transition-colors text-text-muted hover:bg-surface-hover hover:text-status-error"
                   onClick={(e) => handlePanelClose(e, panel)}
                 >
                   <X className="w-3 h-3" />
@@ -224,7 +226,7 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
         {/* Add Panel dropdown button */}
         <div className="relative h-8 flex items-center" ref={dropdownRef}>
           <button
-            className="flex items-center px-3 py-1 hover:bg-gray-700 text-sm h-full"
+            className="flex items-center h-full px-3 py-1 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
             onClick={() => setShowDropdown(!showDropdown)}
           >
             <Plus className="w-4 h-4 mr-1" />
@@ -233,11 +235,11 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
           </button>
           
           {showDropdown && (
-            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+            <div className="absolute top-full left-0 mt-1 bg-surface-primary border border-border-secondary rounded shadow-dropdown z-10">
               {availablePanelTypes.map((type) => (
                 <button
                   key={type}
-                  className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-700 text-left"
+                  className="flex items-center w-full px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary text-left"
                   onClick={() => handleAddPanel(type)}
                 >
                   {getPanelIcon(type)}
