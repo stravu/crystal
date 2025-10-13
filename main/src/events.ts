@@ -147,45 +147,50 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     panelId: string,
     mutator: (state: ClaudePanelState) => ClaudePanelState
   ): Promise<ClaudePanelState | undefined> => {
-    const panel = panelManager.getPanel(panelId);
-    if (!panel) {
-      return undefined;
-    }
-
-    const existing = (panel.state.customState as ClaudePanelState | undefined) ?? {};
-    const baseState: ClaudePanelState = {
-      ...existing,
-      autoContextRunState: existing.autoContextRunState ?? 'idle'
-    };
-
-    if (!('contextUsage' in baseState)) {
-      baseState.contextUsage = null;
-    }
-
-    const nextCustomState = mutator({ ...baseState });
-    const nextPanelState = {
-      ...panel.state,
-      customState: nextCustomState
-    };
-
-    await panelManager.updatePanel(panelId, { state: nextPanelState });
-
-    const mw = getMainWindow();
-    if (mw && !mw.isDestroyed()) {
-      try {
-        mw.webContents.send('panel:updated', {
-          ...panel,
-          state: nextPanelState
-        });
-      } catch (ipcError) {
-        console.error(`[Main] Failed to send panel:updated event for panel ${panelId}:`, ipcError);
+    // Use mutex to prevent read-modify-write race conditions on panel state
+    const { withLock } = await import('./utils/mutex');
+    return await withLock(`panel-state-${panelId}`, async () => {
+      const panel = panelManager.getPanel(panelId);
+      if (!panel) {
+        return undefined;
       }
-    }
 
-    return nextCustomState;
+      const existing = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+      const baseState: ClaudePanelState = {
+        ...existing,
+        autoContextRunState: existing.autoContextRunState ?? 'idle'
+      };
+
+      if (!('contextUsage' in baseState)) {
+        baseState.contextUsage = null;
+      }
+
+      const nextCustomState = mutator({ ...baseState });
+      const nextPanelState = {
+        ...panel.state,
+        customState: nextCustomState
+      };
+
+      await panelManager.updatePanel(panelId, { state: nextPanelState });
+
+      const mw = getMainWindow();
+      if (mw && !mw.isDestroyed()) {
+        try {
+          mw.webContents.send('panel:updated', {
+            ...panel,
+            state: nextPanelState
+          });
+        } catch (ipcError) {
+          console.error(`[Main] Failed to send panel:updated event for panel ${panelId}:`, ipcError);
+        }
+      }
+
+      return nextCustomState;
+    });
   };
 
   const finalizeAutoContextRun = async (panelId: string): Promise<void> => {
+    console.log(`[auto-context-debug] finalizeAutoContextRun called for panel ${panelId}`);
     try {
       const bufferedOutputs = sessionManager.consumeAutoContextCapture(panelId);
       const outputs = bufferedOutputs.length > 0
@@ -193,17 +198,24 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         : (typeof sessionManager.getPanelOutputs === 'function'
             ? sessionManager.getPanelOutputs(panelId, 200)
             : []);
+      console.log(`[auto-context-debug] Extracted ${outputs.length} outputs for context usage analysis`);
+
       const contextUsage = extractContextUsageFromOutputs(outputs);
+      console.log(`[auto-context-debug] Context usage extracted: ${contextUsage || 'none found'}`);
+
       const timestamp = new Date().toISOString();
 
+      console.log(`[auto-context-debug] Setting autoContextRunState back to 'idle'`);
       await updateClaudePanelCustomState(panelId, (state) => ({
         ...state,
         autoContextRunState: 'idle',
         lastAutoContextAt: timestamp,
         contextUsage: contextUsage ?? state.contextUsage ?? null
       }));
+      console.log(`[auto-context-debug] finalizeAutoContextRun completed successfully`);
     } catch (error) {
       console.error(`[Main] Failed to finalize automatic context run for panel ${panelId}:`, error);
+      console.log(`[auto-context-debug] Error in finalizeAutoContextRun: ${error instanceof Error ? error.message : String(error)}`);
       sessionManager.clearAutoContextCapture(panelId);
       await updateClaudePanelCustomState(panelId, (state) => ({
         ...state,
@@ -213,21 +225,29 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
   };
 
   const startAutoContextRun = async (panelId: string, sessionId: string): Promise<void> => {
+    console.log(`[auto-context-debug] startAutoContextRun called - panelId: ${panelId}, sessionId: ${sessionId}`);
+
     const claudeManager = resolveClaudePanelManager();
     if (!claudeManager) {
+      console.log(`[auto-context-debug] claudeManager not available - returning early`);
       return;
     }
 
     const session = sessionManager.getSession(sessionId);
+    console.log(`[auto-context-debug] session exists: ${!!session}, archived: ${session?.archived}, worktreePath: ${session?.worktreePath}`);
     if (!session || session.archived || !session.worktreePath) {
+      console.log(`[auto-context-debug] Session check failed - returning early`);
       return;
     }
 
     const panel = panelManager.getPanel(panelId);
+    console.log(`[auto-context-debug] panel exists: ${!!panel}`);
     if (!panel) {
+      console.log(`[auto-context-debug] Panel not found - returning early`);
       return;
     }
 
+    console.log(`[auto-context-debug] Starting auto context capture for panel ${panelId}`);
     sessionManager.clearAutoContextCapture(panelId);
     sessionManager.beginAutoContextCapture(panelId);
 
@@ -240,13 +260,16 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     const conversationHistory = sessionManager.getPanelConversationMessages
       ? sessionManager.getPanelConversationMessages(panelId)
       : [];
+    console.log(`[auto-context-debug] conversation history length: ${conversationHistory.length}, model: ${modelOverride || 'default'}`);
 
+    console.log(`[auto-context-debug] Setting autoContextRunState to 'running'`);
     await updateClaudePanelCustomState(panelId, (state) => ({
       ...state,
       autoContextRunState: 'running'
     }));
 
     try {
+      console.log(`[auto-context-debug] Calling claudeManager.continuePanel with /context prompt`);
       await claudeManager.continuePanel(
         panelId,
         session.worktreePath,
@@ -254,7 +277,9 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         conversationHistory,
         modelOverride
       );
+      console.log(`[auto-context-debug] claudeManager.continuePanel completed successfully`);
     } catch (error) {
+      console.log(`[auto-context-debug] claudeManager.continuePanel threw error: ${error instanceof Error ? error.message : String(error)}`);
       (logger || console).warn?.(`[Main] Failed to run automatic /context for panel ${panelId}: ${error instanceof Error ? error.message : String(error)}`);
       sessionManager.clearAutoContextCapture(panelId);
       await updateClaudePanelCustomState(panelId, (state) => ({
@@ -715,23 +740,40 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
     let skipSessionSummary = false;
 
-    if (panelId) {
-      try {
-        const panel = panelManager.getPanel(panelId);
-        if (panel) {
-          const customState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
-          const autoState = customState.autoContextRunState ?? 'idle';
+    console.log(`[auto-context-debug] Claude exit handler called - panelId: ${panelId}, sessionId: ${sessionId}, exitCode: ${exitCode}`);
 
-          if (autoState === 'running') {
-            skipSessionSummary = true;
-            await finalizeAutoContextRun(panelId);
-          } else if (exitCode === 0) {
-            await startAutoContextRun(panelId, sessionId);
+    if (panelId) {
+      // Use mutex to prevent race conditions between concurrent exit handlers
+      const { withLock } = await import('./utils/mutex');
+      try {
+        await withLock(`auto-context-${panelId}`, async () => {
+          const panel = panelManager.getPanel(panelId);
+          console.log(`[auto-context-debug] Panel exists: ${!!panel}`);
+
+          if (panel) {
+            const customState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
+            const autoState = customState.autoContextRunState ?? 'idle';
+            console.log(`[auto-context-debug] autoContextRunState: ${autoState}, exitCode: ${exitCode}`);
+
+            if (autoState === 'running') {
+              console.log(`[auto-context-debug] Finalizing auto context run for panel ${panelId}`);
+              skipSessionSummary = true;
+              await finalizeAutoContextRun(panelId);
+            } else if (exitCode === 0) {
+              console.log(`[auto-context-debug] Starting auto context run for panel ${panelId}`);
+              await startAutoContextRun(panelId, sessionId);
+            } else {
+              console.log(`[auto-context-debug] Skipping auto context - exitCode is ${exitCode}, not 0`);
+            }
+          } else {
+            console.log(`[auto-context-debug] Panel ${panelId} not found in panelManager`);
           }
-        }
+        });
       } catch (autoContextError) {
         console.error(`[Main] Failed to handle automatic context usage for panel ${panelId}:`, autoContextError);
       }
+    } else {
+      console.log(`[auto-context-debug] No panelId in exit event - skipping auto context`);
     }
 
     // Refresh git status after Claude exits, as it may have made commits

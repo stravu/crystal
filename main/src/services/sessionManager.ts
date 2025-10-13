@@ -124,10 +124,13 @@ export class SessionManager extends EventEmitter {
   }
 
   beginAutoContextCapture(panelId: string): void {
+    // Use synchronous operation - no race condition here as it's a simple set
     this.autoContextBuffers.set(panelId, []);
   }
 
   collectAutoContextOutput(panelId: string, output: SessionOutput): void {
+    // Get buffer atomically - if it doesn't exist, skip collection
+    // This prevents race with consumeAutoContextCapture
     const buffer = this.autoContextBuffers.get(panelId);
     if (buffer) {
       buffer.push(output);
@@ -135,9 +138,11 @@ export class SessionManager extends EventEmitter {
   }
 
   consumeAutoContextCapture(panelId: string): SessionOutput[] {
+    // Atomically get and delete the buffer to prevent races with collectAutoContextOutput
     const buffer = this.autoContextBuffers.get(panelId) ?? [];
     this.autoContextBuffers.delete(panelId);
-    return buffer;
+    // Return a copy to prevent external modifications to our internal state
+    return [...buffer];
   }
 
   clearAutoContextCapture(panelId: string): void {
