@@ -1,6 +1,23 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.3.3] - 2025-10-12
+
+### Added
+- **Prompt navigation**: Click on a prompt in the prompt history to snap to it in the output
+- **Reverse sort order**: Ability to reverse the sort order of sessions
+- **Multi-agent session creation**: Can now create both Codex and Claude Code sessions with one prompt
+
+### Changed
+- **Git merge strategy**: Now uses merge to main instead of rebase for safer operations
+- **Folder sorting**: Folders are no longer always pinned to the top in sort order
+
+### Fixed
+- **Light mode persistence**: Fixed light mode setting not persisting across sessions
+- **Light mode UI**: Various light mode visual fixes
+- **Automatic /context**: Fixed automatic /context command handling
+- **Codex parsing**: Fixed parsing issues with new Codex format
+
 ## [0.3.2] - 2025-10-10
 
 ### Fixed
