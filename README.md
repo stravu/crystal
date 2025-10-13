@@ -4,6 +4,10 @@
   <h3><a href="https://github.com/stravu/crystal/releases/latest">**Get the Latest Release Here**</a></h3>
 </div>
 
+<img width="1405" height="904" alt="image" src="https://github.com/user-attachments/assets/7e9fdd70-8e40-4fe2-a859-367f49929828" />
+<img width="1402" height="901" alt="image" src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" />
+
+
 <div align="center">
 
 [![Build](https://github.com/stravu/crystal/actions/workflows/build.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/build.yml)
