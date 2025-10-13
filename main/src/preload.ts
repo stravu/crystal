@@ -264,7 +264,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (name: string, projectId: number, parentFolderId?: string | null): Promise<IPCResponse> => ipcRenderer.invoke('folders:create', name, projectId, parentFolderId),
     update: (folderId: string, updates: { name?: string; display_order?: number; parent_folder_id?: string | null }): Promise<IPCResponse> => ipcRenderer.invoke('folders:update', folderId, updates),
     delete: (folderId: string): Promise<IPCResponse> => ipcRenderer.invoke('folders:delete', folderId),
-    reorder: (projectId: number, folderIds: string[]): Promise<IPCResponse> => ipcRenderer.invoke('folders:reorder', projectId, folderIds),
+    reorder: (projectId: number, folderOrders: Array<{ id: string; displayOrder: number }>): Promise<IPCResponse> => ipcRenderer.invoke('folders:reorder', projectId, folderOrders),
     moveSession: (sessionId: string, folderId: string | null): Promise<IPCResponse> => ipcRenderer.invoke('folders:move-session', sessionId, folderId),
     move: (folderId: string, parentFolderId: string | null): Promise<IPCResponse> => ipcRenderer.invoke('folders:move', folderId, parentFolderId),
   },

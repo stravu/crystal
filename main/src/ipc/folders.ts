@@ -79,9 +79,9 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
   });
 
   // Reorder folders within a project
-  ipcMain.handle('folders:reorder', async (_, projectId: number, folderIds: string[]) => {
+  ipcMain.handle('folders:reorder', async (_, projectId: number, folderOrders: Array<{ id: string; displayOrder: number }>) => {
     try {
-      databaseService.reorderFolders(projectId, folderIds);
+      databaseService.reorderFolders(projectId, folderOrders);
       return { success: true };
     } catch (error: unknown) {
       console.error('[IPC] Failed to reorder folders:', error);

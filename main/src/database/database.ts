@@ -1176,9 +1176,113 @@ export class DatabaseService {
         // Mark migration as complete
         this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('unified_panel_settings_migrated', 'true')").run();
         console.log('[Database] Completed unified panel settings migration 006');
-        
+
       } catch (error) {
         console.error('[Database] Failed to run unified panel settings migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
+
+    // Fix overlapping displayOrder values between folders and sessions
+    // This migration is needed ONLY for databases from before folders and sessions
+    // were merged into one unified ordering system. It should NOT run on databases
+    // where users have manually reordered items via drag-and-drop.
+    const overlappingOrderFixApplied = this.db.prepare("SELECT value FROM user_preferences WHERE key = 'folder_session_order_fix_applied'").get();
+    if (!overlappingOrderFixApplied) {
+      console.log('[Database] Checking for old-style folder/session ordering that needs migration...');
+
+      try {
+        // Get all projects
+        const projects = this.db.prepare('SELECT id FROM projects').all() as Array<{ id: number }>;
+        let projectsNeedingMigration = 0;
+
+        for (const project of projects) {
+          // Check if this project has the OLD pattern: folders with low displayOrder (0-10)
+          // AND sessions also with low displayOrder (0-10), indicating separate ordering systems
+          // Exclude main repo sessions as they have separate handling
+          const folderStats = this.db.prepare(`
+            SELECT MIN(display_order) as min_order, MAX(display_order) as max_order, COUNT(*) as count
+            FROM folders
+            WHERE project_id = ? AND parent_folder_id IS NULL
+          `).get(project.id) as { min_order: number | null; max_order: number | null; count: number };
+
+          const sessionStats = this.db.prepare(`
+            SELECT MIN(display_order) as min_order, MAX(display_order) as max_order, COUNT(*) as count
+            FROM sessions
+            WHERE project_id = ?
+              AND (archived = 0 OR archived IS NULL)
+              AND folder_id IS NULL
+              AND (is_main_repo = 0 OR is_main_repo IS NULL)
+          `).get(project.id) as { min_order: number | null; max_order: number | null; count: number };
+
+          // Only migrate if BOTH folders and sessions start near 0 and have overlapping ranges
+          // This indicates the old separate ordering system
+          const needsMigration =
+            folderStats.count > 0 &&
+            sessionStats.count > 0 &&
+            folderStats.min_order !== null &&
+            sessionStats.min_order !== null &&
+            folderStats.min_order <= 5 &&  // Folders start near beginning
+            sessionStats.min_order <= 5 &&  // Sessions also start near beginning
+            folderStats.max_order! < sessionStats.count + folderStats.count - 5;  // Range overlap indicates old system
+
+          if (needsMigration) {
+            projectsNeedingMigration++;
+            console.log(`[Database] Fixing Folder Ordering for project ${project.id}: Detected old ordering system (${folderStats.count} folders, ${sessionStats.count} sessions)`);
+
+            // Get all root-level sessions and folders for this project
+            const rootSessions = this.db.prepare(`
+              SELECT id, display_order, created_at
+              FROM sessions
+              WHERE project_id = ?
+                AND (archived = 0 OR archived IS NULL)
+                AND folder_id IS NULL
+                AND (is_main_repo = 0 OR is_main_repo IS NULL)
+              ORDER BY created_at ASC
+            `).all(project.id) as Array<{ id: string; display_order: number; created_at: string }>;
+
+            const allFolders = this.db.prepare(`
+              SELECT id, display_order, created_at
+              FROM folders
+              WHERE project_id = ?
+                AND parent_folder_id IS NULL
+              ORDER BY created_at ASC
+            `).all(project.id) as Array<{ id: string; display_order: number; created_at: string }>;
+
+            // Combine and sort by creation timestamp to determine proper order
+            type OrderedItem = { type: 'session' | 'folder'; id: string; createdAt: Date };
+            const allItems: OrderedItem[] = [
+              ...rootSessions.map(s => ({ type: 'session' as const, id: s.id, createdAt: new Date(s.created_at) })),
+              ...allFolders.map(f => ({ type: 'folder' as const, id: f.id, createdAt: new Date(f.created_at) }))
+            ];
+
+            // Sort by creation timestamp (oldest first)
+            allItems.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+            // Reassign displayOrder sequentially
+            allItems.forEach((item, index) => {
+              if (item.type === 'session') {
+                this.db.prepare('UPDATE sessions SET display_order = ? WHERE id = ?').run(index, item.id);
+              } else {
+                this.db.prepare('UPDATE folders SET display_order = ? WHERE id = ?').run(index, item.id);
+              }
+            });
+
+            console.log(`[Database] Fixed ordering for project ${project.id}: Reassigned displayOrder for ${allItems.length} items`);
+          }
+        }
+
+        // Always mark migration as complete, even if no projects needed it
+        // This prevents the check from running on every startup
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('folder_session_order_fix_applied', 'true')").run();
+        if (projectsNeedingMigration > 0) {
+          console.log(`[Database] Completed folder/session ordering fix migration for ${projectsNeedingMigration} project(s)`);
+        } else {
+          console.log('[Database] No projects needed ordering migration (already using unified system)');
+        }
+
+      } catch (error) {
+        console.error('[Database] Failed to fix folder/session ordering:', error);
         // Don't throw - allow app to continue
       }
     }
@@ -1347,18 +1451,42 @@ export class DatabaseService {
     }
     
     const id = `folder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     console.log('[Database] Creating folder:', { id, name, projectId, parentFolderId });
-    
-    // Get the max display_order for folders in this project at the same level
-    const maxOrder = this.db.prepare(`
-      SELECT MAX(display_order) as max_order 
-      FROM folders 
-      WHERE project_id = ? 
-      AND (parent_folder_id ${parentFolderId ? '= ?' : 'IS NULL'})
-    `).get(parentFolderId ? [projectId, parentFolderId] : projectId) as { max_order: number | null };
-    
-    const displayOrder = (maxOrder?.max_order ?? -1) + 1;
+
+    // Get the max display_order - if this is a root-level folder (no parent),
+    // we need to consider both folders and sessions since they share the same space
+    let displayOrder: number;
+    if (!parentFolderId) {
+      // Root-level folder: check both folders and sessions
+      const maxFolderOrder = this.db.prepare(`
+        SELECT MAX(display_order) as max_order
+        FROM folders
+        WHERE project_id = ? AND parent_folder_id IS NULL
+      `).get(projectId) as { max_order: number | null };
+
+      const maxSessionOrder = this.db.prepare(`
+        SELECT MAX(display_order) as max_order
+        FROM sessions
+        WHERE project_id = ? AND (archived = 0 OR archived IS NULL) AND folder_id IS NULL
+      `).get(projectId) as { max_order: number | null };
+
+      // Use the maximum of both to ensure no overlap
+      const maxOrder = Math.max(
+        maxFolderOrder?.max_order ?? -1,
+        maxSessionOrder?.max_order ?? -1
+      );
+      displayOrder = maxOrder + 1;
+    } else {
+      // Nested folder: only check folders at the same level
+      const maxOrder = this.db.prepare(`
+        SELECT MAX(display_order) as max_order
+        FROM folders
+        WHERE project_id = ? AND parent_folder_id = ?
+      `).get(projectId, parentFolderId) as { max_order: number | null };
+
+      displayOrder = (maxOrder?.max_order ?? -1) + 1;
+    }
     
     const stmt = this.db.prepare(`
       INSERT INTO folders (id, name, project_id, parent_folder_id, display_order)
@@ -1443,19 +1571,19 @@ export class DatabaseService {
     stmt.run(newOrder, folderId);
   }
 
-  reorderFolders(projectId: number, folderIds: string[]): void {
+  reorderFolders(projectId: number, folderOrders: Array<{ id: string; displayOrder: number }>): void {
     const stmt = this.db.prepare(`
-      UPDATE folders 
-      SET display_order = ?, updated_at = CURRENT_TIMESTAMP 
+      UPDATE folders
+      SET display_order = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND project_id = ?
     `);
-    
+
     const transaction = this.db.transaction(() => {
-      folderIds.forEach((id, index) => {
-        stmt.run(index, id, projectId);
+      folderOrders.forEach(({ id, displayOrder }) => {
+        stmt.run(displayOrder, id, projectId);
       });
     });
-    
+
     transaction();
   }
 
@@ -1574,14 +1702,30 @@ export class DatabaseService {
   // Session operations
   createSession(data: CreateSessionData): Session {
     return this.transaction(() => {
-      // Get the max display_order for sessions in this project
-      const maxOrderResult = this.db.prepare(`
-        SELECT MAX(display_order) as max_order 
-        FROM sessions 
-        WHERE project_id = ? AND (archived = 0 OR archived IS NULL)
+      // Get the max display_order for both sessions and folders in this project
+      // Sessions and folders share the same display_order space within a project
+      // Exclude main repo sessions as they have separate handling
+      const maxSessionOrder = this.db.prepare(`
+        SELECT MAX(display_order) as max_order
+        FROM sessions
+        WHERE project_id = ?
+          AND (archived = 0 OR archived IS NULL)
+          AND folder_id IS NULL
+          AND (is_main_repo = 0 OR is_main_repo IS NULL)
       `).get(data.project_id) as { max_order: number | null };
-      
-      const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
+
+      const maxFolderOrder = this.db.prepare(`
+        SELECT MAX(display_order) as max_order
+        FROM folders
+        WHERE project_id = ? AND parent_folder_id IS NULL
+      `).get(data.project_id) as { max_order: number | null };
+
+      // Use the maximum of both to ensure no overlap
+      const maxOrder = Math.max(
+        maxSessionOrder?.max_order ?? -1,
+        maxFolderOrder?.max_order ?? -1
+      );
+      const displayOrder = maxOrder + 1;
       
       this.db.prepare(`
         INSERT INTO sessions (id, name, initial_prompt, worktree_name, worktree_path, status, project_id, folder_id, permission_mode, is_main_repo, display_order, auto_commit, tool_type, base_commit, base_branch, commit_mode, commit_mode_settings)

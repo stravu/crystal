@@ -1277,37 +1277,37 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       const targetSessionIndex = rootSessions.findIndex(s => s.id === targetSession.id);
 
       if (sourceSessionIndex !== -1 && targetSessionIndex !== -1) {
-        // Reorder only the root sessions
-        const newRootSessions = [...rootSessions];
-        const [removed] = newRootSessions.splice(sourceSessionIndex, 1);
-        newRootSessions.splice(targetSessionIndex, 0, removed);
-
         // Update display orders for root sessions and folders together
-        // Create a combined list to assign sequential displayOrder values
-        type RootItem = { type: 'session'; id: string; displayOrder: number } | { type: 'folder'; id: string; displayOrder: number };
+        // Build a combined list with CURRENT displayOrder values, sorted by displayOrder
+        type RootItem = { type: 'session' | 'folder'; id: string; displayOrder: number; createdAt: string; originalIndex: number };
         const rootItems: RootItem[] = [
-          ...rootFolders.map(f => ({ type: 'folder' as const, id: f.id, displayOrder: f.displayOrder ?? 0 })),
-          ...rootSessions.map(s => ({ type: 'session' as const, id: s.id, displayOrder: s.displayOrder ?? 0 }))
+          ...rootFolders.map((f, idx) => ({ type: 'folder' as const, id: f.id, displayOrder: f.displayOrder ?? 0, createdAt: f.createdAt, originalIndex: idx })),
+          ...rootSessions.map((s, idx) => ({ type: 'session' as const, id: s.id, displayOrder: s.displayOrder ?? 0, createdAt: s.createdAt, originalIndex: idx }))
         ];
 
-        // Sort to get current order
-        rootItems.sort((a, b) => a.displayOrder - b.displayOrder);
-
-        // Find where to insert the dragged session
-        const insertIndex = rootItems.findIndex(item => item.type === 'session' && item.id === targetSession.id);
-
-        // Remove the source session from the list
-        const sourceItemIndex = rootItems.findIndex(item => item.type === 'session' && item.id === dragState.sessionId);
-        if (sourceItemIndex !== -1) {
-          const [removedItem] = rootItems.splice(sourceItemIndex, 1);
-          // Insert at target position
-          rootItems.splice(insertIndex, 0, removedItem);
-        }
-
-        // Reassign displayOrder values sequentially
-        rootItems.forEach((item, index) => {
-          item.displayOrder = index;
+        // Sort by current displayOrder to get the current visual order
+        // Use createdAt as a tiebreaker to ensure stable sorting when displayOrder values are duplicated
+        rootItems.sort((a, b) => {
+          const orderDiff = a.displayOrder - b.displayOrder;
+          if (orderDiff !== 0) return orderDiff;
+          // If displayOrder is equal, sort by createdAt (older items first)
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         });
+
+        // Find positions of source and target in the current order
+        const sourceItemIndex = rootItems.findIndex(item => item.type === 'session' && item.id === dragState.sessionId);
+        const targetItemIndex = rootItems.findIndex(item => item.type === 'session' && item.id === targetSession.id);
+
+        if (sourceItemIndex !== -1 && targetItemIndex !== -1) {
+          // Remove the source item and insert it at the target position
+          const [removedItem] = rootItems.splice(sourceItemIndex, 1);
+          rootItems.splice(targetItemIndex, 0, removedItem);
+
+          // Reassign displayOrder values sequentially to reflect the new order
+          rootItems.forEach((item, index) => {
+            item.displayOrder = index;
+          });
+        }
 
         // Prepare updates for API
         const sessionOrders = rootItems
@@ -1326,11 +1326,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
 
           // Update folders if there are any
           if (folderOrders.length > 0) {
-            // folders.reorder expects (projectId, orderedFolderIds[])
-            const orderedFolderIds = folderOrders
-              .sort((a, b) => a.displayOrder - b.displayOrder)
-              .map(f => f.id);
-            const folderResponse = await API.folders.reorder(projectId, orderedFolderIds);
+            // folders.reorder now expects (projectId, folderOrders[])
+            const folderResponse = await API.folders.reorder(projectId, folderOrders);
             if (!folderResponse.success) {
               throw new Error(folderResponse.error || 'Failed to reorder folders');
             }
@@ -1409,11 +1406,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
             throw new Error(sessionResponse.error || 'Failed to reorder sessions');
           }
 
-          // folders.reorder expects (projectId, orderedFolderIds[])
-          const orderedFolderIds = folderOrders
-            .sort((a, b) => a.displayOrder - b.displayOrder)
-            .map(f => f.id);
-          const folderResponse = await API.folders.reorder(projectId, orderedFolderIds);
+          // folders.reorder now expects (projectId, folderOrders[])
+          const folderResponse = await API.folders.reorder(projectId, folderOrders);
           if (!folderResponse.success) {
             throw new Error(folderResponse.error || 'Failed to reorder folders');
           }

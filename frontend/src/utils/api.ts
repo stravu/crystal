@@ -352,9 +352,9 @@ export class API {
       return window.electronAPI.folders.delete(folderId);
     },
 
-    async reorder(projectId: number, folderIds: string[]) {
+    async reorder(projectId: number, folderOrders: Array<{ id: string; displayOrder: number }>) {
       if (!isElectron()) throw new Error('Electron API not available');
-      return window.electronAPI.folders.reorder(projectId, folderIds);
+      return window.electronAPI.folders.reorder(projectId, folderOrders);
     },
 
     async moveSession(sessionId: string, folderId: string | null) {

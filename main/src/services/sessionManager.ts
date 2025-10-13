@@ -221,6 +221,7 @@ export class SessionManager extends EventEmitter {
       isMainRepo: dbSession.is_main_repo,
       projectId: dbSession.project_id, // Add the missing projectId field
       folderId: dbSession.folder_id,
+      displayOrder: dbSession.display_order, // Include displayOrder for proper sorting
       isFavorite: dbSession.is_favorite,
       autoCommit: dbSession.auto_commit,
       // Model is now managed at panel level
