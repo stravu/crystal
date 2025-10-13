@@ -35,6 +35,10 @@ export class ConfigManager extends EventEmitter {
       sessionCreationPreferences: {
         sessionCount: 1,
         toolType: 'none',
+        selectedTools: {
+          claude: false,
+          codex: false
+        },
         claudeConfig: {
           model: 'auto',
           permissionMode: 'ignore',
@@ -75,6 +79,10 @@ export class ConfigManager extends EventEmitter {
         sessionCreationPreferences: {
           ...this.config.sessionCreationPreferences,
           ...loadedConfig.sessionCreationPreferences,
+          selectedTools: {
+            ...this.config.sessionCreationPreferences?.selectedTools,
+            ...loadedConfig.sessionCreationPreferences?.selectedTools
+          },
           claudeConfig: {
             ...this.config.sessionCreationPreferences?.claudeConfig,
             ...loadedConfig.sessionCreationPreferences?.claudeConfig
@@ -161,6 +169,10 @@ export class ConfigManager extends EventEmitter {
     return this.config.sessionCreationPreferences || {
       sessionCount: 1,
       toolType: 'none',
+      selectedTools: {
+        claude: false,
+        codex: false
+      },
       claudeConfig: {
         model: 'auto',
         permissionMode: 'ignore',

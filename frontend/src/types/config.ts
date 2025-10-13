@@ -21,6 +21,10 @@ export interface AppConfig {
   sessionCreationPreferences?: {
     sessionCount?: number;
     toolType?: 'claude' | 'codex' | 'none';
+    selectedTools?: {
+      claude?: boolean;
+      codex?: boolean;
+    };
     claudeConfig?: {
       model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
       permissionMode?: 'ignore' | 'approve';

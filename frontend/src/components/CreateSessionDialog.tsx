@@ -14,7 +14,7 @@ import { Card } from './ui/Card';
 import { ClaudeCodeConfigComponent, type ClaudeCodeConfig } from './dialog/ClaudeCodeConfig';
 import { CodexConfigComponent, type CodexConfig } from './dialog/CodexConfig';
 import { DEFAULT_CODEX_MODEL, type OpenAICodexModel } from '../../../shared/types/models';
-import { useSessionPreferencesStore } from '../stores/sessionPreferencesStore';
+import { useSessionPreferencesStore, type SessionCreationPreferences } from '../stores/sessionPreferencesStore';
 
 // Interface for branch information
 interface BranchInfo {
@@ -207,6 +207,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
       if (initialPrompt) {
         // If we have an initialPrompt, default to Claude being selected
         setSelectedTools({ claude: true, codex: false });
+      } else if (preferences.selectedTools) {
+        setSelectedTools({
+          claude: !!preferences.selectedTools.claude,
+          codex: !!preferences.selectedTools.codex
+        });
       } else if (preferences.toolType) {
         // Map old preference format to new checkbox format
         setSelectedTools({
@@ -237,9 +242,27 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
   }, [preferences, initialPrompt]);
 
   // Save preferences when certain settings change
-  const savePreferences = async (updates: Partial<typeof preferences>) => {
+  const savePreferences = useCallback(async (updates: Partial<SessionCreationPreferences>) => {
     await updatePreferences(updates);
-  };
+  }, [updatePreferences]);
+
+  const persistSelectedToolsPreference = useCallback((tools: { claude: boolean; codex: boolean }) => {
+    const nextToolType: SessionCreationPreferences['toolType'] = tools.claude && tools.codex
+      ? 'none'
+      : tools.claude
+        ? 'claude'
+        : tools.codex
+          ? 'codex'
+          : 'none';
+
+    void savePreferences({
+      toolType: nextToolType,
+      selectedTools: {
+        claude: tools.claude,
+        codex: tools.codex
+      }
+    });
+  }, [savePreferences]);
   
   // Note: Model preferences are now stored in panel settings, not at project level
   
@@ -891,9 +914,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
                     }`}
                     onClick={() => {
                       setSelectedTools(prev => {
-                        const newValue = !prev.claude;
-                        // Don't save preferences for multi-tool selection since the old format doesn't support it
-                        return { ...prev, claude: newValue };
+                        const nextState = { ...prev, claude: !prev.claude };
+                        persistSelectedToolsPreference(nextState);
+                        return nextState;
                       });
                     }}
                   >
@@ -924,9 +947,9 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
                     }`}
                     onClick={() => {
                       setSelectedTools(prev => {
-                        const newValue = !prev.codex;
-                        // Don't save preferences for multi-tool selection since the old format doesn't support it
-                        return { ...prev, codex: newValue };
+                        const nextState = { ...prev, codex: !prev.codex };
+                        persistSelectedToolsPreference(nextState);
+                        return nextState;
                       });
                     }}
                   >

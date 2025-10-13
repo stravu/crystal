@@ -6,6 +6,10 @@ import type { CommitModeSettings } from '../../../shared/types';
 export interface SessionCreationPreferences {
   sessionCount: number;
   toolType: 'claude' | 'codex' | 'none';
+  selectedTools: {
+    claude: boolean;
+    codex: boolean;
+  };
   claudeConfig: {
     model: 'auto' | 'sonnet' | 'opus' | 'haiku';
     permissionMode: 'ignore' | 'approve';
@@ -27,6 +31,10 @@ export interface SessionCreationPreferences {
 const defaultPreferences: SessionCreationPreferences = {
   sessionCount: 1,
   toolType: 'none',
+  selectedTools: {
+    claude: false,
+    codex: false
+  },
   claudeConfig: {
     model: 'auto',
     permissionMode: 'ignore',
@@ -70,6 +78,10 @@ export const useSessionPreferencesStore = create<SessionPreferencesStore>((set, 
         const mergedPreferences: SessionCreationPreferences = {
           ...defaultPreferences,
           ...response.data,
+          selectedTools: {
+            ...defaultPreferences.selectedTools,
+            ...response.data.selectedTools
+          },
           claudeConfig: {
             ...defaultPreferences.claudeConfig,
             ...response.data.claudeConfig
@@ -101,6 +113,10 @@ export const useSessionPreferencesStore = create<SessionPreferencesStore>((set, 
     const newPreferences: SessionCreationPreferences = {
       ...currentPreferences,
       ...allowedUpdates,
+      selectedTools: {
+        ...currentPreferences.selectedTools,
+        ...(allowedUpdates.selectedTools || {})
+      },
       claudeConfig: {
         ...currentPreferences.claudeConfig,
         ...(allowedUpdates.claudeConfig || {})
