@@ -559,6 +559,42 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
         toolsToCreate.push('none');
       }
 
+      // Generate session name ONCE if not provided and we have API key + prompt
+      let baseSessionName = sessionName;
+      if (!baseSessionName && hasApiKey && finalPrompt.trim()) {
+        try {
+          console.log('[CreateSessionDialog] Generating session name from prompt');
+          const response = await API.sessions.generateName(finalPrompt);
+          if (response.success && response.data) {
+            baseSessionName = response.data;
+            console.log(`[CreateSessionDialog] Generated session name: ${baseSessionName}`);
+          } else {
+            // AI generation failed
+            showError({
+              title: 'Failed to Generate Session Name',
+              error: response.error || 'Could not generate session name from prompt. Please provide a session name manually.'
+            });
+            return;
+          }
+        } catch (error) {
+          console.error('[CreateSessionDialog] Failed to generate session name:', error);
+          showError({
+            title: 'Failed to Generate Session Name',
+            error: 'An error occurred while generating the session name. Please provide a session name manually.'
+          });
+          return;
+        }
+      }
+
+      // At this point, baseSessionName should always have a value (either user-provided or AI-generated)
+      if (!baseSessionName) {
+        showError({
+          title: 'Session Name Required',
+          error: 'Please provide a session name or add an Anthropic API key in Settings to enable auto-naming.'
+        });
+        return;
+      }
+
       // Determine if we need to create a folder
       // Create folder when: multiple sessions (sessionCount > 1) OR multiple tools selected
       const shouldCreateFolder = sessionCount > 1 || toolsToCreate.length > 1;
@@ -567,11 +603,10 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
       let folderId: string | undefined;
       if (shouldCreateFolder && projectId) {
         try {
-          const folderName = sessionName || 'Multi-session';
-          const folderResponse = await API.folders.create(folderName, projectId);
+          const folderResponse = await API.folders.create(baseSessionName, projectId);
           if (folderResponse.success && folderResponse.data) {
             folderId = folderResponse.data.id;
-            console.log(`[CreateSessionDialog] Created folder: ${folderName} (${folderId})`);
+            console.log(`[CreateSessionDialog] Created folder: ${baseSessionName} (${folderId})`);
             // Wait a bit to ensure the folder is created in the UI
             await new Promise(resolve => setTimeout(resolve, 200));
           }
@@ -603,12 +638,12 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
         // - If multiple tools selected, add tool prefix (e.g., 'CC-' for Claude Code or 'CX-' for Codex)
         // - If both sessionCount > 1 AND multiple tools, the count suffix will be added by taskQueue
         let finalSessionName: string | undefined;
-        if (sessionName) {
+        if (baseSessionName) {
           if (toolsToCreate.length > 1) {
             const prefix = toolType === 'claude' ? 'CC' : toolType === 'codex' ? 'CX' : toolType;
-            finalSessionName = `${prefix}-${sessionName}`;
+            finalSessionName = `${prefix}-${baseSessionName}`;
           } else {
-            finalSessionName = sessionName;
+            finalSessionName = baseSessionName;
           }
         }
 
