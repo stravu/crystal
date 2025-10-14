@@ -527,7 +527,8 @@ export class WorktreeManager {
 
         // Check if there are any changes to squash
         command = `git log --oneline ${base}..HEAD`;
-        const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
+        const { stdout: commits, stderr: stderr3 } = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = commits || stderr3 || '';
         if (!commits.trim()) {
           throw new Error(`No commits to squash. The branch is already up to date with ${mainBranch}.`);
         }
@@ -537,16 +538,19 @@ export class WorktreeManager {
           // Check if origin remote exists
           command = `git remote get-url origin`;
           executedCommands.push(`git remote get-url origin (in ${projectPath})`);
-          await execWithShellPath(command, { cwd: projectPath });
+          const originResult = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = originResult.stdout || originResult.stderr || '';
 
           // Fetch from origin to get latest refs
           command = `git fetch origin ${mainBranch}`;
           executedCommands.push(`git fetch origin ${mainBranch} (in ${projectPath})`);
-          await execWithShellPath(command, { cwd: projectPath });
+          const fetchResult = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = fetchResult.stdout || fetchResult.stderr || '';
 
           // Check if local main is behind origin/main
           command = `git rev-list --count ${mainBranch}..origin/${mainBranch}`;
-          const { stdout: behindCount } = await execWithShellPath(command, { cwd: projectPath });
+          const { stdout: behindCount, stderr: stderr4 } = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = behindCount || stderr4 || '';
           const mainIsBehindOrigin = parseInt(behindCount.trim()) > 0;
 
           if (mainIsBehindOrigin) {
@@ -678,7 +682,8 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
 
         // Check if there are any changes to merge
         command = `git log --oneline ${mainBranch}..HEAD`;
-        const { stdout: commits } = await execWithShellPath(command, { cwd: worktreePath });
+        const { stdout: commits, stderr: stderr2 } = await execWithShellPath(command, { cwd: worktreePath });
+        lastOutput = commits || stderr2 || '';
         if (!commits.trim()) {
           throw new Error(`No commits to merge. The branch is already up to date with ${mainBranch}.`);
         }
@@ -691,17 +696,20 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           // Check if origin remote exists
           command = `git remote get-url origin`;
           executedCommands.push(`git remote get-url origin (in ${projectPath})`);
-          await execWithShellPath(command, { cwd: projectPath });
+          const originResult = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = originResult.stdout || originResult.stderr || '';
           hasOrigin = true;
 
           // Fetch from origin to get latest refs
           command = `git fetch origin ${mainBranch}`;
           executedCommands.push(`git fetch origin ${mainBranch} (in ${projectPath})`);
-          await execWithShellPath(command, { cwd: projectPath });
+          const fetchResult = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = fetchResult.stdout || fetchResult.stderr || '';
 
           // Check if local main is behind origin/main
           command = `git rev-list --count ${mainBranch}..origin/${mainBranch}`;
-          const { stdout: behindCount } = await execWithShellPath(command, { cwd: projectPath });
+          const { stdout: behindCount, stderr: stderr3 } = await execWithShellPath(command, { cwd: projectPath });
+          lastOutput = behindCount || stderr3 || '';
           mainIsBehindOrigin = parseInt(behindCount.trim()) > 0;
 
           if (mainIsBehindOrigin) {
