@@ -144,6 +144,7 @@ interface ElectronAPI {
     detectBranch: (path: string) => Promise<IPCResponse>;
     reorder: (projectOrders: Array<{ id: number; displayOrder: number }>) => Promise<IPCResponse>;
     listBranches: (projectId: string) => Promise<IPCResponse>;
+    runScript: (projectId: number) => Promise<IPCResponse>;
   };
 
   // Git operations
