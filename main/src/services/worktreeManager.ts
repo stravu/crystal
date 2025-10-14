@@ -533,46 +533,7 @@ export class WorktreeManager {
           throw new Error(`No commits to squash. The branch is already up to date with ${mainBranch}.`);
         }
 
-        // SAFETY CHECK 1: Check if origin exists and if main is behind origin
-        try {
-          // Check if origin remote exists
-          command = `git remote get-url origin`;
-          executedCommands.push(`git remote get-url origin (in ${projectPath})`);
-          const originResult = await execWithShellPath(command, { cwd: projectPath });
-          lastOutput = originResult.stdout || originResult.stderr || '';
-
-          // Fetch from origin to get latest refs
-          command = `git fetch origin ${mainBranch}`;
-          executedCommands.push(`git fetch origin ${mainBranch} (in ${projectPath})`);
-          const fetchResult = await execWithShellPath(command, { cwd: projectPath });
-          lastOutput = fetchResult.stdout || fetchResult.stderr || '';
-
-          // Check if local main is behind origin/main
-          command = `git rev-list --count ${mainBranch}..origin/${mainBranch}`;
-          const { stdout: behindCount, stderr: stderr4 } = await execWithShellPath(command, { cwd: projectPath });
-          lastOutput = behindCount || stderr4 || '';
-          const mainIsBehindOrigin = parseInt(behindCount.trim()) > 0;
-
-          if (mainIsBehindOrigin) {
-            throw new Error(
-              `Cannot merge to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
-              `Please update ${mainBranch} first:\n` +
-              `  1. Go to the main repo session\n` +
-              `  2. Run: git pull origin ${mainBranch}\n` +
-              `  3. Then try this operation again`
-            );
-          }
-        } catch (error: unknown) {
-          const err = error as Error;
-          // If error message contains our custom message, re-throw it
-          if (err.message.includes('Cannot merge to')) {
-            throw err;
-          }
-          // Otherwise, origin doesn't exist or fetch failed - that's okay, continue
-          console.log(`[WorktreeManager] No origin remote or fetch failed, continuing with local ${mainBranch}`);
-        }
-
-        // SAFETY CHECK 2: Rebase worktree onto main FIRST before squashing
+        // SAFETY CHECK 1: Rebase worktree onto main FIRST before squashing
         command = `git rebase ${mainBranch}`;
         executedCommands.push(`git rebase ${mainBranch} (in ${worktreePath})`);
         try {
@@ -624,7 +585,8 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
         const checkoutResult = await execWithShellPath(command, { cwd: projectPath });
         lastOutput = checkoutResult.stdout || checkoutResult.stderr || '';
 
-        // SAFETY CHECK 3: Use --ff-only merge instead of rebase to prevent history rewriting
+        // SAFETY CHECK 2: Use --ff-only merge to prevent history rewriting
+        // This will fail if local main has diverged from the worktree branch
         command = `git merge --ff-only ${branchName}`;
         executedCommands.push(`git merge --ff-only ${branchName} (in ${projectPath})`);
         try {
@@ -636,7 +598,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           throw new Error(
             `Failed to fast-forward ${mainBranch} to ${branchName}.\n\n` +
             `This usually means ${mainBranch} has commits that ${branchName} doesn't have.\n` +
-            `Please ensure ${mainBranch} is up to date and try again.\n\n` +
+            `You may need to rebase the worktree onto ${mainBranch} first, or reset ${mainBranch} to match origin.\n\n` +
             `Git output: ${err.stderr || err.stdout || err.message}`
           );
         }
@@ -655,7 +617,8 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           originalError?: Error;
         };
         gitError.gitCommands = executedCommands;
-        gitError.gitOutput = err.stderr || err.stdout || lastOutput || err.message || '';
+        // Prioritize actual error messages over lastOutput (which may contain unrelated data like commit counts)
+        gitError.gitOutput = err.stderr || err.stdout || err.message || lastOutput || '';
         gitError.workingDirectory = worktreePath;
         gitError.projectPath = projectPath;
         gitError.originalError = err;
@@ -688,50 +651,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           throw new Error(`No commits to merge. The branch is already up to date with ${mainBranch}.`);
         }
 
-        // SAFETY CHECK 1: Check if origin exists and if main is behind origin
-        let hasOrigin = false;
-        let mainIsBehindOrigin = false;
-
-        try {
-          // Check if origin remote exists
-          command = `git remote get-url origin`;
-          executedCommands.push(`git remote get-url origin (in ${projectPath})`);
-          const originResult = await execWithShellPath(command, { cwd: projectPath });
-          lastOutput = originResult.stdout || originResult.stderr || '';
-          hasOrigin = true;
-
-          // Fetch from origin to get latest refs
-          command = `git fetch origin ${mainBranch}`;
-          executedCommands.push(`git fetch origin ${mainBranch} (in ${projectPath})`);
-          const fetchResult = await execWithShellPath(command, { cwd: projectPath });
-          lastOutput = fetchResult.stdout || fetchResult.stderr || '';
-
-          // Check if local main is behind origin/main
-          command = `git rev-list --count ${mainBranch}..origin/${mainBranch}`;
-          const { stdout: behindCount, stderr: stderr3 } = await execWithShellPath(command, { cwd: projectPath });
-          lastOutput = behindCount || stderr3 || '';
-          mainIsBehindOrigin = parseInt(behindCount.trim()) > 0;
-
-          if (mainIsBehindOrigin) {
-            throw new Error(
-              `Cannot merge to ${mainBranch}: local ${mainBranch} is behind origin/${mainBranch}.\n\n` +
-              `Please update ${mainBranch} first:\n` +
-              `  1. Go to the main repo session\n` +
-              `  2. Run: git pull origin ${mainBranch}\n` +
-              `  3. Then try this operation again`
-            );
-          }
-        } catch (error: unknown) {
-          const err = error as Error;
-          // If error message contains our custom message, re-throw it
-          if (err.message.includes('Cannot merge to')) {
-            throw err;
-          }
-          // Otherwise, origin doesn't exist or fetch failed - that's okay, continue
-          console.log(`[WorktreeManager] No origin remote or fetch failed, continuing with local ${mainBranch}`);
-        }
-
-        // SAFETY CHECK 2: Rebase worktree onto main FIRST (resolves conflicts in worktree, not main)
+        // SAFETY CHECK 1: Rebase worktree onto main FIRST (resolves conflicts in worktree, not main)
         command = `git rebase ${mainBranch}`;
         executedCommands.push(`git rebase ${mainBranch} (in ${worktreePath})`);
         try {
@@ -759,8 +679,8 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
         const checkoutResult = await execWithShellPath(command, { cwd: projectPath });
         lastOutput = checkoutResult.stdout || checkoutResult.stderr || '';
 
-        // SAFETY CHECK 3: Use --ff-only merge instead of rebase to prevent history rewriting
-        // This will ONLY succeed if it's a clean fast-forward (main hasn't moved ahead)
+        // SAFETY CHECK 2: Use --ff-only merge to prevent history rewriting
+        // This will fail if local main has diverged from the worktree branch
         command = `git merge --ff-only ${branchName}`;
         executedCommands.push(`git merge --ff-only ${branchName} (in ${projectPath})`);
         try {
@@ -772,7 +692,7 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           throw new Error(
             `Failed to fast-forward ${mainBranch} to ${branchName}.\n\n` +
             `This usually means ${mainBranch} has commits that ${branchName} doesn't have.\n` +
-            `Please ensure ${mainBranch} is up to date and try again.\n\n` +
+            `You may need to rebase the worktree onto ${mainBranch} first, or reset ${mainBranch} to match origin.\n\n` +
             `Git output: ${err.stderr || err.stdout || err.message}`
           );
         }
@@ -791,7 +711,8 @@ Co-Authored-By: Crystal <crystal@stravu.com>` : commitMessage;
           originalError?: Error;
         };
         gitError.gitCommands = executedCommands;
-        gitError.gitOutput = err.stderr || err.stdout || lastOutput || err.message || '';
+        // Prioritize actual error messages over lastOutput (which may contain unrelated data like commit counts)
+        gitError.gitOutput = err.stderr || err.stdout || err.message || lastOutput || '';
         gitError.workingDirectory = worktreePath;
         gitError.projectPath = projectPath;
         gitError.originalError = err;
