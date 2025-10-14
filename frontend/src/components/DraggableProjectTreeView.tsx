@@ -118,6 +118,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   } | null>(null);
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
   const [refreshingProjects, setRefreshingProjects] = useState<Set<number>>(new Set());
+  const [runningProjectId, setRunningProjectId] = useState<number | null>(null);
+  const [closingProjectId, setClosingProjectId] = useState<number | null>(null);
   const [selectedProjectForFolder, setSelectedProjectForFolder] = useState<Project | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [parentFolderForCreate, setParentFolderForCreate] = useState<Folder | null>(null);
@@ -482,6 +484,65 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [projectsWithSessions, activeProjectId]);
+
+  // Track running project scripts
+  useEffect(() => {
+    // Check initial running state
+    const checkRunningProject = async () => {
+      try {
+        const response = await window.electronAPI.projects.getRunningScript();
+        if (response.success && response.data) {
+          setRunningProjectId(response.data as number);
+        }
+      } catch (error) {
+        console.error('Failed to check running project:', error);
+      }
+    };
+
+    checkRunningProject();
+
+    // Listen for project script state changes
+    const handleProjectScriptChanged = (event: CustomEvent) => {
+      const { projectId } = event.detail;
+      setRunningProjectId(projectId);
+      setClosingProjectId(null);
+    };
+
+    const handleProjectScriptClosing = (event: CustomEvent) => {
+      const { projectId } = event.detail;
+      setClosingProjectId(projectId);
+    };
+
+    // Listen for panel events to detect when project scripts finish
+    const handlePanelEvent = (event: CustomEvent) => {
+      const panelEvent = event.detail;
+      // When a process ends, check if it was a project script
+      if (panelEvent.type === 'process:ended' && panelEvent.source?.panelType === 'logs') {
+        // Check if this was the running project's session
+        const sessionId = panelEvent.source.sessionId;
+        if (sessionId && runningProjectId !== null) {
+          // Find which project this session belongs to
+          const project = projectsWithSessions.find(p =>
+            p.sessions.some(s => s.id === sessionId && s.isMainRepo)
+          );
+          if (project && project.id === runningProjectId) {
+            setRunningProjectId(null);
+            setClosingProjectId(null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('project-script-changed', handleProjectScriptChanged as EventListener);
+    window.addEventListener('project-script-closing', handleProjectScriptClosing as EventListener);
+    window.addEventListener('panel:event', handlePanelEvent as EventListener);
+
+    return () => {
+      window.removeEventListener('project-script-changed', handleProjectScriptChanged as EventListener);
+      window.removeEventListener('project-script-closing', handleProjectScriptClosing as EventListener);
+      window.removeEventListener('panel:event', handlePanelEvent as EventListener);
+    };
+  }, [runningProjectId, projectsWithSessions]);
 
   const loadProjectsWithSessions = async () => {
     try {
@@ -909,10 +970,39 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   [refreshingProjects] // Dependencies for useCallback
 );
 
-  // Handler to run project script in project root
+  // Handler to run/stop project script in project root
   const handleRunProjectScript = useCallback(async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
 
+    // If this project is closing, do nothing
+    if (closingProjectId === project.id) {
+      return;
+    }
+
+    // If this project is running, stop it
+    if (runningProjectId === project.id) {
+      try {
+        setClosingProjectId(project.id);
+        const response = await window.electronAPI.projects.stopScript(project.id);
+
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to stop script');
+        }
+
+        setClosingProjectId(null);
+        setRunningProjectId(null);
+      } catch (error: unknown) {
+        console.error('Failed to stop project script:', error);
+        setClosingProjectId(null);
+        showError({
+          title: 'Failed to stop script',
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        });
+      }
+      return;
+    }
+
+    // Otherwise, run the script
     try {
       const response = await window.electronAPI.projects.runScript(project.id);
 
@@ -935,7 +1025,7 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     }
-  }, [setActiveSession, showError]);
+  }, [setActiveSession, showError, runningProjectId, closingProjectId]);
   
 
   const handleCreateSession = (project: Project) => {
@@ -2025,10 +2115,23 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                 {project.run_script && project.run_script.trim() && (
                   <button
                     onClick={(e) => handleRunProjectScript(project, e)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-status-success/10 text-status-success hover:text-status-success"
-                    title="Run project script in project root"
+                    disabled={closingProjectId === project.id}
+                    className={`transition-opacity p-1 rounded ${
+                      closingProjectId === project.id
+                        ? 'cursor-wait text-status-warning'
+                        : runningProjectId === project.id
+                        ? 'hover:bg-status-error/10 text-status-error hover:text-status-error opacity-100'
+                        : 'opacity-0 group-hover:opacity-100 hover:bg-status-success/10 text-status-success hover:text-status-success'
+                    }`}
+                    title={
+                      closingProjectId === project.id
+                        ? 'Closing script...'
+                        : runningProjectId === project.id
+                        ? 'Stop script'
+                        : 'Run project script in project root'
+                    }
                   >
-                    ▶️
+                    {closingProjectId === project.id ? '⏸️' : runningProjectId === project.id ? '⏹️' : '▶️'}
                   </button>
                 )}
 

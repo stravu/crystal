@@ -97,6 +97,40 @@ try {
       console.error('Failed to dispatch panel:event to window:', e);
     }
   });
+
+  // Bridge project script events
+  ipcRenderer.on('project-script-changed', (_event, data) => {
+    try {
+      window.dispatchEvent(new CustomEvent('project-script-changed', { detail: data }));
+    } catch (e) {
+      console.error('Failed to dispatch project-script-changed to window:', e);
+    }
+  });
+
+  ipcRenderer.on('project-script-closing', (_event, data) => {
+    try {
+      window.dispatchEvent(new CustomEvent('project-script-closing', { detail: data }));
+    } catch (e) {
+      console.error('Failed to dispatch project-script-closing to window:', e);
+    }
+  });
+
+  // Bridge session script events (for consistency)
+  ipcRenderer.on('script-session-changed', (_event, data) => {
+    try {
+      window.dispatchEvent(new CustomEvent('script-session-changed', { detail: data }));
+    } catch (e) {
+      console.error('Failed to dispatch script-session-changed to window:', e);
+    }
+  });
+
+  ipcRenderer.on('script-closing', (_event, data) => {
+    try {
+      window.dispatchEvent(new CustomEvent('script-closing', { detail: data }));
+    } catch (e) {
+      console.error('Failed to dispatch script-closing to window:', e);
+    }
+  });
 } catch (e) {
   // Ignore if IPC is not available for some reason
 }
@@ -265,6 +299,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listBranches: (projectId: string): Promise<IPCResponse> => ipcRenderer.invoke('projects:list-branches', projectId),
     refreshGitStatus: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('projects:refresh-git-status', projectId),
     runScript: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('projects:run-script', projectId),
+    getRunningScript: (): Promise<IPCResponse> => ipcRenderer.invoke('projects:get-running-script'),
+    stopScript: (projectId?: number): Promise<IPCResponse> => ipcRenderer.invoke('projects:stop-script', projectId),
   },
 
   // Git operations

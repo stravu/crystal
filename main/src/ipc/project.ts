@@ -1,6 +1,47 @@
 import { IpcMain } from 'electron';
 import type { AppServices } from './types';
 import type { CreateProjectRequest, UpdateProjectRequest } from '../../../frontend/src/types/project';
+import { scriptExecutionTracker } from '../services/scriptExecutionTracker';
+import { panelManager } from '../services/panelManager';
+
+// Helper function to stop a running project script
+async function stopProjectScriptInternal(projectId?: number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const runningScript = scriptExecutionTracker.getRunningScript();
+
+    // If a specific project ID is provided, only stop if it matches the running project
+    if (projectId !== undefined && runningScript?.type === 'project' && runningScript?.id !== projectId) {
+      return { success: true }; // Not running, nothing to stop
+    }
+
+    // If there's a running project script, stop it
+    if (runningScript && runningScript.type === 'project' && runningScript.sessionId) {
+      const projectIdToStop = runningScript.id as number;
+
+      // Mark as closing
+      scriptExecutionTracker.markClosing('project', projectIdToStop);
+
+      const { panelManager } = require('../services/panelManager');
+      const { logsManager } = require('../services/panels/logPanel/logsManager');
+
+      const panels = await panelManager.getPanelsForSession(runningScript.sessionId);
+      const logsPanel = panels?.find((p: { type: string }) => p.type === 'logs');
+      if (logsPanel) {
+        await logsManager.stopScript(logsPanel.id);
+      }
+
+      // Mark as stopped
+      scriptExecutionTracker.stop('project', projectIdToStop);
+
+      console.log(`[Main] Stopped project script for project ${projectIdToStop}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Failed to stop project script:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to stop project script' };
+  }
+}
 
 export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices): void {
   const { databaseService, sessionManager, worktreeManager } = services;
@@ -348,6 +389,20 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
     }
   });
 
+  ipcMain.handle('projects:get-running-script', async () => {
+    try {
+      const runningProjectId = scriptExecutionTracker.getRunningScriptId('project');
+      return { success: true, data: runningProjectId };
+    } catch (error) {
+      console.error('[Main] Failed to get running project script:', error);
+      return { success: false, error: 'Failed to get running project script' };
+    }
+  });
+
+  ipcMain.handle('projects:stop-script', async (_event, projectId?: number) => {
+    return stopProjectScriptInternal(projectId);
+  });
+
   ipcMain.handle('projects:run-script', async (_event, projectId: number) => {
     try {
       // Get the project
@@ -359,6 +414,37 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       // Get the run script
       if (!project.run_script || !project.run_script.trim()) {
         return { success: false, error: 'No run script configured for this project' };
+      }
+
+      // If there's already a running script (any type), stop it first
+      const runningScript = scriptExecutionTracker.getRunningScript();
+      if (runningScript) {
+        console.log(`[Main] Stopping currently running ${runningScript.type} script for ${runningScript.type}:${runningScript.id}`);
+
+        // Mark the old script as closing
+        scriptExecutionTracker.markClosing(runningScript.type, runningScript.id);
+
+        // Stop the script based on its type
+        if (runningScript.type === 'project') {
+          // Call internal stop function
+          const stopResult = await stopProjectScriptInternal(runningScript.id as number);
+          if (!stopResult?.success) {
+            console.warn('[Main] Failed to stop running project script, continuing anyway');
+          }
+        } else if (runningScript.type === 'session') {
+          // Stop session script through logs panel
+          const sessionIdToStop = runningScript.id as string;
+          const panels = await panelManager.getPanelsForSession(sessionIdToStop);
+          const logsPanel = panels?.find((p: { type: string }) => p.type === 'logs');
+          if (logsPanel) {
+            const { logsManager } = require('../services/panels/logPanel/logsManager');
+            await logsManager.stopScript(logsPanel.id);
+          }
+          // Also try old mechanism as fallback
+          await sessionManager.stopRunningScript();
+          // Mark as stopped in tracker
+          scriptExecutionTracker.stop('session', sessionIdToStop);
+        }
       }
 
       // Get or create main repo session for this project
@@ -373,9 +459,16 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       const { logsManager } = require('../services/panels/logPanel/logsManager');
       await logsManager.runScript(sessionId, project.run_script, project.path);
 
+      // Track the running project
+      scriptExecutionTracker.start('project', projectId, sessionId);
+
       return { success: true, data: { sessionId } };
     } catch (error) {
       console.error('[Main] Failed to run project script:', error);
+
+      // Clear running state on error
+      scriptExecutionTracker.stop('project', projectId);
+
       return { success: false, error: error instanceof Error ? error.message : 'Failed to run project script' };
     }
   });

@@ -9,6 +9,7 @@ import { getShellPath } from '../utils/shellPath';
 import { TerminalSessionManager } from './terminalSessionManager';
 import type { BaseAIPanelState, ToolPanelState, ToolPanel } from '../../../shared/types/panels';
 import { formatForDisplay } from '../utils/timestampUtils';
+import { scriptExecutionTracker } from './scriptExecutionTracker';
 
 // Interface for generic JSON message data that can contain various properties
 interface GenericMessageData {
@@ -1046,13 +1047,16 @@ export class SessionManager extends EventEmitter {
   async runScript(sessionId: string, commands: string[], workingDirectory: string): Promise<void> {
     // Stop any currently running script and wait for it to fully terminate
     await this.stopRunningScript();
-    
+
     // Clear previous logs when starting a new run
     cleanupSessionLogs(sessionId);
-    
+
     // Mark session as running
     this.setSessionRunning(sessionId, true);
     this.currentRunningSessionId = sessionId;
+
+    // Track in shared script execution tracker
+    scriptExecutionTracker.start('session', sessionId);
     
     // Join commands with && to run them sequentially
     const command = commands.join(' && ');
@@ -1098,18 +1102,24 @@ export class SessionManager extends EventEmitter {
     // Handle process exit
     this.runningScriptProcess.on('exit', (code) => {
       addSessionLog(sessionId, 'info', `Process exited with code: ${code}`, 'Application');
-      
+
       this.setSessionRunning(sessionId, false);
       this.currentRunningSessionId = null;
       this.runningScriptProcess = null;
+
+      // Update shared tracker
+      scriptExecutionTracker.stop('session', sessionId);
     });
 
     this.runningScriptProcess.on('error', (error) => {
       addSessionLog(sessionId, 'error', `Error: ${error.message}`, 'Application');
-      
+
       this.setSessionRunning(sessionId, false);
       this.currentRunningSessionId = null;
       this.runningScriptProcess = null;
+
+      // Update shared tracker
+      scriptExecutionTracker.stop('session', sessionId);
     });
   }
 
@@ -1278,7 +1288,10 @@ export class SessionManager extends EventEmitter {
 
       const sessionId = this.currentRunningSessionId;
       const process = this.runningScriptProcess;
-      
+
+      // Mark as closing in shared tracker
+      scriptExecutionTracker.markClosing('session', sessionId);
+
       // Immediately clear references to prevent new output
       this.currentRunningSessionId = null;
       this.runningScriptProcess = null;
@@ -1445,7 +1458,10 @@ export class SessionManager extends EventEmitter {
   private finishStopScript(sessionId: string): void {
     // Update session state
     this.setSessionRunning(sessionId, false);
-    
+
+    // Update shared tracker
+    scriptExecutionTracker.stop('session', sessionId);
+
     // Emit a final message to indicate the script was stopped
     addSessionLog(sessionId, 'info', '\n[Script stopped by user]', 'System');
   }
@@ -1459,7 +1475,8 @@ export class SessionManager extends EventEmitter {
   }
 
   getCurrentRunningSessionId(): string | null {
-    return this.currentRunningSessionId;
+    // Use shared tracker for consistency
+    return scriptExecutionTracker.getRunningScriptId('session') as string | null;
   }
 
   async cleanup(): Promise<void> {
