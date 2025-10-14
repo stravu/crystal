@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, Play } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -848,23 +848,23 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const handleRefreshProjectGitStatus = useCallback(
     throttle(async (project: Project, e: React.MouseEvent) => {
       e.stopPropagation();
-      
+
       // Prevent multiple refresh operations on same project
       if (refreshingProjects.has(project.id)) {
         return;
       }
-      
+
       // Add to refreshing set
       setRefreshingProjects(prev => new Set([...prev, project.id]));
-      
+
       try {
         // Start git status refresh for all sessions in this project (non-blocking)
         const response = await window.electronAPI.invoke('projects:refresh-git-status', project.id);
-      
+
       if (!response.success) {
         throw new Error(response.error || 'Failed to refresh git status');
       }
-      
+
       // Log summary only if there were sessions to refresh
       if (response.data.count > 0) {
         if (response.data.backgroundRefresh) {
@@ -873,7 +873,7 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
           console.log(`[GitStatus] Refreshed ${response.data.count} sessions in ${project.name}`);
         }
       }
-      
+
       // For background refresh, keep the spinner for a bit to show something is happening
       if (response.data.backgroundRefresh) {
         // Remove spinner after a short delay to indicate background process started
@@ -908,6 +908,34 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   }, 5000), // 5 second throttle
   [refreshingProjects] // Dependencies for useCallback
 );
+
+  // Handler to run project script in project root
+  const handleRunProjectScript = useCallback(async (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      const response = await window.electronAPI.projects.runScript(project.id);
+
+      if (!response.success) {
+        showError({
+          title: 'Failed to run script',
+          error: response.error || 'Unknown error occurred'
+        });
+        return;
+      }
+
+      // If successful, switch to the main repo session to view output
+      if (response.data?.sessionId) {
+        setActiveSession(response.data.sessionId);
+      }
+    } catch (error: unknown) {
+      console.error('Failed to run project script:', error);
+      showError({
+        title: 'Failed to run script',
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  }, [setActiveSession, showError]);
   
 
   const handleCreateSession = (project: Project) => {
@@ -1993,7 +2021,17 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                     refreshingProjects.has(project.id) ? 'animate-spin' : ''
                   }`} />
                 </button>
-                
+
+                {project.run_script && project.run_script.trim() && (
+                  <button
+                    onClick={(e) => handleRunProjectScript(project, e)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-status-success/10 text-status-success hover:text-status-success"
+                    title="Run project script in project root"
+                  >
+                    ▶️
+                  </button>
+                )}
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2367,7 +2405,7 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
             {/* Optional Scripts Section */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 pb-2 border-b border-border-primary">
-                <Play className="w-5 h-5 text-interactive" />
+                <span className="text-xl">▶️</span>
                 <h3 className="text-heading-3 font-semibold text-text-primary">Optional Scripts</h3>
               </div>
               

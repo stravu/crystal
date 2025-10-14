@@ -301,50 +301,82 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
   ipcMain.handle('projects:refresh-git-status', async (_event, projectId: string) => {
     try {
       const projectIdNum = parseInt(projectId);
-      
+
       // Check if the project exists
       const project = databaseService.getProject(projectIdNum);
       if (!project) {
         return { success: false, error: 'Project not found' };
       }
-      
+
       // Get all sessions for this project
       const sessions = await sessionManager.getAllSessions();
       const projectSessions = sessions.filter(s => s.projectId === projectIdNum && !s.archived && s.status !== 'error');
-      
+
       // Use gitStatusManager from services
       const { gitStatusManager } = services;
-      
+
       // Count the sessions that will be refreshed
       const sessionsToRefresh = projectSessions.filter(session => session.worktreePath);
       const sessionCount = sessionsToRefresh.length;
-      
+
       // Start the refresh in background (non-blocking)
       // Don't await this - let it run asynchronously
       setImmediate(() => {
         const refreshPromises = sessionsToRefresh
-          .map(session => 
+          .map(session =>
             gitStatusManager.refreshSessionGitStatus(session.id, true) // true = user initiated
               .catch(error => {
                 console.error(`[Main] Failed to refresh git status for session ${session.id}:`, error);
                 return null;
               })
           );
-        
+
         // Log when all refreshes complete (in background)
         Promise.allSettled(refreshPromises).then(results => {
           const refreshedCount = results.filter(result => result.status === 'fulfilled').length;
           console.log(`[Main] Background refresh completed: ${refreshedCount}/${sessionCount} sessions`);
         });
       });
-      
+
       // Return immediately with the count of sessions that will be refreshed
       console.log(`[Main] Starting background refresh for ${sessionCount} sessions`);
-      
+
       return { success: true, data: { count: sessionCount, backgroundRefresh: true } };
     } catch (error) {
       console.error('[Main] Failed to start project git status refresh:', error);
       return { success: false, error: 'Failed to refresh git status' };
+    }
+  });
+
+  ipcMain.handle('projects:run-script', async (_event, projectId: number) => {
+    try {
+      // Get the project
+      const project = databaseService.getProject(projectId);
+      if (!project) {
+        return { success: false, error: 'Project not found' };
+      }
+
+      // Get the run script
+      if (!project.run_script || !project.run_script.trim()) {
+        return { success: false, error: 'No run script configured for this project' };
+      }
+
+      // Get or create main repo session for this project
+      const mainRepoSession = await sessionManager.getOrCreateMainRepoSession(projectId);
+      if (!mainRepoSession) {
+        return { success: false, error: 'Failed to get or create main repo session' };
+      }
+
+      const sessionId = mainRepoSession.id;
+
+      // Run the script in the project root using logsManager
+      const { logsManager } = require('../services/panels/logPanel/logsManager');
+      await logsManager.runScript(sessionId, project.run_script, project.path);
+
+      return { success: true, data: { sessionId } };
+    } catch (error) {
+      console.error('[Main] Failed to run project script:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to run project script' };
     }
   });
 } 
