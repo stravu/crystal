@@ -4,9 +4,26 @@
   <h3><a href="https://github.com/stravu/crystal/releases/latest">**Get the Latest Release Here**</a></h3>
 </div>
 
-<img width="2254" height="1451" alt="image" src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" />
-<img width="1402" height="901" alt="image" src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" />
-<img width="1401" height="899" alt="image" src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" />
+Crystal lets you use AI on isolated copies of your code so you can work on multiple tasks instead of waiting for your agents to finish.
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" alt="Run one or more sessions with Claude Code, Codex, or both" width="700"/>
+  <p><em>Run one or more sessions with Claude Code, Codex, or both</em></p>
+</div>
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" alt="Rich output for your agents" width="400"/>
+        <p><em>Rich output for your agents</em></p>
+      </td>
+      <td align="center" width="50%">
+        <img src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" alt="Run your code and test before merging" width="400"/>
+        <p><em>Run your code and test before merging</em></p>
+      </td>
+    </tr>
+  </table>
+</div>
 
 
 <div align="center">
@@ -17,19 +34,8 @@
 
 </div>
 
-Crystal lets you use AI on isolated copies of your code so you can work on multiple tasks instead of waiting for your agents to finish.
-
-
-
-
-
-
 
 https://github.com/user-attachments/assets/5ca66e5b-8d05-4570-8417-5e8dcd7726ef
-
-
-
-
 
 
 
