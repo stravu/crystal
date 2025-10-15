@@ -4,28 +4,6 @@
   <h3><a href="https://github.com/stravu/crystal/releases/latest">**Get the Latest Release Here**</a></h3>
 </div>
 
-Crystal lets you use AI on isolated copies of your code so you can work on multiple tasks instead of waiting for your agents to finish.
-
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" alt="Run one or more sessions with Claude Code, Codex, or both" width="700"/>
-  <p><em>Run one or more sessions with Claude Code, Codex, or both</em></p>
-</div>
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="50%">
-        <img src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" alt="Rich output for your agents" width="400"/>
-        <p><em>Rich output for your agents</em></p>
-      </td>
-      <td align="center" width="50%">
-        <img src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" alt="Run your code and test before merging" width="400"/>
-        <p><em>Run your code and test before merging</em></p>
-      </td>
-    </tr>
-  </table>
-</div>
-
-
 <div align="center">
 
 [![Build](https://github.com/stravu/crystal/actions/workflows/build.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/build.yml)
@@ -33,6 +11,33 @@ Crystal lets you use AI on isolated copies of your code so you can work on multi
 [![Join our Discord](https://img.shields.io/badge/Join%20our-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/XrVa6q7DPY)
 
 </div>
+
+<div align="center">
+  <strong>Crystal lets you use AI on isolated copies of your code so you can work on multiple tasks instead of waiting for your agents to finish.</strong>
+</div>
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" alt="Main Dashboard" width="400"/>
+  <p><em>Main dashboard showing the complete interface with all key features</em></p>
+</div>
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" alt="Feature View 1" width="400"/>
+        <p><em>Detailed view of the primary feature set</em></p>
+      </td>
+      <td align="center" width="50%">
+        <img src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" alt="Feature View 2" width="400"/>
+        <p><em>Additional functionality and options panel</em></p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+
 
 
 https://github.com/user-attachments/assets/5ca66e5b-8d05-4570-8417-5e8dcd7726ef
@@ -44,7 +49,7 @@ https://github.com/user-attachments/assets/5ca66e5b-8d05-4570-8417-5e8dcd7726ef
 1. Create sessions from prompts, each in an isolated git worktree
 2. Iterate with your AI assistant (Claude Code or Codex) inside your sessions. Each iteration will make a commit so you can always go back.
 3. Review the diff changes and make manual edits as needed
-4. Squash your commits together with a new message and rebase to your main branch.
+4. Squash your commits together with a new message and merge to your main branch.
 
 
 ## 🚀 Quick Start
