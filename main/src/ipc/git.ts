@@ -3,6 +3,7 @@ import type { AppServices } from './types';
 import { execSync } from '../utils/commandExecutor';
 import { buildGitCommitCommand, escapeShellArg } from '../utils/shellEscape';
 import { panelManager } from '../services/panelManager';
+import { mainWindow } from '../index';
 import { panelEventBus } from '../services/panelEventBus';
 import { PanelEventType, ToolPanelType, PanelEvent } from '../../../shared/types/panels';
 import type { Session } from '../types/session';
@@ -83,6 +84,15 @@ export function registerGitHandlers(ipcMain: IpcMain, services: AppServices): vo
       // Emit the event once to the panel event bus
       // All Claude panels that have subscribed will receive it
       panelEventBus.emitPanelEvent(event as PanelEvent);
+
+      // Also forward to renderer so UI components listening for window 'panel:event' receive it
+      try {
+        if (mainWindow) {
+          mainWindow.webContents.send('panel:event', event);
+        }
+      } catch (ipcError) {
+        console.error('[Git] Failed to forward git operation event to renderer:', ipcError);
+      }
     } catch (error) {
       console.error('[Git] Failed to emit git operation event:', error);
     }

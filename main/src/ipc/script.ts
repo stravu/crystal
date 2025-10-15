@@ -4,6 +4,7 @@ import { getShellPath, findExecutableInPath } from '../utils/shellPath';
 import { logsManager } from '../services/panels/logPanel/logsManager';
 import { panelManager } from '../services/panelManager';
 import { ExecException } from 'child_process';
+import { scriptExecutionTracker } from '../services/scriptExecutionTracker';
 
 export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: AppServices): void {
   // Script execution handlers
@@ -39,12 +40,46 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
         return { success: false, error: 'No run script configured for this project' };
       }
 
+      // Check if there's already a running script (any type) and stop it
+      const runningScript = scriptExecutionTracker.getRunningScript();
+      if (runningScript) {
+        console.log(`[Main] Stopping currently running ${runningScript.type} script for ${runningScript.type}:${runningScript.id}`);
+
+        // Mark the old script as closing
+        scriptExecutionTracker.markClosing(runningScript.type, runningScript.id);
+
+        // Stop the script based on its type
+        if (runningScript.type === 'session') {
+          // Stop through session manager (will update tracker)
+          await sessionManager.stopRunningScript();
+        } else if (runningScript.type === 'project') {
+          // Stop project script through logs panel
+          if (runningScript.sessionId) {
+            const panels = await panelManager.getPanelsForSession(runningScript.sessionId);
+            const logsPanel = panels?.find((p: { type: string }) => p.type === 'logs');
+            if (logsPanel) {
+              await logsManager.stopScript(logsPanel.id);
+            }
+          }
+          // Mark as stopped
+          scriptExecutionTracker.stop('project', runningScript.id);
+        }
+      }
+
       // Use logs panel instead of old script running mechanism
       const commandString = commands.join(' && ');
       await logsManager.runScript(sessionId, commandString, session.worktreePath);
+
+      // Track this session script as running
+      scriptExecutionTracker.start('session', sessionId);
+
       return { success: true };
     } catch (error) {
       console.error('Failed to run script:', error);
+
+      // Clear running state on error
+      scriptExecutionTracker.stop('session', sessionId);
+
       return { success: false, error: 'Failed to run script' };
     }
   });

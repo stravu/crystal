@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import CombinedDiffView from './CombinedDiffView';
 import type { ToolPanel, DiffPanelState } from '../../../../../shared/types/panels';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 interface DiffPanelProps {
   panel: ToolPanel;
@@ -17,19 +17,28 @@ export const DiffPanel: React.FC<DiffPanelProps> = ({
   isMainRepo = false
 }) => {
   const [isStale, setIsStale] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const diffState = panel.state?.customState as DiffPanelState | undefined;
   const lastRefreshRef = useRef<number>(Date.now());
   
   // Listen for file change events from other panels
   useEffect(() => {
     const handlePanelEvent = (event: CustomEvent) => {
-      const { type, source } = event.detail;
+      const { type, source, data } = event.detail || {};
       
       // Mark as stale when files change from other panels
       if (type === 'files:changed' || type === 'terminal:command_executed') {
         if (source.sessionId === sessionId && source.panelId !== panel.id) {
           setIsStale(true);
+        }
+      } else if (type === 'git:operation_completed') {
+        // Refresh diff when git operations complete for this session (e.g., merge to main)
+        if (source?.sessionId === sessionId) {
+          // Optionally check for operation types that affect diffs
+          const op = data?.operation as string | undefined;
+          if (!op || op === 'merge_to_main' || op === 'squash_and_merge') {
+            setIsStale(true);
+          }
         }
       }
     };
@@ -46,12 +55,12 @@ export const DiffPanel: React.FC<DiffPanelProps> = ({
     if (isActive && isStale) {
       // Mark as not stale immediately to avoid double refreshes
       setIsStale(false);
-      setIsRefreshing(true);
+      // Force re-mount of CombinedDiffView to reload git data
+      setRefreshKey(prev => prev + 1);
       
       // Add a small delay to ensure any pending file operations are complete
       const timer = setTimeout(() => {
         lastRefreshRef.current = Date.now();
-        setIsRefreshing(false);
         
         // Update panel state
         window.electron?.invoke('panels:update', panel.id, {
@@ -83,27 +92,7 @@ export const DiffPanel: React.FC<DiffPanelProps> = ({
     }
   }, [isActive, isStale, panel.id, sessionId, panel.state, diffState]);
   
-  const handleManualRefresh = useCallback(() => {
-    setIsStale(false);
-    setIsRefreshing(true);
-    
-    setTimeout(() => {
-      lastRefreshRef.current = Date.now();
-      setIsRefreshing(false);
-      
-      // Update panel state
-      window.electron?.invoke('panels:update', panel.id, {
-        state: {
-          ...panel.state,
-          customState: {
-            ...diffState,
-            lastRefresh: new Date().toISOString(),
-            isDiffStale: false
-          }
-        }
-      });
-    }, 500);
-  }, [panel.id, panel.state, diffState]);
+  // Manual refresh button removed (redundant with header refresh in CombinedDiffView)
   
   return (
     <div className="diff-panel h-full flex flex-col bg-gray-800">
@@ -117,17 +106,10 @@ export const DiffPanel: React.FC<DiffPanelProps> = ({
         </div>
       )}
       
-      {/* Refresh indicator */}
-      {isRefreshing && (
-        <div className="bg-blue-900/50 border-b border-blue-700 px-3 py-2 flex items-center gap-2 text-blue-400 text-sm">
-          <RefreshCw className="w-4 h-4 animate-spin" />
-          <span>Refreshing diff...</span>
-        </div>
-      )}
-      
       {/* Main diff view */}
       <div className="flex-1 overflow-hidden">
         <CombinedDiffView 
+          key={refreshKey}
           sessionId={sessionId}
           selectedExecutions={[]}
           isGitOperationRunning={false}
@@ -136,17 +118,7 @@ export const DiffPanel: React.FC<DiffPanelProps> = ({
         />
       </div>
       
-      {/* Manual refresh button (always visible) */}
-      <div className="border-t border-gray-700 px-3 py-2">
-        <button
-          onClick={handleManualRefresh}
-          disabled={isRefreshing}
-          className="flex items-center gap-2 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-gray-300"
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span>Refresh Diff</span>
-        </button>
-      </div>
+      {/* Bottom manual refresh removed; header refresh in CombinedDiffView remains */}
     </div>
   );
 };

@@ -1396,6 +1396,27 @@ export const useSessionView = (
   };
 
   const handleSquashAndRebaseToMain = async () => {
+    if (!activeSession) return;
+
+    // Check if worktree needs to be rebased onto main first
+    try {
+      const changesResponse = await API.sessions.hasChangesToRebase(activeSession.id);
+      if (changesResponse.success && changesResponse.data === true) {
+        // Show warning that rebase is needed first
+        setGitErrorDetails({
+          title: 'Rebase Required',
+          message: `Your worktree has changes from ${gitCommands?.mainBranch || 'main'} that need to be rebased first.\n\nYou must rebase your worktree before merging to prevent conflicts.`,
+          output: `Your worktree branch is behind ${gitCommands?.mainBranch || 'main'}.\n\nClick "Rebase from ${gitCommands?.mainBranch || 'Main'}" first to update your worktree, then try merging again.`,
+          workingDirectory: activeSession.worktreePath,
+        });
+        setShowGitErrorDialog(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking if rebase needed:', error);
+      // Continue with merge dialog on error - let the merge fail with proper error handling
+    }
+
     const defaultMessage = await generateDefaultCommitMessage();
     setCommitMessage(defaultMessage);
     setDialogType('squash');
