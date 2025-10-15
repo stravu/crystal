@@ -4,7 +4,7 @@
   <h3><a href="https://github.com/stravu/crystal/releases/latest">**Get the Latest Release Here**</a></h3>
 </div>
 
-<img width="1405" height="904" alt="image" src="https://github.com/user-attachments/assets/7e9fdd70-8e40-4fe2-a859-367f49929828" />
+<img width="2254" height="1451" alt="image" src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" />
 <img width="1402" height="901" alt="image" src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" />
 <img width="1401" height="899" alt="image" src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" />
 
@@ -17,7 +17,7 @@
 
 </div>
 
-Crystal is an Electron desktop application that lets you run, inspect, and test multiple AI coding assistant instances simultaneously using git worktrees. Crystal supports both **Claude Code** (Anthropic) and **Codex** (OpenAI) assistants. Crystal is an independent project created by [Stravu](https://stravu.com/?utm_source=Crystal&utm_medium=OS&utm_campaign=Crystal&utm_id=1). Stravu provides editable, collaborate AI notebooks with text, tables, diagrams.
+Crystal lets you use AI on isolated copies of your code so you can work on multiple tasks instead of waiting for your agents to finish.
 
 
 
@@ -40,16 +40,6 @@ https://github.com/user-attachments/assets/5ca66e5b-8d05-4570-8417-5e8dcd7726ef
 3. Review the diff changes and make manual edits as needed
 4. Squash your commits together with a new message and rebase to your main branch.
 
-## ✨ Key Features
-
-- **🤖 Multiple AI Assistants** - Support for Claude Code (Anthropic) and Codex (OpenAI)
-- **🚀 Parallel Sessions** - Run multiple AI assistant instances at once
-- **🌳 Git Worktree Isolation** - Each session gets its own branch
-- **💾 Session Persistence** - Resume conversations anytime
-- **🔧 Git Integration** - Built-in rebase and squash operations
-- **📊 Change Tracking** - View diffs and track modifications
-- **🔔 Notifications** - Desktop alerts when sessions need input
-- **🏗️ Run Scripts** - Test changes instantly without leaving Crystal
 
 ## 🚀 Quick Start
 
