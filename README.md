@@ -17,20 +17,20 @@
 </div>
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" alt="Main Dashboard" width="400"/>
-  <p><em>Main dashboard showing the complete interface with all key features</em></p>
+  <img src="https://github.com/user-attachments/assets/45ca7166-e69a-4ed2-8ef5-ef83dc52ffd6" alt="Run one or more sessions with Claude Code, Codex, or both" width="400"/>
+  <p><em>Run one or more sessions with Claude Code, Codex, or both</em></p>
 </div>
 
 <div align="center">
   <table>
     <tr>
       <td align="center" width="50%">
-        <img src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" alt="Feature View 1" width="400"/>
-        <p><em>Detailed view of the primary feature set</em></p>
+        <img src="https://github.com/user-attachments/assets/e180691e-aaa3-4171-bdae-3b0459dcc495" alt="Rich output for your agents" width="400"/>
+        <p><em>Rich output for your agents</em></p>
       </td>
       <td align="center" width="50%">
-        <img src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" alt="Feature View 2" width="400"/>
-        <p><em>Additional functionality and options panel</em></p>
+        <img src="https://github.com/user-attachments/assets/1f64ac92-9158-4e83-997e-6650a9bc9072" alt="Run your code and test before merging" width="400"/>
+        <p><em>Run your code and test before merging</em></p>
       </td>
     </tr>
   </table>
