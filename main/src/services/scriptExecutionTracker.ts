@@ -111,10 +111,11 @@ export class ScriptExecutionTracker extends EventEmitter {
 
     // Emit closing event to notify frontend
     if (mainWindow) {
-      const eventName = type === 'session' ? 'script-closing' : 'project-script-closing';
-      mainWindow.webContents.send(eventName, {
-        [type === 'session' ? 'sessionId' : 'projectId']: id
-      });
+      if (type === 'session') {
+        mainWindow.webContents.send('script-closing', id);
+      } else {
+        mainWindow.webContents.send('project-script-closing', { projectId: id });
+      }
     }
 
     this.emit('script-closing', { type, id });
@@ -144,7 +145,7 @@ export class ScriptExecutionTracker extends EventEmitter {
     if (!mainWindow) return;
 
     if (type === 'session') {
-      mainWindow.webContents.send('script-session-changed', { detail: id });
+      mainWindow.webContents.send('script-session-changed', id);
     } else {
       mainWindow.webContents.send('project-script-changed', { projectId: id });
     }
