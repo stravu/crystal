@@ -8,7 +8,7 @@
 
 [![Build](https://github.com/stravu/crystal/actions/workflows/build.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/build.yml)
 [![Quality](https://github.com/stravu/crystal/actions/workflows/quality.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/quality.yml)
-[![Downloads](https://img.shields.io/github/downloads/stravu/crystal/total)]
+![Downloads](https://img.shields.io/github/downloads/stravu/crystal/total)
 </div>
 
 <div align="center">
