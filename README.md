@@ -8,10 +8,11 @@
 
 [![Build](https://github.com/stravu/crystal/actions/workflows/build.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/build.yml)
 [![Quality](https://github.com/stravu/crystal/actions/workflows/quality.yml/badge.svg)](https://github.com/stravu/crystal/actions/workflows/quality.yml)
-![Downloads](https://img.shields.io/github/downloads/stravu/crystal/total)
+[![Downloads](https://img.shields.io/github/downloads/stravu/crystal/total)]
 </div>
 
 <div align="center">
+  
 [![Join our Discord](https://img.shields.io/badge/Join%20our-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/XrVa6q7DPY)
 </div>
 
