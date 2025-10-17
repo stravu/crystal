@@ -172,12 +172,16 @@ export class CliManagerFactory {
       // Extract Claude-specific options
       const options = additionalOptions as Record<string, unknown> | undefined;
       const permissionIpcPath = options?.permissionIpcPath || null;
-      
+      const personaLoader = options?.personaLoader || undefined;
+      const databaseService = options?.databaseService || undefined;
+
       return new ClaudeCodeManager(
         sessionManager as SessionManager,
         logger,
         configManager,
-        (typeof permissionIpcPath === 'string' ? permissionIpcPath : null) as string | null
+        (typeof permissionIpcPath === 'string' ? permissionIpcPath : null) as string | null,
+        personaLoader as import('./personaLoader').PersonaLoader | undefined,
+        databaseService as import('../database/database').DatabaseService | undefined
       );
     };
 

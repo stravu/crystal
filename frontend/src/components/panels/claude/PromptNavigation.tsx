@@ -3,6 +3,7 @@ import { formatDistanceToNow } from '../../../utils/formatters';
 import { formatDuration, getTimeDifference, isValidTimestamp, parseTimestamp } from '../../../utils/timestampUtils';
 import { API } from '../../../utils/api';
 import { PromptDetailModal } from '../../PromptDetailModal';
+import { Badge } from '../../ui/Badge';
 // import type { Session } from '../../../types/session';
 
 interface PromptMarker {
@@ -14,6 +15,8 @@ interface PromptMarker {
   output_line?: number;
   timestamp: string;
   completion_timestamp?: string;
+  model_id?: string;
+  persona_name?: string;
 }
 
 interface PromptNavigationProps {
@@ -211,6 +214,23 @@ export function PromptNavigation({ panelId, onNavigateToPrompt }: PromptNavigati
                     <div className="text-sm text-text-primary line-clamp-2">
                       {marker.prompt_text}
                     </div>
+
+                    {/* Model and Persona badges */}
+                    {(marker.model_id || marker.persona_name) && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {marker.model_id && (
+                          <Badge variant="primary" size="sm">
+                            {marker.model_id.replace('claude-', '').replace(/-\d{8}$/, '')}
+                          </Badge>
+                        )}
+                        {marker.persona_name && (
+                          <Badge variant="info" size="sm">
+                            {marker.persona_name}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center space-x-2 text-xs text-text-tertiary mt-1">
                       <span>{formatDistanceToNow(parseTimestamp(marker.timestamp))} ago</span>
                       {calculateDuration(marker, index) && (

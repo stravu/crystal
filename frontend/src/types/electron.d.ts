@@ -298,6 +298,9 @@ interface ElectronAPI {
   claudePanels: {
     getModel: (panelId: string) => Promise<IPCResponse>;
     setModel: (panelId: string, model: string) => Promise<IPCResponse>;
+    listPersonas: () => Promise<IPCResponse>;
+    getPersona: (panelId: string) => Promise<IPCResponse>;
+    setPersona: (panelId: string, personaId: string) => Promise<IPCResponse>;
   };
 
   // Codex panel operations

@@ -1183,6 +1183,74 @@ export class DatabaseService {
       }
     }
 
+    // Migration 007: Add model_id and persona_name to prompt_markers
+    const promptMarkerMetadataMigrationComplete = this.db.prepare(
+      "SELECT value FROM user_preferences WHERE key = 'prompt_marker_metadata_migrated'"
+    ).get() as { value: string } | undefined;
+
+    if (!promptMarkerMetadataMigrationComplete) {
+      console.log('[Database] Running migration 007: Add model_id and persona_name to prompt_markers');
+
+      try {
+        // Check if columns already exist
+        const promptMarkersInfo = this.db.prepare("PRAGMA table_info(prompt_markers)").all() as SqliteTableInfo[];
+        const hasModelIdColumn = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'model_id');
+        const hasPersonaNameColumn = promptMarkersInfo.some((col: SqliteTableInfo) => col.name === 'persona_name');
+
+        if (!hasModelIdColumn) {
+          this.db.prepare("ALTER TABLE prompt_markers ADD COLUMN model_id TEXT").run();
+          console.log('[Database] Added model_id column to prompt_markers table');
+        }
+
+        if (!hasPersonaNameColumn) {
+          this.db.prepare("ALTER TABLE prompt_markers ADD COLUMN persona_name TEXT").run();
+          console.log('[Database] Added persona_name column to prompt_markers table');
+        }
+
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('prompt_marker_metadata_migrated', 'true')").run();
+        console.log('[Database] Completed prompt marker metadata migration 007');
+
+      } catch (error) {
+        console.error('[Database] Failed to run prompt marker metadata migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
+
+    // Migration 008: Add model_id and persona_name to conversation_messages
+    const conversationMessageMetadataMigrationComplete = this.db.prepare(
+      "SELECT value FROM user_preferences WHERE key = 'conversation_message_metadata_migrated'"
+    ).get() as { value: string } | undefined;
+
+    if (!conversationMessageMetadataMigrationComplete) {
+      console.log('[Database] Running migration 008: Add model_id and persona_name to conversation_messages');
+
+      try {
+        // Check if columns already exist
+        const conversationMessagesInfo = this.db.prepare("PRAGMA table_info(conversation_messages)").all() as SqliteTableInfo[];
+        const hasModelIdColumn = conversationMessagesInfo.some((col: SqliteTableInfo) => col.name === 'model_id');
+        const hasPersonaNameColumn = conversationMessagesInfo.some((col: SqliteTableInfo) => col.name === 'persona_name');
+
+        if (!hasModelIdColumn) {
+          this.db.prepare("ALTER TABLE conversation_messages ADD COLUMN model_id TEXT").run();
+          console.log('[Database] Added model_id column to conversation_messages table');
+        }
+
+        if (!hasPersonaNameColumn) {
+          this.db.prepare("ALTER TABLE conversation_messages ADD COLUMN persona_name TEXT").run();
+          console.log('[Database] Added persona_name column to conversation_messages table');
+        }
+
+        // Mark migration as complete
+        this.db.prepare("INSERT INTO user_preferences (key, value) VALUES ('conversation_message_metadata_migrated', 'true')").run();
+        console.log('[Database] Completed conversation message metadata migration 008');
+
+      } catch (error) {
+        console.error('[Database] Failed to run conversation message metadata migration:', error);
+        // Don't throw - allow app to continue
+      }
+    }
+
     // Fix overlapping displayOrder values between folders and sessions
     // This migration is needed ONLY for databases from before folders and sessions
     // were merged into one unified ordering system. It should NOT run on databases
@@ -2045,17 +2113,17 @@ export class DatabaseService {
   }
 
   // Claude panel conversation message operations - use panel_id for Claude-specific data
-  addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string): void {
+  addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string, modelId?: string, personaName?: string): void {
     // Get the session_id from the panel
     const panel = this.getPanel(panelId);
     if (!panel) {
       throw new Error(`Panel not found: ${panelId}`);
     }
-    
+
     this.db.prepare(`
-      INSERT INTO conversation_messages (session_id, panel_id, message_type, content)
-      VALUES (?, ?, ?, ?)
-    `).run(panel.sessionId, panelId, messageType, content);
+      INSERT INTO conversation_messages (session_id, panel_id, message_type, content, model_id, persona_name)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(panel.sessionId, panelId, messageType, content, modelId, personaName);
   }
 
   getPanelConversationMessages(panelId: string): ConversationMessage[] {
@@ -2129,7 +2197,7 @@ export class DatabaseService {
 
   getPanelPromptMarkers(panelId: string): PromptMarker[] {
     const markers = this.db.prepare(`
-      SELECT 
+      SELECT
         id,
         session_id,
         panel_id,
@@ -2137,16 +2205,18 @@ export class DatabaseService {
         output_index,
         output_line,
         datetime(timestamp) || 'Z' as timestamp,
-        CASE 
-          WHEN completion_timestamp IS NOT NULL 
+        CASE
+          WHEN completion_timestamp IS NOT NULL
           THEN datetime(completion_timestamp) || 'Z'
           ELSE NULL
-        END as completion_timestamp
-      FROM prompt_markers 
-      WHERE panel_id = ? 
+        END as completion_timestamp,
+        model_id,
+        persona_name
+      FROM prompt_markers
+      WHERE panel_id = ?
       ORDER BY timestamp ASC
     `).all(panelId) as PromptMarker[];
-    
+
     return markers;
   }
 
@@ -2191,22 +2261,22 @@ export class DatabaseService {
   }
 
   // Claude panel prompt marker operations - use panel_id for Claude-specific data
-  addPanelPromptMarker(panelId: string, promptText: string, outputIndex: number, outputLine?: number): number {
-    console.log('[Database] Adding panel prompt marker:', { panelId, promptText, outputIndex, outputLine });
-    
+  addPanelPromptMarker(panelId: string, promptText: string, outputIndex: number, outputLine?: number, modelId?: string, personaName?: string): number {
+    console.log('[Database] Adding panel prompt marker:', { panelId, promptText, outputIndex, outputLine, modelId, personaName });
+
     try {
       // Get the session_id from the panel
       const panel = this.getPanel(panelId);
       if (!panel) {
         throw new Error(`Panel not found: ${panelId}`);
       }
-      
+
       // Use datetime('now') to ensure UTC timestamp
       const result = this.db.prepare(`
-        INSERT INTO prompt_markers (session_id, panel_id, prompt_text, output_index, output_line, timestamp)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-      `).run(panel.sessionId, panelId, promptText, outputIndex, outputLine);
-      
+        INSERT INTO prompt_markers (session_id, panel_id, prompt_text, output_index, output_line, model_id, persona_name, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(panel.sessionId, panelId, promptText, outputIndex, outputLine, modelId, personaName);
+
       console.log('[Database] Panel prompt marker added successfully, ID:', result.lastInsertRowid);
       return result.lastInsertRowid as number;
     } catch (error) {

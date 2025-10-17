@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import type { IpcRendererEvent } from 'electron';
 import { Loader2, Archive, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ArchiveTask {
@@ -28,7 +27,7 @@ export function ArchiveProgress() {
     loadProgress();
 
     // Listen for progress updates
-    const handleProgress = (_event: IpcRendererEvent, data: ArchiveProgressData) => {
+    const handleProgress = (_event: any, data: ArchiveProgressData) => {
       setProgress(data);
       // Auto-expand when there are active tasks
       if (data.activeCount > 0 && !isExpanded) {

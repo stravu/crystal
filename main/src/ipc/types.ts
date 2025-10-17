@@ -17,6 +17,7 @@ import type { CliManagerFactory } from '../services/cliManagerFactory';
 import type { AbstractCliManager } from '../services/panels/cli/AbstractCliManager';
 import type { Logger } from '../utils/logger';
 import type { ArchiveProgressManager } from '../services/archiveProgressManager';
+import type { PersonaLoader } from '../services/personaLoader';
 
 export interface AppServices {
   app: App;
@@ -34,6 +35,7 @@ export interface AppServices {
   versionChecker: VersionChecker;
   stravuAuthManager: StravuAuthManager;
   stravuNotebookService: StravuNotebookService;
+  personaLoader: PersonaLoader;
   taskQueue: TaskQueue | null;
   getMainWindow: () => BrowserWindow | null;
   logger?: Logger;

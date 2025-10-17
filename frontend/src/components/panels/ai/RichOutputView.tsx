@@ -11,6 +11,7 @@ import { TodoListDisplay } from './components/TodoListDisplay';
 import { MessageTransformer, UnifiedMessage } from './transformers/MessageTransformer';
 import { RichOutputSettings } from './AbstractAIPanel';
 import { CodexMessageTransformer } from './transformers/CodexMessageTransformer';
+import { Badge } from '../../ui/Badge';
 
 // Local interface for combining user prompts with output messages
 interface UserPromptMessage {
@@ -20,6 +21,8 @@ interface UserPromptMessage {
     content: Array<{ type: 'text'; text: string }>;
   };
   timestamp: string;
+  model_id?: string;
+  persona_name?: string;
 }
 
 // Interface for conversation messages from database
@@ -29,6 +32,8 @@ interface ConversationMessage {
   message_type: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  model_id?: string;
+  persona_name?: string;
 }
 
 // We'll use any for event handling since events can come from different sources with different shapes
@@ -235,7 +240,9 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                   role: 'user',
                   content: [{ type: 'text', text: msg.content }]
                 },
-                timestamp: msg.timestamp
+                timestamp: msg.timestamp,
+                model_id: msg.model_id,
+                persona_name: msg.persona_name
               });
             }
           });
@@ -570,6 +577,40 @@ export const RichOutputView = React.forwardRef<{ scrollToPrompt: (promptIndex: n
                 · {(message.metadata.duration / 1000).toFixed(1)}s
               </span>
             )}
+            {(() => {
+              // Get both panel setting (model_id) and actual model used (model from API)
+              const panelSetting = message.metadata?.model_id && typeof message.metadata.model_id === 'string'
+                ? message.metadata.model_id
+                : null;
+              const actualModel = message.metadata?.model && typeof message.metadata.model === 'string'
+                ? message.metadata.model
+                : null;
+
+              // If panel setting is "auto", show both badges
+              if (panelSetting === 'auto' && actualModel) {
+                return (
+                  <>
+                    <Badge variant="default" size="sm">auto</Badge>
+                    <Badge variant="primary" size="sm">
+                      {actualModel.replace('claude-', '').replace(/-\d{8}$/, '')}
+                    </Badge>
+                  </>
+                );
+              }
+
+              // Otherwise, show whichever is available (prefer actual model from API)
+              const modelToDisplay = actualModel || panelSetting;
+              return modelToDisplay ? (
+                <Badge variant="primary" size="sm">
+                  {modelToDisplay.replace('claude-', '').replace(/-\d{8}$/, '')}
+                </Badge>
+              ) : null;
+            })()}
+            {message.metadata?.persona_name && typeof message.metadata.persona_name === 'string' ? (
+              <Badge variant="info" size="sm">
+                {message.metadata.persona_name}
+              </Badge>
+            ) : null}
           </div>
           {/* Action buttons */}
           <div className="flex items-center gap-1">

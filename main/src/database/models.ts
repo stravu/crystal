@@ -130,6 +130,8 @@ export interface PromptMarker {
   output_line?: number;
   timestamp: string;
   completion_timestamp?: string;
+  model_id?: string;
+  persona_name?: string;
 }
 
 export interface ExecutionDiff {

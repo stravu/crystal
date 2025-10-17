@@ -884,13 +884,25 @@ export class SessionManager extends EventEmitter {
   }
 
   addPanelConversationMessage(panelId: string, messageType: 'user' | 'assistant', content: string): void {
-    this.db.addPanelConversationMessage(panelId, messageType, content);
+    // Get model and persona from panel settings for both user and assistant messages
+    let modelId: string | undefined;
+    let personaName: string | undefined;
+    try {
+      const settings = this.db.getPanelSettings(panelId);
+      modelId = typeof settings?.model === 'string' ? settings.model : undefined;
+      personaName = typeof settings?.persona === 'string' ? settings.persona : undefined;
+    } catch (e) {
+      // Ignore errors - model and persona are optional
+    }
+
+    // Add conversation message with model and persona metadata
+    this.db.addPanelConversationMessage(panelId, messageType, content, modelId, personaName);
 
     // Emit event when a user message is added (new prompt)
     if (messageType === 'user') {
       // Also add to prompt markers so the commit manager can track the latest prompt
       const outputs = this.db.getPanelOutputs(panelId);
-      this.db.addPanelPromptMarker(panelId, content, outputs.length);
+      this.db.addPanelPromptMarker(panelId, content, outputs.length, undefined, modelId, personaName);
 
       this.emit('panel-prompt-added', { panelId, content });
     }

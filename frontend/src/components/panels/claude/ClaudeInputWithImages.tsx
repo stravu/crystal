@@ -8,6 +8,7 @@ import { CommitModePill } from '../../CommitModeToggle';
 import { Dropdown, type DropdownItem } from '../../ui/Dropdown';
 import { Pill } from '../../ui/Pill';
 import { SwitchSimple as Switch } from '../../ui/SwitchSimple';
+import { PersonaSelector } from './PersonaSelector';
 
 interface AttachedImage {
   id: string;
@@ -593,6 +594,9 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   setShowDropdown={() => {}}
                   panelId={panelId}
                 />
+
+                {/* Persona Selector */}
+                <PersonaSelector panelId={panelId} />
 
                 {/* Auto-Commit Mode Pill - always visible */}
                 <CommitModePill
