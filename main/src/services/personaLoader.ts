@@ -28,15 +28,21 @@ export class PersonaLoader {
    */
   listAvailablePersonas(): PersonaDefinition[] {
     try {
+      console.log(`[PersonaLoader] Checking agents directory: ${this.agentsDirectory}`);
+
       // Check if agents directory exists
       if (!fs.existsSync(this.agentsDirectory)) {
         console.warn(`[PersonaLoader] Agents directory not found: ${this.agentsDirectory}`);
         return [];
       }
 
+      console.log('[PersonaLoader] Agents directory exists, reading contents...');
+
       // Read all subdirectories in the agents folder
       const entries = fs.readdirSync(this.agentsDirectory, { withFileTypes: true });
       const agentDirs = entries.filter(entry => entry.isDirectory());
+
+      console.log(`[PersonaLoader] Found ${agentDirs.length} subdirectories:`, agentDirs.map(d => d.name));
 
       const personas: PersonaDefinition[] = [];
 
@@ -63,7 +69,9 @@ export class PersonaLoader {
         }
       }
 
-      return personas.sort((a, b) => a.name.localeCompare(b.name));
+      const sortedPersonas = personas.sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`[PersonaLoader] Returning ${sortedPersonas.length} personas:`, sortedPersonas.map(p => p.name));
+      return sortedPersonas;
     } catch (error) {
       console.error('[PersonaLoader] Error listing personas:', error);
       return [];

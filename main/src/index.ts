@@ -572,19 +572,19 @@ async function initializeServices() {
 
   // Initialize PersonaLoader
   // From crystal/main/dist/main/src, go up to crystal-vibe-agile root and into agents directory
-  // __dirname in dev = crystal/main/dist/main/src, so ../../../../ = crystal-vibe-agile/
-  const agentsDirectory = path.join(__dirname, '../../../../agents');
+  // __dirname in dev = crystal/main/dist/main/src, so ../../../../../ = crystal-vibe-agile/
+  const agentsDirectory = path.join(__dirname, '../../../../../agents');
   personaLoader = new PersonaLoader(agentsDirectory);
 
   // Initialize CLI manager factory
   cliManagerFactory = CliManagerFactory.getInstance(logger, configManager);
 
-  // Create default CLI manager (Claude) with permission IPC path and personaLoader
+  // Create default CLI manager (Claude) with permission IPC path, personaLoader, and databaseService
   defaultCliManager = await cliManagerFactory.createManager('claude', {
     sessionManager,
     logger,
     configManager,
-    additionalOptions: { permissionIpcPath, personaLoader }
+    additionalOptions: { permissionIpcPath, personaLoader, databaseService }
   });
   gitDiffManager = new GitDiffManager();
   gitStatusManager = new GitStatusManager(sessionManager, worktreeManager, gitDiffManager, logger);
