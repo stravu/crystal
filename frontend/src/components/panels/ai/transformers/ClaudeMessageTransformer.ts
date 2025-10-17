@@ -36,8 +36,8 @@ interface ClaudeRawMessage {
   type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result' | 'result';
   role?: 'user' | 'assistant' | 'system';
   content?: string | object;
-  message?: { 
-    content?: string | ContentBlock[]; 
+  message?: {
+    content?: string | ContentBlock[];
     model?: string;
     duration?: number;
     usage?: {
@@ -68,6 +68,8 @@ interface ClaudeRawMessage {
   result?: string;
   duration_ms?: number;
   total_cost_usd?: number;
+  model_id?: string;
+  persona_name?: string;
   [key: string]: unknown;
 }
 
@@ -225,7 +227,11 @@ export class ClaudeMessageTransformer implements MessageTransformer {
           role: 'user',
           timestamp: msg.timestamp,
           segments: [{ type: 'text', content: textContent }],
-          metadata: { agent: 'claude' }
+          metadata: {
+            agent: 'claude',
+            model_id: msg.model_id,
+            persona_name: msg.persona_name
+          }
         };
       }
     }
