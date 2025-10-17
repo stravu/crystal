@@ -27,6 +27,7 @@ import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
 import { ArchiveProgressManager } from './services/archiveProgressManager';
+import { PersonaLoader } from './services/personaLoader';
 import { initializeCommitManager } from './services/commitManager';
 import { setCrystalDirectory } from './utils/crystalDirectory';
 import { getCurrentWorktreeName } from './utils/worktreeUtils';
@@ -83,6 +84,7 @@ let versionChecker: VersionChecker;
 let stravuAuthManager: StravuAuthManager;
 let stravuNotebookService: StravuNotebookService;
 let archiveProgressManager: ArchiveProgressManager;
+let personaLoader: PersonaLoader;
 
 // Store original console methods before overriding
 // These must be captured immediately when the module loads
@@ -568,15 +570,21 @@ async function initializeServices() {
     await worktreeManager.initializeProject(activeProject.path);
   }
 
+  // Initialize PersonaLoader
+  // From crystal/main/dist/main/src, go up to crystal-vibe-agile root and into agents directory
+  // __dirname in dev = crystal/main/dist/main/src, so ../../../../ = crystal-vibe-agile/
+  const agentsDirectory = path.join(__dirname, '../../../../agents');
+  personaLoader = new PersonaLoader(agentsDirectory);
+
   // Initialize CLI manager factory
   cliManagerFactory = CliManagerFactory.getInstance(logger, configManager);
-  
-  // Create default CLI manager (Claude) with permission IPC path
+
+  // Create default CLI manager (Claude) with permission IPC path and personaLoader
   defaultCliManager = await cliManagerFactory.createManager('claude', {
     sessionManager,
     logger,
     configManager,
-    additionalOptions: { permissionIpcPath }
+    additionalOptions: { permissionIpcPath, personaLoader }
   });
   gitDiffManager = new GitDiffManager();
   gitStatusManager = new GitStatusManager(sessionManager, worktreeManager, gitDiffManager, logger);
@@ -615,6 +623,7 @@ async function initializeServices() {
     versionChecker,
     stravuAuthManager,
     stravuNotebookService,
+    personaLoader,
     taskQueue,
     getMainWindow: () => mainWindow,
     logger,

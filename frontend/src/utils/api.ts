@@ -546,6 +546,21 @@ export class API {
       if (!isElectron()) throw new Error('Electron API not available');
       return window.electronAPI.claudePanels.setModel(panelId, model);
     },
+
+    async listPersonas() {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.claudePanels.listPersonas();
+    },
+
+    async getPersona(panelId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.claudePanels.getPersona(panelId);
+    },
+
+    async setPersona(panelId: string, personaId: string) {
+      if (!isElectron()) throw new Error('Electron API not available');
+      return window.electronAPI.claudePanels.setPersona(panelId, personaId);
+    },
   };
   
   // Codex panel operations

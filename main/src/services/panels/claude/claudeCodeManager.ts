@@ -13,6 +13,7 @@ import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { withLock } from '../../../utils/mutex';
 import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
+import type { PersonaLoader } from '../../personaLoader';
 
 // Extend global object for MCP configuration storage  
 interface GlobalMcpStorage {
@@ -43,13 +44,17 @@ interface ClaudeCodeProcess {
  * Extends AbstractCliManager for common CLI functionality
  */
 export class ClaudeCodeManager extends AbstractCliManager {
+  private personaLoader?: PersonaLoader;
+
   constructor(
     sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
     configManager?: ConfigManager,
-    private permissionIpcPath?: string | null
+    private permissionIpcPath?: string | null,
+    personaLoader?: PersonaLoader
   ) {
     super(sessionManager, logger, configManager);
+    this.personaLoader = personaLoader;
   }
 
   // Abstract method implementations
@@ -127,7 +132,10 @@ export class ClaudeCodeManager extends AbstractCliManager {
       let finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
 
       // Add system prompts for new sessions
-      const systemPromptAppend = this.buildSystemPromptAppend(dbSession ? { ...dbSession, project_id: dbSession.project_id } : { id: sessionId });
+      const systemPromptAppend = this.buildSystemPromptAppend(
+        dbSession ? { ...dbSession, project_id: dbSession.project_id } : { id: sessionId },
+        options.panelId
+      );
       if (systemPromptAppend) {
         finalPrompt = `${finalPrompt}\n\n${systemPromptAppend}`;
       }
@@ -530,7 +538,7 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
   // Private helper methods
 
-  private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }): string | undefined {
+  private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }, panelId: string): string | undefined {
     const systemPromptParts: string[] = [];
 
     // Add global system prompt first
@@ -544,6 +552,28 @@ export class ClaudeCodeManager extends AbstractCliManager {
       const project = this.sessionManager.getProjectById(dbSession.project_id);
       if (project?.system_prompt) {
         systemPromptParts.push(project.system_prompt);
+      }
+    }
+
+    // Add persona-specific system prompt (Step 3: Persona)
+    if (this.personaLoader && panelId) {
+      try {
+        // Access database service from sessionManager's db property
+        const databaseService = (this.sessionManager as any).db;
+        if (databaseService) {
+          const panelSettings = databaseService.getPanelSettings(panelId);
+          const personaId = panelSettings?.persona;
+
+          if (personaId) {
+            const personaPrompt = this.personaLoader.getSystemPromptForPersona(personaId);
+            if (personaPrompt) {
+              systemPromptParts.push(personaPrompt);
+              this.logger?.verbose(`[ClaudeCodeManager] Added persona prompt for: ${personaId}`);
+            }
+          }
+        }
+      } catch (error) {
+        this.logger?.error(`[ClaudeCodeManager] Failed to load persona prompt:`, error instanceof Error ? error : undefined);
       }
     }
 
