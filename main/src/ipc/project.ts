@@ -258,12 +258,14 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       console.log(`[Main] Deleting project ${project.name} with ${allProjectSessions.length} total sessions`);
       
       // Check if any session from this project has a running script
-      const currentRunningSessionId = sessionManager.getCurrentRunningSessionId();
-      if (currentRunningSessionId) {
-        const runningSession = projectSessions.find(s => s.id === currentRunningSessionId);
-        if (runningSession) {
-          console.log(`[Main] Stopping running script for session ${currentRunningSessionId} before deleting project`);
-          sessionManager.stopRunningScript();
+      const runningScript = scriptExecutionTracker.getRunningScript();
+      if (runningScript) {
+        const runningSession = projectSessions.find(s => s.id === runningScript.id);
+        if (runningSession && runningScript.type === 'session') {
+          console.log(`[Main] Stopping running script for session ${runningScript.id} before deleting project`);
+          await sessionManager.stopRunningScript();
+          // Ensure tracker is updated even if sessionManager's internal update fails
+          scriptExecutionTracker.stop('session', runningScript.id);
         }
       }
       

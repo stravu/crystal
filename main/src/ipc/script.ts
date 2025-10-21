@@ -43,15 +43,27 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
       // Check if there's already a running script (any type) and stop it
       const runningScript = scriptExecutionTracker.getRunningScript();
       if (runningScript) {
-        console.log(`[Main] Stopping currently running ${runningScript.type} script for ${runningScript.type}:${runningScript.id}`);
+        console.log(`[Script] Stopping currently running ${runningScript.type} script for ${runningScript.type}:${runningScript.id} before starting new script for session ${sessionId}`);
 
         // Mark the old script as closing
         scriptExecutionTracker.markClosing(runningScript.type, runningScript.id);
 
         // Stop the script based on its type
         if (runningScript.type === 'session') {
-          // Stop through session manager (will update tracker)
-          await sessionManager.stopRunningScript();
+          console.log('[Script] Stopping session script via logs panel');
+          // Find and stop the logs panel for this session
+          const panels = await panelManager.getPanelsForSession(runningScript.id as string);
+          const logsPanel = panels?.find((p: { type: string }) => p.type === 'logs');
+          if (logsPanel) {
+            console.log('[Script] Found logs panel, stopping:', logsPanel.id);
+            await logsManager.stopScript(logsPanel.id);
+          } else {
+            console.log('[Script] No logs panel found, calling sessionManager.stopRunningScript');
+            await sessionManager.stopRunningScript();
+          }
+          // Ensure tracker is updated
+          scriptExecutionTracker.stop('session', runningScript.id);
+          console.log('[Script] Session script stopped and tracker updated');
         } else if (runningScript.type === 'project') {
           // Stop project script through logs panel
           if (runningScript.sessionId) {
@@ -66,9 +78,13 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
         }
       }
 
+      console.log(`[Script] Starting new script for session ${sessionId}`);
+
       // Use logs panel instead of old script running mechanism
       const commandString = commands.join(' && ');
       await logsManager.runScript(sessionId, commandString, session.worktreePath);
+
+      console.log(`[Script] Script started successfully for session ${sessionId}`);
 
       // Track this session script as running
       scriptExecutionTracker.start('session', sessionId);
@@ -95,7 +111,35 @@ export function registerScriptHandlers(ipcMain: IpcMain, { sessionManager }: App
           await logsManager.stopScript(logsPanel.id);
         }
       } else {
+        // Get running script info before stopping
+        const runningScript = scriptExecutionTracker.getRunningScript();
+
+        console.log('[Script] Stopping script (no sessionId provided), running script:', runningScript);
+
+        // If it's a session script, stop the logs panel process (critical!)
+        if (runningScript && runningScript.type === 'session') {
+          console.log('[Script] Finding logs panel for session:', runningScript.id);
+          const panels = await panelManager.getPanelsForSession(runningScript.id as string);
+          const logsPanel = panels?.find((p: { type: string }) => p.type === 'logs');
+          if (logsPanel) {
+            console.log('[Script] Stopping logs panel:', logsPanel.id);
+            await logsManager.stopScript(logsPanel.id);
+            console.log('[Script] Logs panel stopped successfully');
+          } else {
+            console.log('[Script] No logs panel found for session');
+          }
+        }
+
+        // Also call old mechanism for backward compatibility
         await sessionManager.stopRunningScript();
+
+        // Ensure tracker is updated even if sessionManager's internal update fails
+        if (runningScript && runningScript.type === 'session') {
+          console.log('[Script] Updating tracker to stopped state for session:', runningScript.id);
+          scriptExecutionTracker.stop('session', runningScript.id);
+        }
+
+        console.log('[Script] Stop script completed');
       }
       return { success: true };
     } catch (error) {
