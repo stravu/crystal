@@ -97,8 +97,10 @@ When everything looks good:
   - Open the DMG file and drag Crystal to your Applications folder
   - On first launch, you may need to right-click and select "Open" due to macOS security settings
 
-- **Windows** (Unofficial - Build from source): Windows is currently supported through local builds only. An installer will be provided in future releases.
+- **Windows**: Windows is supported but requires building from source
   - Follow the "Building from Source" instructions below
+  - Requires Visual Studio 2022 with Spectre-mitigated libraries
+  - Official installer coming in future releases
 
 ### Homebrew
 ```bash
@@ -108,6 +110,13 @@ brew install --cask stravu-crystal
 ---
 
 ## Building from Source
+
+### Prerequisites
+
+- **macOS/Linux**: Xcode Command Line Tools or build-essential
+- **Windows**: Visual Studio 2022 with Spectre-mitigated libraries ([see detailed instructions](docs/troubleshooting/SETUP_TROUBLESHOOTING.md#windows-build-requirements))
+
+### Build Steps
 
 ```bash
 # Clone the repository
@@ -126,6 +135,12 @@ pnpm run electron-dev
 ```bash
 # Build for macOS
 pnpm build:mac
+
+# Build for Windows
+pnpm build:win
+
+# Build for Linux
+pnpm build:linux
 ```
 
 ---
