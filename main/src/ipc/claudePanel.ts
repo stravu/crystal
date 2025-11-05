@@ -146,13 +146,61 @@ class ClaudePanelHandler extends BaseAIPanelHandler {
     this.ipcMain.handle('claude-panels:set-model', async (_event, panelId: string, model: string) => {
       try {
         console.log('[IPC] claude-panels:set-model called for panelId:', panelId, 'model:', model);
-        
+
         databaseService.updatePanelSettings(panelId, { model });
-        
+
         return { success: true };
       } catch (error) {
         console.error('Failed to set Claude panel model:', error);
         return { success: false, error: 'Failed to set Claude panel model' };
+      }
+    });
+
+    // List available personas
+    this.ipcMain.handle('claude-panels:list-personas', async () => {
+      try {
+        console.log('[IPC] claude-panels:list-personas called');
+
+        const { personaLoader } = this.services;
+        if (!personaLoader) {
+          console.warn('[IPC] PersonaLoader not available');
+          return { success: true, data: [] };
+        }
+
+        const personas = personaLoader.listAvailablePersonas();
+        return { success: true, data: personas };
+      } catch (error) {
+        console.error('Failed to list personas:', error);
+        return { success: false, error: 'Failed to list personas' };
+      }
+    });
+
+    // Get persona for a panel
+    this.ipcMain.handle('claude-panels:get-persona', async (_event, panelId: string) => {
+      try {
+        console.log('[IPC] claude-panels:get-persona called for panelId:', panelId);
+
+        const settings = databaseService.getPanelSettings(panelId);
+        const persona = settings.persona || null;
+
+        return { success: true, data: persona };
+      } catch (error) {
+        console.error('Failed to get persona:', error);
+        return { success: false, error: 'Failed to get persona' };
+      }
+    });
+
+    // Set persona for a panel
+    this.ipcMain.handle('claude-panels:set-persona', async (_event, panelId: string, personaId: string | null) => {
+      try {
+        console.log('[IPC] claude-panels:set-persona called for panelId:', panelId, 'personaId:', personaId);
+
+        databaseService.updatePanelSettings(panelId, { persona: personaId });
+
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to set persona:', error);
+        return { success: false, error: 'Failed to set persona' };
       }
     });
 

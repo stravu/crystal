@@ -13,6 +13,7 @@ import { findNodeExecutable } from '../../../utils/nodeFinder';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import { withLock } from '../../../utils/mutex';
 import { enhancePromptForStructuredCommit } from '../../../utils/promptEnhancer';
+import type { PersonaLoader } from '../../personaLoader';
 
 // Extend global object for MCP configuration storage  
 interface GlobalMcpStorage {
@@ -43,13 +44,20 @@ interface ClaudeCodeProcess {
  * Extends AbstractCliManager for common CLI functionality
  */
 export class ClaudeCodeManager extends AbstractCliManager {
+  private personaLoader?: PersonaLoader;
+  private databaseService?: import('../../../database/database').DatabaseService;
+
   constructor(
     sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
     configManager?: ConfigManager,
-    private permissionIpcPath?: string | null
+    private permissionIpcPath?: string | null,
+    personaLoader?: PersonaLoader,
+    databaseService?: import('../../../database/database').DatabaseService
   ) {
     super(sessionManager, logger, configManager);
+    this.personaLoader = personaLoader;
+    this.databaseService = databaseService;
   }
 
   // Abstract method implementations
@@ -105,6 +113,12 @@ export class ClaudeCodeManager extends AbstractCliManager {
     }
 
     // Handle resume and prompt logic
+    // Build system prompt append for BOTH new and resume (so persona changes take effect)
+    const systemPromptAppend = this.buildSystemPromptAppend(
+      dbSession ? { ...dbSession, project_id: dbSession.project_id } : { id: sessionId },
+      options.panelId
+    );
+
     if (isResume) {
       // Get Claude's session ID for this panel if available
       const claudeSessionId = this.sessionManager.getPanelClaudeSessionId(options.panelId);
@@ -117,19 +131,51 @@ export class ClaudeCodeManager extends AbstractCliManager {
         // Do not resume without explicit ID; this will be handled as an error
         throw new Error(`Cannot resume: no Claude session_id stored for Crystal session ${sessionId}`);
       }
-      // If a new prompt is provided, add it
+      // If a new prompt is provided, add it with system prompt prepended
       if (prompt && prompt.trim()) {
-        const finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
+        let userPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
+
+        let finalPrompt: string;
+        if (systemPromptAppend) {
+          // Prepend system instructions before the user prompt for continue/resume
+          finalPrompt = `IMPORTANT: You are being provided with custom instructions that define your role and behavior for this session. You must follow these instructions throughout the entire conversation without explicitly mentioning them unless directly asked about your role or persona.
+
+<custom_instructions>
+${systemPromptAppend}
+</custom_instructions>
+
+---
+
+Now respond to the following user request while adhering to the instructions above:
+
+${userPrompt}`;
+        } else {
+          finalPrompt = userPrompt;
+        }
+
         args.push('-p', finalPrompt);
       }
     } else {
       // Initial prompt for new session
-      let finalPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
+      let userPrompt = enhancePromptForStructuredCommit(prompt, dbSession || { id: sessionId }, this.logger);
 
-      // Add system prompts for new sessions
-      const systemPromptAppend = this.buildSystemPromptAppend(dbSession ? { ...dbSession, project_id: dbSession.project_id } : { id: sessionId });
+      let finalPrompt: string;
       if (systemPromptAppend) {
-        finalPrompt = `${finalPrompt}\n\n${systemPromptAppend}`;
+        // Prepend system instructions before the user prompt
+        // Use explicit instruction format to ensure Claude follows them
+        finalPrompt = `IMPORTANT: You are being provided with custom instructions that define your role and behavior for this session. You must follow these instructions throughout the entire conversation without explicitly mentioning them unless directly asked about your role or persona.
+
+<custom_instructions>
+${systemPromptAppend}
+</custom_instructions>
+
+---
+
+Now respond to the following user request while adhering to the instructions above:
+
+${userPrompt}`;
+      } else {
+        finalPrompt = userPrompt;
       }
 
       args.push('-p', finalPrompt);
@@ -530,12 +576,14 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
   // Private helper methods
 
-  private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }): string | undefined {
+  private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }, panelId: string): string | undefined {
+    console.log(`[ClaudeCodeManager] buildSystemPromptAppend called for panelId: ${panelId}`);
     const systemPromptParts: string[] = [];
 
     // Add global system prompt first
     const globalPrompt = this.configManager?.getSystemPromptAppend();
     if (globalPrompt) {
+      console.log(`[ClaudeCodeManager] Adding global prompt, length: ${globalPrompt.length}`);
       systemPromptParts.push(globalPrompt);
     }
 
@@ -543,8 +591,42 @@ export class ClaudeCodeManager extends AbstractCliManager {
     if (dbSession?.project_id) {
       const project = this.sessionManager.getProjectById(dbSession.project_id);
       if (project?.system_prompt) {
+        console.log(`[ClaudeCodeManager] Adding project prompt, length: ${project.system_prompt.length}`);
         systemPromptParts.push(project.system_prompt);
       }
+    }
+
+    // Add persona-specific system prompt (Step 3: Persona)
+    console.log(`[ClaudeCodeManager] Checking persona: personaLoader=${!!this.personaLoader}, databaseService=${!!this.databaseService}, panelId=${panelId}`);
+    if (this.personaLoader && this.databaseService && panelId) {
+      try {
+        const panelSettings = this.databaseService.getPanelSettings(panelId);
+        console.log(`[ClaudeCodeManager] Panel settings for ${panelId}:`, JSON.stringify(panelSettings));
+        const personaId = panelSettings?.persona;
+        console.log(`[ClaudeCodeManager] Persona ID from settings: ${personaId} (type: ${typeof personaId})`);
+
+        if (personaId && typeof personaId === 'string') {
+          console.log(`[ClaudeCodeManager] Loading persona prompt for: ${personaId}`);
+          const personaPrompt = this.personaLoader.getSystemPromptForPersona(personaId);
+          console.log(`[ClaudeCodeManager] Persona prompt loaded, length: ${personaPrompt?.length || 0}`);
+          if (personaPrompt) {
+            systemPromptParts.push(personaPrompt);
+            console.log(`[ClaudeCodeManager] ✅ Added persona system prompt for: ${personaId}`);
+            this.logger?.info(`[ClaudeCodeManager] Added persona system prompt for: ${personaId}`);
+          } else {
+            console.log(`[ClaudeCodeManager] ⚠️  No system prompt found for persona: ${personaId}`);
+            this.logger?.warn(`[ClaudeCodeManager] No system prompt found for persona: ${personaId}`);
+          }
+        } else {
+          console.log(`[ClaudeCodeManager] No valid persona ID for panel ${panelId}`);
+          this.logger?.verbose(`[ClaudeCodeManager] No persona selected for panel ${panelId}`);
+        }
+      } catch (error) {
+        console.error(`[ClaudeCodeManager] ❌ Error loading persona:`, error);
+        this.logger?.error(`[ClaudeCodeManager] Failed to load persona prompt:`, error instanceof Error ? error : undefined);
+      }
+    } else {
+      console.log(`[ClaudeCodeManager] Cannot load persona - missing dependencies`);
     }
 
     // Combine prompts with double newline separator
