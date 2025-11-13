@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings } from './Settings';
 import { DraggableProjectTreeView } from './DraggableProjectTreeView';
 import { ArchiveProgress } from './ArchiveProgress';
-import { Info, Clock, Check, Edit, CircleArrowDown, AlertTriangle, GitMerge, ArrowUpDown } from 'lucide-react';
+import { Info, Clock, Check, Edit, CircleArrowDown, AlertTriangle, GitMerge, ArrowUpDown, FolderPlus, Plus } from 'lucide-react';
 import crystalLogo from '../assets/crystal-logo.svg';
 import { IconButton } from './ui/Button';
 import { Modal, ModalHeader, ModalBody } from './ui/Modal';
@@ -22,6 +22,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
   const [gitCommit, setGitCommit] = useState<string>('');
   const [worktreeName, setWorktreeName] = useState<string>('');
   const [sessionSortAscending, setSessionSortAscending] = useState<boolean>(false); // Default to descending (newest first)
+  const treeViewRef = useRef<{ openAddGroupDialog: () => void; openAddProjectDialog: () => void }>(null);
 
   useEffect(() => {
     // Fetch version info and UI state on component mount
@@ -141,6 +142,18 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
             <span className="truncate text-text-tertiary">Projects & Sessions</span>
             <div className="flex items-center space-x-1">
               <IconButton
+                aria-label="Add Project"
+                size="sm"
+                onClick={() => treeViewRef.current?.openAddProjectDialog()}
+                icon={<Plus className="w-4 h-4" />}
+              />
+              <IconButton
+                aria-label="Add Group"
+                size="sm"
+                onClick={() => treeViewRef.current?.openAddGroupDialog()}
+                icon={<FolderPlus className="w-4 h-4" />}
+              />
+              <IconButton
                 aria-label={sessionSortAscending ? "Sort sessions: Oldest first (click to reverse)" : "Sort sessions: Newest first (click to reverse)"}
                 size="sm"
                 onClick={toggleSessionSortOrder}
@@ -160,7 +173,7 @@ export function Sidebar({ onHelpClick, onAboutClick, onPromptHistoryClick, width
               />
             </div>
           </div>
-          <DraggableProjectTreeView sessionSortAscending={sessionSortAscending} />
+          <DraggableProjectTreeView ref={treeViewRef} sessionSortAscending={sessionSortAscending} />
         </div>
         
         {/* Bottom section - always visible */}

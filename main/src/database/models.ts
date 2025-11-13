@@ -27,6 +27,26 @@ export interface ProjectRunCommand {
   created_at: string;
 }
 
+export interface ProjectGroup {
+  id: number;
+  name: string;
+  description?: string | null;
+  system_prompt?: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectGroupMember {
+  id: number;
+  group_id: number;
+  project_id: number;
+  include_in_context: boolean;
+  role_description?: string | null;
+  display_order: number;
+  created_at: string;
+}
+
 export interface Folder {
   id: string;
   name: string;

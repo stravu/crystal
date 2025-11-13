@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import type { Project, ProjectRunCommand, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, CreatePanelExecutionDiffData } from './models';
+import type { Project, ProjectRunCommand, ProjectGroup, ProjectGroupMember, Folder, Session, SessionOutput, CreateSessionData, UpdateSessionData, ConversationMessage, PromptMarker, ExecutionDiff, CreateExecutionDiffData, CreatePanelExecutionDiffData } from './models';
 import type { ToolPanel, ToolPanelType, ToolPanelState, ToolPanelMetadata } from '../../../shared/types/panels';
 
 // Interface for legacy claude_panel_settings during migration
@@ -1286,28 +1286,90 @@ export class DatabaseService {
         // Don't throw - allow app to continue
       }
     }
+
+    // Migration 006: Project groups
+    const projectGroupsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_groups'").all();
+    if (projectGroupsTable.length === 0) {
+      console.log('[Database] Running project groups migration 006...');
+
+      try {
+        this.transaction(() => {
+          // Create project_groups table
+          this.db.prepare(`
+            CREATE TABLE project_groups (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL UNIQUE,
+              description TEXT,
+              system_prompt TEXT,
+              display_order INTEGER DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `).run();
+
+          // Create project_group_members table
+          this.db.prepare(`
+            CREATE TABLE project_group_members (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              group_id INTEGER NOT NULL,
+              project_id INTEGER NOT NULL,
+              include_in_context INTEGER DEFAULT 1,
+              role_description TEXT,
+              display_order INTEGER DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (group_id) REFERENCES project_groups(id) ON DELETE CASCADE,
+              FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+              UNIQUE(group_id, project_id)
+            )
+          `).run();
+
+          // Create indexes
+          this.db.prepare("CREATE INDEX idx_project_group_members_group_id ON project_group_members(group_id)").run();
+          this.db.prepare("CREATE INDEX idx_project_group_members_project_id ON project_group_members(project_id)").run();
+
+          console.log('[Database] Project groups migration 006 completed successfully');
+        });
+      } catch (error) {
+        console.error('[Database] Failed to run project groups migration:', error);
+        throw error;
+      }
+    }
+
+    // Migration 007: Removed - projects are ungrouped by default now
   }
 
   // Project operations
-  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitStructuredPromptTemplate?: string, commitCheckpointPrefix?: string): Project {
-    // Get the max display_order for projects
-    const maxOrderResult = this.db.prepare(`
-      SELECT MAX(display_order) as max_order 
-      FROM projects
-    `).get() as { max_order: number | null };
-    
-    const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
-    
-    const result = this.db.prepare(`
-      INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order, commit_mode, commit_structured_prompt_template, commit_checkpoint_prefix)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder, commitMode || 'checkpoint', commitStructuredPromptTemplate || null, commitCheckpointPrefix || 'checkpoint: ');
-    
-    const project = this.getProject(result.lastInsertRowid as number);
-    if (!project) {
-      throw new Error('Failed to create project');
-    }
-    return project;
+  createProject(name: string, path: string, systemPrompt?: string, runScript?: string, buildScript?: string, defaultPermissionMode?: 'approve' | 'ignore', openIdeCommand?: string, commitMode?: 'structured' | 'checkpoint' | 'disabled', commitStructuredPromptTemplate?: string, commitCheckpointPrefix?: string, groupId?: number): Project {
+    return this.transaction(() => {
+      // Get the max display_order for projects
+      const maxOrderResult = this.db.prepare(`
+        SELECT MAX(display_order) as max_order
+        FROM projects
+      `).get() as { max_order: number | null };
+
+      const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
+
+      const result = this.db.prepare(`
+        INSERT INTO projects (name, path, system_prompt, run_script, build_script, default_permission_mode, open_ide_command, display_order, commit_mode, commit_structured_prompt_template, commit_checkpoint_prefix)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(name, path, systemPrompt || null, runScript || null, buildScript || null, defaultPermissionMode || 'ignore', openIdeCommand || null, displayOrder, commitMode || 'checkpoint', commitStructuredPromptTemplate || null, commitCheckpointPrefix || 'checkpoint: ');
+
+      const project = this.getProject(result.lastInsertRowid as number);
+      if (!project) {
+        throw new Error('Failed to create project');
+      }
+
+      // Add to group if specified
+      if (groupId) {
+        console.log(`[Database] Adding project ${project.id} to group ${groupId}`);
+        this.addProjectToGroup(groupId, project.id, true);
+      } else {
+        console.log(`[Database] Leaving project ${project.id} ungrouped (no groupId provided)`);
+      }
+      // Otherwise, leave project ungrouped
+
+      return project;
+    });
   }
 
   getProject(id: number): Project | undefined {
@@ -1420,6 +1482,241 @@ export class DatabaseService {
 
   deleteProject(id: number): boolean {
     const result = this.db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  // Project Group operations
+  createProjectGroup(name: string, description?: string, systemPrompt?: string): ProjectGroup {
+    const maxOrderResult = this.db.prepare(`
+      SELECT MAX(display_order) as max_order
+      FROM project_groups
+    `).get() as { max_order: number | null };
+
+    const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
+
+    const result = this.db.prepare(`
+      INSERT INTO project_groups (name, description, system_prompt, display_order)
+      VALUES (?, ?, ?, ?)
+    `).run(name, description || null, systemPrompt || null, displayOrder);
+
+    const group = this.getProjectGroup(result.lastInsertRowid as number);
+    if (!group) {
+      throw new Error('Failed to create project group');
+    }
+    return group;
+  }
+
+  getProjectGroup(id: number): ProjectGroup | undefined {
+    return this.db.prepare('SELECT * FROM project_groups WHERE id = ?').get(id) as ProjectGroup | undefined;
+  }
+
+  getAllProjectGroups(): ProjectGroup[] {
+    return this.db.prepare('SELECT * FROM project_groups ORDER BY display_order ASC, created_at ASC').all() as ProjectGroup[];
+  }
+
+  updateProjectGroup(id: number, updates: { name?: string; description?: string | null; system_prompt?: string | null; display_order?: number }): ProjectGroup | undefined {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (updates.name !== undefined) {
+      fields.push('name = ?');
+      values.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      fields.push('description = ?');
+      values.push(updates.description);
+    }
+    if (updates.system_prompt !== undefined) {
+      fields.push('system_prompt = ?');
+      values.push(updates.system_prompt);
+    }
+    if (updates.display_order !== undefined) {
+      fields.push('display_order = ?');
+      values.push(updates.display_order);
+    }
+
+    if (fields.length === 0) {
+      return this.getProjectGroup(id);
+    }
+
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    this.db.prepare(`
+      UPDATE project_groups
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `).run(...values);
+
+    return this.getProjectGroup(id);
+  }
+
+  deleteProjectGroup(id: number): boolean {
+    const result = this.db.prepare('DELETE FROM project_groups WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  // Project Group Member operations
+  addProjectToGroup(groupId: number, projectId: number, includeInContext: boolean = true, roleDescription?: string): ProjectGroupMember {
+    const maxOrderResult = this.db.prepare(`
+      SELECT MAX(display_order) as max_order
+      FROM project_group_members
+      WHERE group_id = ?
+    `).get(groupId) as { max_order: number | null };
+
+    const displayOrder = (maxOrderResult?.max_order ?? -1) + 1;
+
+    const result = this.db.prepare(`
+      INSERT INTO project_group_members (group_id, project_id, include_in_context, role_description, display_order)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(groupId, projectId, includeInContext ? 1 : 0, roleDescription || null, displayOrder);
+
+    const member = this.getProjectGroupMember(result.lastInsertRowid as number);
+    if (!member) {
+      throw new Error('Failed to add project to group');
+    }
+    return member;
+  }
+
+  getProjectGroupMember(id: number): ProjectGroupMember | undefined {
+    const row = this.db.prepare('SELECT * FROM project_group_members WHERE id = ?').get(id) as {
+      id: number;
+      group_id: number;
+      project_id: number;
+      include_in_context: number;
+      role_description?: string | null;
+      display_order: number;
+      created_at: string;
+    } | undefined;
+
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      include_in_context: Boolean(row.include_in_context)
+    };
+  }
+
+  getProjectGroupMembers(groupId: number): ProjectGroupMember[] {
+    const rows = this.db.prepare('SELECT * FROM project_group_members WHERE group_id = ? ORDER BY display_order ASC').all(groupId) as Array<{
+      id: number;
+      group_id: number;
+      project_id: number;
+      include_in_context: number;
+      role_description?: string | null;
+      display_order: number;
+      created_at: string;
+    }>;
+
+    return rows.map(row => ({
+      ...row,
+      include_in_context: Boolean(row.include_in_context)
+    }));
+  }
+
+  getProjectGroupForProject(projectId: number): { group: ProjectGroup; member: ProjectGroupMember } | undefined {
+    const row = this.db.prepare(`
+      SELECT
+        pg.id as group_id, pg.name as group_name, pg.description as group_description,
+        pg.system_prompt as group_system_prompt, pg.display_order as group_display_order,
+        pg.created_at as group_created_at, pg.updated_at as group_updated_at,
+        pgm.id as member_id, pgm.group_id as member_group_id, pgm.project_id as member_project_id,
+        pgm.include_in_context, pgm.role_description, pgm.display_order as member_display_order,
+        pgm.created_at as member_created_at
+      FROM project_group_members pgm
+      JOIN project_groups pg ON pgm.group_id = pg.id
+      WHERE pgm.project_id = ?
+    `).get(projectId) as {
+      group_id: number;
+      group_name: string;
+      group_description?: string | null;
+      group_system_prompt?: string | null;
+      group_display_order: number;
+      group_created_at: string;
+      group_updated_at: string;
+      member_id: number;
+      member_group_id: number;
+      member_project_id: number;
+      include_in_context: number;
+      role_description?: string | null;
+      member_display_order: number;
+      member_created_at: string;
+    } | undefined;
+
+    if (!row) return undefined;
+
+    return {
+      group: {
+        id: row.group_id,
+        name: row.group_name,
+        description: row.group_description,
+        system_prompt: row.group_system_prompt,
+        display_order: row.group_display_order,
+        created_at: row.group_created_at,
+        updated_at: row.group_updated_at
+      },
+      member: {
+        id: row.member_id,
+        group_id: row.member_group_id,
+        project_id: row.member_project_id,
+        include_in_context: Boolean(row.include_in_context),
+        role_description: row.role_description,
+        display_order: row.member_display_order,
+        created_at: row.member_created_at
+      }
+    };
+  }
+
+  getAllProjectGroupsWithProjects(): Array<ProjectGroup & { projects: Project[] }> {
+    const groups = this.getAllProjectGroups();
+
+    return groups.map(group => {
+      const members = this.getProjectGroupMembers(group.id);
+      const projects = members
+        .map(member => this.getProject(member.project_id))
+        .filter((project): project is Project => project !== undefined);
+
+      return {
+        ...group,
+        projects
+      };
+    });
+  }
+
+  updateProjectGroupMember(id: number, updates: { include_in_context?: boolean; role_description?: string | null; display_order?: number }): ProjectGroupMember | undefined {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (updates.include_in_context !== undefined) {
+      fields.push('include_in_context = ?');
+      values.push(updates.include_in_context ? 1 : 0);
+    }
+    if (updates.role_description !== undefined) {
+      fields.push('role_description = ?');
+      values.push(updates.role_description);
+    }
+    if (updates.display_order !== undefined) {
+      fields.push('display_order = ?');
+      values.push(updates.display_order);
+    }
+
+    if (fields.length === 0) {
+      return this.getProjectGroupMember(id);
+    }
+
+    values.push(id);
+
+    this.db.prepare(`
+      UPDATE project_group_members
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `).run(...values);
+
+    return this.getProjectGroupMember(id);
+  }
+
+  removeProjectFromGroup(groupId: number, projectId: number): boolean {
+    const result = this.db.prepare('DELETE FROM project_group_members WHERE group_id = ? AND project_id = ?').run(groupId, projectId);
     return result.changes > 0;
   }
 

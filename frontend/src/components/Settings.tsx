@@ -1,21 +1,23 @@
 import { useState, useEffect } from 'react';
 import { NotificationSettings } from './NotificationSettings';
 import { StravuConnection } from './StravuConnection';
+import ProjectGroupsManagement from './ProjectGroupsManagement';
 import { useNotifications } from '../hooks/useNotifications';
 import { API } from '../utils/api';
 import type { AppConfig } from '../types/config';
 import { useConfigStore } from '../stores/configStore';
-import { 
-  Shield, 
-  ShieldOff, 
-  Sun, 
-  Moon, 
+import {
+  Shield,
+  ShieldOff,
+  Sun,
+  Moon,
   Settings as SettingsIcon,
   Palette,
   Zap,
   RefreshCw,
   FileText,
-  Eye
+  Eye,
+  FolderGit2
 } from 'lucide-react';
 import { Input, Textarea, Checkbox } from './ui/Input';
 import { Button } from './ui/Button';
@@ -51,6 +53,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'stravu'>('general');
+  const [showProjectGroups, setShowProjectGroups] = useState(false);
   const { updateSettings } = useNotifications();
   const { theme, toggleTheme } = useTheme();
   const { fetchConfig: refreshConfigStore } = useConfigStore();
@@ -473,6 +476,33 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
               </SettingsSection>
             </CollapsibleCard>
 
+            {/* Project Groups */}
+            <CollapsibleCard
+              title="Project Groups"
+              subtitle="Group related repositories and share context across projects"
+              icon={<FolderGit2 className="w-5 h-5" />}
+              defaultExpanded={false}
+            >
+              <SettingsSection
+                title="Manage Project Groups"
+                description="Create groups to organize multiple related repositories (e.g., microservices, frontend + backend)"
+                icon={<FolderGit2 className="w-4 h-4" />}
+              >
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowProjectGroups(true)}
+                  className="w-full"
+                >
+                  Open Project Groups Manager
+                </Button>
+                <p className="text-xs text-text-tertiary mt-2">
+                  Projects in the same group share context via --add-dir when running AI sessions.
+                  This allows the AI to reference code from peer repositories.
+                </p>
+              </SettingsSection>
+            </CollapsibleCard>
+
             {error && (
               <div className="text-status-error text-sm bg-status-error/10 border border-status-error/30 rounded-lg p-4">
                 {error}
@@ -585,6 +615,12 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
           </Button>
         </ModalFooter>
       )}
+
+      {/* Project Groups Management Dialog */}
+      <ProjectGroupsManagement
+        isOpen={showProjectGroups}
+        onClose={() => setShowProjectGroups(false)}
+      />
     </Modal>
   );
 }

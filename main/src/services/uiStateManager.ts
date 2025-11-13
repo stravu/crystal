@@ -4,6 +4,7 @@ interface UIState {
   treeView: {
     expandedProjects: number[];
     expandedFolders: string[];
+    expandedGroups: number[];
     sessionSortAscending: boolean;
   };
 }
@@ -35,6 +36,16 @@ class UIStateManager {
     }
   }
 
+  getExpandedGroups(): number[] {
+    const value = this.db.getUIState('treeView.expandedGroups');
+    if (!value) return [];
+    try {
+      return JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+
   getSessionSortAscending(): boolean {
     const value = this.db.getUIState('treeView.sessionSortAscending');
     if (!value) return false; // Default to descending (newest first)
@@ -53,19 +64,25 @@ class UIStateManager {
     this.db.setUIState('treeView.expandedFolders', JSON.stringify(folderIds));
   }
 
+  saveExpandedGroups(groupIds: number[]): void {
+    this.db.setUIState('treeView.expandedGroups', JSON.stringify(groupIds));
+  }
+
   saveSessionSortAscending(ascending: boolean): void {
     this.db.setUIState('treeView.sessionSortAscending', JSON.stringify(ascending));
   }
 
-  saveExpandedState(projectIds: number[], folderIds: string[]): void {
+  saveExpandedState(projectIds: number[], folderIds: string[], groupIds: number[]): void {
     this.saveExpandedProjects(projectIds);
     this.saveExpandedFolders(folderIds);
+    this.saveExpandedGroups(groupIds);
   }
 
-  getExpandedState(): { expandedProjects: number[]; expandedFolders: string[]; sessionSortAscending: boolean } {
+  getExpandedState(): { expandedProjects: number[]; expandedFolders: string[]; expandedGroups: number[]; sessionSortAscending: boolean } {
     return {
       expandedProjects: this.getExpandedProjects(),
       expandedFolders: this.getExpandedFolders(),
+      expandedGroups: this.getExpandedGroups(),
       sessionSortAscending: this.getSessionSortAscending()
     };
   }
@@ -73,6 +90,7 @@ class UIStateManager {
   clear(): void {
     this.db.deleteUIState('treeView.expandedProjects');
     this.db.deleteUIState('treeView.expandedFolders');
+    this.db.deleteUIState('treeView.expandedGroups');
     this.db.deleteUIState('treeView.sessionSortAscending');
   }
 }

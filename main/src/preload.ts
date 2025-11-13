@@ -303,6 +303,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stopScript: (projectId?: number): Promise<IPCResponse> => ipcRenderer.invoke('projects:stop-script', projectId),
   },
 
+  // Project groups
+  projectGroups: {
+    getAll: (): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:get-all'),
+    getAllWithProjects: (): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:get-all-with-projects'),
+    get: (groupId: number): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:get', groupId),
+    create: (groupData: { name: string; description?: string; system_prompt?: string }): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:create', groupData),
+    update: (groupId: number, updates: { name?: string; description?: string | null; system_prompt?: string | null; display_order?: number }): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:update', groupId, updates),
+    delete: (groupId: number): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:delete', groupId),
+    getMembers: (groupId: number): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:get-members', groupId),
+    getForProject: (projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:get-for-project', projectId),
+    addProject: (data: { group_id: number; project_id: number; include_in_context?: boolean; role_description?: string }): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:add-project', data),
+    removeProject: (groupId: number, projectId: number): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:remove-project', groupId, projectId),
+    updateMember: (memberId: number, updates: { include_in_context?: boolean; role_description?: string | null; display_order?: number }): Promise<IPCResponse> => ipcRenderer.invoke('project-groups:update-member', memberId, updates),
+  },
+
   // Git operations
   git: {
     detectBranch: (path: string): Promise<IPCResponse<string>> => ipcRenderer.invoke('projects:detect-branch', path),
@@ -384,7 +399,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // UI State management
   uiState: {
     getExpanded: (): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:get-expanded'),
-    saveExpanded: (projectIds: number[], folderIds: string[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded', projectIds, folderIds),
+    saveExpanded: (projectIds: number[], folderIds: string[], groupIds?: number[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded', projectIds, folderIds, groupIds),
     saveExpandedProjects: (projectIds: number[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded-projects', projectIds),
     saveExpandedFolders: (folderIds: string[]): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-expanded-folders', folderIds),
     saveSessionSortAscending: (ascending: boolean): Promise<IPCResponse> => ipcRenderer.invoke('ui-state:save-session-sort-ascending', ascending),
