@@ -135,6 +135,38 @@ export class ClaudeCodeManager extends AbstractCliManager {
       args.push('-p', finalPrompt);
     }
 
+    // Add peer repositories from project group via --add-dir
+    if (dbSession?.project_id) {
+      const db = this.sessionManager.db;
+      const groupInfo = db.getProjectGroupForProject(dbSession.project_id);
+
+      console.log('[ClaudeCodeManager] Checking for project group. Project ID:', dbSession.project_id, 'Group info:', groupInfo ? `Group "${groupInfo.group.name}" (ID: ${groupInfo.group.id})` : 'No group found');
+
+      if (groupInfo) {
+        // Get all peer projects in the group with include_in_context=true
+        const peerMembers = db.getProjectGroupMembers(groupInfo.group.id)
+          .filter((member: { include_in_context: boolean; project_id: number }) =>
+            member.include_in_context && member.project_id !== dbSession.project_id);
+
+        console.log('[ClaudeCodeManager] Found', peerMembers.length, 'peer projects in group');
+
+        // Add --add-dir for each peer project
+        for (const peerMember of peerMembers) {
+          const peerProject = db.getProject(peerMember.project_id);
+          if (peerProject) {
+            args.push('--add-dir', peerProject.path);
+            console.log('[ClaudeCodeManager] Adding --add-dir:', peerProject.path, '(', peerProject.name, ')');
+            this.logger?.verbose(`Adding peer repository to context: ${peerProject.name} (${peerProject.path})`);
+          }
+        }
+
+        if (peerMembers.length > 0) {
+          this.logger?.info(`Added ${peerMembers.length} peer repositories from project group "${groupInfo.group.name}"`);
+          console.log('[ClaudeCodeManager] Final args array:', args);
+        }
+      }
+    }
+
     // Add MCP configuration if provided
     if (mcpConfigPath) {
       args.push('--mcp-config', mcpConfigPath, '--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission');
@@ -539,8 +571,42 @@ export class ClaudeCodeManager extends AbstractCliManager {
       systemPromptParts.push(globalPrompt);
     }
 
-    // Add project-specific system prompt
+    // Add project group system prompt and context information
     if (dbSession?.project_id) {
+      const db = this.sessionManager.db;
+      const groupInfo = db.getProjectGroupForProject(dbSession.project_id);
+
+      if (groupInfo) {
+        // Add group-level system prompt
+        if (groupInfo.group.system_prompt) {
+          systemPromptParts.push(groupInfo.group.system_prompt);
+        }
+
+        // Add information about peer repositories
+        const peerMembers = db.getProjectGroupMembers(groupInfo.group.id)
+          .filter((member: { include_in_context: boolean; project_id: number }) =>
+            member.include_in_context && member.project_id !== dbSession.project_id);
+
+        if (peerMembers.length > 0) {
+          const currentProject = db.getProject(dbSession.project_id);
+          let contextInfo = `This project is part of the "${groupInfo.group.name}" project group.\n`;
+          contextInfo += `Current repository: ${currentProject?.name || 'Unknown'}\n`;
+          contextInfo += `\nOther repositories in this group:\n`;
+
+          for (const peerMember of peerMembers) {
+            const peerProject = db.getProject(peerMember.project_id);
+            if (peerProject) {
+              const roleDesc = peerMember.role_description ? ` - ${peerMember.role_description}` : '';
+              contextInfo += `- ${peerProject.name}${roleDesc}\n`;
+            }
+          }
+
+          contextInfo += `\nAll peer repositories are available via --add-dir and can be referenced in your work.`;
+          systemPromptParts.push(contextInfo);
+        }
+      }
+
+      // Add project-specific system prompt
       const project = this.sessionManager.getProjectById(dbSession.project_id);
       if (project?.system_prompt) {
         systemPromptParts.push(project.system_prompt);

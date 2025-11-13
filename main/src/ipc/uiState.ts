@@ -20,9 +20,9 @@ export function registerUIStateHandlers(services: AppServices) {
     }
   });
 
-  ipcMain.handle('ui-state:save-expanded', async (_, projectIds: number[], folderIds: string[]) => {
+  ipcMain.handle('ui-state:save-expanded', async (_, projectIds: number[], folderIds: string[], groupIds: number[] = []) => {
     try {
-      uiStateManager.saveExpandedState(projectIds, folderIds);
+      uiStateManager.saveExpandedState(projectIds, folderIds, groupIds);
       return {
         success: true
       };

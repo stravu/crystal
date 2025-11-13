@@ -4,6 +4,7 @@ import { registerAppHandlers } from './app';
 import { registerUpdaterHandlers } from './updater';
 import { registerSessionHandlers } from './session';
 import { registerProjectHandlers } from './project';
+import { registerProjectGroupHandlers } from './projectGroups';
 import { registerConfigHandlers } from './config';
 import { registerDialogHandlers } from './dialog';
 import { registerGitHandlers } from './git';
@@ -27,6 +28,7 @@ export function registerIpcHandlers(services: AppServices): void {
   registerUpdaterHandlers(ipcMain, services);
   registerSessionHandlers(ipcMain, services);
   registerProjectHandlers(ipcMain, services);
+  registerProjectGroupHandlers(ipcMain, services);
   registerConfigHandlers(ipcMain, services);
   registerDialogHandlers(ipcMain, services);
   registerGitHandlers(ipcMain, services);

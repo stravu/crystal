@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { ChevronRight, ChevronDown, Folder as FolderIcon, FolderOpen, Plus, Settings, GripVertical, Archive, GitBranch, RefreshCw, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useErrorStore } from '../stores/errorStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -12,7 +12,7 @@ import { API } from '../utils/api';
 import { debounce } from '../utils/debounce';
 import { throttle } from '../utils/performanceUtils';
 import type { Session } from '../types/session';
-import type { Project, CreateProjectRequest } from '../types/project';
+import type { Project, CreateProjectRequest, ProjectGroupWithProjects } from '../types/project';
 import type { Folder } from '../types/folder';
 import { useContextMenu } from '../contexts/ContextMenuContext';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './ui/Modal';
@@ -32,10 +32,12 @@ interface DragState {
   projectId: number | null;
   sessionId: string | null;
   folderId: string | null;
-  overType: 'project' | 'session' | 'folder' | null;
+  overType: 'project' | 'session' | 'folder' | 'group' | null;
   overProjectId: number | null;
   overSessionId: string | null;
   overFolderId: string | null;
+  overGroupId: number | null;
+  insertPosition: 'before' | 'after' | null;
 }
 
 interface DraggableProjectTreeViewProps {
@@ -88,9 +90,12 @@ const createTreeItemComparator = (ascending: boolean) => {
   };
 };
 
-export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProjectTreeViewProps) {
+export const DraggableProjectTreeView = forwardRef<{ openAddGroupDialog: () => void }, DraggableProjectTreeViewProps>(
+  function DraggableProjectTreeView({ sessionSortAscending }, ref) {
+  const [groups, setGroups] = useState<ProjectGroupWithProjects[]>([]);
   const [projectsWithSessions, setProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
   const [archivedProjectsWithSessions, setArchivedProjectsWithSessions] = useState<ProjectWithSessions[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [expandedArchivedProjects, setExpandedArchivedProjects] = useState<Set<number>>(new Set());
@@ -102,6 +107,13 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
+  const [showAddGroupDialog, setShowAddGroupDialog] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState('');
+  // Track which group the user wants to add a new project to (will be used to auto-assign project to group after creation)
+  const [selectedGroupForNewProject, setSelectedGroupForNewProject] = useState<ProjectGroupWithProjects | null>(null);
   const [newProject, setNewProject] = useState<CreateProjectRequest>({ name: '', path: '', buildScript: '', runScript: '' });
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
@@ -143,14 +155,25 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     overType: null,
     overProjectId: null,
     overSessionId: null,
-    overFolderId: null
+    overFolderId: null,
+    overGroupId: null,
+    insertPosition: null
   });
   const dragCounter = useRef(0);
-  
+
+  // Expose method to parent component
+  useImperativeHandle(ref, () => ({
+    openAddGroupDialog: () => setShowAddGroupDialog(true),
+    openAddProjectDialog: () => {
+      setSelectedGroupForNewProject(null);
+      setShowAddProjectDialog(true);
+    }
+  }));
+
   // Performance monitoring - track render count
   const renderCountRef = useRef(0);
   const lastRenderTimeRef = useRef(Date.now());
-  
+
   useEffect(() => {
     renderCountRef.current += 1;
     const now = Date.now();
@@ -165,14 +188,16 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   });
   
   // Create debounced save function
+  const saveUIStateInternal = async (projectIds: number[], folderIds: string[], groupIds: number[]) => {
+    try {
+      await window.electronAPI?.uiState?.saveExpanded(projectIds, folderIds, groupIds);
+    } catch (error) {
+      console.error('[DraggableProjectTreeView] Failed to save UI state:', error);
+    }
+  };
+
   const saveUIState = useCallback(
-    debounce(async (projectIds: number[], folderIds: string[]) => {
-      try {
-        await window.electronAPI?.uiState?.saveExpanded(projectIds, folderIds);
-      } catch (error) {
-        console.error('[DraggableProjectTreeView] Failed to save UI state:', error);
-      }
-    }, 500),
+    debounce(saveUIStateInternal, 500),
     []
   );
 
@@ -180,8 +205,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   useEffect(() => {
     const projectIds = Array.from(expandedProjects);
     const folderIds = Array.from(expandedFolders);
-    saveUIState(projectIds, folderIds);
-  }, [expandedProjects, expandedFolders, saveUIState]);
+    const groupIds = Array.from(expandedGroups);
+    saveUIState(projectIds, folderIds, groupIds);
+  }, [expandedProjects, expandedFolders, expandedGroups, saveUIState]);
 
   // Ensure paths are expanded when active session changes (for auto-selection)
   useEffect(() => {
@@ -553,11 +579,19 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const loadProjectsWithSessions = async () => {
     try {
       setIsLoading(true);
+
+      // Load groups with projects
+      const groupsResponse = await window.electronAPI.projectGroups.getAllWithProjects();
+      if (groupsResponse.success && groupsResponse.data) {
+        setGroups(groupsResponse.data as ProjectGroupWithProjects[]);
+      }
+
+      // Also load projects with sessions for compatibility with existing code
       const response = await API.sessions.getAllWithProjects();
       if (response.success && response.data) {
-        
+
         setProjectsWithSessions(response.data);
-        
+
         // Try to load saved UI state
         let savedState = null;
         try {
@@ -568,21 +602,34 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         } catch (error) {
           console.error('[DraggableProjectTreeView] Failed to load saved UI state:', error);
         }
-        
+
         if (savedState && savedState.expandedProjects && savedState.expandedFolders) {
           // Use saved state
           setExpandedProjects(new Set(savedState.expandedProjects));
           setExpandedFolders(new Set(savedState.expandedFolders));
+          if (savedState.expandedGroups) {
+            setExpandedGroups(new Set(savedState.expandedGroups));
+          }
         } else {
           // Fall back to auto-expand logic
           const projectsToExpand = new Set<number>();
           const foldersToExpand = new Set<string>();
-          
+          const groupsToExpand = new Set<number>();
+
+          // Auto-expand groups that have projects
+          if (groupsResponse.success && groupsResponse.data) {
+            (groupsResponse.data as ProjectGroupWithProjects[]).forEach(group => {
+              if (group.projects.length > 0) {
+                groupsToExpand.add(group.id);
+              }
+            });
+          }
+
           response.data.forEach((project: ProjectWithSessions) => {
             if (project.sessions.length > 0) {
               projectsToExpand.add(project.id);
             }
-            
+
             // Auto-expand folders that contain sessions
             if (project.folders && project.folders.length > 0) {
               project.folders.forEach(folder => {
@@ -593,7 +640,7 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
               });
             }
           });
-          
+
           // Also expand the project containing the active session
           if (activeSessionId) {
             response.data.forEach((project: ProjectWithSessions) => {
@@ -602,7 +649,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
               }
             });
           }
-          
+
+          setExpandedGroups(groupsToExpand);
           setExpandedProjects(projectsToExpand);
           setExpandedFolders(foldersToExpand);
         }
@@ -632,13 +680,31 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     }
   };
 
+  const toggleGroup = useCallback((groupId: number, event?: React.MouseEvent) => {
+    // Prevent event from bubbling to parent handlers
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  }, []);
+
   const toggleProject = useCallback((projectId: number, event?: React.MouseEvent) => {
     // Prevent event from bubbling to parent handlers
     if (event) {
       event.stopPropagation();
       event.preventDefault();
     }
-    
+
     setExpandedProjects(prev => {
       const newSet = new Set(prev);
       if (newSet.has(projectId)) {
@@ -1095,7 +1161,17 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     }
 
     try {
-      const response = await API.projects.create({ ...newProject, active: false });
+      // Include groupId in the create request if a group was selected
+      const createRequest = {
+        ...newProject,
+        active: false,
+        groupId: selectedGroupForNewProject?.id
+      };
+
+      console.log('[DraggableProjectTreeView] Creating project with request:', createRequest);
+      console.log('[DraggableProjectTreeView] selectedGroupForNewProject:', selectedGroupForNewProject);
+
+      const response = await API.projects.create(createRequest);
 
       if (!response.success) {
         showError({
@@ -1111,16 +1187,123 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
       setDetectedBranchForNewProject(null);
       setShowValidationErrors(false);
-      
-      // Add the new project to the list without reloading everything
-      const newProjectWithSessions = { ...response.data, sessions: [], folders: [] };
-      setProjectsWithSessions(prev => [...prev, newProjectWithSessions]);
+      setSelectedGroupForNewProject(null);
+
+      // Reload projects and groups to reflect the changes
+      await loadProjectsWithSessions();
     } catch (error: unknown) {
       console.error('Failed to create project:', error);
       showError({
         title: 'Failed to Create Project',
         error: error instanceof Error ? error.message : 'An error occurred while creating the project.',
         details: error instanceof Error ? error.stack : String(error)
+      });
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
+      return;
+    }
+
+    try {
+      const response = await window.electronAPI.projectGroups.create({
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim() || undefined
+      });
+
+      if (!response.success) {
+        showError({
+          title: 'Failed to Create Group',
+          error: response.error || 'An error occurred while creating the group.'
+        });
+        return;
+      }
+
+      // Expand the newly created group by default
+      if (response.data && typeof response.data.id === 'number') {
+        setExpandedGroups(prev => new Set(prev).add(response.data.id));
+      }
+
+      setShowAddGroupDialog(false);
+      setNewGroupName('');
+      setNewGroupDescription('');
+
+      // Reload to reflect the new group
+      await loadProjectsWithSessions();
+    } catch (error: unknown) {
+      console.error('Failed to create group:', error);
+      showError({
+        title: 'Failed to Create Group',
+        error: error instanceof Error ? error.message : 'An error occurred while creating the group.'
+      });
+    }
+  };
+
+  const handleStartGroupEdit = (group: ProjectGroupWithProjects) => {
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+  };
+
+  const handleSaveGroupEdit = async () => {
+    if (!editingGroupId || !editingGroupName.trim()) {
+      return;
+    }
+
+    try {
+      const response = await window.electronAPI.projectGroups.update(editingGroupId, {
+        name: editingGroupName.trim()
+      });
+
+      if (!response.success) {
+        showError({
+          title: 'Failed to Rename Group',
+          error: response.error || 'An error occurred while renaming the group.'
+        });
+        return;
+      }
+
+      setEditingGroupId(null);
+      setEditingGroupName('');
+
+      // Reload to reflect the changes
+      await loadProjectsWithSessions();
+    } catch (error: unknown) {
+      console.error('Failed to rename group:', error);
+      showError({
+        title: 'Failed to Rename Group',
+        error: error instanceof Error ? error.message : 'An error occurred while renaming the group.'
+      });
+    }
+  };
+
+  const handleCancelGroupEdit = () => {
+    setEditingGroupId(null);
+    setEditingGroupName('');
+  };
+
+  const handleDeleteGroup = async (groupId: number, groupName: string) => {
+    const confirmed = confirm(`Are you sure you want to delete the group "${groupName}"?\n\nProjects in this group will not be deleted, just ungrouped.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await window.electronAPI.projectGroups.delete(groupId);
+
+      if (!response.success) {
+        showError({
+          title: 'Failed to Delete Group',
+          error: response.error || 'An error occurred while deleting the group.'
+        });
+        return;
+      }
+
+      // Reload to reflect the changes
+      await loadProjectsWithSessions();
+    } catch (error: unknown) {
+      console.error('Failed to delete group:', error);
+      showError({
+        title: 'Failed to Delete Group',
+        error: error instanceof Error ? error.message : 'An error occurred while deleting the group.'
       });
     }
   };
@@ -1174,6 +1357,13 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     }
   };
 
+  // Helper function to calculate insert position based on cursor position
+  const getInsertPosition = (e: React.DragEvent, element: HTMLElement): 'before' | 'after' => {
+    const rect = element.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    return e.clientY < midpoint ? 'before' : 'after';
+  };
+
   // Drag and drop handlers
   const handleProjectDragStart = (e: React.DragEvent, project: Project) => {
     e.stopPropagation();
@@ -1185,7 +1375,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       overType: null,
       overProjectId: null,
       overSessionId: null,
-      overFolderId: null
+      overFolderId: null,
+      overGroupId: null,
+      insertPosition: null
     });
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'project', id: project.id }));
@@ -1201,7 +1393,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       overType: null,
       overProjectId: null,
       overSessionId: null,
-      overFolderId: null
+      overFolderId: null,
+      overGroupId: null,
+      insertPosition: null
     });
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'session', id: session.id, projectId }));
@@ -1217,7 +1411,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       overType: null,
       overProjectId: null,
       overSessionId: null,
-      overFolderId: null
+      overFolderId: null,
+      overGroupId: null,
+      insertPosition: null
     });
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', id: folder.id, projectId }));
@@ -1232,7 +1428,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       overType: null,
       overProjectId: null,
       overSessionId: null,
-      overFolderId: null
+      overFolderId: null,
+      overGroupId: null,
+      insertPosition: null
     });
     dragCounter.current = 0;
   };
@@ -1240,14 +1438,17 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const handleProjectDragOver = (e: React.DragEvent, project: Project) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    const insertPosition = getInsertPosition(e, e.currentTarget as HTMLElement);
+
     if (dragState.type === 'project' && dragState.projectId !== project.id) {
       setDragState(prev => ({
         ...prev,
         overType: 'project',
         overProjectId: project.id,
         overSessionId: null,
-        overFolderId: null
+        overFolderId: null,
+        insertPosition
       }));
     } else if (dragState.type === 'session') {
       // Allow sessions to be dropped on projects (to move out of folders)
@@ -1256,7 +1457,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         overType: 'project',
         overProjectId: project.id,
         overSessionId: null,
-        overFolderId: null
+        overFolderId: null,
+        insertPosition
       }));
     } else if (dragState.type === 'folder' && dragState.projectId === project.id) {
       // Allow folders to be reordered within the same project
@@ -1265,7 +1467,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         overType: 'project',
         overProjectId: project.id,
         overSessionId: null,
-        overFolderId: null
+        overFolderId: null,
+        insertPosition
       }));
     }
   };
@@ -1273,6 +1476,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const handleSessionDragOver = (e: React.DragEvent, session: Session, projectId: number) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const insertPosition = getInsertPosition(e, e.currentTarget as HTMLElement);
 
     // Allow both sessions and folders to be reordered relative to sessions
     if (dragState.type === 'session' &&
@@ -1282,7 +1487,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         ...prev,
         overType: 'session',
         overProjectId: projectId,
-        overSessionId: session.id
+        overSessionId: session.id,
+        insertPosition
       }));
     } else if (dragState.type === 'folder' &&
                dragState.projectId === projectId) {
@@ -1291,7 +1497,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         ...prev,
         overType: 'session',
         overProjectId: projectId,
-        overSessionId: session.id
+        overSessionId: session.id,
+        insertPosition
       }));
     }
   };
@@ -1301,21 +1508,84 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     e.stopPropagation();
     
     if (dragState.type === 'project' && dragState.projectId && dragState.projectId !== targetProject.id) {
-      // Reorder projects
+      // Check if projects are in different groups
+      const sourceGroup = groups.find(g => g.projects.some(p => p.id === dragState.projectId));
+      const targetGroup = groups.find(g => g.projects.some(p => p.id === targetProject.id));
+
+      // If they're in different groups, move the project to the target's group first
+      if (sourceGroup?.id !== targetGroup?.id) {
+        try {
+          // Remove from current group if exists
+          if (sourceGroup) {
+            const removeResponse = await window.electronAPI.projectGroups.removeProject(sourceGroup.id, dragState.projectId);
+            if (!removeResponse.success) {
+              showError({
+                title: 'Failed to move project',
+                error: removeResponse.error || 'Failed to remove from current group'
+              });
+              handleDragEnd();
+              return;
+            }
+          }
+
+          // Add to target group if exists
+          if (targetGroup) {
+            const addResponse = await window.electronAPI.projectGroups.addProject({
+              group_id: targetGroup.id,
+              project_id: dragState.projectId,
+              include_in_context: true
+            });
+            if (!addResponse.success) {
+              showError({
+                title: 'Failed to add project to group',
+                error: addResponse.error || 'Unknown error occurred'
+              });
+              handleDragEnd();
+              return;
+            }
+          }
+
+          // Reload to reflect the group change
+          await loadProjectsWithSessions();
+          handleDragEnd();
+          return;
+        } catch (error: unknown) {
+          console.error('Failed to move project between groups:', error);
+          showError({
+            title: 'Failed to move project',
+            error: error instanceof Error ? error.message : 'Unknown error occurred'
+          });
+          handleDragEnd();
+          return;
+        }
+      }
+
+      // If in same group (or both ungrouped), reorder projects
       const sourceIndex = projectsWithSessions.findIndex(p => p.id === dragState.projectId);
       const targetIndex = projectsWithSessions.findIndex(p => p.id === targetProject.id);
-      
+
       if (sourceIndex !== -1 && targetIndex !== -1) {
         const newProjects = [...projectsWithSessions];
         const [removed] = newProjects.splice(sourceIndex, 1);
-        newProjects.splice(targetIndex, 0, removed);
-        
+
+        // Calculate insert position: if 'after', insert after target; if 'before', insert before
+        let insertIndex = targetIndex;
+        if (dragState.insertPosition === 'after') {
+          // If we removed an item before the target, the target index has shifted down
+          insertIndex = sourceIndex < targetIndex ? targetIndex : targetIndex + 1;
+        } else {
+          // 'before' - adjust if we removed an item before the target
+          insertIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+        }
+
+        newProjects.splice(insertIndex, 0, removed);
+
         // Update display order for all projects
         const projectOrders = newProjects.map((project, index) => ({
           id: project.id,
           displayOrder: index
         }));
-        
+
         try {
           const response = await API.projects.reorder(projectOrders);
           if (response.success) {
@@ -1425,7 +1695,18 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         if (sourceItemIndex !== -1 && targetItemIndex !== -1) {
           // Remove the source item and insert it at the target position
           const [removedItem] = rootItems.splice(sourceItemIndex, 1);
-          rootItems.splice(targetItemIndex, 0, removedItem);
+
+          // Calculate insert position: if 'after', insert after target; if 'before', insert before
+          let insertIndex = targetItemIndex;
+          if (dragState.insertPosition === 'after') {
+            // If we removed an item before the target, the target index has shifted down
+            insertIndex = sourceItemIndex < targetItemIndex ? targetItemIndex : targetItemIndex + 1;
+          } else {
+            // 'before' - adjust if we removed an item before the target
+            insertIndex = sourceItemIndex < targetItemIndex ? targetItemIndex - 1 : targetItemIndex;
+          }
+
+          rootItems.splice(insertIndex, 0, removedItem);
 
           // Reassign displayOrder values sequentially to reflect the new order
           rootItems.forEach((item, index) => {
@@ -1569,7 +1850,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const handleFolderDragOver = (e: React.DragEvent, folder: Folder, projectId: number) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    const insertPosition = getInsertPosition(e, e.currentTarget as HTMLElement);
+
     // Allow sessions to be dropped into folders
     if (dragState.type === 'session') {
       setDragState(prev => ({
@@ -1577,7 +1860,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         overType: 'folder',
         overProjectId: projectId,
         overFolderId: folder.id,
-        overSessionId: null
+        overSessionId: null,
+        insertPosition
       }));
     } else if (dragState.type === 'folder' && dragState.folderId !== folder.id) {
       // Allow folders to be reordered (but not nested)
@@ -1586,7 +1870,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         overType: 'folder',
         overProjectId: projectId,
         overFolderId: folder.id,
-        overSessionId: null
+        overSessionId: null,
+        insertPosition
       }));
     }
   };
@@ -1707,6 +1992,88 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     handleDragEnd();
   };
 
+  const handleGroupDragOver = (e: React.DragEvent, groupId: number | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Only allow dragging projects into groups
+    if (dragState.type === 'project' && dragState.projectId !== null) {
+      // Check if the dragged project is already in this group
+      const currentGroup = groups.find(g => g.projects.some(p => p.id === dragState.projectId));
+
+      // Don't show drop target if dragging over the current group
+      if (currentGroup?.id === groupId) {
+        return;
+      }
+
+      setDragState(prev => ({
+        ...prev,
+        overType: 'group',
+        overGroupId: groupId
+      }));
+    }
+  };
+
+  const handleGroupDrop = async (e: React.DragEvent, groupId: number | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (dragState.type === 'project' && dragState.projectId) {
+      try {
+        // Check if project is already in this group
+        const currentGroup = groups.find(g => g.projects.some(p => p.id === dragState.projectId));
+
+        if (currentGroup?.id === groupId) {
+          // Already in this group, do nothing
+          handleDragEnd();
+          return;
+        }
+
+        // If project is in a different group, remove it first
+        if (currentGroup) {
+          const removeResponse = await window.electronAPI.projectGroups.removeProject(currentGroup.id, dragState.projectId);
+          if (!removeResponse.success) {
+            showError({
+              title: 'Failed to move project',
+              error: removeResponse.error || 'Failed to remove from current group'
+            });
+            handleDragEnd();
+            return;
+          }
+        }
+
+        // Add to new group (if not null, which represents ungrouped)
+        if (groupId !== null) {
+          const response = await window.electronAPI.projectGroups.addProject({
+            group_id: groupId,
+            project_id: dragState.projectId,
+            include_in_context: true
+          });
+
+          if (!response.success) {
+            showError({
+              title: 'Failed to add project to group',
+              error: response.error || 'Unknown error occurred'
+            });
+            handleDragEnd();
+            return;
+          }
+        }
+
+        // Reload to reflect changes
+        await loadProjectsWithSessions();
+      } catch (error: unknown) {
+        console.error('Failed to move project:', error);
+        showError({
+          title: 'Failed to move project',
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        });
+      }
+    }
+
+    handleDragEnd();
+  };
+
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     dragCounter.current--;
@@ -1716,7 +2083,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         overType: null,
         overProjectId: null,
         overSessionId: null,
-        overFolderId: null
+        overFolderId: null,
+        overGroupId: null
       }));
     }
   };
@@ -1790,19 +2158,26 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
             />
           )}
         </div>
-        <div 
-          className={`relative group/folder flex items-center space-x-1 py-1 rounded cursor-pointer transition-colors hover:bg-surface-hover ${
-            isDraggingOverFolder ? 'bg-interactive/20' : ''
-          }`}
-          style={{ marginLeft: `${0}px`, paddingLeft: '8px', paddingRight: '8px' }}
-          draggable
-          onDragStart={(e) => handleFolderDragStart(e, folder, project.id)}
-          onDragOver={(e) => handleFolderDragOver(e, folder, project.id)}
-          onDrop={(e) => handleFolderDrop(e, folder, project.id)}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onContextMenu={(e) => handleFolderContextMenu(e, folder, project.id)}
-        >
+
+        <div className="relative">
+          {/* Insertion indicator - before */}
+          {isDraggingOverFolder && dragState.insertPosition === 'before' && (
+            <div className="absolute left-0 right-0 -top-0.5 h-0.5 bg-interactive z-10">
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+            </div>
+          )}
+
+          <div
+            className={`relative group/folder flex items-center space-x-1 py-1 rounded cursor-pointer transition-colors hover:bg-surface-hover`}
+            style={{ marginLeft: `${0}px`, paddingLeft: '8px', paddingRight: '8px' }}
+            draggable
+            onDragStart={(e) => handleFolderDragStart(e, folder, project.id)}
+            onDragOver={(e) => handleFolderDragOver(e, folder, project.id)}
+            onDrop={(e) => handleFolderDrop(e, folder, project.id)}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onContextMenu={(e) => handleFolderContextMenu(e, folder, project.id)}
+          >
           <div className="opacity-0 group-hover/folder:opacity-100 transition-opacity cursor-move">
             <GripVertical className="w-3 h-3 text-text-tertiary" />
           </div>
@@ -1904,8 +2279,16 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
           >
             <span className="text-status-error hover:text-status-error">🗑️</span>
           </button>
+          </div>
+
+          {/* Insertion indicator - after */}
+          {isDraggingOverFolder && dragState.insertPosition === 'after' && (
+            <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-interactive z-10">
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+            </div>
+          )}
         </div>
-        
+
         {isExpanded && hasChildren && (
           <div className="mt-1 space-y-1" style={{ marginLeft: '16px' }}>
             {(() => {
@@ -1971,27 +2354,41 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                       />
                     </div>
 
-                    <div
-                      className={`relative group flex items-center ${
-                        isDraggingOverSession ? 'bg-interactive/20 rounded' : ''
-                      }`}
-                      style={{ marginLeft: '0px', paddingLeft: '8px' }}
-                      draggable
-                      onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
-                      onDragEnd={handleDragEnd}
-                      onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
-                      onDrop={(e) => handleSessionDrop(e, session, project.id)}
-                      onDragEnter={handleDragEnter}
-                      onDragLeave={handleDragLeave}
-                    >
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
-                        <GripVertical className="w-3 h-3 text-text-tertiary" />
+                    <div className="relative">
+                      {/* Insertion indicator - before */}
+                      {isDraggingOverSession && dragState.insertPosition === 'before' && (
+                        <div className="absolute left-0 right-0 -top-0.5 h-0.5 bg-interactive z-10">
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                        </div>
+                      )}
+
+                      <div
+                        className={`relative group flex items-center`}
+                        style={{ marginLeft: '0px', paddingLeft: '8px' }}
+                        draggable
+                        onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
+                        onDrop={(e) => handleSessionDrop(e, session, project.id)}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                      >
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
+                          <GripVertical className="w-3 h-3 text-text-tertiary" />
+                        </div>
+                        <SessionListItem
+                          key={session.id}
+                          session={session}
+                          isNested
+                        />
                       </div>
-                      <SessionListItem
-                        key={session.id}
-                        session={session}
-                        isNested
-                      />
+
+                      {/* Insertion indicator - after */}
+                      {isDraggingOverSession && dragState.insertPosition === 'after' && (
+                        <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-interactive z-10">
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -2006,20 +2403,140 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   return (
     <>
       <div className="space-y-1 px-2 pb-2">
-        {projectsWithSessions.length === 0 ? (
+        {groups.length === 0 && projectsWithSessions.length === 0 ? (
           <EmptyState
             icon={FolderIcon}
             title="No Projects Yet"
             description="Add your first project to start managing Claude Code sessions."
             action={{
               label: 'Add Project',
-              onClick: () => setShowAddProjectDialog(true)
+              onClick: () => {
+                setSelectedGroupForNewProject(null);
+                setShowAddProjectDialog(true);
+              }
             }}
             className="py-8"
           />
         ) : (
           <>
-            {projectsWithSessions.map((project) => {
+            {/* Groups Section */}
+            {groups.length > 0 && (
+              <div className="mb-4">
+
+                {groups.map((group) => {
+              const isGroupExpanded = expandedGroups.has(group.id);
+              const projectsInGroup = projectsWithSessions.filter(p => group.projects.some(gp => gp.id === p.id));
+
+              // Check if the dragged project is already in this group
+              const draggedProjectInThisGroup = dragState.type === 'project' && dragState.projectId !== null &&
+                group.projects.some(p => p.id === dragState.projectId);
+
+              const isDraggingOverGroup = dragState.overType === 'group' && dragState.overGroupId === group.id && !draggedProjectInThisGroup;
+
+              return (
+                <div key={group.id} className="mb-2">
+                  {/* Group Header */}
+                  <div
+                    className={`flex items-center space-x-2 px-2 py-2 bg-surface-primary rounded-lg group/group ${
+                      isDraggingOverGroup ? 'ring-2 ring-interactive' : ''
+                    }`}
+                    onDragOver={(e) => handleGroupDragOver(e, group.id)}
+                    onDrop={(e) => handleGroupDrop(e, group.id)}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <button
+                      onClick={(e) => toggleGroup(group.id, e)}
+                      className="p-0.5 hover:bg-surface-hover rounded transition-colors"
+                    >
+                      {isGroupExpanded ? (
+                        <ChevronDown className="w-3 h-3 text-text-tertiary" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3 text-text-tertiary" />
+                      )}
+                    </button>
+
+                    {editingGroupId === group.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingGroupName}
+                          onChange={(e) => setEditingGroupName(e.target.value)}
+                          className="flex-1 px-2 py-1 text-sm bg-surface-secondary border border-border-primary rounded text-text-primary focus:outline-none focus:border-interactive"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveGroupEdit();
+                            } else if (e.key === 'Escape') {
+                              handleCancelGroupEdit();
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={handleSaveGroupEdit}
+                          className="p-1 hover:bg-surface-hover rounded transition-colors"
+                          title="Save"
+                        >
+                          <Check className="w-3 h-3 text-status-success" />
+                        </button>
+                        <button
+                          onClick={handleCancelGroupEdit}
+                          className="p-1 hover:bg-surface-hover rounded transition-colors"
+                          title="Cancel"
+                        >
+                          <X className="w-3 h-3 text-text-tertiary" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <FolderIcon className="w-4 h-4 text-text-tertiary" />
+                        <span className="text-sm font-bold text-text-primary flex-1">{group.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartGroupEdit(group);
+                          }}
+                          className="p-1 hover:bg-surface-hover rounded transition-colors opacity-0 group-hover/group:opacity-100"
+                          title="Edit group name"
+                        >
+                          <Pencil className="w-3 h-3 text-text-tertiary" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGroup(group.id, group.name);
+                          }}
+                          className="p-1 hover:bg-surface-hover rounded transition-colors opacity-0 group-hover/group:opacity-100"
+                          title="Delete group"
+                        >
+                          <Trash2 className="w-3 h-3 text-status-error" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGroupForNewProject(group);
+                            setShowAddProjectDialog(true);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-all"
+                          title="Add new project to this group"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>New Project</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Projects in this group */}
+                  {isGroupExpanded && (
+                    <div
+                      className="ml-4 mt-1 space-y-1"
+                      onDragOver={(e) => handleGroupDragOver(e, group.id)}
+                      onDrop={(e) => handleGroupDrop(e, group.id)}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                    >
+                      {projectsInGroup.map((project) => {
           const isExpanded = expandedProjects.has(project.id);
           const sessionCount = project.sessions.length;
           const isDraggingOver = dragState.overType === 'project' && dragState.overProjectId === project.id;
@@ -2027,14 +2544,19 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
           const isActiveProject = activeProjectId === project.id;
           
           return (
-            <div key={project.id} className="mb-1">
-              <div 
+            <div key={project.id} className="mb-1 relative">
+              {/* Insertion indicator - before */}
+              {isDraggingOver && dragState.insertPosition === 'before' && (
+                <div className="absolute left-0 right-0 -top-0.5 h-0.5 bg-interactive z-10">
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                </div>
+              )}
+
+              <div
                 className={`group flex items-center space-x-1 px-2 py-2 rounded-lg transition-colors ${
-                  isActiveProject 
-                    ? 'bg-interactive/10 text-interactive' 
-                    : isDraggingOver 
-                      ? 'bg-interactive/20' 
-                      : 'bg-surface-secondary/50 hover:bg-surface-hover'
+                  isActiveProject
+                    ? 'bg-interactive/10 text-interactive'
+                    : 'bg-surface-secondary/50 hover:bg-surface-hover'
                 }`}
                 draggable
                 onDragStart={(e) => handleProjectDragStart(e, project)}
@@ -2226,27 +2748,41 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                               />
                             </div>
 
-                            <div
-                              className={`relative group flex items-center ${
-                                isDraggingOverSession ? 'bg-interactive/20 rounded' : ''
-                              }`}
-                              style={{ marginLeft: '0px', paddingLeft: '8px' }}
-                              draggable
-                              onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
-                              onDragEnd={handleDragEnd}
-                              onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
-                              onDrop={(e) => handleSessionDrop(e, session, project.id)}
-                              onDragEnter={handleDragEnter}
-                              onDragLeave={handleDragLeave}
-                            >
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
-                                <GripVertical className="w-3 h-3 text-text-tertiary" />
+                            <div className="relative">
+                              {/* Insertion indicator - before */}
+                              {isDraggingOverSession && dragState.insertPosition === 'before' && (
+                                <div className="absolute left-0 right-0 -top-0.5 h-0.5 bg-interactive z-10">
+                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                                </div>
+                              )}
+
+                              <div
+                                className={`relative group flex items-center`}
+                                style={{ marginLeft: '0px', paddingLeft: '8px' }}
+                                draggable
+                                onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
+                                onDrop={(e) => handleSessionDrop(e, session, project.id)}
+                                onDragEnter={handleDragEnter}
+                                onDragLeave={handleDragLeave}
+                              >
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
+                                  <GripVertical className="w-3 h-3 text-text-tertiary" />
+                                </div>
+                                <SessionListItem
+                                  key={session.id}
+                                  session={session}
+                                  isNested
+                                />
                               </div>
-                              <SessionListItem
-                                key={session.id}
-                                session={session}
-                                isNested
-                              />
+
+                              {/* Insertion indicator - after */}
+                              {isDraggingOverSession && dragState.insertPosition === 'after' && (
+                                <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-interactive z-10">
+                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -2271,19 +2807,366 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
                   </div>
                 </div>
               )}
+
+              {/* Insertion indicator - after */}
+              {isDraggingOver && dragState.insertPosition === 'after' && (
+                <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-interactive z-10">
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                </div>
+              )}
             </div>
           );
         })}
-        
-            <div className="mt-3 pt-3 border-t border-border-primary">
-              <button
-                onClick={() => setShowAddProjectDialog(true)}
-                className="w-full px-2 py-1.5 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors flex items-center justify-center space-x-2"
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+              </div>
+            )}
+
+            {/* Ungrouped Projects Virtual Group */}
+            {(() => {
+              const ungroupedProjects = projectsWithSessions.filter(project =>
+                !groups.some(group => group.projects.some(gp => gp.id === project.id))
+              );
+
+              // Always show Ungrouped group if there are any groups (even if empty), so it can be a drag target
+              if (ungroupedProjects.length === 0 && groups.length === 0) return null;
+
+              const UNGROUPED_GROUP_ID = -1;
+              const isGroupExpanded = expandedGroups.has(UNGROUPED_GROUP_ID);
+              const isDraggingOverGroup = dragState.overType === 'group' && dragState.overGroupId === UNGROUPED_GROUP_ID;
+
+              return (
+                <div className="mb-2">
+                  {/* Group Header (Virtual Ungrouped Group) */}
+                  <div
+                    className={`flex items-center space-x-2 px-2 py-2 bg-surface-primary rounded-lg group/group ${
+                      isDraggingOverGroup ? 'ring-2 ring-interactive' : ''
+                    }`}
+                    onDragOver={(e) => handleGroupDragOver(e, UNGROUPED_GROUP_ID)}
+                    onDrop={(e) => handleGroupDrop(e, null)}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <button
+                      onClick={(e) => toggleGroup(UNGROUPED_GROUP_ID, e)}
+                      className="p-0.5 hover:bg-surface-hover rounded transition-colors"
+                    >
+                      {isGroupExpanded ? (
+                        <ChevronDown className="w-3 h-3 text-text-tertiary" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3 text-text-tertiary" />
+                      )}
+                    </button>
+
+                    <FolderIcon className="w-4 h-4 text-text-tertiary" />
+                    <span className="text-sm font-bold text-text-primary flex-1">Ungrouped</span>
+                  </div>
+
+                  {/* Projects in ungrouped virtual group */}
+                  {isGroupExpanded && (
+                    <div
+                      className="ml-4 mt-1 space-y-1"
+                      onDragOver={(e) => handleGroupDragOver(e, UNGROUPED_GROUP_ID)}
+                      onDrop={(e) => handleGroupDrop(e, null)}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                    >
+                      {ungroupedProjects.length === 0 ? (
+                        <div className="px-2 py-3 text-sm text-text-tertiary italic">
+                          No ungrouped projects. Drag projects here to remove them from groups.
+                        </div>
+                      ) : (
+                        ungroupedProjects.map((project) => {
+          const isExpanded = expandedProjects.has(project.id);
+          const sessionCount = project.sessions.length;
+          const isDraggingOver = dragState.overType === 'project' && dragState.overProjectId === project.id;
+          const unviewedCount = project.sessions.filter(s => s.status === 'completed_unviewed').length;
+          const isActiveProject = activeProjectId === project.id;
+
+          return (
+            <div key={project.id} className="mb-1 relative">
+              {/* Insertion indicator - before */}
+              {isDraggingOver && dragState.insertPosition === 'before' && (
+                <div className="absolute left-0 right-0 -top-0.5 h-0.5 bg-interactive z-10">
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                </div>
+              )}
+
+              <div
+                className={`group flex items-center space-x-1 px-2 py-2 rounded-lg transition-colors ${
+                  isActiveProject
+                    ? 'bg-interactive/10 text-interactive'
+                    : 'bg-surface-secondary/50 hover:bg-surface-hover'
+                }`}
+                draggable
+                onDragStart={(e) => handleProjectDragStart(e, project)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleProjectDragOver(e, project)}
+                onDrop={(e) => handleProjectDrop(e, project)}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
               >
-                <Plus className="w-4 h-4" />
-                <span>New Project</span>
-              </button>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move">
+                  <GripVertical className="w-3 h-3 text-text-tertiary" />
+                </div>
+
+                {(sessionCount > 0 || (project.folders && project.folders.length > 0)) ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      toggleProject(project.id, e);
+                    }}
+                    onMouseDown={(e) => {
+                      // Prevent drag start when clicking the toggle button
+                      e.stopPropagation();
+                    }}
+                    className="p-0.5 hover:bg-surface-hover rounded transition-colors z-10"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-3 h-3 text-text-tertiary" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-text-tertiary" />
+                    )}
+                  </button>
+                ) : (
+                  <div className="w-3 h-3 p-0.5" />
+                )}
+
+                <div
+                  className="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer"
+                  onClick={() => handleProjectClick(project)}
+                >
+                  <div className="relative" title="Git-backed project (connected to repository)">
+                    <GitBranch className="w-4 h-4 text-interactive flex-shrink-0" />
+                  </div>
+                  <span className="text-sm font-semibold text-text-primary truncate text-left" title={project.name}>
+                    {project.name}
+                  </span>
+                  {unviewedCount > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-interactive text-white rounded-full animate-pulse">
+                      {unviewedCount}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Check if cmd/ctrl is held for quick add
+                    if (e.metaKey || e.ctrlKey) {
+                      handleQuickAddSession(project);
+                    } else {
+                      handleCreateSession(project);
+                    }
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-all opacity-0 group-hover:opacity-100"
+                  title={`New Session${navigator.platform.includes('Mac') ? ' (⌘' : ' (Ctrl'}+click for quick session)`}
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>New Session</span>
+                </button>
+
+                <button
+                  onClick={(e) => handleRefreshProjectGitStatus(project, e)}
+                  disabled={refreshingProjects.has(project.id)}
+                  className={`p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-all opacity-0 group-hover:opacity-100 ${
+                    refreshingProjects.has(project.id) ? 'cursor-wait' : ''
+                  }`}
+                  title="Refresh git status for all sessions"
+                >
+                  <RefreshCw className={`w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 ${
+                    refreshingProjects.has(project.id) ? 'animate-spin' : ''
+                  }`} />
+                </button>
+
+                {project.run_script && project.run_script.trim() && (
+                  <button
+                    onClick={(e) => handleRunProjectScript(project, e)}
+                    disabled={closingProjectId === project.id}
+                    className={`transition-opacity p-1 rounded ${
+                      closingProjectId === project.id
+                        ? 'cursor-wait text-status-warning'
+                        : runningProjectId === project.id
+                        ? 'hover:bg-status-error/10 text-status-error hover:text-status-error opacity-100'
+                        : 'opacity-0 group-hover:opacity-100 hover:bg-status-success/10 text-status-success hover:text-status-success'
+                    }`}
+                    title={
+                      closingProjectId === project.id
+                        ? 'Closing script...'
+                        : runningProjectId === project.id
+                        ? 'Stop script'
+                        : 'Run project script in project root'
+                    }
+                  >
+                    {closingProjectId === project.id ? '⏸️' : runningProjectId === project.id ? '⏹️' : '▶️'}
+                  </button>
+                )}
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProjectForSettings(project);
+                    setShowProjectSettings(true);
+                  }}
+                  className="p-1 hover:bg-surface-hover rounded transition-colors opacity-0 group-hover:opacity-100"
+                  title="Project settings"
+                >
+                  <Settings className="w-3 h-3 text-text-tertiary hover:text-text-primary" />
+                </button>
+              </div>
+
+              {isExpanded && (sessionCount > 0 || (project.folders && project.folders.length > 0)) && (
+                <div className="relative mt-1 space-y-1">
+                  {/* Main vertical line from project to all children */}
+                  <div className="absolute top-0 bottom-0 w-px bg-border-secondary" style={{ left: '8px' }} />
+                  {/* Render folders and sessions mixed together by displayOrder */}
+                  {(() => {
+                    // Get root folders (folders without a parent)
+                    const folderTree = project.folders ? buildFolderTree(project.folders) : [];
+                    // Get root sessions (sessions not in any folder)
+                    const rootSessions = project.sessions.filter(s => !s.folderId);
+
+                    const rootItems: TreeItem[] = [
+                      ...folderTree.map(folder => ({
+                        type: 'folder' as const,
+                        data: folder,
+                        id: folder.id,
+                        name: folder.name,
+                        displayOrder: folder.displayOrder ?? 0,
+                        createdAtValue: parseCreatedAt(folder.createdAt)
+                      })),
+                      ...rootSessions.map(session => ({
+                        type: 'session' as const,
+                        data: session,
+                        id: session.id,
+                        name: session.name,
+                        displayOrder: session.displayOrder ?? 0,
+                        createdAtValue: parseCreatedAt(session.createdAt)
+                      }))
+                    ];
+
+                    rootItems.sort(treeComparator);
+
+                    // Render each item based on its type
+                    return rootItems.map((item, index, array) => {
+                      const isLastItem = index === array.length - 1;
+
+                      if (item.type === 'folder') {
+                        return renderFolder(item.data, project, 1, isLastItem, [!isLastItem]);
+                      } else {
+                        // Render session
+                        const session = item.data;
+                        const isDraggingOverSession = dragState.overType === 'session' &&
+                                                     dragState.overSessionId === session.id &&
+                                                     dragState.overProjectId === project.id;
+
+                        return (
+                          <div
+                            key={session.id}
+                            className="relative"
+                            style={{ marginLeft: '16px' }}
+                          >
+                            {/* Tree lines for root sessions */}
+                            <div className="absolute inset-0 pointer-events-none">
+                              {/* Vertical line from parent if not last session */}
+                              {!isLastItem && (
+                                <div
+                                  className="absolute top-0 bottom-0 w-px bg-border-secondary"
+                                  style={{ left: '8px' }}
+                                />
+                              )}
+
+                              {/* Horizontal connector line for root session */}
+                              <div
+                                className="absolute h-px bg-border-secondary"
+                                style={{
+                                  left: '8px',
+                                  right: 'calc(100% - 16px)',
+                                  top: '16px'
+                                }}
+                              />
+                            </div>
+
+                            <div className="relative">
+                              {/* Insertion indicator - before */}
+                              {isDraggingOverSession && dragState.insertPosition === 'before' && (
+                                <div className="absolute left-0 right-0 -top-0.5 h-0.5 bg-interactive z-10">
+                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                                </div>
+                              )}
+
+                              <div
+                                className={`relative group flex items-center`}
+                                style={{ marginLeft: '0px', paddingLeft: '8px' }}
+                                draggable
+                                onDragStart={(e) => handleSessionDragStart(e, session, project.id)}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={(e) => handleSessionDragOver(e, session, project.id)}
+                                onDrop={(e) => handleSessionDrop(e, session, project.id)}
+                                onDragEnter={handleDragEnter}
+                                onDragLeave={handleDragLeave}
+                              >
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-move pl-1">
+                                  <GripVertical className="w-3 h-3 text-text-tertiary" />
+                                </div>
+                                <SessionListItem
+                                  key={session.id}
+                                  session={session}
+                                  isNested
+                                />
+                              </div>
+
+                              {/* Insertion indicator - after */}
+                              {isDraggingOverSession && dragState.insertPosition === 'after' && (
+                                <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-interactive z-10">
+                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                    });
+                  })()}
+
+                  {/* Add folder button */}
+                  <div className="ml-6 mt-2 border-t border-border-primary pt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProjectForFolder(project);
+                        setShowCreateFolderDialog(true);
+                        setNewFolderName('');
+                      }}
+                      className="w-full px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded transition-colors flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Folder</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Insertion indicator - after */}
+              {isDraggingOver && dragState.insertPosition === 'after' && (
+                <div className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-interactive z-10">
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-interactive rounded-full" />
+                </div>
+              )}
             </div>
+          );
+        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
           </>
         )}
         
@@ -2406,13 +3289,14 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       )}
       
       {/* Add Project Dialog */}
-      <Modal 
-        isOpen={showAddProjectDialog} 
+      <Modal
+        isOpen={showAddProjectDialog}
         onClose={() => {
           setShowAddProjectDialog(false);
           setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
           setDetectedBranchForNewProject(null);
           setShowValidationErrors(false);
+          setSelectedGroupForNewProject(null);
         }}
         size="lg"
       >
@@ -2555,6 +3439,7 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
               setNewProject({ name: '', path: '', buildScript: '', runScript: '' });
               setDetectedBranchForNewProject(null);
               setShowValidationErrors(false);
+              setSelectedGroupForNewProject(null);
             }}
             variant="ghost"
             size="md"
@@ -2654,6 +3539,79 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         </div>
       )}
 
+      {/* Add Group Dialog */}
+      {showAddGroupDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => {
+          setShowAddGroupDialog(false);
+          setNewGroupName('');
+          setNewGroupDescription('');
+        }}>
+          <div className="bg-surface-primary rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">
+              Create New Group
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Group Name <span className="text-status-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary"
+                  placeholder="My Project Group"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newGroupName.trim()) {
+                      handleCreateGroup();
+                    } else if (e.key === 'Escape') {
+                      setShowAddGroupDialog(false);
+                      setNewGroupName('');
+                      setNewGroupDescription('');
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={newGroupDescription}
+                  onChange={(e) => setNewGroupDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:border-interactive focus:ring-1 focus:ring-interactive placeholder-text-tertiary resize-none"
+                  placeholder="Describe the purpose of this group..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowAddGroupDialog(false);
+                  setNewGroupName('');
+                  setNewGroupDescription('');
+                }}
+                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateGroup}
+                disabled={!newGroupName.trim()}
+                className="px-4 py-2 bg-interactive hover:bg-interactive-hover text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Create Group
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Folder Context Menu */}
       {isMenuOpen('folder') && menuState.payload && menuState.position && (
         <div
@@ -2709,4 +3667,4 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       )}
     </>
   );
-}
+});
