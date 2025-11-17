@@ -1,0 +1,60 @@
+import { IpcMain } from 'electron';
+import { spawn } from 'child_process';
+import { existsSync } from 'fs';
+import type { AppServices } from './types';
+
+const NIMBALYST_PATH = '/Applications/Nimbalyst.app/Contents/MacOS/Nimbalyst';
+
+export function registerNimbalystHandlers(ipcMain: IpcMain, services: AppServices): void {
+  // Check if Nimbalyst is installed
+  ipcMain.handle('nimbalyst:check-installed', () => {
+    try {
+      // TEMP: Simulate Nimbalyst not being installed for testing
+      const isInstalled = false; // Change back to: existsSync(NIMBALYST_PATH);
+      return { success: true, data: isInstalled };
+    } catch (error) {
+      console.error('Error checking Nimbalyst installation:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to check Nimbalyst installation' };
+    }
+  });
+
+  // Open a worktree in Nimbalyst
+  ipcMain.handle('nimbalyst:open-worktree', async (_event, worktreePath: string) => {
+    try {
+      // Check if Nimbalyst is installed
+      if (!existsSync(NIMBALYST_PATH)) {
+        return {
+          success: false,
+          error: 'Nimbalyst is not installed. Please download it from https://nimbalyst.com/'
+        };
+      }
+
+      // Check if worktree path exists
+      if (!existsSync(worktreePath)) {
+        return {
+          success: false,
+          error: `Worktree path does not exist: ${worktreePath}`
+        };
+      }
+
+      // Spawn Nimbalyst with the worktree path
+      const child = spawn(NIMBALYST_PATH, ['--workspace', worktreePath], {
+        detached: true,
+        stdio: 'ignore'
+      });
+
+      // Unref the child process so it can continue running independently
+      child.unref();
+
+      console.log('[Nimbalyst] Opened worktree:', worktreePath);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error opening worktree in Nimbalyst:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to open worktree in Nimbalyst'
+      };
+    }
+  });
+}

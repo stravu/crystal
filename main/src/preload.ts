@@ -599,6 +599,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debug: {
     getTableStructure: (tableName: 'folders' | 'sessions'): Promise<IPCResponse> => ipcRenderer.invoke('debug:get-table-structure', tableName),
   },
+
+  // Nimbalyst integration
+  nimbalyst: {
+    checkInstalled: (): Promise<IPCResponse> => ipcRenderer.invoke('nimbalyst:check-installed'),
+    openWorktree: (worktreePath: string): Promise<IPCResponse> => ipcRenderer.invoke('nimbalyst:open-worktree', worktreePath),
+  },
 });
 
 // Expose electron event listeners and utilities for permission requests
