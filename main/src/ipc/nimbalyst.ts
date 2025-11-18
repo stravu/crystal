@@ -9,8 +9,7 @@ export function registerNimbalystHandlers(ipcMain: IpcMain, services: AppService
   // Check if Nimbalyst is installed
   ipcMain.handle('nimbalyst:check-installed', () => {
     try {
-      // TEMP: Simulate Nimbalyst not being installed for testing
-      const isInstalled = false; // Change back to: existsSync(NIMBALYST_PATH);
+      const isInstalled = existsSync(NIMBALYST_PATH);
       return { success: true, data: isInstalled };
     } catch (error) {
       console.error('Error checking Nimbalyst installation:', error);
