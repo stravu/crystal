@@ -570,13 +570,15 @@ async function initializeServices() {
 
   // Initialize CLI manager factory
   cliManagerFactory = CliManagerFactory.getInstance(logger, configManager);
-  
+
   // Create default CLI manager (Claude) with permission IPC path
+  // Skip validation during startup - tools will be validated when actually used
   defaultCliManager = await cliManagerFactory.createManager('claude', {
     sessionManager,
     logger,
     configManager,
-    additionalOptions: { permissionIpcPath }
+    additionalOptions: { permissionIpcPath },
+    skipValidation: true  // Allow Crystal to start even if Claude Code is not installed
   });
   gitDiffManager = new GitDiffManager();
   gitStatusManager = new GitStatusManager(sessionManager, worktreeManager, gitDiffManager, logger);
