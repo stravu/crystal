@@ -36,8 +36,12 @@ export function registerNimbalystHandlers(ipcMain: IpcMain, services: AppService
         };
       }
 
-      // Spawn Nimbalyst with the worktree path
-      const child = spawn(NIMBALYST_PATH, ['--workspace', worktreePath], {
+      // Spawn Nimbalyst with the worktree path and git-worktree filter
+      const args = ['--workspace', worktreePath, '--filter', 'git-worktree'];
+      console.log('[Nimbalyst] Opening with command:', NIMBALYST_PATH, args.join(' '));
+      console.log('[Nimbalyst] Full args array:', JSON.stringify(args));
+
+      const child = spawn(NIMBALYST_PATH, args, {
         detached: true,
         stdio: 'ignore'
       });
@@ -45,7 +49,7 @@ export function registerNimbalystHandlers(ipcMain: IpcMain, services: AppService
       // Unref the child process so it can continue running independently
       child.unref();
 
-      console.log('[Nimbalyst] Opened worktree:', worktreePath);
+      console.log('[Nimbalyst] Process spawned successfully for worktree:', worktreePath);
 
       return { success: true };
     } catch (error) {
