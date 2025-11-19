@@ -59,14 +59,15 @@ export abstract class BaseAIPanelHandler {
    */
   protected registerExistingPanels(): void {
     const { databaseService, logger } = this.services;
-    
+
     logger?.info(`[${this.config.panelTypeName}] Registering existing ${this.config.panelTypeName} panels from database...`);
     const activePanels = databaseService.getActivePanels();
     const typedPanels = activePanels.filter(panel => panel.type === this.config.panelType);
-    
+
     for (const panel of typedPanels) {
       try {
-        this.panelManager.registerPanel(panel.id, panel.sessionId);
+        // Pass false for isUserInitiated since this is restoration from database
+        this.panelManager.registerPanel(panel.id, panel.sessionId, undefined, false);
         logger?.info(`[${this.config.panelTypeName}] Registered existing panel ${panel.id} for session ${panel.sessionId}`);
       } catch (error) {
         logger?.error(`[${this.config.panelTypeName}] Failed to register existing panel ${panel.id}: ${error}`);

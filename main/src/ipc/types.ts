@@ -17,6 +17,7 @@ import type { CliManagerFactory } from '../services/cliManagerFactory';
 import type { AbstractCliManager } from '../services/panels/cli/AbstractCliManager';
 import type { Logger } from '../utils/logger';
 import type { ArchiveProgressManager } from '../services/archiveProgressManager';
+import type { AnalyticsManager } from '../services/analyticsManager';
 
 export interface AppServices {
   app: App;
@@ -38,4 +39,5 @@ export interface AppServices {
   getMainWindow: () => BrowserWindow | null;
   logger?: Logger;
   archiveProgressManager?: ArchiveProgressManager;
+  analyticsManager?: AnalyticsManager;
 } 

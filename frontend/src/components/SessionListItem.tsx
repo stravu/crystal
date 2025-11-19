@@ -13,6 +13,7 @@ import type { Session, GitStatus } from '../types/session';
 import { useContextMenu } from '../contexts/ContextMenuContext';
 import { IconButton } from './ui/IconButton';
 import { cn } from '../utils/cn';
+import { AnalyticsService } from '../services/analyticsService';
 
 interface SessionListItemProps {
   session: Session;
@@ -341,6 +342,12 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
     e.stopPropagation();
 
     try {
+      // Track button click
+      const sessionIdHash = await AnalyticsService.hashSessionId(session.id);
+      await AnalyticsService.trackNimbalystButtonClicked({
+        session_id_hash: sessionIdHash
+      });
+
       // Check if Nimbalyst is installed
       const checkResponse = await window.electronAPI.nimbalyst.checkInstalled();
 
@@ -349,6 +356,11 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       }
 
       if (!checkResponse.data) {
+        // Track install dialog shown
+        await AnalyticsService.trackNimbalystInstallDialogShown({
+          session_id_hash: sessionIdHash
+        });
+
         // Show install dialog if not installed
         setShowNimbalystInstall(true);
         return;
@@ -360,6 +372,11 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       if (!openResponse.success) {
         throw new Error(openResponse.error || 'Failed to open worktree in Nimbalyst');
       }
+
+      // Track successful open
+      await AnalyticsService.trackNimbalystOpened({
+        session_id_hash: sessionIdHash
+      });
 
     } catch (error) {
       console.error('Error opening in Nimbalyst:', error);

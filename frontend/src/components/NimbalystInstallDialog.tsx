@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { X, ExternalLink, Download } from 'lucide-react';
 import { NimbalystIcon } from './icons/NimbalystIcon';
+import { AnalyticsService } from '../services/analyticsService';
 
 interface NimbalystInstallDialogProps {
   isOpen: boolean;
@@ -28,7 +29,10 @@ export function NimbalystInstallDialog({ isOpen, onClose }: NimbalystInstallDial
 
   if (!isOpen) return null;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    // Track download button click
+    await AnalyticsService.trackNimbalystDownloadClicked({});
+
     window.electronAPI.invoke('openExternal', 'https://nimbalyst.com/');
     onClose();
   };

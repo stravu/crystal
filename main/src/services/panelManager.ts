@@ -4,10 +4,16 @@ import { databaseService } from './database';
 import { panelEventBus } from './panelEventBus';
 import { mainWindow } from '../index';
 import { withLock } from '../utils/mutex';
+import type { AnalyticsManager } from './analyticsManager';
 
 export class PanelManager {
   private panels = new Map<string, ToolPanel>();
-  
+  private analyticsManager: AnalyticsManager | null = null;
+
+  setAnalyticsManager(analyticsManager: AnalyticsManager): void {
+    this.analyticsManager = analyticsManager;
+  }
+
   constructor() {
     // Load panels from database on startup (but don't initialize processes)
     this.loadPanelsFromDatabase();
@@ -108,9 +114,18 @@ export class PanelManager {
       if (mainWindow) {
         mainWindow.webContents.send('panel:created', panel);
       }
-      
+
+      // Track terminal panel creation analytics (only for new panels, not restoration)
+      if (request.type === 'terminal' && this.analyticsManager) {
+        const terminalCount = this.getPanelsBySessionAndType(request.sessionId, 'terminal').length;
+        this.analyticsManager.track('terminal_panel_created', {
+          session_id_hash: this.analyticsManager.hashSessionId(request.sessionId),
+          terminal_count: terminalCount
+        });
+      }
+
       console.log(`[PanelManager] Created panel ${panelId} of type ${request.type} for session ${request.sessionId}`);
-      
+
       return panel;
     });
   }
@@ -137,16 +152,21 @@ export class PanelManager {
         console.warn(`[PanelManager] Panel ${panelId} not found for deletion`);
         return;
       }
-      
+
       // Check if panel is permanent
       if (panel.metadata.permanent) {
         console.warn(`[PanelManager] Cannot delete permanent panel ${panelId}`);
         return;
       }
-      
+
+      // Calculate panel lifetime for analytics
+      const createdAt = new Date(panel.metadata.createdAt);
+      const now = new Date();
+      const lifetimeSeconds = Math.floor((now.getTime() - createdAt.getTime()) / 1000);
+
       // Clean up event subscriptions
       panelEventBus.unsubscribePanel(panelId);
-      
+
       // If this was the active panel, activate another one
       const activePanelId = databaseService.getActivePanel(panel.sessionId)?.id;
       if (activePanelId === panelId) {
@@ -157,18 +177,26 @@ export class PanelManager {
           await this.setActivePanel(panel.sessionId, null);
         }
       }
-      
+
       // Remove from database
       databaseService.deletePanel(panelId);
-      
+
       // Remove from cache
       this.panels.delete(panelId);
-      
+
       // Emit IPC event to notify frontend
       if (mainWindow) {
         mainWindow.webContents.send('panel:deleted', { panelId, sessionId: panel.sessionId });
       }
-      
+
+      // Track panel closure
+      if (this.analyticsManager) {
+        this.analyticsManager.track('panel_closed', {
+          panel_type: panel.type,
+          panel_lifetime_seconds: lifetimeSeconds
+        });
+      }
+
       console.log(`[PanelManager] Deleted panel ${panelId}`);
     });
   }
@@ -204,9 +232,17 @@ export class PanelManager {
   
   async setActivePanel(sessionId: string, panelId: string | null): Promise<void> {
     return await withLock(`panel-active-${sessionId}`, async () => {
+      // Get current active panel for analytics
+      const currentActivePanel = databaseService.getActivePanel(sessionId);
+      const fromPanelType = currentActivePanel?.type;
+
       // Update database
       databaseService.setActivePanel(sessionId, panelId);
-      
+
+      // Get new active panel for analytics
+      const newActivePanel = panelId ? this.getPanel(panelId) : null;
+      const toPanelType = newActivePanel?.type;
+
       // Update panel states
       const panels = this.getPanelsForSession(sessionId);
       panels.forEach(panel => {
@@ -222,17 +258,25 @@ export class PanelManager {
             state: panel.state,
             metadata: panel.metadata
           });
-          
+
           // Update in cache
           this.panels.set(panel.id, panel);
         }
       });
-      
+
       // Emit IPC event to notify frontend
       if (mainWindow) {
         mainWindow.webContents.send('panel:activeChanged', { sessionId, panelId });
       }
-      
+
+      // Track panel switching (only if both from and to panels exist)
+      if (this.analyticsManager && fromPanelType && toPanelType && fromPanelType !== toPanelType) {
+        this.analyticsManager.track('panel_switched', {
+          from_panel_type: fromPanelType,
+          to_panel_type: toPanelType
+        });
+      }
+
       console.log(`[PanelManager] Set active panel for session ${sessionId} to ${panelId}`);
     });
   }

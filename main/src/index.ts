@@ -27,6 +27,7 @@ import { StravuAuthManager } from './services/stravuAuthManager';
 import { StravuNotebookService } from './services/stravuNotebookService';
 import { Logger } from './utils/logger';
 import { ArchiveProgressManager } from './services/archiveProgressManager';
+import { AnalyticsManager } from './services/analyticsManager';
 import { initializeCommitManager } from './services/commitManager';
 import { setCrystalDirectory } from './utils/crystalDirectory';
 import { getCurrentWorktreeName } from './utils/worktreeUtils';
@@ -83,6 +84,10 @@ let versionChecker: VersionChecker;
 let stravuAuthManager: StravuAuthManager;
 let stravuNotebookService: StravuNotebookService;
 let archiveProgressManager: ArchiveProgressManager;
+let analyticsManager: AnalyticsManager;
+
+// Store app start time for session duration tracking
+let appStartTime: number;
 
 // Store original console methods before overriding
 // These must be captured immediately when the module loads
@@ -537,9 +542,17 @@ async function initializeServices() {
   databaseService = new DatabaseService(dbPath);
   databaseService.initialize();
 
-  sessionManager = new SessionManager(databaseService);
+  // Initialize analytics manager early so it can be used by SessionManager
+  analyticsManager = new AnalyticsManager(configManager);
+  await analyticsManager.initialize();
+
+  // Set analytics manager on logsManager for script execution tracking
+  const { logsManager } = await import('./services/panels/logPanel/logsManager');
+  logsManager.setAnalyticsManager(analyticsManager);
+
+  sessionManager = new SessionManager(databaseService, analyticsManager);
   sessionManager.initializeFromDatabase();
-  
+
   archiveProgressManager = new ArchiveProgressManager();
 
   // Start permission IPC server
@@ -559,8 +572,8 @@ async function initializeServices() {
     permissionIpcServer = null;
   }
 
-  // Create worktree manager with configManager
-  worktreeManager = new WorktreeManager(configManager);
+  // Create worktree manager with configManager and analyticsManager
+  worktreeManager = new WorktreeManager(configManager, analyticsManager);
 
   // Initialize the active project's worktree directory if one exists
   const activeProject = sessionManager.getActiveProject();
@@ -580,12 +593,12 @@ async function initializeServices() {
     additionalOptions: { permissionIpcPath },
     skipValidation: true  // Allow Crystal to start even if Claude Code is not installed
   });
-  gitDiffManager = new GitDiffManager();
+  gitDiffManager = new GitDiffManager(logger, analyticsManager);
   gitStatusManager = new GitStatusManager(sessionManager, worktreeManager, gitDiffManager, logger);
   executionTracker = new ExecutionTracker(sessionManager, gitDiffManager);
   worktreeNameGenerator = new WorktreeNameGenerator(configManager);
   runCommandManager = new RunCommandManager(databaseService);
-  
+
   // Initialize version checker
   versionChecker = new VersionChecker(configManager, logger);
   stravuAuthManager = new StravuAuthManager(logger);
@@ -621,6 +634,7 @@ async function initializeServices() {
     getMainWindow: () => mainWindow,
     logger,
     archiveProgressManager,
+    analyticsManager,
   };
 
   // Initialize IPC handlers first so managers (like ClaudePanelManager) are ready
@@ -656,15 +670,45 @@ async function initializeServices() {
 }
 
 app.whenReady().then(async () => {
+  // Record app start time
+  appStartTime = Date.now();
+
   console.log('[Main] App is ready, initializing services...');
   await initializeServices();
   console.log('[Main] Services initialized, creating window...');
   await createWindow();
   console.log('[Main] Window created successfully');
-  
+
+  // Track app lifecycle events
+  try {
+    const currentVersion = app.getVersion();
+    const lastVersion = databaseService.getLastAppVersion();
+    const isFirstLaunch = lastVersion === null;
+
+    // Check if version changed (app update)
+    if (lastVersion && lastVersion !== currentVersion) {
+      console.log(`[Analytics] App updated from ${lastVersion} to ${currentVersion}`);
+      analyticsManager.track('app_updated', {
+        previous_version: lastVersion,
+        new_version: currentVersion
+      });
+    }
+
+    // Track app opened
+    console.log(`[Analytics] App opened (version: ${currentVersion}, first_launch: ${isFirstLaunch})`);
+    analyticsManager.track('app_opened', {
+      is_first_launch: isFirstLaunch
+    });
+
+    // Record app open in database with version
+    databaseService.recordAppOpen(false, false, currentVersion);
+  } catch (error) {
+    console.error('[Analytics] Failed to track app lifecycle events:', error);
+  }
+
   // Configure auto-updater
   setupAutoUpdater(() => mainWindow);
-  
+
   // Check for updates after window is created
   setTimeout(async () => {
     console.log('[Main] Performing startup version check...');
@@ -764,6 +808,23 @@ app.on('before-quit', async (event) => {
   // Stop version checker
   if (versionChecker) {
     versionChecker.stopPeriodicCheck();
+  }
+
+  // Track app closed event with session duration
+  if (analyticsManager && appStartTime) {
+    try {
+      const sessionDurationSeconds = Math.floor((Date.now() - appStartTime) / 1000);
+      console.log(`[Analytics] App closed after ${sessionDurationSeconds} seconds`);
+      analyticsManager.track('app_closed', {
+        session_duration_seconds: sessionDurationSeconds
+      });
+
+      // Flush analytics events before shutdown
+      await analyticsManager.flush();
+      await analyticsManager.shutdown();
+    } catch (error) {
+      console.error('[Analytics] Failed to track app_closed event:', error);
+    }
   }
 
   // Close logger to ensure all logs are flushed

@@ -46,4 +46,10 @@ export interface AppConfig {
   };
   // Crystal commit footer setting (enabled by default)
   enableCrystalFooter?: boolean;
+  // PostHog analytics settings
+  analytics?: {
+    enabled: boolean;
+    posthogApiKey?: string;
+    posthogHost?: string;
+  };
 }
