@@ -38,6 +38,9 @@ importers:
       openai:
         specifier: ^5.1.1
         version: 5.10.1(zod@3.25.76)
+      posthog-node:
+        specifier: ^5.11.2
+        version: 5.11.2
       web-streams-polyfill:
         specifier: ^3.3.3
         version: 3.3.3
