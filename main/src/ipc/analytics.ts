@@ -37,13 +37,9 @@ interface NotificationShownEvent extends Record<string, string | number | boolea
   trigger_event: string;
 }
 
-interface AnalyticsOptedOutEvent extends Record<string, string | number | boolean | string[] | undefined> {
-  // No additional properties needed
-}
-
-interface AnalyticsOptedInEvent extends Record<string, string | number | boolean | string[] | undefined> {
-  // No additional properties needed
-}
+// Event types for analytics opt-in/opt-out (no additional properties needed)
+type AnalyticsOptedOutEvent = Record<string, string | number | boolean | string[] | undefined>;
+type AnalyticsOptedInEvent = Record<string, string | number | boolean | string[] | undefined>;
 
 interface NimbalystButtonClickedEvent extends Record<string, string | number | boolean | string[] | undefined> {
   session_id_hash?: string;
@@ -53,9 +49,8 @@ interface NimbalystInstallDialogShownEvent extends Record<string, string | numbe
   session_id_hash?: string;
 }
 
-interface NimbalystDownloadClickedEvent extends Record<string, string | number | boolean | string[] | undefined> {
-  // No additional properties needed
-}
+// Event type for Nimbalyst download clicked (no additional properties needed)
+type NimbalystDownloadClickedEvent = Record<string, string | number | boolean | string[] | undefined>;
 
 interface NimbalystOpenedEvent extends Record<string, string | number | boolean | string[] | undefined> {
   session_id_hash?: string;
@@ -98,13 +93,11 @@ export function registerAnalyticsHandlers(ipcMain: IpcMain, services: AppService
         return { success: false, error: 'Invalid event data' };
       }
 
-      // Special handling for opt-out event: track it even if analytics is about to be disabled
+      // Special handling for opt-out event: always track it even if analytics is about to be disabled
       // This ensures we capture the opt-out event before the config change takes effect
       if (data.event === 'analytics_opted_out') {
-        // Force tracking by temporarily bypassing the enabled check
-        if (analyticsManager.isEnabled() || true) {
-          analyticsManager.track(data.event, data.properties);
-        }
+        // Always track opt-out events regardless of current enabled state
+        analyticsManager.track(data.event, data.properties);
       } else {
         // Normal tracking (respects enabled/disabled state)
         analyticsManager.track(data.event, data.properties);

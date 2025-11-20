@@ -66,9 +66,8 @@ export interface NimbalystInstallDialogShownProperties extends Record<string, st
   session_id_hash?: string;
 }
 
-export interface NimbalystDownloadClickedProperties extends Record<string, string | number | boolean | string[] | undefined> {
-  // No additional properties needed
-}
+// Event type for Nimbalyst download clicked (no additional properties needed)
+export type NimbalystDownloadClickedProperties = Record<string, string | number | boolean | string[] | undefined>;
 
 export interface NimbalystOpenedProperties extends Record<string, string | number | boolean | string[] | undefined> {
   session_id_hash?: string;
