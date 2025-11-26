@@ -76,9 +76,9 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
     if (!projectId) return;
     
     try {
-      // First, update the project's run script to "crystal-run.sh"
+      // First, update the project's run script to "./crystal-run.sh"
       const updateResponse = await API.projects.update(projectId, {
-        run_script: 'crystal-run.sh'
+        run_script: './crystal-run.sh'
       });
       
       if (!updateResponse.success) {
@@ -87,7 +87,7 @@ const SetupTasksPanel: React.FC<SetupTasksPanelProps> = ({ panelId, isActive }) 
         return;
       }
       
-      console.log('[SetupTasksPanel] Successfully set run script to crystal-run.sh');
+      console.log('[SetupTasksPanel] Successfully set run script to ./crystal-run.sh');
       
       // Now open the session dialog with the specific prompt
       setShowSessionDialog(true);
