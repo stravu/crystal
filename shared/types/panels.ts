@@ -50,6 +50,9 @@ export interface DiffPanelState {
   commitSha?: string;               // Specific commit being viewed
 }
 
+// Panel status type - mirrors session status but at panel level
+export type PanelStatus = 'idle' | 'running' | 'waiting' | 'stopped' | 'completed_unviewed' | 'error';
+
 // Base interface for AI panel states (Claude, Codex, etc.)
 export interface BaseAIPanelState {
   // Common state for all AI tools
@@ -58,10 +61,14 @@ export interface BaseAIPanelState {
   model?: string;                // Model being used
   lastActivityTime?: string;     // For "idle since" indicators
   lastInput?: string;            // Last input sent to the AI
-  
+
+  // Panel-level status tracking (independent per panel)
+  panelStatus?: PanelStatus;     // Current panel execution status
+  hasUnviewedContent?: boolean;  // Whether panel has content not yet viewed
+
   // Generic agent session ID for resume functionality (used by all AI agents)
   agentSessionId?: string;        // The AI agent's session ID for resuming conversations
-  
+
   // Legacy fields for backward compatibility (will be migrated to agentSessionId)
   claudeSessionId?: string;       // Deprecated: Use agentSessionId instead
   codexSessionId?: string;        // Deprecated: Use agentSessionId instead

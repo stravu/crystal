@@ -200,12 +200,24 @@ export const SessionView = memo(() => {
   const handlePanelSelect = useCallback(
     async (panel: ToolPanel) => {
       if (!activeSession) return;
-      
+
       // Add to history when panel is selected
       addToHistory(activeSession.id, panel.id);
-      
+
       setActivePanelInStore(activeSession.id, panel.id);
       await panelApi.setActivePanel(activeSession.id, panel.id);
+
+      // Clear unviewed content flag when panel is viewed (for AI panels)
+      if (panel.type === 'claude' || panel.type === 'codex') {
+        const customState = panel.state?.customState as { hasUnviewedContent?: boolean; panelStatus?: string } | undefined;
+        if (customState?.hasUnviewedContent || customState?.panelStatus === 'completed_unviewed') {
+          try {
+            await panelApi.clearPanelUnviewedContent(panel.id);
+          } catch (err) {
+            console.error('[SessionView] Failed to clear unviewed content:', err);
+          }
+        }
+      }
     },
     [activeSession, setActivePanelInStore, addToHistory]
   );

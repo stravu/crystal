@@ -6,7 +6,7 @@ import { addSessionLog } from './ipc/logs';
 import { getCodexModelConfig } from '../../shared/types/models';
 import { panelManager } from './services/panelManager';
 import { terminalPanelManager } from './services/terminalPanelManager';
-import type { ToolPanel, CodexPanelState, ClaudePanelState } from '../../shared/types/panels';
+import type { ToolPanel, CodexPanelState, ClaudePanelState, BaseAIPanelState, PanelStatus } from '../../shared/types/panels';
 import type { ClaudePanelManager } from './services/panels/claude/claudePanelManager';
 import type { SessionOutput } from './types/session';
 import {
@@ -324,6 +324,71 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     });
   };
 
+  /**
+   * Update the status of an AI panel (claude/codex) and notify frontend
+   */
+  const updateAIPanelStatus = async (
+    panelId: string,
+    status: PanelStatus,
+    hasUnviewedContent?: boolean
+  ): Promise<void> => {
+    const { withLock } = await import('./utils/mutex');
+    return await withLock(`panel-state-${panelId}`, async () => {
+      const panel = panelManager.getPanel(panelId);
+      if (!panel) {
+        return;
+      }
+
+      // Only update status for AI panels (claude/codex)
+      if (panel.type !== 'claude' && panel.type !== 'codex') {
+        return;
+      }
+
+      const existing = (panel.state.customState as BaseAIPanelState | undefined) ?? {};
+      const nextCustomState: BaseAIPanelState = {
+        ...existing,
+        panelStatus: status,
+        lastActivityTime: new Date().toISOString()
+      };
+
+      // Only update hasUnviewedContent if explicitly provided
+      if (hasUnviewedContent !== undefined) {
+        nextCustomState.hasUnviewedContent = hasUnviewedContent;
+      }
+
+      const nextPanelState = {
+        ...panel.state,
+        customState: nextCustomState
+      };
+
+      await panelManager.updatePanel(panelId, { state: nextPanelState });
+
+      const mw = getMainWindow();
+      if (mw && !mw.isDestroyed()) {
+        try {
+          mw.webContents.send('panel:updated', {
+            ...panel,
+            state: nextPanelState
+          });
+        } catch (ipcError) {
+          console.error(`[Main] Failed to send panel:updated event for panel ${panelId}:`, ipcError);
+        }
+      }
+    });
+  };
+
+  /**
+   * Check if the panel is currently the active panel for its session
+   */
+  const isPanelActive = (panelId: string, _sessionId: string): boolean => {
+    // Check if this panel is the active panel by looking at the panel's isActive state
+    const panel = panelManager.getPanel(panelId);
+    if (!panel) return false;
+
+    // Use the panel's state.isActive property which is set when a panel becomes active
+    return panel.state.isActive === true;
+  };
+
   const finalizeAutoContextRun = async (panelId: string): Promise<void> => {
     console.log(`[auto-context-debug] finalizeAutoContextRun called for panel ${panelId}`);
     try {
@@ -447,6 +512,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         return;
       }
 
+      // Update panel status to running
+      if (panelId) {
+        await updateAIPanelStatus(panelId, 'running');
+      }
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -494,6 +563,14 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
       const signalText = signal === null || signal === undefined ? 'null' : String(signal);
 
+      // Update panel status to stopped/completed_unviewed
+      if (panelId) {
+        const isActive = isPanelActive(panelId, sessionId);
+        // If panel is not active, mark as having unviewed content
+        const panelStatusOnExit: PanelStatus = exitCode === 0 && !isActive ? 'completed_unviewed' : 'stopped';
+        await updateAIPanelStatus(panelId, panelStatusOnExit, exitCode === 0 && !isActive);
+      }
+
       if (exitCode !== null && exitCode !== undefined) {
         await sessionManager.setSessionExitCode(sessionId, exitCode);
       }
@@ -502,23 +579,40 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       if (session) {
         const dbSession = sessionManager.getDbSession(sessionId);
 
-        // If exit code is 0 (successful completion), mark as completed
-        // The updateSession method will handle converting to 'completed_unviewed' if not viewed
-        if (exitCode === 0 && dbSession && dbSession.status === 'running') {
-          // Update to 'stopped' which will be converted to 'completed_unviewed' by the mapping logic
-          // since the database status will be set to 'completed'
-          sessionManager.db.updateSession(sessionId, { status: 'completed' });
+        // Check if ALL panels for this session have stopped before updating session status
+        const sessionPanels = panelManager.getPanelsForSession(sessionId);
+        const aiPanels = sessionPanels.filter((p: ToolPanel) => p.type === 'claude' || p.type === 'codex');
 
-          // Get the updated session with proper status mapping
-          const updatedSession = sessionManager.getSession(sessionId);
-          if (updatedSession) {
-            // Manually emit the event since we bypassed updateSession for direct DB access
-            sessionManager.emit('session-updated', updatedSession);
+        // Check if any AI panel is still running
+        const hasRunningPanels = aiPanels.some((p: ToolPanel) => {
+          const customState = p.state?.customState as BaseAIPanelState | undefined;
+          return customState?.panelStatus === 'running' || customState?.panelStatus === 'waiting';
+        });
+
+        // Only update session status if no panels are still running
+        if (!hasRunningPanels) {
+          // If exit code is 0 (successful completion), mark as completed
+          // The updateSession method will handle converting to 'completed_unviewed' if not viewed
+          if (exitCode === 0 && dbSession && dbSession.status === 'running') {
+            // Update to 'stopped' which will be converted to 'completed_unviewed' by the mapping logic
+            // since the database status will be set to 'completed'
+            sessionManager.db.updateSession(sessionId, { status: 'completed' });
+
+            // Get the updated session with proper status mapping
+            const updatedSession = sessionManager.getSession(sessionId);
+            if (updatedSession) {
+              // Manually emit the event since we bypassed updateSession for direct DB access
+              sessionManager.emit('session-updated', updatedSession);
+            }
+          }
+          // For non-zero exit codes or already completed sessions
+          else if (dbSession && dbSession.status !== 'completed') {
+            await sessionManager.updateSession(sessionId, { status: 'stopped' });
           }
         }
-        // For non-zero exit codes or already completed sessions
-        else if (dbSession && dbSession.status !== 'completed') {
-          await sessionManager.updateSession(sessionId, { status: 'stopped' });
+        // If panels are still running, keep session in running state
+        else if (dbSession && dbSession.status !== 'running') {
+          await sessionManager.updateSession(sessionId, { status: 'running' });
         }
       }
 
@@ -789,6 +883,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     // Check if Claude is waiting for user input
     if (output.type === 'json' && typeof output.data === 'object' && output.data && 'type' in output.data && output.data.type === 'prompt') {
       console.log(`[Main] Claude is waiting for user input in session ${output.sessionId}`);
+      // Update panel status to waiting
+      if (output.panelId) {
+        await updateAIPanelStatus(output.panelId, 'waiting');
+      }
       await sessionManager.updateSession(output.sessionId, { status: 'waiting' });
     }
 
@@ -810,7 +908,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   claudeCodeManager.on('spawned', async ({ panelId, sessionId }: { panelId?: string; sessionId: string }) => {
     // Validate the event context
-    const validation = panelId 
+    const validation = panelId
       ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
       : validateEventContext({ sessionId }, sessionId);
 
@@ -819,6 +917,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       return; // Don't process invalid events
     }
 
+    // Update panel status to running
+    if (panelId) {
+      await updateAIPanelStatus(panelId, 'running');
+    }
 
     // Add a small delay to ensure the session is fully initialized
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -1041,6 +1143,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
     if (panelId) {
       console.log(`Panel ${panelId} (session ${sessionId}) encountered an error: ${error}`);
+      // Update panel status to error
+      await updateAIPanelStatus(panelId, 'error');
     } else {
       console.log(`Session ${sessionId} encountered an error: ${error}`);
     }

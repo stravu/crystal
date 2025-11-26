@@ -1,8 +1,8 @@
-import { IpcMain } from 'electron';
+import { IpcMain, BrowserWindow } from 'electron';
 import { panelManager } from '../services/panelManager';
 import { terminalPanelManager } from '../services/terminalPanelManager';
 import { databaseService } from '../services/database';
-import { CreatePanelRequest, PanelEventType, ToolPanel } from '../../../shared/types/panels';
+import { CreatePanelRequest, PanelEventType, ToolPanel, BaseAIPanelState } from '../../../shared/types/panels';
 import type { AppServices } from './types';
 
 export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
@@ -193,6 +193,56 @@ export function registerPanelHandlers(ipcMain: IpcMain, services: AppServices) {
   // Event handlers
   ipcMain.handle('panels:emitEvent', async (_, panelId: string, eventType: PanelEventType, data: unknown) => {
     return panelManager.emitPanelEvent(panelId, eventType, data);
+  });
+
+  // Clear unviewed content flag for AI panels
+  ipcMain.handle('panels:clearUnviewedContent', async (event, panelId: string) => {
+    try {
+      const panel = panelManager.getPanel(panelId);
+      if (!panel) {
+        return { success: false, error: 'Panel not found' };
+      }
+
+      // Only applicable to AI panels
+      if (panel.type !== 'claude' && panel.type !== 'codex') {
+        return { success: true };
+      }
+
+      const customState = (panel.state.customState as BaseAIPanelState | undefined) ?? {};
+
+      // Clear unviewed content flag and reset status if it was completed_unviewed
+      const nextCustomState: BaseAIPanelState = {
+        ...customState,
+        hasUnviewedContent: false,
+        panelStatus: customState.panelStatus === 'completed_unviewed' ? 'stopped' : customState.panelStatus,
+        lastActivityTime: new Date().toISOString()
+      };
+
+      const nextPanelState = {
+        ...panel.state,
+        customState: nextCustomState
+      };
+
+      await panelManager.updatePanel(panelId, { state: nextPanelState });
+
+      // Notify frontend of the update
+      const webContents = event.sender;
+      if (webContents && !webContents.isDestroyed()) {
+        try {
+          webContents.send('panel:updated', {
+            ...panel,
+            state: nextPanelState
+          });
+        } catch (ipcError) {
+          console.error(`[Panels IPC] Failed to send panel:updated event for panel ${panelId}:`, ipcError);
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to clear unviewed content:', error);
+      return { success: false, error: (error as Error).message };
+    }
   });
   
   // Panel-specific terminal handlers (called via panels: namespace from frontend)

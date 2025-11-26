@@ -60,6 +60,14 @@ export const panelApi = {
   async emitPanelEvent(panelId: string, eventType: string, data: Record<string, unknown>): Promise<void> {
     // Use direct invoke for event emission as there's no typed wrapper for this
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC event emission returns void
-    return window.electron!.invoke('panels:emitEvent', panelId, eventType, data) as any;
+    return window.electron!.invoke('panels:emitEvent', panelId, eventType, data) as unknown as void;
+  },
+
+  async clearPanelUnviewedContent(panelId: string): Promise<void> {
+    // Clear the hasUnviewedContent flag and set status to 'stopped' for AI panels
+    const response = await window.electron!.invoke('panels:clearUnviewedContent', panelId);
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to clear unviewed content');
+    }
   }
 };
