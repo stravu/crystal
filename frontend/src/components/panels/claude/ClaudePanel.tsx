@@ -10,6 +10,7 @@ import { ClaudeMessageTransformer } from '../ai/transformers/ClaudeMessageTransf
 import { Settings } from 'lucide-react';
 import { useConfigStore } from '../../../stores/configStore';
 import type { ClaudePanelState } from '../../../../../shared/types/panels';
+import { ResizablePanel } from '../../ResizablePanel';
 
 export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive }) => {
   const hook = useClaudePanel(panel.id, isActive);
@@ -187,28 +188,35 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
 
       {/* Claude Input - Always visible at bottom if not archived */}
       {!activeSession.archived && (
-        <ClaudeInputWithImages
-          activeSession={activeSession}
-          viewMode="richOutput"
-          input={hook.input}
-          setInput={hook.setInput}
-          textareaRef={hook.textareaRef}
-          handleTerminalCommand={hook.handleTerminalCommand}
-          handleSendInput={hook.handleSendInput}
-          handleContinueConversation={hook.handleContinueConversation}
-          isStravuConnected={hook.isStravuConnected}
-          setShowStravuSearch={hook.setShowStravuSearch}
-          ultrathink={hook.ultrathink}
-          setUltrathink={hook.setUltrathink}
-          gitCommands={hook.gitCommands}
-          handleCompactContext={hook.handleCompactContext}
-          hasConversationHistory={hook.hasConversationHistory}
-          contextCompacted={hook.contextCompacted}
-          handleCancelRequest={hook.handleStopSession}
-          contextUsageDisplay={contextDisplay}
-          contextUpdating={isContextUpdating}
-          panelId={panel.id}
-        />
+        <ResizablePanel
+          defaultHeight={300}
+          minHeight={200}
+          maxHeight={600}
+          storageKey="claude-input-panel-height"
+        >
+          <ClaudeInputWithImages
+            activeSession={activeSession}
+            viewMode="richOutput"
+            input={hook.input}
+            setInput={hook.setInput}
+            textareaRef={hook.textareaRef}
+            handleTerminalCommand={hook.handleTerminalCommand}
+            handleSendInput={hook.handleSendInput}
+            handleContinueConversation={hook.handleContinueConversation}
+            isStravuConnected={hook.isStravuConnected}
+            setShowStravuSearch={hook.setShowStravuSearch}
+            ultrathink={hook.ultrathink}
+            setUltrathink={hook.setUltrathink}
+            gitCommands={hook.gitCommands}
+            handleCompactContext={hook.handleCompactContext}
+            hasConversationHistory={hook.hasConversationHistory}
+            contextCompacted={hook.contextCompacted}
+            handleCancelRequest={hook.handleStopSession}
+            contextUsageDisplay={contextDisplay}
+            contextUpdating={isContextUpdating}
+            panelId={panel.id}
+          />
+        </ResizablePanel>
       )}
 
       {/* Show archived message if session is archived */}
