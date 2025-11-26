@@ -189,8 +189,8 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
       {/* Claude Input - Always visible at bottom if not archived */}
       {!activeSession.archived && (
         <ResizablePanel
-          defaultHeight={300}
-          minHeight={200}
+          defaultHeight={200}
+          minHeight={140}
           maxHeight={600}
           storageKey="claude-input-panel-height"
         >

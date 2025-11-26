@@ -182,8 +182,8 @@ export const CodexPanel: React.FC<CodexPanelProps> = React.memo(({ panel, isActi
       {/* Codex Input - Always visible at bottom */}
       {!activeSession.archived && (
         <ResizablePanel
-          defaultHeight={300}
-          minHeight={200}
+          defaultHeight={200}
+          minHeight={140}
           maxHeight={600}
           storageKey="codex-input-panel-height"
         >
