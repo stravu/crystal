@@ -290,4 +290,44 @@ export class AnalyticsService {
       console.error('[Analytics] Failed to track nimbalyst_opened:', error);
     }
   }
+
+  /**
+   * Track analytics opted in event
+   * Called when user accepts analytics in the consent dialog
+   */
+  static async trackAnalyticsOptedIn(): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    try {
+      await window.electronAPI.analytics.trackUIEvent({
+        event: 'analytics_opted_in',
+        properties: {},
+      });
+    } catch (error) {
+      console.error('[Analytics] Failed to track analytics_opted_in:', error);
+    }
+  }
+
+  /**
+   * Track analytics opted out event
+   * Called when user declines analytics in the consent dialog
+   * Uses minimal tracking to ensure this event is captured even when disabling analytics
+   */
+  static async trackAnalyticsOptedOut(): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    try {
+      // Use the standard UI event tracking - the backend will use minimal tracking
+      // for opt-out events to ensure they're captured
+      await window.electronAPI.analytics.trackUIEvent({
+        event: 'analytics_opted_out',
+        properties: {},
+      });
+    } catch (error) {
+      console.error('[Analytics] Failed to track analytics_opted_out:', error);
+    }
+  }
 }
+
+// Export the class as a singleton-like service for static method usage
+export const analyticsService = AnalyticsService;

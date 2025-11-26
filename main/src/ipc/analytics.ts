@@ -93,11 +93,10 @@ export function registerAnalyticsHandlers(ipcMain: IpcMain, services: AppService
         return { success: false, error: 'Invalid event data' };
       }
 
-      // Special handling for opt-out event: always track it even if analytics is about to be disabled
-      // This ensures we capture the opt-out event before the config change takes effect
+      // Special handling for opt-out event: use minimal tracking to ensure it's captured
       if (data.event === 'analytics_opted_out') {
-        // Always track opt-out events regardless of current enabled state
-        analyticsManager.track(data.event, data.properties);
+        // Use minimal tracking for opt-out events (works even when analytics is disabled)
+        analyticsManager.trackMinimalEvent(data.event, data.properties);
       } else {
         // Normal tracking (respects enabled/disabled state)
         analyticsManager.track(data.event, data.properties);
@@ -107,6 +106,19 @@ export function registerAnalyticsHandlers(ipcMain: IpcMain, services: AppService
     } catch (error) {
       console.error('[Analytics IPC] Failed to track UI event:', error);
       return { success: false, error: 'Failed to track event' };
+    }
+  });
+
+  /**
+   * Track minimal events (used for opt-out tracking and basic app opens when opted out)
+   */
+  ipcMain.handle('analytics:track-minimal-event', async (_event, eventName: string, properties?: Record<string, string | number | boolean | string[] | undefined>) => {
+    try {
+      analyticsManager.trackMinimalEvent(eventName, properties);
+      return { success: true };
+    } catch (error) {
+      console.error('[Analytics IPC] Failed to track minimal event:', error);
+      return { success: false, error: 'Failed to track minimal event' };
     }
   });
 

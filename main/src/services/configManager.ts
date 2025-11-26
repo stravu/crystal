@@ -58,7 +58,7 @@ export class ConfigManager extends EventEmitter {
         }
       },
       analytics: {
-        enabled: true,
+        enabled: false, // Opt-in: disabled by default until user consents
         posthogApiKey: 'phc_uwOqT2KUa4C9Qx5WbEPwQSN9mUCoSGFg1aY0b670ft5',
         posthogHost: 'https://us.i.posthog.com'
       }
@@ -201,14 +201,14 @@ export class ConfigManager extends EventEmitter {
 
   getAnalyticsSettings() {
     return this.config.analytics || {
-      enabled: true,
+      enabled: false, // Opt-in: disabled by default until user consents
       posthogApiKey: 'phc_uwOqT2KUa4C9Qx5WbEPwQSN9mUCoSGFg1aY0b670ft5',
       posthogHost: 'https://us.i.posthog.com'
     };
   }
 
   isAnalyticsEnabled(): boolean {
-    return this.config.analytics?.enabled ?? true;
+    return this.config.analytics?.enabled ?? false; // Opt-in: default to false
   }
 
   getAnalyticsDistinctId(): string | undefined {

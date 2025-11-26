@@ -15,6 +15,7 @@ export class AnalyticsManager extends EventEmitter {
   private configManager: ConfigManager;
   private distinctId: string;
   private isInitialized = false;
+  private minimalClient: PostHog | null = null; // Separate client for minimal tracking when opted out
 
   constructor(configManager: ConfigManager) {
     super();
@@ -51,9 +52,23 @@ export class AnalyticsManager extends EventEmitter {
   async initialize(): Promise<void> {
     const settings = this.configManager.getAnalyticsSettings();
 
-    // Don't initialize if analytics is disabled or no API key
+    // Always initialize minimal client for basic tracking (even when opted out)
+    if (settings.posthogApiKey) {
+      try {
+        this.minimalClient = new PostHog(settings.posthogApiKey, {
+          host: settings.posthogHost || 'https://app.posthog.com',
+          flushAt: 1, // Flush immediately for minimal events
+          flushInterval: 1000,
+        });
+        console.log('[Analytics] Minimal PostHog client initialized');
+      } catch (error) {
+        console.error('[Analytics] Failed to initialize minimal PostHog client:', error);
+      }
+    }
+
+    // Don't initialize full client if analytics is disabled
     if (!settings.enabled || !settings.posthogApiKey) {
-      console.log('[Analytics] Analytics disabled or no API key configured');
+      console.log('[Analytics] Full analytics disabled or no API key configured');
       this.isInitialized = false;
       return;
     }
@@ -111,6 +126,42 @@ export class AnalyticsManager extends EventEmitter {
   }
 
   /**
+   * Track a minimal event even when analytics is disabled
+   * Used for: app_opened when opted out, analytics_opted_out event
+   */
+  trackMinimalEvent(eventName: string, properties?: Record<string, string | number | boolean | string[] | undefined>): void {
+    if (!this.minimalClient) {
+      console.log('[Analytics] Minimal client not available, skipping minimal event');
+      return;
+    }
+
+    try {
+      // Only include very basic properties for privacy
+      const minimalProperties = {
+        ...properties,
+        app_version: app.getVersion(),
+        platform: os.platform(),
+        analytics_enabled: this.configManager.isAnalyticsEnabled(),
+      };
+
+      // Remove undefined values
+      const cleanedProperties = Object.fromEntries(
+        Object.entries(minimalProperties).filter(([_, v]) => v !== undefined)
+      );
+
+      this.minimalClient.capture({
+        distinctId: this.distinctId,
+        event: eventName,
+        properties: cleanedProperties,
+      });
+
+      console.log(`[Analytics] Tracked minimal event: ${eventName}`);
+    } catch (error) {
+      console.error(`[Analytics] Failed to track minimal event ${eventName}:`, error);
+    }
+  }
+
+  /**
    * Identify the user (with anonymous ID)
    */
   identify(properties?: Record<string, string | number | boolean | undefined>): void {
@@ -152,16 +203,29 @@ export class AnalyticsManager extends EventEmitter {
    * Shutdown the client
    */
   async shutdown(): Promise<void> {
-    if (!this.client) {
-      return;
+    const shutdownPromises: Promise<void>[] = [];
+
+    if (this.client) {
+      shutdownPromises.push(
+        this.client.shutdown().then(() => {
+          console.log('[Analytics] PostHog client shut down');
+        }).catch((error) => {
+          console.error('[Analytics] Failed to shut down PostHog client:', error);
+        })
+      );
     }
 
-    try {
-      await this.client.shutdown();
-      console.log('[Analytics] PostHog client shut down');
-    } catch (error) {
-      console.error('[Analytics] Failed to shut down PostHog client:', error);
+    if (this.minimalClient) {
+      shutdownPromises.push(
+        this.minimalClient.shutdown().then(() => {
+          console.log('[Analytics] Minimal PostHog client shut down');
+        }).catch((error) => {
+          console.error('[Analytics] Failed to shut down minimal PostHog client:', error);
+        })
+      );
     }
+
+    await Promise.all(shutdownPromises);
   }
 
   /**

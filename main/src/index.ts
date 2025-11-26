@@ -694,11 +694,18 @@ app.whenReady().then(async () => {
       });
     }
 
-    // Track app opened
-    console.log(`[Analytics] App opened (version: ${currentVersion}, first_launch: ${isFirstLaunch})`);
-    analyticsManager.track('app_opened', {
-      is_first_launch: isFirstLaunch
-    });
+    // Track app opened - use minimal tracking if analytics is disabled
+    console.log(`[Analytics] App opened (version: ${currentVersion}, first_launch: ${isFirstLaunch}, analytics_enabled: ${configManager.isAnalyticsEnabled()})`);
+    if (configManager.isAnalyticsEnabled()) {
+      analyticsManager.track('app_opened', {
+        is_first_launch: isFirstLaunch
+      });
+    } else {
+      // Track minimal app_opened event even when opted out
+      analyticsManager.trackMinimalEvent('app_opened', {
+        is_first_launch: isFirstLaunch
+      });
+    }
 
     // Record app open in database with version
     databaseService.recordAppOpen(false, false, currentVersion);
