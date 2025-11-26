@@ -76,7 +76,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   // eslint-disable-next-line no-control-regex
   const ANSI_ESCAPE_REGEX = /\x1B\[[0-9;]*m/g;
+  // Original format: "76k/200k tokens (38%)"
   const CONTEXT_USAGE_REGEX = /([0-9]+(?:\.[0-9]+)?k?\s*\/\s*[0-9]+(?:\.[0-9]+)?k?\s+tokens?\s*\(\d+%[^)]*\))/i;
+  // Alternative format: "Context: 76000/200000 tokens" or similar
+  const CONTEXT_USAGE_ALT_REGEX = /context[:\s]+([0-9,]+)\s*(?:\/|of)\s*([0-9,]+)\s*tokens?/i;
 
   const extractCandidateStrings = (payload: unknown): string[] => {
     const strings: string[] = [];
@@ -121,18 +124,128 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     return strings;
   };
 
+  // Helper to format token count (e.g., 76000 -> "76k", 200000 -> "200k")
+  const formatTokenCount = (count: number): string => {
+    if (count >= 1000) {
+      return `${Math.round(count / 1000)}k`;
+    }
+    return String(count);
+  };
+
+  // Try to extract context usage from JSON result message with modelUsage
+  const extractContextFromResultJson = (data: Record<string, unknown>): string | null => {
+    // Check for result type with modelUsage
+    if (data.type !== 'result' || !data.modelUsage) {
+      return null;
+    }
+
+    const modelUsage = data.modelUsage as Record<string, unknown>;
+
+    // Find the first model with contextWindow info
+    for (const modelData of Object.values(modelUsage)) {
+      if (typeof modelData !== 'object' || modelData === null) continue;
+
+      const model = modelData as Record<string, unknown>;
+      const contextWindow = model.contextWindow;
+
+      if (typeof contextWindow !== 'number' || contextWindow <= 0) continue;
+
+      // Calculate current context usage from cache tokens
+      // cacheReadInputTokens represents tokens read from cache (already in context)
+      const cacheRead = typeof model.cacheReadInputTokens === 'number' ? model.cacheReadInputTokens : 0;
+      const cacheCreation = typeof model.cacheCreationInputTokens === 'number' ? model.cacheCreationInputTokens : 0;
+      const inputTokens = typeof model.inputTokens === 'number' ? model.inputTokens : 0;
+
+      // Estimate current context as the input tokens for the most recent turn
+      // This is an approximation since we don't have exact current context size
+      const estimatedContext = Math.min(inputTokens + cacheRead, contextWindow);
+
+      if (estimatedContext > 0) {
+        const percentage = Math.round((estimatedContext / contextWindow) * 100);
+        return `${formatTokenCount(estimatedContext)}/${formatTokenCount(contextWindow)} tokens (${percentage}%)`;
+      }
+    }
+
+    return null;
+  };
+
+  // Try to extract context usage from system init message
+  const extractContextFromInitJson = (data: Record<string, unknown>): string | null => {
+    if (data.type !== 'system' || data.subtype !== 'init') {
+      return null;
+    }
+
+    // Check for context_tokens field (new format)
+    if (typeof data.context_tokens === 'number' && typeof data.context_window === 'number') {
+      const used = data.context_tokens;
+      const max = data.context_window;
+      const percentage = Math.round((used / max) * 100);
+      return `${formatTokenCount(used)}/${formatTokenCount(max)} tokens (${percentage}%)`;
+    }
+
+    return null;
+  };
+
   const extractContextUsageFromOutputs = (outputs: SessionOutput[]): string | null => {
+    console.log(`[auto-context-debug] extractContextUsageFromOutputs called with ${outputs.length} outputs`);
+
+    // Log output types for debugging
+    const typeCounts: Record<string, number> = {};
     for (const output of outputs) {
-      if (output.type !== 'stdout' || typeof output.data !== 'string') {
-        if (output.type === 'json' && output.data && typeof output.data === 'object') {
-          const candidates = extractCandidateStrings(output.data);
-          for (const candidate of candidates) {
-            const match = typeof candidate === 'string' ? candidate.match(CONTEXT_USAGE_REGEX) : null;
-            if (match) {
-              return match[1].replace(/\s+/g, ' ').trim();
-            }
+      const key = output.type === 'json' && output.data && typeof output.data === 'object'
+        ? `json:${(output.data as Record<string, unknown>).type || 'unknown'}`
+        : output.type;
+      typeCounts[key] = (typeCounts[key] || 0) + 1;
+    }
+    console.log(`[auto-context-debug] Output types: ${JSON.stringify(typeCounts)}`);
+
+    for (const output of outputs) {
+      // Handle JSON outputs
+      if (output.type === 'json' && output.data && typeof output.data === 'object') {
+        const jsonData = output.data as Record<string, unknown>;
+
+        // Try to extract from result message (new format)
+        const resultContext = extractContextFromResultJson(jsonData);
+        if (resultContext) {
+          console.log(`[auto-context-debug] Found context in result JSON: ${resultContext}`);
+          return resultContext;
+        }
+
+        // Try to extract from init message
+        const initContext = extractContextFromInitJson(jsonData);
+        if (initContext) {
+          console.log(`[auto-context-debug] Found context in init JSON: ${initContext}`);
+          return initContext;
+        }
+
+        // Try original string extraction method
+        const candidates = extractCandidateStrings(output.data);
+        for (const candidate of candidates) {
+          if (typeof candidate !== 'string') continue;
+
+          // Try original regex
+          const match = candidate.match(CONTEXT_USAGE_REGEX);
+          if (match) {
+            console.log(`[auto-context-debug] Found context via original regex: ${match[1]}`);
+            return match[1].replace(/\s+/g, ' ').trim();
+          }
+
+          // Try alternative format
+          const altMatch = candidate.match(CONTEXT_USAGE_ALT_REGEX);
+          if (altMatch) {
+            const used = parseInt(altMatch[1].replace(/,/g, ''), 10);
+            const max = parseInt(altMatch[2].replace(/,/g, ''), 10);
+            const percentage = Math.round((used / max) * 100);
+            const result = `${formatTokenCount(used)}/${formatTokenCount(max)} tokens (${percentage}%)`;
+            console.log(`[auto-context-debug] Found context via alt regex: ${result}`);
+            return result;
           }
         }
+        continue;
+      }
+
+      // Handle stdout outputs
+      if (output.type !== 'stdout' || typeof output.data !== 'string') {
         continue;
       }
 
@@ -141,13 +254,27 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         .split(/\r?\n/);
 
       for (const line of cleanedLines) {
+        // Try original regex
         const match = line.match(CONTEXT_USAGE_REGEX);
         if (match) {
+          console.log(`[auto-context-debug] Found context in stdout via original regex: ${match[1]}`);
           return match[1].replace(/\s+/g, ' ').trim();
+        }
+
+        // Try alternative format
+        const altMatch = line.match(CONTEXT_USAGE_ALT_REGEX);
+        if (altMatch) {
+          const used = parseInt(altMatch[1].replace(/,/g, ''), 10);
+          const max = parseInt(altMatch[2].replace(/,/g, ''), 10);
+          const percentage = Math.round((used / max) * 100);
+          const result = `${formatTokenCount(used)}/${formatTokenCount(max)} tokens (${percentage}%)`;
+          console.log(`[auto-context-debug] Found context in stdout via alt regex: ${result}`);
+          return result;
         }
       }
     }
 
+    console.log(`[auto-context-debug] No context usage found in outputs`);
     return null;
   };
 
