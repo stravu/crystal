@@ -563,7 +563,9 @@ export const SessionView = memo(() => {
         shouldSquash={hook.shouldSquash}
         setShouldSquash={hook.setShouldSquash}
         onConfirm={hook.performSquashWithCommitMessage}
+        onMergeAndArchive={hook.performSquashWithCommitMessageAndArchive}
         isMerging={hook.isMerging}
+        isMergingAndArchiving={hook.isMergingAndArchiving}
       />
 
       <GitErrorDialog

@@ -45,6 +45,7 @@ export const useSessionView = (
   const [ultrathink, setUltrathink] = useState(false);
   const [isLoadingOutput, setIsLoadingOutput] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  const [isMergingAndArchiving, setIsMergingAndArchiving] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [outputLoadState, setOutputLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
@@ -1465,6 +1466,59 @@ export const useSessionView = (
     }
   };
 
+  const performSquashWithCommitMessageAndArchive = async (message: string) => {
+    if (!activeSession) return;
+    setIsMergingAndArchiving(true);
+    setMergeError(null);
+    setShowCommitMessageDialog(false);
+    try {
+      const response: GitErrorResponse = shouldSquash
+        ? await API.sessions.squashAndRebaseToMain(activeSession.id, message)
+        : await API.sessions.rebaseToMain(activeSession.id);
+
+      if (!response.success) {
+        if (response.gitError) {
+          const gitError = response.gitError;
+          setGitErrorDetails({
+            title: 'Merge Failed',
+            message: response.error || `Failed to merge to main`,
+            commands: gitError.commands,
+            output: gitError.output || 'No output available',
+            workingDirectory: gitError.workingDirectory,
+            projectPath: gitError.projectPath,
+          });
+          setShowGitErrorDialog(true);
+        } else {
+          setMergeError(response.error || `Failed to merge to main`);
+        }
+        return;
+      }
+
+      // Merge succeeded, now archive the session
+      const sessionId = activeSession.id;
+      useSessionStore.getState().addDeletingSessionId(sessionId);
+
+      try {
+        const archiveResponse = await API.sessions.delete(sessionId);
+        if (!archiveResponse.success) {
+          console.error('[performSquashWithCommitMessageAndArchive] Archive failed:', archiveResponse.error);
+          // Merge succeeded but archive failed - show error but don't block
+          setMergeError(`Merge succeeded but archive failed: ${archiveResponse.error}`);
+        }
+        // Clear active session after archiving
+        await useSessionStore.getState().setActiveSession(null);
+      } catch (archiveError) {
+        console.error('[performSquashWithCommitMessageAndArchive] Archive error:', archiveError);
+        setMergeError(`Merge succeeded but archive failed: ${archiveError instanceof Error ? archiveError.message : 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error(`[performSquashWithCommitMessageAndArchive] Error in try block`, error);
+      setMergeError(error instanceof Error ? error.message : `Failed to merge to main`);
+    } finally {
+      setIsMergingAndArchiving(false);
+    }
+  };
+
   const handleOpenIDE = async () => {
     if (!activeSession) return;
     
@@ -1661,6 +1715,7 @@ export const useSessionView = (
     isLoadingOutput,
     outputLoadState,
     isMerging,
+    isMergingAndArchiving,
     mergeError,
     loadError,
     gitCommands,
@@ -1692,6 +1747,7 @@ export const useSessionView = (
     handleAbortRebaseAndUseClaude,
     handleSquashAndRebaseToMain,
     performSquashWithCommitMessage,
+    performSquashWithCommitMessageAndArchive,
     handleOpenIDE,
     isOpeningIDE,
     handleStravuFileSelect,
