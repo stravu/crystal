@@ -252,7 +252,9 @@ function App() {
       showNotification(
         `🚀 Update Available - Crystal v${versionInfo.latest}`,
         'A new version of Crystal is available!',
-        '/favicon.ico'
+        '/favicon.ico',
+        'version_update',
+        `update:${versionInfo.latest}` // Deduplicate by version - only track once per version
       );
     };
     

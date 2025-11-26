@@ -28,12 +28,10 @@ The following packages are licensed under the MIT license:
   - @babel/helper-validator-option (7.27.1) - The Babel Team (https://babel.dev/team)
   - @babel/helpers (7.27.6) - The Babel Team (https://babel.dev/team)
   - @babel/parser (7.28.0) - The Babel Team (https://babel.dev/team)
-  - @babel/parser (7.28.4) - The Babel Team (https://babel.dev/team)
   - @babel/runtime (7.27.6) - The Babel Team (https://babel.dev/team)
   - @babel/template (7.27.2) - The Babel Team (https://babel.dev/team)
   - @babel/traverse (7.28.0) - The Babel Team (https://babel.dev/team)
   - @babel/types (7.28.1) - The Babel Team (https://babel.dev/team)
-  - @babel/types (7.28.4) - The Babel Team (https://babel.dev/team)
   - @bcoe/v8-coverage (0.2.3) - Charles Samborski <demurgos@demurgos.net> (https://demurgos.net)
   - @braintree/sanitize-url (7.1.1)
   - @develar/schema-utils (2.6.5) - webpack Contrib (https://github.com/webpack-contrib)
@@ -57,7 +55,6 @@ The following packages are licensed under the MIT license:
   - @emotion/weak-memoize (0.4.0)
   - @esbuild/darwin-arm64 (0.21.5)
   - @esbuild/darwin-arm64 (0.25.7)
-  - @eslint-community/eslint-utils (4.9.0) - Toru Nagashima
   - @eslint-community/regexpp (4.12.1) - Toru Nagashima
   - @floating-ui/core (1.7.2) - atomiks
   - @floating-ui/dom (1.7.2) - atomiks
@@ -67,21 +64,16 @@ The following packages are licensed under the MIT license:
   - @iconify/types (2.0.0) - Vjacheslav Trushkin
   - @iconify/utils (3.0.2) - Vjacheslav Trushkin
   - @ioredis/commands (1.2.0) - Zihua Li <i@zihua.li> (http://zihua.li)
-  - @ioredis/commands (1.4.0) - Zihua Li <i@zihua.li> (http://zihua.li)
   - @isaacs/balanced-match (4.0.1)
   - @isaacs/brace-expansion (5.0.0)
   - @istanbuljs/schema (0.1.3) - Corey Farrell
   - @jridgewell/gen-mapping (0.3.12) - Justin Ridgewell <justin@ridgewell.name>
-  - @jridgewell/gen-mapping (0.3.13) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/resolve-uri (3.1.2) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/sourcemap-codec (1.5.4) - Justin Ridgewell <justin@ridgewell.name>
-  - @jridgewell/sourcemap-codec (1.5.5) - Justin Ridgewell <justin@ridgewell.name>
   - @jridgewell/trace-mapping (0.3.29) - Justin Ridgewell <justin@ridgewell.name>
-  - @jridgewell/trace-mapping (0.3.31) - Justin Ridgewell <justin@ridgewell.name>
   - @malept/flatpak-bundler (0.4.0) - Matt Watson <mattdangerw@gmail.com>
   - @mermaid-js/parser (0.6.2) - Yokozuna59
   - @modelcontextprotocol/sdk (1.16.0) - Anthropic, PBC (https://anthropic.com)
-  - @modelcontextprotocol/sdk (1.18.2) - Anthropic, PBC (https://anthropic.com)
   - @monaco-editor/loader (1.5.0) - Suren Atoyan <contact@surenatoyan.com>
   - @msgpackr-extract/msgpackr-extract-darwin-arm64 (3.0.3) - Kris Zyp
   - @nodelib/fs.scandir (2.1.5)
@@ -89,19 +81,17 @@ The following packages are licensed under the MIT license:
   - @nodelib/fs.walk (1.2.8)
   - @npmcli/move-file (2.0.1) - GitHub Inc.
   - @pkgjs/parseargs (0.11.0)
+  - @posthog/core (1.5.2)
   - @radix-ui/number (1.1.1)
   - @radix-ui/primitive (1.1.2)
   - @radix-ui/rect (1.1.1)
   - @rolldown/pluginutils (1.0.0-beta.27)
   - @rollup/rollup-darwin-arm64 (4.45.1) - Lukas Taegert-Atkinson
-  - @rollup/rollup-darwin-arm64 (4.52.3) - Lukas Taegert-Atkinson
   - @sindresorhus/is (4.6.0) - Sindre Sorhus
   - @standard-schema/spec (1.0.0) - Colin McDonnell
   - @szmarczak/http-timer (4.0.6) - Szymon Marczak
   - @tootallnate/once (2.0.0) - Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)
-  - @vitest/coverage-v8 (2.1.9) - Anthony Fu <anthonyfu117@hotmail.com>
   - @vitest/expect (2.1.9)
-  - @vitest/mocker (2.1.9)
   - @vitest/pretty-format (2.1.9)
   - @vitest/runner (2.1.9)
   - @vitest/snapshot (2.1.9)
@@ -123,7 +113,6 @@ The following packages are licensed under the MIT license:
   - ajv-keywords (3.5.2) - Evgeny Poberezkin
   - ansi-regex (5.0.1) - Sindre Sorhus
   - ansi-regex (6.1.0) - Sindre Sorhus
-  - ansi-regex (6.2.2) - Sindre Sorhus
   - ansi-styles (4.3.0) - Sindre Sorhus
   - ansi-styles (6.2.1) - Sindre Sorhus
   - ansi-to-html (0.7.2) - Rob Burns
@@ -169,7 +158,6 @@ The following packages are licensed under the MIT license:
   - camelcase-css (2.0.1) - Steven Vachon <contact@svachon.com> (https://www.svachon.com/)
   - ccount (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - chai (5.2.1) - Jake Luer <jake@alogicalparadox.com>
-  - chai (5.3.3) - Jake Luer <jake@alogicalparadox.com>
   - chalk (4.1.2)
   - character-entities (2.0.2) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - character-entities-html4 (2.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -225,7 +213,6 @@ The following packages are licensed under the MIT license:
   - dayjs (1.11.13) - iamkun
   - debounce-fn (6.0.0) - Sindre Sorhus
   - debug (4.4.1) - Josh Junon (https://github.com/qix-)
-  - debug (4.4.3) - Josh Junon (https://github.com/qix-)
   - decode-named-character-reference (1.2.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - decompress-response (6.0.0) - Sindre Sorhus
   - deep-eql (5.0.2) - Jake Luer <jake@alogicalparadox.com>
@@ -279,7 +266,6 @@ The following packages are licensed under the MIT license:
   - etag (1.8.1)
   - eventsource (3.0.7) - Espen Hovlandsdal <espen@hovlandsdal.com>
   - eventsource-parser (3.0.3) - Espen Hovlandsdal <espen@hovlandsdal.com>
-  - eventsource-parser (3.0.6) - Espen Hovlandsdal <espen@hovlandsdal.com>
   - express (5.1.0) - TJ Holowaychuk <tj@vision-media.ca>
   - express-rate-limit (7.5.1) - Nathan Friedly
   - exsolve (1.0.7)
@@ -349,9 +335,7 @@ The following packages are licensed under the MIT license:
   - indent-string (4.0.0) - Sindre Sorhus
   - inline-style-parser (0.2.4)
   - ioredis (5.6.1) - Zihua Li <i@zihua.li> (http://zihua.li)
-  - ioredis (5.8.0) - Zihua Li <i@zihua.li> (http://zihua.li)
   - ip-address (9.0.5) - Beau Gunderson <beau@beaugunderson.com> (https://beaugunderson.com/)
-  - ip-address (10.0.1) - Beau Gunderson <beau@beaugunderson.com> (https://beaugunderson.com/)
   - ipaddr.js (1.9.1) - whitequark <whitequark@whitequark.org>
   - is-alphabetical (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - is-alphanumerical (2.0.1) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -408,12 +392,9 @@ The following packages are licensed under the MIT license:
   - longest-streak (3.1.0) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - loose-envify (1.4.0) - Andres Suarez <zertosh@gmail.com>
   - loupe (3.1.4) - Veselin Todorov <hi@vesln.com>
-  - loupe (3.2.1) - Veselin Todorov <hi@vesln.com>
   - lowercase-keys (2.0.0) - Sindre Sorhus
   - luxon (3.7.1) - Isaac Cambron
-  - luxon (3.7.2) - Isaac Cambron
   - magic-string (0.30.17) - Rich Harris
-  - magic-string (0.30.19) - Rich Harris
   - magicast (0.3.5)
   - make-dir (4.0.0) - Sindre Sorhus
   - markdown-table (3.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
@@ -529,7 +510,6 @@ The following packages are licensed under the MIT license:
   - path-key (3.1.1) - Sindre Sorhus
   - path-parse (1.0.7) - Javier Blanco <http://jbgutierrez.info>
   - path-to-regexp (8.2.0)
-  - path-to-regexp (8.3.0)
   - path-type (4.0.0) - Sindre Sorhus
   - pathe (1.1.2)
   - pathe (2.0.3)
@@ -546,6 +526,7 @@ The following packages are licensed under the MIT license:
   - plist (3.1.0) - Nathan Rajlich <nathan@tootallnate.net>
   - points-on-curve (0.2.0) - Preet Shihn
   - points-on-path (0.2.1) - Preet Shihn
+  - posthog-node (5.11.2) - PostHog
   - prebuild-install (7.1.3) - Mathias Buus (@mafintosh)
   - prelude-ls (1.2.1) - George Zahariev <z@georgezahariev.com>
   - progress (2.0.3) - TJ Holowaychuk <tj@vision-media.ca>
@@ -561,7 +542,6 @@ The following packages are licensed under the MIT license:
   - quick-lru (5.1.1) - Sindre Sorhus
   - range-parser (1.2.1) - TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)
   - raw-body (3.0.0) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
-  - raw-body (3.0.1) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
   - react (19.1.0)
   - react-diff-viewer-continued (3.4.0)
   - react-dom (19.1.0)
@@ -590,7 +570,6 @@ The following packages are licensed under the MIT license:
   - retry (0.12.0) - Tim Koschützki <tim@debuggable.com> (http://debuggable.com/)
   - reusify (1.1.0) - Matteo Collina <hello@matteocollina.com>
   - rollup (4.45.1) - Rich Harris
-  - rollup (4.52.3) - Rich Harris
   - roughjs (4.6.6) - Preet Shihn <preetshihn@gmail.com>
   - router (2.2.0) - Douglas Christopher Wilson <doug@somethingdoug.com>
   - run-parallel (1.2.0) - Feross Aboukhadijeh
@@ -614,7 +593,6 @@ The following packages are licensed under the MIT license:
   - slice-ansi (3.0.0)
   - smart-buffer (4.2.0) - Josh Glazebrook
   - socks (2.8.6) - Josh Glazebrook
-  - socks (2.8.7) - Josh Glazebrook
   - socks-proxy-agent (7.0.0) - Nathan Rajlich
   - socks-proxy-agent (8.0.5) - Nathan Rajlich
   - source-map-support (0.5.21)
@@ -632,7 +610,6 @@ The following packages are licensed under the MIT license:
   - stringify-entities (4.0.4) - Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)
   - strip-ansi (6.0.1) - Sindre Sorhus
   - strip-ansi (7.1.0) - Sindre Sorhus
-  - strip-ansi (7.1.2) - Sindre Sorhus
   - strip-json-comments (2.0.1) - Sindre Sorhus
   - strip-json-comments (3.1.1) - Sindre Sorhus
   - style-to-js (1.1.17) - Mark <mark@remarkablemark.org>
@@ -646,7 +623,6 @@ The following packages are licensed under the MIT license:
   - tagged-tag (1.0.0) - Sindre Sorhus
   - tailwind-merge (2.6.0) - Dany Castillo
   - tar-fs (2.1.3) - Mathias Buus
-  - tar-fs (2.1.4) - Mathias Buus
   - tar-stream (2.2.0) - Mathias Buus <mathiasbuus@gmail.com>
   - temp-file (3.4.0) - Vladimir Krivosheev
   - thenify (3.3.1) - Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)
@@ -657,7 +633,6 @@ The following packages are licensed under the MIT license:
   - tinyexec (0.3.2) - James Garbutt (https://github.com/43081j)
   - tinyexec (1.0.1) - James Garbutt (https://github.com/43081j)
   - tinyglobby (0.2.14) - Superchupu
-  - tinyglobby (0.2.15) - Superchupu
   - tinypool (1.1.1)
   - tinyrainbow (1.2.0)
   - tinyspy (3.0.2)
@@ -884,7 +859,6 @@ The following packages are licensed under the Apache-2.0 license:
   - @chevrotain/utils (11.0.3) - Shahar Soel
   - @humanfs/core (0.19.1) - Nicholas C. Zakas
   - @humanfs/node (0.16.6) - Nicholas C. Zakas
-  - @humanfs/node (0.16.7) - Nicholas C. Zakas
   - @humanwhocodes/module-importer (1.0.1) - Nicholas C. Zaks
   - @humanwhocodes/retry (0.3.1) - Nicholas C. Zaks
   - @humanwhocodes/retry (0.4.3) - Nicholas C. Zaks
@@ -895,7 +869,6 @@ The following packages are licensed under the Apache-2.0 license:
   - cluster-key-slot (1.1.2) - Mike Diarmid
   - denque (2.1.0) - Invertase
   - detect-libc (2.0.4) - Lovell Fuller <npm@lovell.info>
-  - detect-libc (2.1.1) - Lovell Fuller <npm@lovell.info>
   - didyoumean (1.2.2) - Dave Porter
   - ejs (3.1.10) - Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)
   - expect-type (1.2.2)
@@ -1499,46 +1472,6 @@ The complete list of contributors can be found at:
 
 --------------------------------------------------------------------------------
 
-Package: fast-uri
-Version: 3.1.0
-Author: Vincent Le Goff <vince.legoff@gmail.com> (https://github.com/zekth)
-Homepage: https://github.com/fastify/fast-uri
-
-Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
-Copyright (c) 2021-present The Fastify team
-All rights reserved.
-
-The Fastify team members are listed at https://github.com/fastify/fastify#team.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * The names of any contributors may not be used to endorse or promote
-      products derived from this software without specific prior written
-      permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS AND CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-                                  *   *   *
-
-The complete list of contributors can be found at:
-- https://github.com/garycourt/uri-js/graphs/contributors
-
---------------------------------------------------------------------------------
-
 Package: global-agent
 Version: 3.0.0
 Author: Gajus Kuizinas
@@ -1688,38 +1621,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Package: istanbul-reports
 Version: 3.1.7
-Author: Krishnan Anantheswaran <kananthmail-github@yahoo.com>
-Homepage: https://istanbul.js.org/
-
-Copyright 2012-2015 Yahoo! Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the Yahoo! Inc. nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL YAHOO! INC. BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
---------------------------------------------------------------------------------
-
-Package: istanbul-reports
-Version: 3.2.0
 Author: Krishnan Anantheswaran <kananthmail-github@yahoo.com>
 Homepage: https://istanbul.js.org/
 
@@ -2605,28 +2506,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
---------------------------------------------------------------------------------
-
-================================================================================
-## SEE LICENSE IN README.md LICENSE
-================================================================================
-
-Package: @anthropic-ai/claude-code
-Version: 2.0.0
-Author: Anthropic <support@anthropic.com>
-Homepage: https://github.com/anthropics/claude-code
-
-© Anthropic PBC. All rights reserved. Use is subject to Anthropic's [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms).
-
---------------------------------------------------------------------------------
-
-Package: @anthropic-ai/claude-code
-Version: 2.0.1
-Author: Anthropic <support@anthropic.com>
-Homepage: https://github.com/anthropics/claude-code
-
-© Anthropic PBC. All rights reserved. Use is subject to Anthropic's [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms).
 
 --------------------------------------------------------------------------------
 
@@ -3927,6 +3806,19 @@ FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+================================================================================
+## SEE LICENSE IN README.md LICENSE
+================================================================================
+
+Package: @anthropic-ai/claude-code
+Version: 2.0.0
+Author: Anthropic <support@anthropic.com>
+Homepage: https://github.com/anthropics/claude-code
+
+© Anthropic PBC. All rights reserved. Use is subject to Anthropic's [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms).
 
 --------------------------------------------------------------------------------
 

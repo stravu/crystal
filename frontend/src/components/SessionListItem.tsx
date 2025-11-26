@@ -5,12 +5,15 @@ import { StatusIndicator } from './StatusIndicator';
 import { GitStatusIndicator } from './GitStatusIndicator';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RunScriptConfigDialog } from './RunScriptConfigDialog';
+import { NimbalystInstallDialog } from './NimbalystInstallDialog';
 import { API } from '../utils/api';
 import { Star, Archive } from 'lucide-react';
+import { NimbalystIcon } from './icons/NimbalystIcon';
 import type { Session, GitStatus } from '../types/session';
 import { useContextMenu } from '../contexts/ContextMenuContext';
 import { IconButton } from './ui/IconButton';
 import { cn } from '../utils/cn';
+import { AnalyticsService } from '../services/analyticsService';
 
 interface SessionListItemProps {
   session: Session;
@@ -32,6 +35,7 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
   const { menuState, openMenu, closeMenu, isMenuOpen } = useContextMenu();
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showRunScriptConfig, setShowRunScriptConfig] = useState(false);
+  const [showNimbalystInstall, setShowNimbalystInstall] = useState(false);
   const [gitStatusLoading, setGitStatusLoading] = useState(false);
   
   
@@ -320,17 +324,63 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     try {
       const response = await API.sessions.toggleFavorite(session.id);
-      
+
       if (!response.success) {
         throw new Error(response.error || 'Failed to toggle favorite status');
       }
-      
+
     } catch (error) {
       console.error('Error toggling favorite status:', error);
       alert('Failed to toggle favorite status');
+    }
+  };
+
+  const handleOpenInNimbalyst = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      // Track button click
+      const sessionIdHash = await AnalyticsService.hashSessionId(session.id);
+      await AnalyticsService.trackNimbalystButtonClicked({
+        session_id_hash: sessionIdHash
+      });
+
+      // Check if Nimbalyst is installed
+      const checkResponse = await window.electronAPI.nimbalyst.checkInstalled();
+
+      if (!checkResponse.success) {
+        throw new Error(checkResponse.error || 'Failed to check Nimbalyst installation');
+      }
+
+      if (!checkResponse.data) {
+        // Track install dialog shown
+        await AnalyticsService.trackNimbalystInstallDialogShown({
+          session_id_hash: sessionIdHash
+        });
+
+        // Show install dialog if not installed
+        setShowNimbalystInstall(true);
+        return;
+      }
+
+      // Open the worktree in Nimbalyst
+      const openResponse = await window.electronAPI.nimbalyst.openWorktree(session.worktreePath);
+
+      if (!openResponse.success) {
+        throw new Error(openResponse.error || 'Failed to open worktree in Nimbalyst');
+      }
+
+      // Track successful open
+      await AnalyticsService.trackNimbalystOpened({
+        session_id_hash: sessionIdHash
+      });
+
+    } catch (error) {
+      console.error('Error opening in Nimbalyst:', error);
+      alert('Failed to open in Nimbalyst');
     }
   };
   
@@ -399,18 +449,28 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
                   size="sm"
                   className={cn(
                     'transition-all',
-                    session.isFavorite 
-                      ? 'text-status-warning hover:text-status-warning-hover' 
+                    session.isFavorite
+                      ? 'text-status-warning hover:text-status-warning-hover'
                       : 'text-text-tertiary opacity-0 group-hover:opacity-100'
                   )}
                   aria-label={session.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                   icon={
-                    <Star 
-                      className="w-4 h-4" 
+                    <Star
+                      className="w-4 h-4"
                       fill={session.isFavorite ? 'currentColor' : 'none'}
                       strokeWidth={session.isFavorite ? 0 : 2}
                     />
                   }
+                />
+              )}
+              {!session.archived && (
+                <IconButton
+                  onClick={handleOpenInNimbalyst}
+                  variant="ghost"
+                  size="sm"
+                  className="text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:text-blue-500"
+                  aria-label="Open in Nimbalyst"
+                  icon={<NimbalystIcon size={18} className="text-current" />}
                 />
               )}
               {!session.archived && (
@@ -514,6 +574,11 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
       <RunScriptConfigDialog
         isOpen={showRunScriptConfig}
         onClose={() => setShowRunScriptConfig(false)}
+      />
+
+      <NimbalystInstallDialog
+        isOpen={showNimbalystInstall}
+        onClose={() => setShowNimbalystInstall(false)}
       />
     </>
   );

@@ -6,6 +6,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { getShellPath } from '../utils/shellPath';
 import { ShellDetector } from '../utils/shellDetector';
+import type { AnalyticsManager } from './analyticsManager';
 
 interface TerminalProcess {
   pty: pty.IPty;
@@ -20,7 +21,12 @@ interface TerminalProcess {
 export class TerminalPanelManager {
   private terminals = new Map<string, TerminalProcess>();
   private readonly MAX_SCROLLBACK_LINES = 10000;
-  
+  private analyticsManager: AnalyticsManager | null = null;
+
+  setAnalyticsManager(analyticsManager: AnalyticsManager): void {
+    this.analyticsManager = analyticsManager;
+  }
+
   async initializeTerminal(panel: ToolPanel, cwd: string): Promise<void> {
     if (this.terminals.has(panel.id)) {
       return;
@@ -79,7 +85,11 @@ export class TerminalPanelManager {
     } as TerminalPanelState;
     
     await panelManager.updatePanel(panel.id, { state });
-    
+
+    // NOTE: terminal_panel_created analytics tracking has been moved to panelManager.createPanel()
+    // to ensure it only fires when users explicitly create new panels, not during app restoration
+    // or when panels are initialized for viewing.
+
   }
   
   private setupTerminalHandlers(terminal: TerminalProcess): void {

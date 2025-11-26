@@ -3,6 +3,7 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { CodexManager } from './codexManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { AnalyticsManager } from '../../analyticsManager';
 import type { ConversationMessage } from '../../../database/models';
 import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig } from '../../../../../shared/types/aiPanelConfig';
 import { DEFAULT_CODEX_MODEL } from '../../../../../shared/types/models';
@@ -34,9 +35,10 @@ export class CodexPanelManager extends AbstractAIPanelManager {
     codexManager: CodexManager,
     sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
-    configManager?: ConfigManager
+    configManager?: ConfigManager,
+    analyticsManager?: AnalyticsManager
   ) {
-    super(codexManager, sessionManager, logger, configManager);
+    super(codexManager, sessionManager, logger, configManager, analyticsManager);
     this.logger?.verbose('CodexPanelManager initialized');
     this.setupCodexSpecificHandlers();
   }
@@ -265,8 +267,12 @@ export class CodexPanelManager extends AbstractAIPanelManager {
 
   /**
    * Register panel with Codex-specific state handling
+   * @param panelId - The panel ID to register
+   * @param sessionId - The session ID this panel belongs to
+   * @param initialState - Optional Codex-specific initial state
+   * @param isUserInitiated - If true, track analytics event (default: true). Set to false during app startup/restoration.
    */
-  registerPanel(panelId: string, sessionId: string, initialState?: CodexPanelState): void {
+  registerPanel(panelId: string, sessionId: string, initialState?: CodexPanelState, isUserInitiated = true): void {
     // Transform Codex-specific state to base state if needed
     const baseInitialState = initialState ? {
       isInitialized: initialState.isInitialized,
@@ -282,7 +288,7 @@ export class CodexPanelManager extends AbstractAIPanelManager {
       }
     } : undefined;
 
-    super.registerPanel(panelId, sessionId, baseInitialState);
+    super.registerPanel(panelId, sessionId, baseInitialState, isUserInitiated);
   }
 
   /**

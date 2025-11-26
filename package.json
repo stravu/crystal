@@ -69,6 +69,7 @@
     "electron-updater": "^6.6.8",
     "glob": "^11.0.0",
     "openai": "^5.1.1",
+    "posthog-node": "^5.11.2",
     "web-streams-polyfill": "^3.3.3"
   },
   "devDependencies": {

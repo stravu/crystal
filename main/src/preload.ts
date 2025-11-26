@@ -599,6 +599,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debug: {
     getTableStructure: (tableName: 'folders' | 'sessions'): Promise<IPCResponse> => ipcRenderer.invoke('debug:get-table-structure', tableName),
   },
+
+  // Nimbalyst integration
+  nimbalyst: {
+    checkInstalled: (): Promise<IPCResponse> => ipcRenderer.invoke('nimbalyst:check-installed'),
+    openWorktree: (worktreePath: string): Promise<IPCResponse> => ipcRenderer.invoke('nimbalyst:open-worktree', worktreePath),
+  },
+
+  // Analytics tracking
+  analytics: {
+    trackUIEvent: (eventData: {
+      event: 'view_switched' | 'help_dialog_opened' | 'settings_opened' | 'settings_saved' | 'sidebar_toggled' | 'search_used';
+      properties: Record<string, string | number | boolean | string[]>;
+    }): Promise<IPCResponse> => ipcRenderer.invoke('analytics:track-ui-event', eventData),
+    categorizeResultCount: (count: number): Promise<IPCResponse<string>> => ipcRenderer.invoke('analytics:categorize-result-count', count),
+    hashSessionId: (sessionId: string): Promise<IPCResponse<string>> => ipcRenderer.invoke('analytics:hash-session-id', sessionId),
+  },
 });
 
 // Expose electron event listeners and utilities for permission requests

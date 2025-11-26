@@ -5,14 +5,15 @@ import type { VersionInfo } from './services/versionChecker';
 import { addSessionLog } from './ipc/logs';
 import { getCodexModelConfig } from '../../shared/types/models';
 import { panelManager } from './services/panelManager';
+import { terminalPanelManager } from './services/terminalPanelManager';
 import type { ToolPanel, CodexPanelState, ClaudePanelState } from '../../shared/types/panels';
 import type { ClaudePanelManager } from './services/panels/claude/claudePanelManager';
 import type { SessionOutput } from './types/session';
-import { 
-  validateSessionExists, 
-  validateEventContext, 
+import {
+  validateSessionExists,
+  validateEventContext,
   validatePanelEventContext,
-  logValidationFailure 
+  logValidationFailure
 } from './utils/sessionValidation';
 import type { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
 import type { GitCommit } from './services/gitDiffManager';
@@ -30,8 +31,15 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     worktreeManager,
     archiveProgressManager,
     databaseService,
-    logger
+    logger,
+    analyticsManager
   } = services;
+
+  // Wire up analytics manager to panel managers
+  if (analyticsManager) {
+    panelManager.setAnalyticsManager(analyticsManager);
+    terminalPanelManager.setAnalyticsManager(analyticsManager);
+  }
 
   let codexCliManager: AbstractCliManager | undefined;
   try {

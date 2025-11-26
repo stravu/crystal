@@ -303,7 +303,8 @@ export class CliToolRegistry extends EventEmitter {
   public async createManager(
     toolId: string,
     sessionManager: SessionManager,
-    additionalOptions?: Record<string, unknown>
+    additionalOptions?: Record<string, unknown>,
+    skipValidation = false
   ): Promise<AbstractCliManager> {
     const tool = this.tools.get(toolId);
     if (!tool) {
@@ -317,10 +318,12 @@ export class CliToolRegistry extends EventEmitter {
       return existingManager;
     }
 
-    // Validate tool availability
-    const availability = await this.checkToolAvailability(toolId);
-    if (!availability.available) {
-      throw new Error(`CLI tool '${toolId}' is not available: ${availability.error}`);
+    // Validate tool availability (unless skipValidation is true)
+    if (!skipValidation) {
+      const availability = await this.checkToolAvailability(toolId);
+      if (!availability.available) {
+        throw new Error(`CLI tool '${toolId}' is not available: ${availability.error}`);
+      }
     }
 
     // Create new manager instance

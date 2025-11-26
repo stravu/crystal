@@ -14,15 +14,15 @@ export let codexPanelManager: CodexPanelManager;
 
 class CodexPanelHandler extends BaseAIPanelHandler {
   protected createPanelManager(): CodexPanelManager {
-    const { sessionManager, logger, configManager } = this.services;
-    
+    const { sessionManager, logger, configManager, analyticsManager } = this.services;
+
     // Initialize singleton instances if needed
     if (!codexManager) {
       this.services.logger?.info('[codex-debug] Initializing CodexManager singleton');
       codexManager = new CodexManager(sessionManager, logger, configManager);
     }
-    
-    return new CodexPanelManager(codexManager, sessionManager, logger, configManager);
+
+    return new CodexPanelManager(codexManager, sessionManager, logger, configManager, analyticsManager);
   }
 
   protected getInitialPanelState(): Partial<CodexPanelState> {
@@ -62,11 +62,13 @@ class CodexPanelHandler extends BaseAIPanelHandler {
           logger?.info(`[codex-debug] Panel ${panelId} has existing codexSessionId: ${existingCodexSessionId}`);
           // Just register the panel - the frontend will handle resuming when the user sends a message
           logger?.info(`[codex-debug] Registering panel ${panelId} with session ${sessionId} for potential resume`);
-          (this.panelManager as CodexPanelManager).registerPanel(panelId, sessionId);
+          // Pass false for isUserInitiated since this is runtime initialization, not panel creation
+          (this.panelManager as CodexPanelManager).registerPanel(panelId, sessionId, undefined, false);
         } else {
           // Register the panel with the manager
           logger?.info(`[codex-debug] Registering new panel ${panelId} with session ${sessionId}`);
-          (this.panelManager as CodexPanelManager).registerPanel(panelId, sessionId);
+          // Pass false for isUserInitiated since this is runtime initialization, not panel creation
+          (this.panelManager as CodexPanelManager).registerPanel(panelId, sessionId, undefined, false);
           
           // If a prompt is provided, start the Codex process
           if (prompt) {
