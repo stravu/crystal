@@ -1,6 +1,27 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.3.4] - 2025-11-26
+
+### Added
+- **Merge and archive**: New "merge and archive" button that merges changes and archives the session in one action
+- **Archive folders on merge**: Ability to archive entire folders when merging
+- **Nimbalyst integration**: Open Nimbalyst directly from Crystal with worktree filter support
+- **Resizable UI elements**: File changes panel and prompt box/panel can now be resized
+
+### Changed
+- **Multiple agents per worktree**: Run multiple agents in one worktree at a time for more flexible workflows
+
+### Fixed
+- **Token usage parsing**: Fixed issues with token usage parsing
+- **Run script command**: Fixed wrong script command for run script ([#226](https://github.com/stravu/crystal/issues/226))
+- **Run script state**: Fixed run script state management issues
+- **Graceful degradation**: Application no longer fails to load if Codex or Claude Code are not installed
+- **Dependencies and linting**: Fixed various dependency and linting errors
+
+### Documentation
+- **Windows build requirements**: Added Windows build requirements documentation
+
 ## [0.3.3] - 2025-10-12
 
 ### Added
