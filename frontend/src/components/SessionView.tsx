@@ -12,6 +12,7 @@ import { SessionHeader } from './session/SessionHeader';
 // import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages'; // Removed - now in panels
 import { GitErrorDialog } from './session/GitErrorDialog';
 import { CommitMessageDialog } from './session/CommitMessageDialog';
+import { FolderArchiveDialog } from './session/FolderArchiveDialog';
 // import { FileEditor } from './panels/editor/FileEditor'; // Removed - now in panels
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
@@ -200,12 +201,24 @@ export const SessionView = memo(() => {
   const handlePanelSelect = useCallback(
     async (panel: ToolPanel) => {
       if (!activeSession) return;
-      
+
       // Add to history when panel is selected
       addToHistory(activeSession.id, panel.id);
-      
+
       setActivePanelInStore(activeSession.id, panel.id);
       await panelApi.setActivePanel(activeSession.id, panel.id);
+
+      // Clear unviewed content flag when panel is viewed (for AI panels)
+      if (panel.type === 'claude' || panel.type === 'codex') {
+        const customState = panel.state?.customState as { hasUnviewedContent?: boolean; panelStatus?: string } | undefined;
+        if (customState?.hasUnviewedContent || customState?.panelStatus === 'completed_unviewed') {
+          try {
+            await panelApi.clearPanelUnviewedContent(panel.id);
+          } catch (err) {
+            console.error('[SessionView] Failed to clear unviewed content:', err);
+          }
+        }
+      }
     },
     [activeSession, setActivePanelInStore, addToHistory]
   );
@@ -563,7 +576,9 @@ export const SessionView = memo(() => {
         shouldSquash={hook.shouldSquash}
         setShouldSquash={hook.setShouldSquash}
         onConfirm={hook.performSquashWithCommitMessage}
+        onMergeAndArchive={hook.performSquashWithCommitMessageAndArchive}
         isMerging={hook.isMerging}
+        isMergingAndArchiving={hook.isMergingAndArchiving}
       />
 
       <GitErrorDialog
@@ -578,6 +593,14 @@ export const SessionView = memo(() => {
         isOpen={hook.showStravuSearch}
         onClose={() => hook.setShowStravuSearch(false)}
         onFileSelect={hook.handleStravuFileSelect}
+      />
+
+      <FolderArchiveDialog
+        isOpen={hook.showFolderArchiveDialog}
+        sessionCount={hook.folderSessionCount}
+        onArchiveSessionOnly={hook.handleArchiveSessionOnly}
+        onArchiveEntireFolder={hook.handleArchiveEntireFolder}
+        onCancel={hook.handleCancelFolderArchive}
       />
 
     </div>

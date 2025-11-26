@@ -10,6 +10,7 @@ import { CodexInputPanelStyled } from './CodexInputPanelStyled';
 import { useCodexPanel } from '../../../hooks/useCodexPanel';
 import { DEFAULT_CODEX_MODEL, type CodexInputOptions } from '../../../../../shared/types/models';
 import { useConfigStore } from '../../../stores/configStore';
+import { ResizablePanel } from '../../ResizablePanel';
 
 interface CodexPanelProps {
   panel: ToolPanel;
@@ -180,15 +181,22 @@ export const CodexPanel: React.FC<CodexPanelProps> = React.memo(({ panel, isActi
 
       {/* Codex Input - Always visible at bottom */}
       {!activeSession.archived && (
-        <CodexInputPanelStyled
-          session={activeSession}
-          panelId={panel.id}
-          panel={panel}
-          onSendMessage={hook.handleSendMessage as (message: string, options?: CodexInputOptions) => Promise<void>}
-          disabled={hook.isProcessing}
-          initialModel={model}
-          onCancel={hook.handleInterrupt}
-        />
+        <ResizablePanel
+          defaultHeight={200}
+          minHeight={140}
+          maxHeight={600}
+          storageKey="codex-input-panel-height"
+        >
+          <CodexInputPanelStyled
+            session={activeSession}
+            panelId={panel.id}
+            panel={panel}
+            onSendMessage={hook.handleSendMessage as (message: string, options?: CodexInputOptions) => Promise<void>}
+            disabled={hook.isProcessing}
+            initialModel={model}
+            onCancel={hook.handleInterrupt}
+          />
+        </ResizablePanel>
       )}
     </div>
   );

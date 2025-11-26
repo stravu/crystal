@@ -5,16 +5,26 @@ import { panelManager } from '../../panelManager';
 import { addSessionLog, cleanupSessionLogs } from '../../../ipc/logs';
 import { mainWindow } from '../../../index';
 import { getShellPath } from '../../../utils/shellPath';
+import type { AnalyticsManager } from '../../analyticsManager';
 
 export class LogsManager {
   private static instance: LogsManager;
   private activeProcesses = new Map<string, ChildProcess>(); // panelId -> process
+  private scriptStartTimes = new Map<string, number>(); // panelId -> start timestamp
+  private analyticsManager: AnalyticsManager | null = null;
   
   static getInstance(): LogsManager {
     if (!LogsManager.instance) {
       LogsManager.instance = new LogsManager();
     }
     return LogsManager.instance;
+  }
+
+  /**
+   * Set the analytics manager for tracking script executions
+   */
+  setAnalyticsManager(analyticsManager: AnalyticsManager): void {
+    this.analyticsManager = analyticsManager;
   }
 
   /**
@@ -94,6 +104,10 @@ export class LogsManager {
     
     // Update panel state to running
     const startTime = new Date().toISOString();
+
+    // Record start time for analytics tracking
+    this.scriptStartTimes.set(panel.id, Date.now());
+
     await panelManager.updatePanel(panel.id, {
       state: {
         ...panel.state,
@@ -412,7 +426,22 @@ export class LogsManager {
   private async handleProcessExit(panelId: string, sessionId: string, code: number | null): Promise<void> {
     // Remove from active processes
     this.activeProcesses.delete(panelId);
-    
+
+    // Track script execution analytics
+    const startTime = this.scriptStartTimes.get(panelId);
+    if (startTime && this.analyticsManager) {
+      const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+      const success = code === 0;
+
+      this.analyticsManager.track('run_script_executed', {
+        success,
+        duration_seconds: this.analyticsManager.categorizeDuration(duration),
+      });
+
+      // Clean up start time
+      this.scriptStartTimes.delete(panelId);
+    }
+
     // Update panel state
     const panel = await panelManager.getPanel(panelId);
     if (panel) {
@@ -429,7 +458,7 @@ export class LogsManager {
         }
       });
     }
-    
+
     // Emit process ended event
     if (mainWindow) {
       mainWindow.webContents.send('panel:event', {
@@ -442,16 +471,16 @@ export class LogsManager {
         data: { exitCode: code },
         timestamp: new Date().toISOString()
       });
-      
+
       // Also send specific event for the panel
       mainWindow.webContents.send('process:ended', {
         panelId,
         exitCode: code
       });
     }
-    
+
     // Add final log entry
-    const message = code === 0 
+    const message = code === 0
       ? 'Process completed successfully'
       : `Process exited with code ${code}`;
     addSessionLog(sessionId, code === 0 ? 'info' : 'error', message, 'Script');

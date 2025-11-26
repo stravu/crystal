@@ -44,6 +44,7 @@ import { addSessionLog, cleanupSessionLogs } from '../ipc/logs';
 import { withLock } from '../utils/mutex';
 import * as os from 'os';
 import { panelManager } from './panelManager';
+import type { AnalyticsManager } from './analyticsManager';
 
 export class SessionManager extends EventEmitter {
   private activeSessions: Map<string, Session> = new Map();
@@ -52,12 +53,14 @@ export class SessionManager extends EventEmitter {
   private activeProject: Project | null = null;
   private terminalSessionManager: TerminalSessionManager;
   private autoContextBuffers: Map<string, SessionOutput[]> = new Map();
+  private analyticsManager: AnalyticsManager | null = null;
 
-  constructor(public db: DatabaseService) {
+  constructor(public db: DatabaseService, analyticsManager?: AnalyticsManager) {
     super();
     // Increase max listeners to prevent warnings when many components listen to events
     // This is expected since multiple SessionListItem components and project tree views listen to events
     this.setMaxListeners(100);
+    this.analyticsManager = analyticsManager || null;
     this.terminalSessionManager = new TerminalSessionManager();
     
     // Forward terminal output events to the terminal display
@@ -390,7 +393,49 @@ export class SessionManager extends EventEmitter {
     this.activeSessions.set(session.id, session);
     // Don't emit the event here - let the caller decide when to emit it
     // this.emit('session-created', session);
-    
+
+    // Track session creation with analytics
+    if (this.analyticsManager) {
+      // Get session statistics for analytics
+      const allSessions = this.db.getAllSessions();
+      const activeSessions = allSessions.filter(s => !s.archived);
+      const archivedSessions = allSessions.filter(s => s.archived);
+
+      // Count sessions by status
+      const statusCounts: Record<string, number> = {};
+      activeSessions.forEach(s => {
+        const status = s.status || 'unknown';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+
+      // Count unique projects
+      const allProjects = this.db.getAllProjects();
+      const projectCount = allProjects.length;
+
+      this.analyticsManager.track('session_created', {
+        tool_type: toolType || 'none',
+        template_type: worktreeName.startsWith('main') ? 'main' : 'worktree',
+        session_count: 1, // This is for a single session creation
+        has_folder: !!folderId,
+        used_claude_code: toolType === 'claude',
+        used_codex: toolType === 'codex',
+        used_auto_name: false, // Will be updated by caller if auto-name was used
+        auto_name_available: true, // Auto-naming is always available
+        git_mode: isMainRepo ? 'main_repo' : commitMode || 'disabled',
+        existing_active_sessions_count: activeSessions.length,
+        existing_total_sessions_count: allSessions.length,
+        existing_archived_sessions_count: archivedSessions.length,
+        existing_sessions_initializing: statusCounts['initializing'] || 0,
+        existing_sessions_running: statusCounts['running'] || 0,
+        existing_sessions_waiting: statusCounts['waiting'] || 0,
+        existing_sessions_stopped: statusCounts['stopped'] || 0,
+        existing_sessions_error: statusCounts['error'] || 0,
+        existing_sessions_completed: statusCounts['completed'] || 0,
+        existing_sessions_completed_unviewed: statusCounts['completed_unviewed'] || 0,
+        existing_projects_count: projectCount
+      });
+    }
+
     return session;
   }
 
@@ -497,6 +542,21 @@ export class SessionManager extends EventEmitter {
 
   updateSessionStatus(id: string, status: Session['status'], statusMessage?: string): void {
     this.updateSession(id, { status, statusMessage });
+
+    // Track session start when status changes to running
+    if (status === 'running' && this.analyticsManager) {
+      const session = this.getSession(id);
+      if (session) {
+        // Check if this is a continuation based on conversation history
+        const conversationMessages = this.getConversationMessages(id);
+        const isContinuation = conversationMessages.length > 0;
+
+        this.analyticsManager.track('session_started', {
+          tool_type: session.toolType || 'none',
+          is_continuation: isContinuation
+        });
+      }
+    }
   }
 
   addSessionError(id: string, error: string, details?: string): void {
@@ -548,12 +608,33 @@ export class SessionManager extends EventEmitter {
       // Update the completion timestamp for the most recent prompt
       const completionTimestamp = output.timestamp instanceof Date ? output.timestamp.toISOString() : output.timestamp;
       this.db.updatePromptMarkerCompletion(id, completionTimestamp);
-      
+
       // Mark the session as completed (this will trigger the completed_unviewed logic if not viewed)
       const dbSession = this.db.getSession(id);
       if (dbSession && dbSession.status === 'running') {
+        // Track session completion with analytics
+        if (this.analyticsManager) {
+          // Calculate duration
+          let durationSeconds = 0;
+          if (dbSession.run_started_at) {
+            const startTime = new Date(dbSession.run_started_at).getTime();
+            const endTime = Date.now();
+            durationSeconds = Math.floor((endTime - startTime) / 1000);
+          }
+
+          // Get prompt count
+          const promptMarkers = this.db.getPromptMarkers(id);
+          const promptCount = promptMarkers.length;
+
+          this.analyticsManager.track('session_completed', {
+            duration_seconds: durationSeconds,
+            duration_category: this.analyticsManager.categorizeDuration(durationSeconds),
+            prompt_count: promptCount
+          });
+        }
+
         this.db.updateSession(id, { status: 'completed' });
-        
+
         // Re-convert to get the proper status (completed_unviewed if not viewed)
         const updatedDbSession = this.db.getSession(id);
         if (updatedDbSession) {
@@ -656,6 +737,21 @@ export class SessionManager extends EventEmitter {
   }
 
   async archiveSession(id: string): Promise<void> {
+    // Track session archival with analytics before archiving
+    if (this.analyticsManager) {
+      const dbSession = this.db.getSession(id);
+      if (dbSession) {
+        // Calculate session age in days
+        const createdTime = new Date(dbSession.created_at).getTime();
+        const currentTime = Date.now();
+        const sessionAgeDays = Math.floor((currentTime - createdTime) / (1000 * 60 * 60 * 24));
+
+        this.analyticsManager.track('session_archived', {
+          session_age_days: sessionAgeDays
+        });
+      }
+    }
+
     const success = this.db.archiveSession(id);
     if (!success) {
       throw new Error(`Session ${id} not found`);
@@ -704,6 +800,31 @@ export class SessionManager extends EventEmitter {
   }
 
   stopSession(id: string): void {
+    // Track session stop with analytics
+    if (this.analyticsManager) {
+      const session = this.getSession(id);
+      if (session) {
+        const dbSession = this.db.getSession(id);
+
+        // Calculate duration
+        let durationSeconds = 0;
+        if (dbSession?.run_started_at) {
+          const startTime = new Date(dbSession.run_started_at).getTime();
+          const endTime = Date.now();
+          durationSeconds = Math.floor((endTime - startTime) / 1000);
+        }
+
+        // Check if session had errors
+        const hadErrors = !!session.error || dbSession?.exit_code !== 0;
+
+        this.analyticsManager.track('session_stopped', {
+          duration_seconds: durationSeconds,
+          duration_category: this.analyticsManager.categorizeDuration(durationSeconds),
+          had_errors: hadErrors
+        });
+      }
+    }
+
     this.updateSession(id, { status: 'stopped' });
   }
 
@@ -917,6 +1038,26 @@ export class SessionManager extends EventEmitter {
 
   async continueConversation(id: string, userMessage: string): Promise<void> {
     return await withLock(`session-input-${id}`, async () => {
+      // Track conversation continuation with analytics
+      if (this.analyticsManager) {
+        const conversationMessages = this.getConversationMessages(id);
+        const messageCount = conversationMessages.length;
+
+        // Calculate time since last message
+        let timeSinceLastMessageHours = 0;
+        if (conversationMessages.length > 0) {
+          const lastMessage = conversationMessages[conversationMessages.length - 1];
+          const lastMessageTime = new Date(lastMessage.timestamp).getTime();
+          const currentTime = Date.now();
+          timeSinceLastMessageHours = (currentTime - lastMessageTime) / (1000 * 60 * 60);
+        }
+
+        this.analyticsManager.track('session_continued', {
+          time_since_last_message_hours: Math.round(timeSinceLastMessageHours * 10) / 10, // Round to 1 decimal
+          message_count: messageCount
+        });
+      }
+
       // Store the user's message
       this.addConversationMessage(id, 'user', userMessage);
       

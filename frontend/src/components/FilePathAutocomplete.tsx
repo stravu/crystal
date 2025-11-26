@@ -421,7 +421,7 @@ const FilePathAutocomplete: React.FC<FilePathAutocompleteProps> = ({
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full w-full">
       {isTextarea ? (
         <textarea
           ref={textareaRef || internalTextareaRef}

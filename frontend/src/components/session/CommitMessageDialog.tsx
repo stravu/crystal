@@ -15,7 +15,9 @@ interface CommitMessageDialogProps {
   shouldSquash: boolean;
   setShouldSquash: (should: boolean) => void;
   onConfirm: (message: string) => void;
+  onMergeAndArchive?: (message: string) => void;
   isMerging: boolean;
+  isMergingAndArchiving?: boolean;
 }
 
 export const CommitMessageDialog: React.FC<CommitMessageDialogProps> = ({
@@ -28,8 +30,11 @@ export const CommitMessageDialog: React.FC<CommitMessageDialogProps> = ({
   shouldSquash,
   setShouldSquash,
   onConfirm,
+  onMergeAndArchive,
   isMerging,
+  isMergingAndArchiving,
 }) => {
+  const isProcessing = isMerging || isMergingAndArchiving;
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <ModalHeader>
@@ -100,15 +105,25 @@ export const CommitMessageDialog: React.FC<CommitMessageDialogProps> = ({
       </ModalBody>
       
       <ModalFooter className="flex justify-end gap-3">
-        <Button onClick={onClose} variant="ghost">
+        <Button onClick={onClose} variant="ghost" disabled={isProcessing}>
           Cancel
         </Button>
+        {dialogType === 'squash' && onMergeAndArchive && (
+          <Button
+            onClick={() => onMergeAndArchive(commitMessage)}
+            disabled={(shouldSquash && !commitMessage.trim()) || isProcessing}
+            loading={isMergingAndArchiving}
+            variant="secondary"
+          >
+            {isMergingAndArchiving ? 'Merging...' : 'Merge & Archive'}
+          </Button>
+        )}
         <Button
           onClick={() => onConfirm(commitMessage)}
-          disabled={(shouldSquash && !commitMessage.trim()) || isMerging}
+          disabled={(shouldSquash && !commitMessage.trim()) || isProcessing}
           loading={isMerging}
         >
-          {isMerging ? 'Merging...' : (dialogType === 'squash' ? (shouldSquash ? 'Merge' : 'Merge') : 'Rebase')}
+          {isMerging ? 'Merging...' : (dialogType === 'squash' ? 'Merge' : 'Rebase')}
         </Button>
       </ModalFooter>
     </Modal>

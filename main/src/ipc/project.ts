@@ -44,7 +44,7 @@ async function stopProjectScriptInternal(projectId?: number): Promise<{ success:
 }
 
 export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices): void {
-  const { databaseService, sessionManager, worktreeManager } = services;
+  const { databaseService, sessionManager, worktreeManager, analyticsManager } = services;
 
   ipcMain.handle('projects:get-all', async () => {
     try {
@@ -151,6 +151,16 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       }
 
       console.log('[Main] Project created successfully:', project);
+
+      // Track project creation
+      if (analyticsManager && project) {
+        const allProjects = databaseService.getAllProjects();
+        analyticsManager.track('project_created', {
+          was_auto_initialized: !isGitRepo,
+          project_count: allProjects.length
+        });
+      }
+
       return { success: true, data: project };
     } catch (error) {
       console.error('[Main] Failed to create project:', error);
@@ -193,6 +203,16 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       if (project) {
         sessionManager.setActiveProject(project);
         await worktreeManager.initializeProject(project.path);
+
+        // Track project switch
+        if (analyticsManager) {
+          const projectIdNum = parseInt(projectId);
+          const projectSessions = databaseService.getAllSessions(projectIdNum);
+          const hasActiveSessions = projectSessions.some(s => s.status === 'running' || s.status === 'pending');
+          analyticsManager.track('project_switched', {
+            has_active_sessions: hasActiveSessions
+          });
+        }
       }
       return { success: true };
     } catch (error) {
@@ -233,6 +253,27 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         sessionManager.emit('project:updated', project);
       }
 
+      // Track project settings update
+      if (analyticsManager && project) {
+        // Determine which category of setting was updated
+        let settingCategory = 'other';
+        if (updates.system_prompt !== undefined) {
+          settingCategory = 'system_prompt';
+        } else if (updates.run_script !== undefined || updates.build_script !== undefined) {
+          settingCategory = 'scripts';
+        } else if (updates.commit_mode !== undefined || updates.commit_structured_prompt_template !== undefined || updates.commit_checkpoint_prefix !== undefined) {
+          settingCategory = 'commit';
+        } else if (updates.open_ide_command !== undefined) {
+          settingCategory = 'ide';
+        } else if (updates.name !== undefined) {
+          settingCategory = 'name';
+        }
+
+        analyticsManager.track('project_settings_updated', {
+          setting_category: settingCategory
+        });
+      }
+
       return { success: true, data: project };
     } catch (error) {
       console.error('Failed to update project:', error);
@@ -258,12 +299,14 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       console.log(`[Main] Deleting project ${project.name} with ${allProjectSessions.length} total sessions`);
       
       // Check if any session from this project has a running script
-      const currentRunningSessionId = sessionManager.getCurrentRunningSessionId();
-      if (currentRunningSessionId) {
-        const runningSession = projectSessions.find(s => s.id === currentRunningSessionId);
-        if (runningSession) {
-          console.log(`[Main] Stopping running script for session ${currentRunningSessionId} before deleting project`);
-          sessionManager.stopRunningScript();
+      const runningScript = scriptExecutionTracker.getRunningScript();
+      if (runningScript) {
+        const runningSession = projectSessions.find(s => s.id === runningScript.id);
+        if (runningSession && runningScript.type === 'session') {
+          console.log(`[Main] Stopping running script for session ${runningScript.id} before deleting project`);
+          await sessionManager.stopRunningScript();
+          // Ensure tracker is updated even if sessionManager's internal update fails
+          scriptExecutionTracker.stop('session', runningScript.id);
         }
       }
       
@@ -285,7 +328,9 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
         
         try {
           console.log(`[Main] Removing worktree '${session.worktree_name}' for session ${session.id}`);
-          await worktreeManager.removeWorktree(project.path, session.worktree_name, project.worktree_folder || undefined);
+          // Pass session creation date for analytics tracking
+          const sessionCreatedAt = session.created_at ? new Date(session.created_at) : undefined;
+          await worktreeManager.removeWorktree(project.path, session.worktree_name, project.worktree_folder || undefined, sessionCreatedAt);
           worktreeCleanupCount++;
         } catch (error) {
           // Log error but continue with other worktrees
@@ -294,7 +339,16 @@ export function registerProjectHandlers(ipcMain: IpcMain, services: AppServices)
       }
       
       console.log(`[Main] Cleaned up ${worktreeCleanupCount} worktrees for project ${project.name}`);
-      
+
+      // Track project deletion before actually deleting
+      if (analyticsManager) {
+        const projectAge = Math.floor((Date.now() - new Date(project.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        analyticsManager.track('project_deleted', {
+          session_count: projectSessions.length,
+          project_age_days: projectAge
+        });
+      }
+
       // Now safe to delete the project
       const success = databaseService.deleteProject(projectIdNum);
       return { success: true, data: success };

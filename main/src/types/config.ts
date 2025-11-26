@@ -62,6 +62,13 @@ export interface AppConfig {
   };
   // Crystal commit footer setting (enabled by default)
   enableCrystalFooter?: boolean;
+  // PostHog analytics settings
+  analytics?: {
+    enabled: boolean;
+    posthogApiKey?: string;
+    posthogHost?: string;
+    distinctId?: string; // Random UUID for anonymous user identification
+  };
 }
 
 export interface UpdateConfigRequest {
@@ -113,4 +120,11 @@ export interface UpdateConfigRequest {
     };
   };
   disableCrystalFooter?: boolean;
+  // PostHog analytics settings
+  analytics?: {
+    enabled: boolean;
+    posthogApiKey?: string;
+    posthogHost?: string;
+    distinctId?: string; // Random UUID for anonymous user identification
+  };
 }

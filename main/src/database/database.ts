@@ -724,11 +724,21 @@ export class DatabaseService {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           welcome_hidden BOOLEAN DEFAULT 0,
-          discord_shown BOOLEAN DEFAULT 0
+          discord_shown BOOLEAN DEFAULT 0,
+          app_version TEXT
         )
       `).run();
       this.db.prepare("CREATE INDEX idx_app_opens_opened_at ON app_opens(opened_at)").run();
       console.log('[Database] Created app_opens table');
+    }
+
+    // Add app_version column to app_opens table if it doesn't exist
+    const appOpensTableInfo = this.db.prepare("PRAGMA table_info(app_opens)").all() as SqliteTableInfo[];
+    const hasAppVersionColumn = appOpensTableInfo.some((col: SqliteTableInfo) => col.name === 'app_version');
+
+    if (!hasAppVersionColumn) {
+      this.db.prepare("ALTER TABLE app_opens ADD COLUMN app_version TEXT").run();
+      console.log('[Database] Added app_version column to app_opens table');
     }
 
     // Remove model column from sessions table if it exists (moved to panel level)
@@ -2509,28 +2519,41 @@ export class DatabaseService {
   }
 
   // App opens operations
-  recordAppOpen(welcomeHidden: boolean, discordShown: boolean = false): void {
+  recordAppOpen(welcomeHidden: boolean, discordShown: boolean = false, appVersion?: string): void {
     this.db.prepare(`
-      INSERT INTO app_opens (welcome_hidden, discord_shown)
-      VALUES (?, ?)
-    `).run(welcomeHidden ? 1 : 0, discordShown ? 1 : 0);
+      INSERT INTO app_opens (welcome_hidden, discord_shown, app_version)
+      VALUES (?, ?, ?)
+    `).run(welcomeHidden ? 1 : 0, discordShown ? 1 : 0, appVersion || null);
   }
 
-  getLastAppOpen(): { opened_at: string; welcome_hidden: boolean; discord_shown: boolean } | null {
+  getLastAppOpen(): { opened_at: string; welcome_hidden: boolean; discord_shown: boolean; app_version?: string } | null {
     const result = this.db.prepare(`
-      SELECT opened_at, welcome_hidden, discord_shown
+      SELECT opened_at, welcome_hidden, discord_shown, app_version
       FROM app_opens
       ORDER BY opened_at DESC
       LIMIT 1
-    `).get() as { opened_at: string; welcome_hidden: number; discord_shown: number } | undefined;
+    `).get() as { opened_at: string; welcome_hidden: number; discord_shown: number; app_version?: string } | undefined;
 
     if (!result) return null;
-    
+
     return {
       opened_at: result.opened_at,
       welcome_hidden: Boolean(result.welcome_hidden),
-      discord_shown: Boolean(result.discord_shown)
+      discord_shown: Boolean(result.discord_shown),
+      app_version: result.app_version
     };
+  }
+
+  getLastAppVersion(): string | null {
+    const result = this.db.prepare(`
+      SELECT app_version
+      FROM app_opens
+      WHERE app_version IS NOT NULL
+      ORDER BY opened_at DESC
+      LIMIT 1
+    `).get() as { app_version: string } | undefined;
+
+    return result?.app_version || null;
   }
 
   updateLastAppOpenDiscordShown(): void {

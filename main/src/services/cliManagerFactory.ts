@@ -16,15 +16,18 @@ import {
 export interface CliManagerFactoryConfig {
   /** Session manager instance */
   sessionManager: unknown;
-  
+
   /** Logger instance */
   logger?: Logger;
-  
+
   /** Configuration manager instance */
   configManager?: ConfigManager;
-  
+
   /** Additional tool-specific options */
   additionalOptions?: Record<string, unknown>;
+
+  /** Skip tool availability validation (useful for startup) */
+  skipValidation?: boolean;
 }
 
 /**
@@ -60,16 +63,17 @@ export class CliManagerFactory {
    * Create a CLI manager for the specified tool
    */
   public async createManager(
-    toolId: string, 
+    toolId: string,
     config: CliManagerFactoryConfig
   ): Promise<AbstractCliManager> {
     try {
       this.validateConfig(config);
-      
+
       const manager = await this.registry.createManager(
         toolId,
         config.sessionManager as SessionManager,
-        config.additionalOptions
+        config.additionalOptions,
+        config.skipValidation
       );
 
       this.logger?.info(`[CliManagerFactory] Created ${toolId} manager successfully`);

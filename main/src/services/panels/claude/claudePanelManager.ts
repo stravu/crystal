@@ -2,6 +2,7 @@ import { AbstractAIPanelManager } from '../ai/AbstractAIPanelManager';
 import { AbstractCliManager } from '../cli/AbstractCliManager';
 import type { Logger } from '../../../utils/logger';
 import type { ConfigManager } from '../../configManager';
+import type { AnalyticsManager } from '../../analyticsManager';
 import type { ConversationMessage } from '../../../database/models';
 import { AIPanelConfig, StartPanelConfig, ContinuePanelConfig } from '../../../../../shared/types/aiPanelConfig';
 import { ClaudePanelState } from '../../../../../shared/types/panels';
@@ -16,9 +17,10 @@ export class ClaudePanelManager extends AbstractAIPanelManager {
     claudeCodeManager: AbstractCliManager,
     sessionManager: import('../../sessionManager').SessionManager,
     logger?: Logger,
-    configManager?: ConfigManager
+    configManager?: ConfigManager,
+    analyticsManager?: AnalyticsManager
   ) {
-    super(claudeCodeManager, sessionManager, logger, configManager);
+    super(claudeCodeManager, sessionManager, logger, configManager, analyticsManager);
   }
 
   /**
@@ -115,15 +117,19 @@ export class ClaudePanelManager extends AbstractAIPanelManager {
 
   /**
    * Register panel with Claude-specific state handling
+   * @param panelId - The panel ID to register
+   * @param sessionId - The session ID this panel belongs to
+   * @param initialState - Optional Claude-specific initial state
+   * @param isUserInitiated - If true, track analytics event (default: true). Set to false during app startup/restoration.
    */
-  registerPanel(panelId: string, sessionId: string, initialState?: ClaudePanelState): void {
+  registerPanel(panelId: string, sessionId: string, initialState?: ClaudePanelState, isUserInitiated = true): void {
     // Transform Claude-specific state to base state if needed
     const baseInitialState = initialState ? {
       ...initialState,
       resumeId: initialState.claudeResumeId // Map claudeResumeId to resumeId for base class
     } : undefined;
 
-    super.registerPanel(panelId, sessionId, baseInitialState);
+    super.registerPanel(panelId, sessionId, baseInitialState, isUserInitiated);
   }
 
   /**

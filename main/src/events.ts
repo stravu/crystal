@@ -5,14 +5,15 @@ import type { VersionInfo } from './services/versionChecker';
 import { addSessionLog } from './ipc/logs';
 import { getCodexModelConfig } from '../../shared/types/models';
 import { panelManager } from './services/panelManager';
-import type { ToolPanel, CodexPanelState, ClaudePanelState } from '../../shared/types/panels';
+import { terminalPanelManager } from './services/terminalPanelManager';
+import type { ToolPanel, CodexPanelState, ClaudePanelState, BaseAIPanelState, PanelStatus } from '../../shared/types/panels';
 import type { ClaudePanelManager } from './services/panels/claude/claudePanelManager';
 import type { SessionOutput } from './types/session';
-import { 
-  validateSessionExists, 
-  validateEventContext, 
+import {
+  validateSessionExists,
+  validateEventContext,
   validatePanelEventContext,
-  logValidationFailure 
+  logValidationFailure
 } from './utils/sessionValidation';
 import type { AbstractCliManager } from './services/panels/cli/AbstractCliManager';
 import type { GitCommit } from './services/gitDiffManager';
@@ -30,8 +31,15 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     worktreeManager,
     archiveProgressManager,
     databaseService,
-    logger
+    logger,
+    analyticsManager
   } = services;
+
+  // Wire up analytics manager to panel managers
+  if (analyticsManager) {
+    panelManager.setAnalyticsManager(analyticsManager);
+    terminalPanelManager.setAnalyticsManager(analyticsManager);
+  }
 
   let codexCliManager: AbstractCliManager | undefined;
   try {
@@ -68,7 +76,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   // eslint-disable-next-line no-control-regex
   const ANSI_ESCAPE_REGEX = /\x1B\[[0-9;]*m/g;
+  // Original format: "76k/200k tokens (38%)"
   const CONTEXT_USAGE_REGEX = /([0-9]+(?:\.[0-9]+)?k?\s*\/\s*[0-9]+(?:\.[0-9]+)?k?\s+tokens?\s*\(\d+%[^)]*\))/i;
+  // Alternative format: "Context: 76000/200000 tokens" or similar
+  const CONTEXT_USAGE_ALT_REGEX = /context[:\s]+([0-9,]+)\s*(?:\/|of)\s*([0-9,]+)\s*tokens?/i;
 
   const extractCandidateStrings = (payload: unknown): string[] => {
     const strings: string[] = [];
@@ -113,18 +124,128 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     return strings;
   };
 
+  // Helper to format token count (e.g., 76000 -> "76k", 200000 -> "200k")
+  const formatTokenCount = (count: number): string => {
+    if (count >= 1000) {
+      return `${Math.round(count / 1000)}k`;
+    }
+    return String(count);
+  };
+
+  // Try to extract context usage from JSON result message with modelUsage
+  const extractContextFromResultJson = (data: Record<string, unknown>): string | null => {
+    // Check for result type with modelUsage
+    if (data.type !== 'result' || !data.modelUsage) {
+      return null;
+    }
+
+    const modelUsage = data.modelUsage as Record<string, unknown>;
+
+    // Find the first model with contextWindow info
+    for (const modelData of Object.values(modelUsage)) {
+      if (typeof modelData !== 'object' || modelData === null) continue;
+
+      const model = modelData as Record<string, unknown>;
+      const contextWindow = model.contextWindow;
+
+      if (typeof contextWindow !== 'number' || contextWindow <= 0) continue;
+
+      // Calculate current context usage from cache tokens
+      // cacheReadInputTokens represents tokens read from cache (already in context)
+      const cacheRead = typeof model.cacheReadInputTokens === 'number' ? model.cacheReadInputTokens : 0;
+      const cacheCreation = typeof model.cacheCreationInputTokens === 'number' ? model.cacheCreationInputTokens : 0;
+      const inputTokens = typeof model.inputTokens === 'number' ? model.inputTokens : 0;
+
+      // Estimate current context as the input tokens for the most recent turn
+      // This is an approximation since we don't have exact current context size
+      const estimatedContext = Math.min(inputTokens + cacheRead, contextWindow);
+
+      if (estimatedContext > 0) {
+        const percentage = Math.round((estimatedContext / contextWindow) * 100);
+        return `${formatTokenCount(estimatedContext)}/${formatTokenCount(contextWindow)} tokens (${percentage}%)`;
+      }
+    }
+
+    return null;
+  };
+
+  // Try to extract context usage from system init message
+  const extractContextFromInitJson = (data: Record<string, unknown>): string | null => {
+    if (data.type !== 'system' || data.subtype !== 'init') {
+      return null;
+    }
+
+    // Check for context_tokens field (new format)
+    if (typeof data.context_tokens === 'number' && typeof data.context_window === 'number') {
+      const used = data.context_tokens;
+      const max = data.context_window;
+      const percentage = Math.round((used / max) * 100);
+      return `${formatTokenCount(used)}/${formatTokenCount(max)} tokens (${percentage}%)`;
+    }
+
+    return null;
+  };
+
   const extractContextUsageFromOutputs = (outputs: SessionOutput[]): string | null => {
+    console.log(`[auto-context-debug] extractContextUsageFromOutputs called with ${outputs.length} outputs`);
+
+    // Log output types for debugging
+    const typeCounts: Record<string, number> = {};
     for (const output of outputs) {
-      if (output.type !== 'stdout' || typeof output.data !== 'string') {
-        if (output.type === 'json' && output.data && typeof output.data === 'object') {
-          const candidates = extractCandidateStrings(output.data);
-          for (const candidate of candidates) {
-            const match = typeof candidate === 'string' ? candidate.match(CONTEXT_USAGE_REGEX) : null;
-            if (match) {
-              return match[1].replace(/\s+/g, ' ').trim();
-            }
+      const key = output.type === 'json' && output.data && typeof output.data === 'object'
+        ? `json:${(output.data as Record<string, unknown>).type || 'unknown'}`
+        : output.type;
+      typeCounts[key] = (typeCounts[key] || 0) + 1;
+    }
+    console.log(`[auto-context-debug] Output types: ${JSON.stringify(typeCounts)}`);
+
+    for (const output of outputs) {
+      // Handle JSON outputs
+      if (output.type === 'json' && output.data && typeof output.data === 'object') {
+        const jsonData = output.data as Record<string, unknown>;
+
+        // Try to extract from result message (new format)
+        const resultContext = extractContextFromResultJson(jsonData);
+        if (resultContext) {
+          console.log(`[auto-context-debug] Found context in result JSON: ${resultContext}`);
+          return resultContext;
+        }
+
+        // Try to extract from init message
+        const initContext = extractContextFromInitJson(jsonData);
+        if (initContext) {
+          console.log(`[auto-context-debug] Found context in init JSON: ${initContext}`);
+          return initContext;
+        }
+
+        // Try original string extraction method
+        const candidates = extractCandidateStrings(output.data);
+        for (const candidate of candidates) {
+          if (typeof candidate !== 'string') continue;
+
+          // Try original regex
+          const match = candidate.match(CONTEXT_USAGE_REGEX);
+          if (match) {
+            console.log(`[auto-context-debug] Found context via original regex: ${match[1]}`);
+            return match[1].replace(/\s+/g, ' ').trim();
+          }
+
+          // Try alternative format
+          const altMatch = candidate.match(CONTEXT_USAGE_ALT_REGEX);
+          if (altMatch) {
+            const used = parseInt(altMatch[1].replace(/,/g, ''), 10);
+            const max = parseInt(altMatch[2].replace(/,/g, ''), 10);
+            const percentage = Math.round((used / max) * 100);
+            const result = `${formatTokenCount(used)}/${formatTokenCount(max)} tokens (${percentage}%)`;
+            console.log(`[auto-context-debug] Found context via alt regex: ${result}`);
+            return result;
           }
         }
+        continue;
+      }
+
+      // Handle stdout outputs
+      if (output.type !== 'stdout' || typeof output.data !== 'string') {
         continue;
       }
 
@@ -133,13 +254,27 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         .split(/\r?\n/);
 
       for (const line of cleanedLines) {
+        // Try original regex
         const match = line.match(CONTEXT_USAGE_REGEX);
         if (match) {
+          console.log(`[auto-context-debug] Found context in stdout via original regex: ${match[1]}`);
           return match[1].replace(/\s+/g, ' ').trim();
+        }
+
+        // Try alternative format
+        const altMatch = line.match(CONTEXT_USAGE_ALT_REGEX);
+        if (altMatch) {
+          const used = parseInt(altMatch[1].replace(/,/g, ''), 10);
+          const max = parseInt(altMatch[2].replace(/,/g, ''), 10);
+          const percentage = Math.round((used / max) * 100);
+          const result = `${formatTokenCount(used)}/${formatTokenCount(max)} tokens (${percentage}%)`;
+          console.log(`[auto-context-debug] Found context in stdout via alt regex: ${result}`);
+          return result;
         }
       }
     }
 
+    console.log(`[auto-context-debug] No context usage found in outputs`);
     return null;
   };
 
@@ -187,6 +322,71 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
       return nextCustomState;
     });
+  };
+
+  /**
+   * Update the status of an AI panel (claude/codex) and notify frontend
+   */
+  const updateAIPanelStatus = async (
+    panelId: string,
+    status: PanelStatus,
+    hasUnviewedContent?: boolean
+  ): Promise<void> => {
+    const { withLock } = await import('./utils/mutex');
+    return await withLock(`panel-state-${panelId}`, async () => {
+      const panel = panelManager.getPanel(panelId);
+      if (!panel) {
+        return;
+      }
+
+      // Only update status for AI panels (claude/codex)
+      if (panel.type !== 'claude' && panel.type !== 'codex') {
+        return;
+      }
+
+      const existing = (panel.state.customState as BaseAIPanelState | undefined) ?? {};
+      const nextCustomState: BaseAIPanelState = {
+        ...existing,
+        panelStatus: status,
+        lastActivityTime: new Date().toISOString()
+      };
+
+      // Only update hasUnviewedContent if explicitly provided
+      if (hasUnviewedContent !== undefined) {
+        nextCustomState.hasUnviewedContent = hasUnviewedContent;
+      }
+
+      const nextPanelState = {
+        ...panel.state,
+        customState: nextCustomState
+      };
+
+      await panelManager.updatePanel(panelId, { state: nextPanelState });
+
+      const mw = getMainWindow();
+      if (mw && !mw.isDestroyed()) {
+        try {
+          mw.webContents.send('panel:updated', {
+            ...panel,
+            state: nextPanelState
+          });
+        } catch (ipcError) {
+          console.error(`[Main] Failed to send panel:updated event for panel ${panelId}:`, ipcError);
+        }
+      }
+    });
+  };
+
+  /**
+   * Check if the panel is currently the active panel for its session
+   */
+  const isPanelActive = (panelId: string, _sessionId: string): boolean => {
+    // Check if this panel is the active panel by looking at the panel's isActive state
+    const panel = panelManager.getPanel(panelId);
+    if (!panel) return false;
+
+    // Use the panel's state.isActive property which is set when a panel becomes active
+    return panel.state.isActive === true;
   };
 
   const finalizeAutoContextRun = async (panelId: string): Promise<void> => {
@@ -312,6 +512,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         return;
       }
 
+      // Update panel status to running
+      if (panelId) {
+        await updateAIPanelStatus(panelId, 'running');
+      }
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -359,6 +563,14 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
       const signalText = signal === null || signal === undefined ? 'null' : String(signal);
 
+      // Update panel status to stopped/completed_unviewed
+      if (panelId) {
+        const isActive = isPanelActive(panelId, sessionId);
+        // If panel is not active, mark as having unviewed content
+        const panelStatusOnExit: PanelStatus = exitCode === 0 && !isActive ? 'completed_unviewed' : 'stopped';
+        await updateAIPanelStatus(panelId, panelStatusOnExit, exitCode === 0 && !isActive);
+      }
+
       if (exitCode !== null && exitCode !== undefined) {
         await sessionManager.setSessionExitCode(sessionId, exitCode);
       }
@@ -367,23 +579,40 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       if (session) {
         const dbSession = sessionManager.getDbSession(sessionId);
 
-        // If exit code is 0 (successful completion), mark as completed
-        // The updateSession method will handle converting to 'completed_unviewed' if not viewed
-        if (exitCode === 0 && dbSession && dbSession.status === 'running') {
-          // Update to 'stopped' which will be converted to 'completed_unviewed' by the mapping logic
-          // since the database status will be set to 'completed'
-          sessionManager.db.updateSession(sessionId, { status: 'completed' });
+        // Check if ALL panels for this session have stopped before updating session status
+        const sessionPanels = panelManager.getPanelsForSession(sessionId);
+        const aiPanels = sessionPanels.filter((p: ToolPanel) => p.type === 'claude' || p.type === 'codex');
 
-          // Get the updated session with proper status mapping
-          const updatedSession = sessionManager.getSession(sessionId);
-          if (updatedSession) {
-            // Manually emit the event since we bypassed updateSession for direct DB access
-            sessionManager.emit('session-updated', updatedSession);
+        // Check if any AI panel is still running
+        const hasRunningPanels = aiPanels.some((p: ToolPanel) => {
+          const customState = p.state?.customState as BaseAIPanelState | undefined;
+          return customState?.panelStatus === 'running' || customState?.panelStatus === 'waiting';
+        });
+
+        // Only update session status if no panels are still running
+        if (!hasRunningPanels) {
+          // If exit code is 0 (successful completion), mark as completed
+          // The updateSession method will handle converting to 'completed_unviewed' if not viewed
+          if (exitCode === 0 && dbSession && dbSession.status === 'running') {
+            // Update to 'stopped' which will be converted to 'completed_unviewed' by the mapping logic
+            // since the database status will be set to 'completed'
+            sessionManager.db.updateSession(sessionId, { status: 'completed' });
+
+            // Get the updated session with proper status mapping
+            const updatedSession = sessionManager.getSession(sessionId);
+            if (updatedSession) {
+              // Manually emit the event since we bypassed updateSession for direct DB access
+              sessionManager.emit('session-updated', updatedSession);
+            }
+          }
+          // For non-zero exit codes or already completed sessions
+          else if (dbSession && dbSession.status !== 'completed') {
+            await sessionManager.updateSession(sessionId, { status: 'stopped' });
           }
         }
-        // For non-zero exit codes or already completed sessions
-        else if (dbSession && dbSession.status !== 'completed') {
-          await sessionManager.updateSession(sessionId, { status: 'stopped' });
+        // If panels are still running, keep session in running state
+        else if (dbSession && dbSession.status !== 'running') {
+          await sessionManager.updateSession(sessionId, { status: 'running' });
         }
       }
 
@@ -654,6 +883,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     // Check if Claude is waiting for user input
     if (output.type === 'json' && typeof output.data === 'object' && output.data && 'type' in output.data && output.data.type === 'prompt') {
       console.log(`[Main] Claude is waiting for user input in session ${output.sessionId}`);
+      // Update panel status to waiting
+      if (output.panelId) {
+        await updateAIPanelStatus(output.panelId, 'waiting');
+      }
       await sessionManager.updateSession(output.sessionId, { status: 'waiting' });
     }
 
@@ -675,7 +908,7 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   claudeCodeManager.on('spawned', async ({ panelId, sessionId }: { panelId?: string; sessionId: string }) => {
     // Validate the event context
-    const validation = panelId 
+    const validation = panelId
       ? validatePanelEventContext({ panelId, sessionId }, panelId, sessionId)
       : validateEventContext({ sessionId }, sessionId);
 
@@ -684,6 +917,10 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
       return; // Don't process invalid events
     }
 
+    // Update panel status to running
+    if (panelId) {
+      await updateAIPanelStatus(panelId, 'running');
+    }
 
     // Add a small delay to ensure the session is fully initialized
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -906,6 +1143,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
     if (panelId) {
       console.log(`Panel ${panelId} (session ${sessionId}) encountered an error: ${error}`);
+      // Update panel status to error
+      await updateAIPanelStatus(panelId, 'error');
     } else {
       console.log(`Session ${sessionId} encountered an error: ${error}`);
     }

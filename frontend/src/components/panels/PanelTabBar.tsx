@@ -2,10 +2,11 @@ import React, { useCallback, memo, useState, useRef, useEffect } from 'react';
 import { Plus, X, Terminal, ChevronDown, MessageSquare, GitBranch, FileText, FileCode, MoreVertical, BarChart3, Code2, Edit2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { PanelTabBarProps } from '../../types/panelComponents';
-import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES, LogsPanelState } from '../../../../shared/types/panels';
+import { ToolPanel, ToolPanelType, PANEL_CAPABILITIES, LogsPanelState, BaseAIPanelState, PanelStatus } from '../../../../shared/types/panels';
 import { Button } from '../ui/Button';
 import { Dropdown } from '../ui/Dropdown';
 import { useSession } from '../../contexts/SessionContext';
+import { StatusDot } from '../ui/StatusDot';
 
 export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
   panels,
@@ -159,6 +160,45 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
     }
   };
 
+  // Get panel status indicator config for AI panels (claude/codex)
+  const getPanelStatusConfig = (panel: ToolPanel): { status: 'running' | 'waiting' | 'info' | 'error' | 'default'; animated: boolean; pulse: boolean } | null => {
+    // Only show status for AI panels
+    if (panel.type !== 'claude' && panel.type !== 'codex') {
+      return null;
+    }
+
+    const customState = panel.state?.customState as BaseAIPanelState | undefined;
+    const panelStatus: PanelStatus | undefined = customState?.panelStatus;
+    const hasUnviewedContent = customState?.hasUnviewedContent ?? false;
+    const isActivePanel = activePanel?.id === panel.id;
+
+    // Don't show status indicator if panel is active and doesn't have unviewed content
+    // (user is actively viewing it)
+    if (isActivePanel && !hasUnviewedContent && panelStatus !== 'running' && panelStatus !== 'waiting') {
+      return null;
+    }
+
+    switch (panelStatus) {
+      case 'running':
+        return { status: 'running', animated: true, pulse: false };
+      case 'waiting':
+        return { status: 'waiting', animated: false, pulse: true };
+      case 'error':
+        return { status: 'error', animated: false, pulse: false };
+      case 'completed_unviewed':
+        // Show blue dot for completed with unviewed content
+        return { status: 'info', animated: false, pulse: true };
+      case 'stopped':
+      case 'idle':
+      default:
+        // Only show if there's unviewed content and panel is not active
+        if (hasUnviewedContent && !isActivePanel) {
+          return { status: 'info', animated: false, pulse: true };
+        }
+        return null;
+    }
+  };
+
   return (
     <div className="panel-tab-bar bg-surface-secondary border-b border-border-primary dark:border-border-hover">
       {/* Flex container that wraps when needed */}
@@ -173,7 +213,8 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
           const isEditing = editingPanelId === panel.id;
           const isDiffPanel = panel.type === 'diff';
           const displayTitle = isDiffPanel ? 'Diff' : panel.title;
-          
+          const statusConfig = getPanelStatusConfig(panel);
+
           return (
             <div
               key={panel.id}
@@ -197,6 +238,16 @@ export const PanelTabBar: React.FC<PanelTabBarProps> = memo(({
                 }
               }}
             >
+              {/* Status indicator for AI panels */}
+              {statusConfig && (
+                <StatusDot
+                  status={statusConfig.status}
+                  size="sm"
+                  animated={statusConfig.animated}
+                  pulse={statusConfig.pulse}
+                  className="mr-1"
+                />
+              )}
               {getPanelIcon(panel.type)}
               
               {isEditing ? (

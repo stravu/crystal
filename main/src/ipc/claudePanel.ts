@@ -10,8 +10,8 @@ let claudePanelManager: ClaudePanelManager;
 
 class ClaudePanelHandler extends BaseAIPanelHandler {
   protected createPanelManager(): ClaudePanelManager {
-    const { sessionManager, claudeCodeManager, logger, configManager } = this.services;
-    return new ClaudePanelManager(claudeCodeManager, sessionManager, logger, configManager);
+    const { sessionManager, claudeCodeManager, logger, configManager, analyticsManager } = this.services;
+    return new ClaudePanelManager(claudeCodeManager, sessionManager, logger, configManager, analyticsManager);
   }
 
   protected getInitialPanelState(): Partial<ClaudePanelState> {

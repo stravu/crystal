@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { API } from '../utils/api';
+import { AnalyticsService } from '../services/analyticsService';
 
 // Extend window interface for webkit audio context compatibility
 declare global {
@@ -29,6 +30,11 @@ export function useNotifications() {
   });
   const settingsLoaded = useRef(false);
   const initialLoadComplete = useRef(false);
+
+  // Track shown notifications to prevent duplicate analytics tracking
+  // Key format: `${sessionId}:${status}` for status notifications, or `${sessionId}:created` for new sessions
+  // This ensures we only track each unique notification once, even if the component re-renders
+  const trackedNotificationsRef = useRef<Set<string>>(new Set());
 
   const requestPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
@@ -78,7 +84,7 @@ export function useNotifications() {
     }
   };
 
-  const showNotification = (title: string, body: string, icon?: string) => {
+  const showNotification = (title: string, body: string, icon?: string, triggerEvent?: string, trackingKey?: string) => {
     if (!settings.enabled) return;
 
     requestPermission().then((hasPermission) => {
@@ -90,8 +96,29 @@ export function useNotifications() {
           tag: 'claude-code-commander',
           requireInteraction: false,
         });
-        
+
         playNotificationSound();
+
+        // Track notification shown analytics - only if this is a unique notification
+        // trackingKey is used to deduplicate notifications (e.g., "sessionId:status")
+        // If no trackingKey is provided, we track every notification (backwards compatibility)
+        if (!trackingKey || !trackedNotificationsRef.current.has(trackingKey)) {
+          // Mark this notification as tracked
+          if (trackingKey) {
+            trackedNotificationsRef.current.add(trackingKey);
+          }
+
+          const notificationType = title.includes('Error') || title.includes('error') ? 'error' :
+                                   title.includes('Complete') || title.includes('complete') ? 'success' :
+                                   title.includes('Required') || title.includes('waiting') ? 'info' : 'other';
+
+          AnalyticsService.trackNotificationShown({
+            notification_type: notificationType,
+            trigger_event: triggerEvent || 'unknown',
+          }).catch((error) => {
+            console.error('[Notifications] Failed to track notification:', error);
+          });
+        }
       }
     });
   };
@@ -141,11 +168,14 @@ export function useNotifications() {
       const prevSession = prevSessions.find(s => s.id === currentSession.id);
       
       if (!prevSession) {
-        // New session created
+        // New session created - use tracking key to prevent duplicate tracking
         if (settings.notifyOnStatusChange) {
           showNotification(
             `New Session Created ${getStatusEmoji('initializing')}`,
-            `"${currentSession.name}" is starting up`
+            `"${currentSession.name}" is starting up`,
+            undefined,
+            'session_created',
+            `${currentSession.id}:created` // Tracking key ensures we only track this once
           );
         }
         return;
@@ -155,27 +185,45 @@ export function useNotifications() {
       if (prevSession.status !== currentSession.status) {
         const emoji = getStatusEmoji(currentSession.status);
         const message = getStatusMessage(currentSession.status);
-        
+
+        // Use tracking key format: `sessionId:status` to deduplicate per-status notifications
+        // This ensures that if a session transitions from waiting->running->waiting,
+        // we track both 'waiting' notifications, but if the component re-renders while
+        // in 'waiting' state, we don't track it multiple times
+        const trackingKey = `${currentSession.id}:${currentSession.status}`;
+
         // Notify based on specific status
         if (currentSession.status === 'waiting' && settings.notifyOnWaiting) {
           showNotification(
             `Input Required ${emoji}`,
-            `"${currentSession.name}" is waiting for your response`
+            `"${currentSession.name}" is waiting for your response`,
+            undefined,
+            'status_waiting',
+            trackingKey
           );
         } else if (currentSession.status === 'completed_unviewed' && settings.notifyOnComplete) {
           showNotification(
             `Session Complete ✅`,
-            `"${currentSession.name}" has finished`
+            `"${currentSession.name}" has finished`,
+            undefined,
+            'status_completed',
+            trackingKey
           );
         } else if (currentSession.status === 'error') {
           showNotification(
             `Session Error ${emoji}`,
-            `"${currentSession.name}" encountered an error`
+            `"${currentSession.name}" encountered an error`,
+            undefined,
+            'status_error',
+            trackingKey
           );
         } else if (settings.notifyOnStatusChange) {
           showNotification(
             `Status Update ${emoji}`,
-            `"${currentSession.name}" ${message}`
+            `"${currentSession.name}" ${message}`,
+            undefined,
+            `status_${currentSession.status}`,
+            trackingKey
           );
         }
       }

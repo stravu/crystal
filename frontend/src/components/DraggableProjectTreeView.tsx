@@ -190,24 +190,30 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       const session = projectsWithSessions
         .flatMap(project => project.sessions)
         .find(s => s.id === activeSessionId);
-      
+
       if (session) {
         console.log('[DraggableProjectTreeView] Active session changed to:', session.id, 'ensuring paths are expanded');
-        
+
         // Ensure project is expanded
-        if (session.projectId && !expandedProjects.has(session.projectId)) {
-          console.log('[DraggableProjectTreeView] Expanding project for active session:', session.projectId);
-          setExpandedProjects(prev => new Set([...prev, session.projectId!]));
-        }
-        
+        setExpandedProjects(prev => {
+          if (session.projectId && !prev.has(session.projectId)) {
+            console.log('[DraggableProjectTreeView] Expanding project for active session:', session.projectId);
+            return new Set([...prev, session.projectId]);
+          }
+          return prev;
+        });
+
         // Ensure folder is expanded
-        if (session.folderId && !expandedFolders.has(session.folderId)) {
-          console.log('[DraggableProjectTreeView] Expanding folder for active session:', session.folderId);
-          setExpandedFolders(prev => new Set([...prev, session.folderId!]));
-        }
+        setExpandedFolders(prev => {
+          if (session.folderId && !prev.has(session.folderId)) {
+            console.log('[DraggableProjectTreeView] Expanding folder for active session:', session.folderId);
+            return new Set([...prev, session.folderId]);
+          }
+          return prev;
+        });
       }
     }
-  }, [activeSessionId, projectsWithSessions, expandedProjects, expandedFolders]);
+  }, [activeSessionId, projectsWithSessions]);
 
   const handleFolderCreated = (folder: Folder) => {
     // Add the folder to the appropriate project

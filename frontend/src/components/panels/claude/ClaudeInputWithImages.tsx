@@ -83,7 +83,6 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
   const [isFocused, setIsFocused] = useState(false);
   const [isToolbarActive, setIsToolbarActive] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>('auto');
-  const [textareaHeight, setTextareaHeight] = useState<number>(52);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -328,24 +327,6 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
   const resolvedContextDisplay = contextUsageDisplay ?? '-- tokens (--%)';
 
-  // Auto-resize textarea with requestAnimationFrame for better performance
-  useEffect(() => {
-    if (!textareaRef.current) return;
-
-    // Use requestAnimationFrame to batch DOM reads/writes
-    const rafId = requestAnimationFrame(() => {
-      if (textareaRef.current) {
-        // Reset height to auto to allow proper shrinking
-        textareaRef.current.style.height = 'auto';
-        const scrollHeight = textareaRef.current.scrollHeight;
-        const newHeight = Math.min(Math.max(scrollHeight, 52), 200);
-        setTextareaHeight(newHeight);
-      }
-    });
-
-    return () => cancelAnimationFrame(rafId);
-  }, [input, textareaRef]);
-
   const handleFocus = useCallback(() => {
     setIsFocused(true);
     setIsToolbarActive(true);
@@ -355,10 +336,10 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
 
   return (
-    <div className="border-t-2 border-border-primary flex-shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
-      <div className="bg-surface-secondary">
+    <div className="h-full flex flex-col shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+      <div className="bg-surface-secondary flex flex-col flex-1 min-h-0">
         {/* Context Bar */}
-        <div className="px-4 py-2 border-b border-border-primary bg-surface-primary">
+        <div className="px-4 py-2 border-b border-border-primary bg-surface-primary flex-shrink-0">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-3">
               {/* Session status indicator */}
@@ -426,8 +407,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
         </div>
 
         {/* Command Input Area */}
-        <div 
-          className="p-4 bg-surface-primary"
+        <div
+          className="p-4 bg-surface-primary flex-1 flex flex-col min-h-0 overflow-auto"
           data-toolbar-container
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -441,7 +422,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
             setTimeout(() => {
               const activeElement = document.activeElement;
               const toolbar = e.currentTarget as HTMLElement;
-              
+
               if (!activeElement || !toolbar || !toolbar.contains(activeElement)) {
                 setIsToolbarActive(false);
               }
@@ -490,16 +471,16 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
           {/* Clean Input Container */}
           <div className={`
-            relative z-10
-            bg-surface-primary 
-            rounded-lg border border-border-primary 
+            relative z-10 flex-1 flex flex-col min-h-0
+            bg-surface-primary
+            rounded-lg border border-border-primary
             shadow-[0_4px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)]
             transition-all duration-200 backdrop-blur-sm
             ${(isFocused || isToolbarActive) ? (buttonConfig.color === 'green' ? 'command-bar-focus-green' : 'command-bar-focus') : ''}
           `}>
             {/* Command prompt field */}
-            <div className="relative">
-              <div className="absolute left-4 top-[50%] -translate-y-[50%] text-text-secondary select-none pointer-events-none font-mono text-sm">
+            <div className="relative flex-1 min-h-0 flex">
+              <div className="absolute left-4 top-4 text-text-secondary select-none pointer-events-none font-mono text-sm z-10">
                 &gt;
               </div>
               <FilePathAutocomplete
@@ -508,7 +489,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                 sessionId={activeSession.id}
                 placeholder={isDragging ? "Drop images here..." : placeholder}
                 className={`
-                  w-full pl-10 pr-4 py-4 
+                  w-full h-full pl-10 pr-4 py-4
                   bg-transparent
                   border-0 focus:outline-none
                   resize-none font-mono text-sm
@@ -528,12 +509,8 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
                   setIsToolbarActive(false);
                   onBlur?.();
                 }}
-                style={{ 
-                  height: `${textareaHeight}px`,
-                  minHeight: '52px', 
-                  maxHeight: '200px',
-                  overflowY: textareaHeight >= 200 ? 'auto' : 'hidden',
-                  transition: 'height 0.1s ease-out'
+                style={{
+                  minHeight: '52px'
                 }}
               />
               {/* Hidden file input */}
@@ -558,7 +535,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
           </div>
 
           {/* Unified Action Bar */}
-          <div className="flex items-center justify-between mt-3 gap-4">
+          <div className="flex items-center justify-between mt-3 gap-4 flex-shrink-0">
             {/* Left Section - Tools and Settings */}
             <div className="flex items-center gap-2">
               {/* Attach Button */}
