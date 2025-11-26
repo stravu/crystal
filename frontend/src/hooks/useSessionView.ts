@@ -65,7 +65,13 @@ export const useSessionView = (
   const [contextCompacted, setContextCompacted] = useState(false);
   const [compactedContext, setCompactedContext] = useState<string | null>(null);
   const [hasConversationHistory, setHasConversationHistory] = useState(false);
-  
+
+  // Folder archive dialog state
+  const [showFolderArchiveDialog, setShowFolderArchiveDialog] = useState(false);
+  const [folderArchiveSessionId, setFolderArchiveSessionId] = useState<string | null>(null);
+  const [folderArchiveFolderId, setFolderArchiveFolderId] = useState<string | null>(null);
+  const [folderSessionCount, setFolderSessionCount] = useState(0);
+
   const [, forceUpdate] = useState({});
   const [shouldReloadOutput, setShouldReloadOutput] = useState(false);
 
@@ -1494,29 +1500,105 @@ export const useSessionView = (
         return;
       }
 
-      // Merge succeeded, now archive the session
+      // Merge succeeded - check if session is in a folder with other sessions
       const sessionId = activeSession.id;
-      useSessionStore.getState().addDeletingSessionId(sessionId);
+      const folderId = activeSession.folderId;
 
-      try {
-        const archiveResponse = await API.sessions.delete(sessionId);
-        if (!archiveResponse.success) {
-          console.error('[performSquashWithCommitMessageAndArchive] Archive failed:', archiveResponse.error);
-          // Merge succeeded but archive failed - show error but don't block
-          setMergeError(`Merge succeeded but archive failed: ${archiveResponse.error}`);
+      if (folderId) {
+        // Check how many sessions are in this folder
+        const allSessions = useSessionStore.getState().sessions;
+        const sessionsInFolder = allSessions.filter(s => s.folderId === folderId && !s.archived);
+
+        if (sessionsInFolder.length > 1) {
+          // There are other sessions in the folder - show dialog
+          setFolderArchiveSessionId(sessionId);
+          setFolderArchiveFolderId(folderId);
+          setFolderSessionCount(sessionsInFolder.length);
+          setShowFolderArchiveDialog(true);
+          return; // Don't archive yet - wait for user decision
         }
-        // Clear active session after archiving
-        await useSessionStore.getState().setActiveSession(null);
-      } catch (archiveError) {
-        console.error('[performSquashWithCommitMessageAndArchive] Archive error:', archiveError);
-        setMergeError(`Merge succeeded but archive failed: ${archiveError instanceof Error ? archiveError.message : 'Unknown error'}`);
       }
+
+      // No folder or only one session in folder - archive just this session
+      await archiveSingleSession(sessionId);
     } catch (error) {
       console.error(`[performSquashWithCommitMessageAndArchive] Error in try block`, error);
       setMergeError(error instanceof Error ? error.message : `Failed to merge to main`);
     } finally {
       setIsMergingAndArchiving(false);
     }
+  };
+
+  const archiveSingleSession = async (sessionId: string) => {
+    useSessionStore.getState().addDeletingSessionId(sessionId);
+    try {
+      const archiveResponse = await API.sessions.delete(sessionId);
+      if (!archiveResponse.success) {
+        console.error('[archiveSingleSession] Archive failed:', archiveResponse.error);
+        setMergeError(`Merge succeeded but archive failed: ${archiveResponse.error}`);
+      }
+      await useSessionStore.getState().setActiveSession(null);
+    } catch (archiveError) {
+      console.error('[archiveSingleSession] Archive error:', archiveError);
+      setMergeError(`Merge succeeded but archive failed: ${archiveError instanceof Error ? archiveError.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleArchiveSessionOnly = async () => {
+    setShowFolderArchiveDialog(false);
+    if (folderArchiveSessionId) {
+      await archiveSingleSession(folderArchiveSessionId);
+    }
+    setFolderArchiveSessionId(null);
+    setFolderArchiveFolderId(null);
+    setFolderSessionCount(0);
+    setIsMergingAndArchiving(false);
+  };
+
+  const handleArchiveEntireFolder = async () => {
+    setShowFolderArchiveDialog(false);
+    if (folderArchiveFolderId) {
+      const allSessions = useSessionStore.getState().sessions;
+      const sessionsInFolder = allSessions.filter(s => s.folderId === folderArchiveFolderId && !s.archived);
+
+      // Add all sessions to deleting state
+      for (const session of sessionsInFolder) {
+        useSessionStore.getState().addDeletingSessionId(session.id);
+      }
+
+      // Archive all sessions in the folder
+      for (const session of sessionsInFolder) {
+        try {
+          const archiveResponse = await API.sessions.delete(session.id);
+          if (!archiveResponse.success) {
+            console.error(`[handleArchiveEntireFolder] Archive failed for session ${session.id}:`, archiveResponse.error);
+          }
+        } catch (archiveError) {
+          console.error(`[handleArchiveEntireFolder] Archive error for session ${session.id}:`, archiveError);
+        }
+      }
+
+      // Delete the folder after archiving all sessions
+      try {
+        await API.folders.delete(folderArchiveFolderId);
+      } catch (folderError) {
+        console.error('[handleArchiveEntireFolder] Folder delete error:', folderError);
+      }
+
+      await useSessionStore.getState().setActiveSession(null);
+    }
+    setFolderArchiveSessionId(null);
+    setFolderArchiveFolderId(null);
+    setFolderSessionCount(0);
+    setIsMergingAndArchiving(false);
+  };
+
+  const handleCancelFolderArchive = () => {
+    setShowFolderArchiveDialog(false);
+    setFolderArchiveSessionId(null);
+    setFolderArchiveFolderId(null);
+    setFolderSessionCount(0);
+    setIsMergingAndArchiving(false);
   };
 
   const handleOpenIDE = async () => {
@@ -1767,5 +1849,11 @@ export const useSessionView = (
     contextCompacted,
     hasConversationHistory,
     compactedContext,
+    // Folder archive dialog
+    showFolderArchiveDialog,
+    folderSessionCount,
+    handleArchiveSessionOnly,
+    handleArchiveEntireFolder,
+    handleCancelFolderArchive,
   };
 };

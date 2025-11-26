@@ -12,6 +12,7 @@ import { SessionHeader } from './session/SessionHeader';
 // import { SessionInputWithImages } from './panels/claude/ClaudeInputWithImages'; // Removed - now in panels
 import { GitErrorDialog } from './session/GitErrorDialog';
 import { CommitMessageDialog } from './session/CommitMessageDialog';
+import { FolderArchiveDialog } from './session/FolderArchiveDialog';
 // import { FileEditor } from './panels/editor/FileEditor'; // Removed - now in panels
 import { ProjectView } from './ProjectView';
 import { API } from '../utils/api';
@@ -592,6 +593,14 @@ export const SessionView = memo(() => {
         isOpen={hook.showStravuSearch}
         onClose={() => hook.setShowStravuSearch(false)}
         onFileSelect={hook.handleStravuFileSelect}
+      />
+
+      <FolderArchiveDialog
+        isOpen={hook.showFolderArchiveDialog}
+        sessionCount={hook.folderSessionCount}
+        onArchiveSessionOnly={hook.handleArchiveSessionOnly}
+        onArchiveEntireFolder={hook.handleArchiveEntireFolder}
+        onCancel={hook.handleCancelFolderArchive}
       />
 
     </div>
