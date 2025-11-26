@@ -10,8 +10,13 @@ import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 
 const HISTORY_LIMIT = 50;
 
-const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({ 
-  sessionId, 
+const SIDEBAR_STORAGE_KEY = 'diff-panel-sidebar-width';
+const DEFAULT_SIDEBAR_WIDTH = 300;
+const MIN_SIDEBAR_WIDTH = 150;
+const MAX_SIDEBAR_WIDTH = 600;
+
+const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
+  sessionId,
   selectedExecutions: initialSelected,
   isGitOperationRunning = false,
   isMainRepo = false,
@@ -31,8 +36,63 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
   const [lastVisibleState, setLastVisibleState] = useState<boolean>(isVisible);
   const [forceRefresh, setForceRefresh] = useState<number>(0);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
-  
+
+  // Resizable sidebar state
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (stored) {
+      const width = parseInt(stored, 10);
+      if (!isNaN(width) && width >= MIN_SIDEBAR_WIDTH && width <= MAX_SIDEBAR_WIDTH) {
+        return width;
+      }
+    }
+    return DEFAULT_SIDEBAR_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
   const diffViewerRef = useRef<DiffViewerHandle>(null);
+
+  // Save sidebar width to localStorage
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, sidebarWidth.toString());
+  }, [sidebarWidth]);
+
+  // Handle resize mouse events
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.querySelector('.combined-diff-view');
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
+      const newWidth = e.clientX - containerRect.left;
+      const constrainedWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, newWidth));
+      setSidebarWidth(constrainedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Change cursor globally while resizing
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
 
   // Load git commands to get main branch
   useEffect(() => {
@@ -552,34 +612,48 @@ const CombinedDiffView: React.FC<CombinedDiffViewProps> = memo(({
       <div className="flex-1 flex min-h-0">
         {/* Commits selection sidebar */}
         {!isFullscreen && (
-          <div className="w-1/3 border-r border-border-primary bg-surface-secondary overflow-hidden flex flex-col">
-            {/* File list - show only when we have a diff */}
-            {filesFromDiff.length > 0 && (
-              <div className="h-1/3 border-b border-border-primary overflow-y-auto">
-                <FileList
-                  files={filesFromDiff}
-                  onFileClick={handleFileClick}
-                  onFileDelete={handleFileDelete}
-                  selectedFile={selectedFile}
+          <>
+            <div
+              className="border-r border-border-primary bg-surface-secondary overflow-hidden flex flex-col flex-shrink-0"
+              style={{ width: sidebarWidth }}
+            >
+              {/* File list - show only when we have a diff */}
+              {filesFromDiff.length > 0 && (
+                <div className="h-1/3 border-b border-border-primary overflow-y-auto">
+                  <FileList
+                    files={filesFromDiff}
+                    onFileClick={handleFileClick}
+                    onFileDelete={handleFileDelete}
+                    selectedFile={selectedFile}
+                  />
+                </div>
+              )}
+
+              {/* Execution list */}
+              <div className={filesFromDiff.length > 0 ? "flex-1 overflow-hidden" : "h-full"}>
+                <ExecutionList
+                  sessionId={sessionId}
+                  executions={executions}
+                  selectedExecutions={selectedExecutions}
+                  onSelectionChange={handleSelectionChange}
+                  onCommit={() => setShowCommitDialog(true)}
+                  onRevert={handleRevert}
+                  onRestore={handleRestore}
+                  historyLimitReached={limitReached}
+                  historyLimit={HISTORY_LIMIT}
                 />
               </div>
-            )}
-            
-            {/* Execution list */}
-            <div className={filesFromDiff.length > 0 ? "flex-1 overflow-hidden" : "h-full"}>
-              <ExecutionList
-                sessionId={sessionId}
-                executions={executions}
-                selectedExecutions={selectedExecutions}
-                onSelectionChange={handleSelectionChange}
-                onCommit={() => setShowCommitDialog(true)}
-                onRevert={handleRevert}
-                onRestore={handleRestore}
-                historyLimitReached={limitReached}
-                historyLimit={HISTORY_LIMIT}
-              />
             </div>
-          </div>
+
+            {/* Resize handle */}
+            <div
+              className={`w-1 hover:bg-interactive cursor-col-resize flex-shrink-0 transition-colors ${
+                isResizing ? 'bg-interactive' : 'bg-transparent'
+              }`}
+              onMouseDown={handleResizeStart}
+              title="Drag to resize sidebar"
+            />
+          </>
         )}
 
         {/* Diff preview */}
