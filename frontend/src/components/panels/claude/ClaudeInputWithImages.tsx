@@ -408,7 +408,7 @@ export const SessionInputWithImages: React.FC<SessionInputWithImagesProps> = mem
 
         {/* Command Input Area */}
         <div
-          className="p-4 bg-surface-primary flex-1 flex flex-col min-h-0 overflow-auto"
+          className="p-4 bg-surface-primary flex-1 flex flex-col min-h-0"
           data-toolbar-container
           onDrop={handleDrop}
           onDragOver={handleDragOver}

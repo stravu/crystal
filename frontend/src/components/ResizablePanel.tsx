@@ -106,7 +106,7 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-visible">
         {children}
       </div>
     </div>
