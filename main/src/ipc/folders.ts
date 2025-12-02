@@ -99,6 +99,14 @@ export function registerFolderHandlers(ipcMain: IpcMain, services: AppServices) 
       }
 
       databaseService.deleteFolder(folderId);
+
+      // Emit the folder:deleted event to notify the frontend
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log(`[IPC] Emitting folder:deleted event for folder ${folderId}`);
+        mainWindow.webContents.send('folder:deleted', folderId);
+      }
+
       return { success: true };
     } catch (error: unknown) {
       console.error('[IPC] Failed to delete folder:', error);

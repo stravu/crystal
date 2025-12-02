@@ -400,14 +400,14 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
     // Handler for folder updates
     const handleFolderUpdated = (updatedFolder: Folder) => {
       console.log('[DraggableProjectTreeView] Folder updated event received:', updatedFolder);
-      
+
       // Update the folder in the appropriate project
-      setProjectsWithSessions(prevProjects => 
+      setProjectsWithSessions(prevProjects =>
         prevProjects.map(project => {
           if (project.id === updatedFolder.projectId) {
             return {
               ...project,
-              folders: project.folders.map(folder => 
+              folders: project.folders.map(folder =>
                 folder.id === updatedFolder.id ? updatedFolder : folder
               )
             };
@@ -417,6 +417,32 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       );
     };
 
+    // Handler for folder deletion
+    const handleFolderDeleted = (folderId: string) => {
+      console.log('[DraggableProjectTreeView] Folder deleted event received:', folderId);
+
+      // Remove the folder from the appropriate project
+      setProjectsWithSessions(prevProjects =>
+        prevProjects.map(project => {
+          const folderExists = project.folders?.some(f => f.id === folderId);
+          if (folderExists) {
+            return {
+              ...project,
+              folders: project.folders.filter(f => f.id !== folderId)
+            };
+          }
+          return project;
+        })
+      );
+
+      // Remove from expanded folders set
+      setExpandedFolders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(folderId);
+        return newSet;
+      });
+    };
+
     // Listen for IPC events
     if (window.electronAPI?.events) {
       const unsubscribeCreated = window.electronAPI.events.onSessionCreated(handleSessionCreated);
@@ -424,7 +450,8 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       const unsubscribeDeleted = window.electronAPI.events.onSessionDeleted(handleSessionDeleted);
       const unsubscribeFolderCreated = window.electronAPI.events.onFolderCreated(handleFolderCreated);
       const unsubscribeFolderUpdated = window.electronAPI.events.onFolderUpdated(handleFolderUpdated);
-      
+      const unsubscribeFolderDeleted = window.electronAPI.events.onFolderDeleted(handleFolderDeleted);
+
       // Listen for project updates
       const unsubscribeProjectUpdated = window.electronAPI.events.onProjectUpdated((updatedProject: Project) => {
         // Update the project in our state
@@ -455,8 +482,9 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
         unsubscribeDeleted();
         unsubscribeFolderCreated();
         unsubscribeFolderUpdated();
+        unsubscribeFolderDeleted();
         unsubscribeProjectUpdated();
-        
+
         // Clean up pending auto-selection timeout
         if (pendingAutoSelect) {
           clearTimeout(pendingAutoSelect.timeoutId);
