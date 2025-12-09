@@ -104,8 +104,10 @@ export class GitDiffManager {
     try {
       // Get commit log with stats, excluding commits that are in main branch
       // This shows only commits unique to the current branch
+      // Using --cherry-pick to also exclude commits that have equivalent patches on main
+      // (e.g., commits that were cherry-picked or rebased to main)
       const logFormat = '%H|%s|%ai|%an';
-      const gitCommand = `git log --format="${logFormat}" --numstat -n ${limit} HEAD --not ${mainBranch} --`;
+      const gitCommand = `git log --format="${logFormat}" --numstat -n ${limit} --cherry-pick --left-only HEAD...${mainBranch} --`;
       
       console.log(`[GitDiffManager] Getting commit history for worktree: ${worktreePath}`);
       console.log(`[GitDiffManager] Main branch: ${mainBranch}`);
