@@ -543,14 +543,31 @@ export const SessionListItem = memo(function SessionListItem({ session, isNested
             disabled={isClosing}
             className={cn(
               'w-full text-left px-4 py-2 text-sm',
-              isClosing 
-                ? 'text-text-tertiary cursor-wait' 
+              isClosing
+                ? 'text-text-tertiary cursor-wait'
                 : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
             )}
           >
             {isClosing ? 'Closing Script...' : isRunning ? 'Stop Script' : 'Run Script'}
           </button>
           <div className="border-t border-border-primary my-1" />
+          <button
+            onClick={() => {
+              closeMenu();
+              // Dispatch the discard-and-retry event with session data
+              // The session will be archived only after the new session is created
+              window.dispatchEvent(new CustomEvent('discard-and-retry', {
+                detail: {
+                  session,
+                  projectId: session.projectId,
+                  folderId: session.folderId
+                }
+              }));
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+          >
+            Discard and Retry
+          </button>
           <button
             onClick={handleDeleteFromMenu}
             className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-surface-hover hover:text-status-error"

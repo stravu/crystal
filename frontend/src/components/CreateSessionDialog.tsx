@@ -55,32 +55,63 @@ interface CreateSessionDialogProps {
   projectId?: number;
   initialPrompt?: string;
   initialSessionName?: string;
+  // For "Discard and Retry" feature - pre-fill session creation settings
+  initialToolType?: 'claude' | 'codex' | 'none';
+  initialBaseBranch?: string;
+  initialFolderId?: string; // Folder to create the new session in
+  initialClaudeConfig?: {
+    model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
+    permissionMode?: 'approve' | 'ignore';
+    ultrathink?: boolean;
+  };
+  initialCodexConfig?: {
+    model?: string;
+    modelProvider?: string;
+    sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    webSearch?: boolean;
+    thinkingLevel?: 'low' | 'medium' | 'high';
+  };
+  // Callback called after session is successfully created (for "Discard and Retry" to archive old session)
+  onSessionCreated?: () => void;
 }
 
-export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, initialPrompt, initialSessionName }: CreateSessionDialogProps) {
+export function CreateSessionDialog({
+  isOpen,
+  onClose,
+  projectName,
+  projectId,
+  initialPrompt,
+  initialSessionName,
+  initialToolType,
+  initialBaseBranch,
+  initialFolderId,
+  initialClaudeConfig,
+  initialCodexConfig,
+  onSessionCreated
+}: CreateSessionDialogProps) {
   const [sessionName, setSessionName] = useState<string>(initialSessionName || '');
   const [sessionCount, setSessionCount] = useState<number>(1);
   const [selectedTools, setSelectedTools] = useState<{ claude: boolean; codex: boolean }>({
-    claude: !!initialPrompt,
-    codex: false
+    claude: initialToolType === 'claude' || !!initialPrompt,
+    codex: initialToolType === 'codex'
   });
   const [sharedPrompt, setSharedPrompt] = useState<string>(initialPrompt || '');
   const [claudeConfig, setClaudeConfig] = useState<ClaudeCodeConfig>({
     prompt: initialPrompt || '',
-    model: 'auto',
-    permissionMode: 'ignore',
-    ultrathink: false,
+    model: initialClaudeConfig?.model || 'auto',
+    permissionMode: initialClaudeConfig?.permissionMode || 'ignore',
+    ultrathink: initialClaudeConfig?.ultrathink || false,
     attachedImages: [],
     attachedTexts: []
   });
   const [codexConfig, setCodexConfig] = useState<CodexConfig>({
     prompt: initialPrompt || '',
-    model: DEFAULT_CODEX_MODEL,
-    modelProvider: 'openai',
+    model: (initialCodexConfig?.model as OpenAICodexModel) || DEFAULT_CODEX_MODEL,
+    modelProvider: initialCodexConfig?.modelProvider || 'openai',
     approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
-    sandboxMode: 'workspace-write',
-    webSearch: false,
-    thinkingLevel: 'medium',
+    sandboxMode: initialCodexConfig?.sandboxMode || 'workspace-write',
+    webSearch: initialCodexConfig?.webSearch || false,
+    thinkingLevel: initialCodexConfig?.thinkingLevel || 'medium',
     attachedImages: [],
     attachedTexts: []
   });
@@ -88,7 +119,8 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
     prompt: initialPrompt || '',
     worktreeTemplate: '',
     count: 1,
-    permissionMode: 'ignore'
+    permissionMode: 'ignore',
+    baseBranch: initialBaseBranch
     // Model is now managed at panel level, not session level
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,7 +218,7 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
         setSessionName(initialSessionName);
       }
       setSessionCount(1);
-      setFormData(prev => ({ ...prev, count: 1 }));
+      setFormData(prev => ({ ...prev, count: 1, baseBranch: initialBaseBranch }));
       // Only clear prompts if there's no initialPrompt
       if (!initialPrompt) {
         syncPromptAcrossConfigs('');
@@ -196,50 +228,91 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
       }
       syncImageAttachments(() => []);
       syncTextAttachments(() => []);
-    }
-  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments, initialPrompt, initialSessionName]);
 
-
-  // Apply loaded preferences to state
-  useEffect(() => {
-    if (preferences) {
-      // Map the old toolType preference to the new selectedTools state
-      if (initialPrompt) {
-        // If we have an initialPrompt, default to Claude being selected
-        setSelectedTools({ claude: true, codex: false });
-      } else if (preferences.selectedTools) {
+      // Apply initial tool type if provided (for "Discard and Retry")
+      if (initialToolType) {
         setSelectedTools({
-          claude: !!preferences.selectedTools.claude,
-          codex: !!preferences.selectedTools.codex
-        });
-      } else if (preferences.toolType) {
-        // Map old preference format to new checkbox format
-        setSelectedTools({
-          claude: preferences.toolType === 'claude',
-          codex: preferences.toolType === 'codex'
+          claude: initialToolType === 'claude',
+          codex: initialToolType === 'codex'
         });
       }
 
-      setClaudeConfig(prev => ({
-        ...prev,
-        model: preferences.claudeConfig.model,
-        permissionMode: preferences.claudeConfig.permissionMode,
-        ultrathink: preferences.claudeConfig.ultrathink
-      }));
-      setCodexConfig(prev => ({
-        ...prev,
-        model: preferences.codexConfig.model as OpenAICodexModel,
-        modelProvider: preferences.codexConfig.modelProvider,
-        approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
-        sandboxMode: preferences.codexConfig.sandboxMode,
-        webSearch: preferences.codexConfig.webSearch,
-        thinkingLevel: preferences.codexConfig.thinkingLevel || 'medium'
-      }));
+      // Apply initial Claude config if provided
+      if (initialClaudeConfig) {
+        setClaudeConfig(prev => ({
+          ...prev,
+          model: initialClaudeConfig.model ?? prev.model,
+          permissionMode: initialClaudeConfig.permissionMode ?? prev.permissionMode,
+          ultrathink: initialClaudeConfig.ultrathink ?? prev.ultrathink
+        }));
+      }
+
+      // Apply initial Codex config if provided
+      if (initialCodexConfig) {
+        setCodexConfig(prev => ({
+          ...prev,
+          model: (initialCodexConfig.model as OpenAICodexModel) || prev.model,
+          modelProvider: initialCodexConfig.modelProvider || prev.modelProvider,
+          sandboxMode: initialCodexConfig.sandboxMode || prev.sandboxMode,
+          webSearch: initialCodexConfig.webSearch ?? prev.webSearch,
+          thinkingLevel: initialCodexConfig.thinkingLevel || prev.thinkingLevel
+        }));
+      }
+    }
+  }, [isOpen, loadPreferences, syncPromptAcrossConfigs, syncImageAttachments, syncTextAttachments, initialPrompt, initialSessionName, initialToolType, initialBaseBranch, initialClaudeConfig, initialCodexConfig]);
+
+
+  // Apply loaded preferences to state (only if initial configs not provided)
+  useEffect(() => {
+    if (preferences) {
+      // Map the old toolType preference to the new selectedTools state
+      // Skip if initialToolType is provided (for "Discard and Retry")
+      if (!initialToolType) {
+        if (initialPrompt) {
+          // If we have an initialPrompt, default to Claude being selected
+          setSelectedTools({ claude: true, codex: false });
+        } else if (preferences.selectedTools) {
+          setSelectedTools({
+            claude: !!preferences.selectedTools.claude,
+            codex: !!preferences.selectedTools.codex
+          });
+        } else if (preferences.toolType) {
+          // Map old preference format to new checkbox format
+          setSelectedTools({
+            claude: preferences.toolType === 'claude',
+            codex: preferences.toolType === 'codex'
+          });
+        }
+      }
+
+      // Only apply Claude config from preferences if no initial config provided
+      if (!initialClaudeConfig) {
+        setClaudeConfig(prev => ({
+          ...prev,
+          model: preferences.claudeConfig.model,
+          permissionMode: preferences.claudeConfig.permissionMode,
+          ultrathink: preferences.claudeConfig.ultrathink
+        }));
+      }
+
+      // Only apply Codex config from preferences if no initial config provided
+      if (!initialCodexConfig) {
+        setCodexConfig(prev => ({
+          ...prev,
+          model: preferences.codexConfig.model as OpenAICodexModel,
+          modelProvider: preferences.codexConfig.modelProvider,
+          approvalPolicy: 'auto',  // Always 'auto' - manual mode not implemented
+          sandboxMode: preferences.codexConfig.sandboxMode,
+          webSearch: preferences.codexConfig.webSearch,
+          thinkingLevel: preferences.codexConfig.thinkingLevel || 'medium'
+        }));
+      }
+
       setShowAdvanced(preferences.showAdvanced);
       setCommitModeSettings(preferences.commitModeSettings);
       // Note: we don't apply baseBranch as it should be project-specific
     }
-  }, [preferences, initialPrompt]);
+  }, [preferences, initialPrompt, initialToolType, initialClaudeConfig, initialCodexConfig]);
 
   // Save preferences when certain settings change
   const savePreferences = useCallback(async (updates: Partial<SessionCreationPreferences>) => {
@@ -597,10 +670,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
 
       // Determine if we need to create a folder
       // Create folder when: multiple sessions (sessionCount > 1) OR multiple tools selected
-      const shouldCreateFolder = sessionCount > 1 || toolsToCreate.length > 1;
+      // But NOT if we already have an initialFolderId (from "Discard and Retry")
+      const shouldCreateFolder = !initialFolderId && (sessionCount > 1 || toolsToCreate.length > 1);
 
-      // Create folder first if needed
-      let folderId: string | undefined;
+      // Use initialFolderId if provided, otherwise create folder if needed
+      let folderId: string | undefined = initialFolderId;
       if (shouldCreateFolder && projectId) {
         try {
           const folderResponse = await API.folders.create(baseSessionName, projectId);
@@ -691,6 +765,11 @@ export function CreateSessionDialog({ isOpen, onClose, projectName, projectId, i
           // Continue creating other sessions even if one fails
           continue;
         }
+      }
+
+      // Call onSessionCreated callback (e.g., to archive old session in "Discard and Retry")
+      if (onSessionCreated) {
+        onSessionCreated();
       }
 
       onClose();

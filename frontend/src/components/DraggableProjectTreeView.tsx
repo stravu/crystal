@@ -99,6 +99,27 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
   const [isLoadingArchived, setIsLoadingArchived] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedProjectForCreate, setSelectedProjectForCreate] = useState<Project | null>(null);
+  // State for "Discard and Retry" feature - pre-fill create dialog with previous session data
+  const [retrySessionData, setRetrySessionData] = useState<{
+    sessionId: string; // ID of session to archive after new session is created
+    prompt: string;
+    sessionName: string;
+    toolType: 'claude' | 'codex' | 'none';
+    baseBranch?: string;
+    folderId?: string; // Folder to create the new session in
+    claudeConfig?: {
+      model?: 'auto' | 'sonnet' | 'opus' | 'haiku';
+      permissionMode?: 'approve' | 'ignore';
+      ultrathink?: boolean;
+    };
+    codexConfig?: {
+      model?: string;
+      modelProvider?: string;
+      sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+      webSearch?: boolean;
+      thinkingLevel?: 'low' | 'medium' | 'high';
+    };
+  } | null>(null);
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState<Project | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
@@ -577,6 +598,51 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
       window.removeEventListener('panel:event', handlePanelEvent as EventListener);
     };
   }, [runningProjectId, projectsWithSessions]);
+
+  // Listen for "Discard and Retry" events from session context menu
+  useEffect(() => {
+    const handleDiscardAndRetry = (event: CustomEvent<{
+      session: Session;
+      projectId: number;
+      folderId?: string;
+    }>) => {
+      const { session, projectId, folderId } = event.detail;
+
+      // Find the project for this session
+      const project = projectsWithSessions.find(p => p.id === projectId);
+      if (!project) {
+        console.error('[DraggableProjectTreeView] Project not found for discard-and-retry:', projectId);
+        return;
+      }
+
+      // Store the retry data including session ID for archiving later
+      setRetrySessionData({
+        sessionId: session.id,
+        prompt: session.prompt || '',
+        sessionName: session.name || '',
+        toolType: session.toolType || 'claude',
+        baseBranch: session.baseBranch,
+        folderId: folderId || session.folderId,
+        claudeConfig: session.toolType === 'claude' ? {
+          permissionMode: session.permissionMode
+        } : undefined,
+        codexConfig: session.toolType === 'codex' ? {
+          // Codex configs would need to be retrieved from panel settings
+          // For now, we'll use defaults
+        } : undefined
+      });
+
+      // Open the create dialog with this project selected
+      setSelectedProjectForCreate(project);
+      setShowCreateDialog(true);
+    };
+
+    window.addEventListener('discard-and-retry', handleDiscardAndRetry as EventListener);
+
+    return () => {
+      window.removeEventListener('discard-and-retry', handleDiscardAndRetry as EventListener);
+    };
+  }, [projectsWithSessions]);
 
   const loadProjectsWithSessions = async () => {
     try {
@@ -2403,9 +2469,26 @@ export function DraggableProjectTreeView({ sessionSortAscending }: DraggableProj
           onClose={() => {
             setShowCreateDialog(false);
             setSelectedProjectForCreate(null);
+            setRetrySessionData(null);
           }}
           projectName={selectedProjectForCreate?.name}
           projectId={selectedProjectForCreate?.id}
+          initialPrompt={retrySessionData?.prompt}
+          initialSessionName={retrySessionData?.sessionName}
+          initialToolType={retrySessionData?.toolType}
+          initialBaseBranch={retrySessionData?.baseBranch}
+          initialFolderId={retrySessionData?.folderId}
+          initialClaudeConfig={retrySessionData?.claudeConfig}
+          initialCodexConfig={retrySessionData?.codexConfig}
+          onSessionCreated={retrySessionData?.sessionId ? async () => {
+            // Archive the old session after new session is created ("Discard and Retry")
+            try {
+              await API.sessions.delete(retrySessionData.sessionId);
+              console.log('[DraggableProjectTreeView] Archived old session after retry:', retrySessionData.sessionId);
+            } catch (error) {
+              console.error('[DraggableProjectTreeView] Failed to archive old session:', error);
+            }
+          } : undefined}
         />
       )}
       
