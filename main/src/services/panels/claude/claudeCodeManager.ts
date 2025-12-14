@@ -137,7 +137,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
 
     // Add MCP configuration if provided
     if (mcpConfigPath) {
-      args.push('--mcp-config', mcpConfigPath, '--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission');
+      args.push('--mcp-config', mcpConfigPath);
+
+      // Only add permission-specific flags if Crystal's permission server is included
+      // (which happens when permission mode is 'approve')
+      const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
+      const effectiveMode = permissionMode || defaultMode;
+      if (effectiveMode === 'approve' && this.permissionIpcPath) {
+        args.push('--permission-prompt-tool', 'mcp__crystal-permissions__approve_permission', '--allowedTools', 'mcp__crystal-permissions__approve_permission');
+      }
     }
 
     return args;
@@ -277,6 +285,22 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }, 5000); // 5 second delay
     }
 
+    // Clean up base project MCP config file if it exists (not .mcp.json from project)
+    const baseConfigPath = globalThis[`mcp_base_config_${sessionId}`];
+    if (baseConfigPath && fs.existsSync(baseConfigPath)) {
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(baseConfigPath)) {
+            fs.unlinkSync(baseConfigPath);
+            this.logger?.verbose(`[MCP] Cleaned up base project config file: ${baseConfigPath}`);
+          }
+          delete globalThis[`mcp_base_config_${sessionId}`];
+        } catch (error) {
+          this.logger?.error(`Failed to delete base project MCP config file:`, error instanceof Error ? error : undefined);
+        }
+      }, 5000); // 5 second delay
+    }
+
     // Clean up temporary MCP script file if it exists
     const mcpScriptPath = globalThis[`mcp_script_${sessionId}`];
     if (mcpScriptPath && fs.existsSync(mcpScriptPath)) {
@@ -377,10 +401,15 @@ export class ClaudeCodeManager extends AbstractCliManager {
       // Set up MCP configuration if needed and add to args
       const defaultMode = this.configManager?.getConfig()?.defaultPermissionMode || 'ignore';
       const effectiveMode = permissionMode || defaultMode;
-      
+
       let mcpConfigPath: string | null = null;
       if (effectiveMode === 'approve' && this.permissionIpcPath) {
+        // Full MCP setup with permission server + base project MCP servers
         mcpConfigPath = await this.setupMcpConfigurationSync(sessionId);
+      } else {
+        // Even without approval mode, check for base project MCP servers
+        // This ensures worktrees can access MCP servers from the base project
+        mcpConfigPath = await this.setupBaseProjectMcpConfig(sessionId);
       }
 
       // Store MCP config path in options for buildCommandArgs to use
@@ -529,6 +558,94 @@ export class ClaudeCodeManager extends AbstractCliManager {
   // Legacy methods are now inherited from AbstractCliManager
 
   // Private helper methods
+
+  /**
+   * Get MCP servers configured for the base project.
+   * Claude Code stores project-specific MCP config in ~/.claude.json under projects[path].mcpServers
+   * and project-level config in .mcp.json files.
+   *
+   * When running in a worktree, Claude doesn't see MCP servers from the base project
+   * because it uses the worktree path as the project key.
+   */
+  private getBaseProjectMcpServers(sessionId: string): { mcpServers: Record<string, unknown>; mcpJsonPath?: string } {
+    const result: { mcpServers: Record<string, unknown>; mcpJsonPath?: string } = { mcpServers: {} };
+
+    try {
+      // Get the session to find the project
+      const dbSession = this.sessionManager.getDbSession(sessionId);
+      if (!dbSession?.project_id) {
+        return result;
+      }
+
+      const project = this.sessionManager.getProjectById(dbSession.project_id);
+      if (!project?.path) {
+        return result;
+      }
+
+      const baseProjectPath = project.path;
+      this.logger?.verbose(`[MCP] Looking for base project MCP servers at: ${baseProjectPath}`);
+
+      // Check for .mcp.json in the base project directory
+      const mcpJsonPath = path.join(baseProjectPath, '.mcp.json');
+      if (fs.existsSync(mcpJsonPath)) {
+        this.logger?.verbose(`[MCP] Found .mcp.json at: ${mcpJsonPath}`);
+        result.mcpJsonPath = mcpJsonPath;
+
+        // Also parse it to merge with other servers
+        try {
+          const mcpJsonContent = fs.readFileSync(mcpJsonPath, 'utf8');
+          const mcpJson = JSON.parse(mcpJsonContent) as { mcpServers?: Record<string, unknown> };
+          if (mcpJson.mcpServers) {
+            Object.assign(result.mcpServers, mcpJson.mcpServers);
+          }
+        } catch (parseError) {
+          this.logger?.warn(`[MCP] Failed to parse .mcp.json: ${parseError}`);
+        }
+      }
+
+      // Read ~/.claude.json to get project-specific MCP servers
+      const claudeConfigPath = path.join(os.homedir(), '.claude.json');
+      if (fs.existsSync(claudeConfigPath)) {
+        try {
+          const claudeConfig = fs.readFileSync(claudeConfigPath, 'utf8');
+          const config = JSON.parse(claudeConfig) as {
+            projects?: Record<string, { mcpServers?: Record<string, unknown> }>;
+            mcpServers?: Record<string, unknown>;
+          };
+
+          // Get project-specific MCP servers
+          const projectConfig = config.projects?.[baseProjectPath];
+          if (projectConfig?.mcpServers && Object.keys(projectConfig.mcpServers).length > 0) {
+            this.logger?.verbose(`[MCP] Found ${Object.keys(projectConfig.mcpServers).length} project-specific MCP servers in ~/.claude.json`);
+            Object.assign(result.mcpServers, projectConfig.mcpServers);
+          }
+
+          // Also include global MCP servers (these apply to all projects)
+          if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+            this.logger?.verbose(`[MCP] Found ${Object.keys(config.mcpServers).length} global MCP servers in ~/.claude.json`);
+            // Global servers have lower priority, so only add if not already present
+            for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+              if (!result.mcpServers[name]) {
+                result.mcpServers[name] = serverConfig;
+              }
+            }
+          }
+        } catch (parseError) {
+          this.logger?.warn(`[MCP] Failed to parse ~/.claude.json: ${parseError}`);
+        }
+      }
+
+      const serverCount = Object.keys(result.mcpServers).length;
+      if (serverCount > 0) {
+        this.logger?.info(`[MCP] Found ${serverCount} MCP servers from base project: ${Object.keys(result.mcpServers).join(', ')}`);
+      }
+
+    } catch (error) {
+      this.logger?.warn(`[MCP] Error getting base project MCP servers: ${error}`);
+    }
+
+    return result;
+  }
 
   private buildSystemPromptAppend(dbSession: { project_id?: number; [key: string]: unknown }): string | undefined {
     const systemPromptParts: string[] = [];
@@ -679,14 +796,23 @@ export class ClaudeCodeManager extends AbstractCliManager {
       }
     }
 
-    const mcpConfig = {
+    // Start with base project MCP servers
+    const baseProjectMcp = this.getBaseProjectMcpServers(sessionId);
+    const mcpConfig: { mcpServers: Record<string, unknown> } = {
       "mcpServers": {
+        // Include base project MCP servers first
+        ...baseProjectMcp.mcpServers,
+        // Crystal's permission server takes precedence (added last)
         "crystal-permissions": {
           "command": mcpCommand,
           "args": mcpArgs
         }
       }
     };
+
+    if (Object.keys(baseProjectMcp.mcpServers).length > 0) {
+      this.logger?.info(`[MCP] Merged ${Object.keys(baseProjectMcp.mcpServers).length} base project MCP servers into config`);
+    }
 
     this.logger?.verbose(`[MCP] Creating MCP config at: ${mcpConfigPath}`);
 
@@ -737,5 +863,47 @@ export class ClaudeCodeManager extends AbstractCliManager {
     // This method is called from initializeCliEnvironment but for Claude we handle MCP in spawnCliProcess
     // Just set up the basic environment variables here
     return;
+  }
+
+  /**
+   * Set up MCP configuration for base project servers only (without Crystal permission server).
+   * Used when permission mode is not 'approve' but we still need to pass base project MCP.
+   */
+  private async setupBaseProjectMcpConfig(sessionId: string): Promise<string | null> {
+    const baseProjectMcp = this.getBaseProjectMcpServers(sessionId);
+
+    // If there's a .mcp.json file in the base project, we can pass it directly
+    // This is the most reliable way since Claude will parse it correctly
+    if (baseProjectMcp.mcpJsonPath) {
+      this.logger?.info(`[MCP] Passing base project .mcp.json: ${baseProjectMcp.mcpJsonPath}`);
+      return baseProjectMcp.mcpJsonPath;
+    }
+
+    // If there are servers from ~/.claude.json, create a temp config file
+    if (Object.keys(baseProjectMcp.mcpServers).length > 0) {
+      const tempDir = path.join(os.homedir(), '.crystal');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const mcpConfigPath = path.join(tempDir, `crystal-base-mcp-${sessionId}.json`);
+      const mcpConfig = { mcpServers: baseProjectMcp.mcpServers };
+
+      try {
+        fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
+        fs.chmodSync(mcpConfigPath, 0o644);
+        this.logger?.info(`[MCP] Created base project MCP config with ${Object.keys(baseProjectMcp.mcpServers).length} servers: ${mcpConfigPath}`);
+
+        // Store for cleanup
+        globalThis[`mcp_base_config_${sessionId}`] = mcpConfigPath;
+
+        return mcpConfigPath;
+      } catch (error) {
+        this.logger?.error(`[MCP] Failed to create base project MCP config: ${error}`);
+        return null;
+      }
+    }
+
+    return null;
   }
 }
