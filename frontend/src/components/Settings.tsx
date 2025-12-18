@@ -16,7 +16,8 @@ import {
   RefreshCw,
   FileText,
   Eye,
-  BarChart3
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import { Input, Textarea, Checkbox } from './ui/Input';
 import { Button } from './ui/Button';
@@ -42,6 +43,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [additionalPathsText, setAdditionalPathsText] = useState('');
   const [platform, setPlatform] = useState<string>('darwin');
   const [enableCrystalFooter, setEnableCrystalFooter] = useState(true);
+  const [disableAutoContext, setDisableAutoContext] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: true,
     playSound: true,
@@ -80,6 +82,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setAutoCheckUpdates(data.autoCheckUpdates !== false); // Default to true
       setDevMode(data.devMode || false);
       setEnableCrystalFooter(data.enableCrystalFooter !== false); // Default to true
+      setDisableAutoContext(data.disableAutoContext || false);
       
       // Load additional paths
       const paths = data.additionalPaths || [];
@@ -142,6 +145,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         devMode,
         enableCrystalFooter,
         additionalPaths: parsedPaths,
+        disableAutoContext,
         notifications: notificationSettings,
         analytics: {
           enabled: analyticsEnabled
@@ -357,6 +361,21 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 />
                 <p className="text-xs text-text-tertiary mt-1">
                   When enabled, commits made through Crystal will include a footer crediting Crystal. This helps others know you're using Crystal for AI-powered development.
+                </p>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Automatic Context Tracking"
+                description="Control whether Claude automatically runs /context after responses"
+                icon={<Activity className="w-4 h-4" />}
+              >
+                <Checkbox
+                  label="Disable automatic context tracking"
+                  checked={disableAutoContext}
+                  onChange={(e) => setDisableAutoContext(e.target.checked)}
+                />
+                <p className="text-xs text-text-tertiary mt-1">
+                  When enabled, Crystal will not automatically run /context after each Claude response. This reduces wait time and Claude quota usage, but you'll need to manually run /context when needed.
                 </p>
               </SettingsSection>
             </CollapsibleCard>
