@@ -375,7 +375,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                   onChange={(e) => setDisableAutoContext(e.target.checked)}
                 />
                 <p className="text-xs text-text-tertiary mt-1">
-                  When enabled, Crystal will not automatically run /context after each Claude response. This reduces wait time and Claude quota usage, but you'll need to manually run /context when needed.
+                  When checked, Crystal will not automatically run /context after each Claude response. This reduces wait time and Claude quota usage.
                 </p>
               </SettingsSection>
             </CollapsibleCard>
