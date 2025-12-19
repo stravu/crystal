@@ -387,7 +387,11 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                       Model for auto-context runs
                     </label>
                     <select
+<<<<<<< HEAD
                       className="w-full px-3 py-2 bg-bg-secondary border border-border-primary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-interactive"
+=======
+                      className="w-full px-3 py-2 bg-background-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+>>>>>>> 43d4a3d (feat: add configurable model selection for auto-context runs)
                       value={autoContextModel}
                       onChange={(e) => setAutoContextModel(e.target.value as 'auto' | 'sonnet' | 'opus' | 'haiku')}
                     >
