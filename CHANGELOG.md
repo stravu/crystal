@@ -1,7 +1,7 @@
 
 All notable changes to Crystal will be documented in this file.
 
-## [0.3.4] - 2025-11-26
+## [0.3.4] - 2025-12-19
 
 ### Added
 - **Merge and archive**: New "merge and archive" button that merges changes and archives the session in one action
