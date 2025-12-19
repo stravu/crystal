@@ -77,8 +77,8 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
 
   // eslint-disable-next-line no-control-regex
   const ANSI_ESCAPE_REGEX = /\x1B\[[0-9;]*m/g;
-  // Original format: "76k/200k tokens (38%)"
-  const CONTEXT_USAGE_REGEX = /([0-9]+(?:\.[0-9]+)?k?\s*\/\s*[0-9]+(?:\.[0-9]+)?k?\s+tokens?\s*\(\d+%[^)]*\))/i;
+  // Match actual /context output format: "74k/200k tokens (37%)"
+  const CONTEXT_USAGE_REGEX = /(\d+(?:\.\d+)?k?)\/(\d+(?:\.\d+)?k?)\s+tokens\s+\((\d+(?:\.\d+)?%)\)/i;
   // Alternative format: "Context: 76000/200000 tokens" or similar
   const CONTEXT_USAGE_ALT_REGEX = /context[:\s]+([0-9,]+)\s*(?:\/|of)\s*([0-9,]+)\s*tokens?/i;
 
@@ -227,8 +227,9 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
           // Try original regex
           const match = candidate.match(CONTEXT_USAGE_REGEX);
           if (match) {
-            console.log(`[auto-context-debug] Found context via original regex: ${match[1]}`);
-            return match[1].replace(/\s+/g, ' ').trim();
+            const result = `${match[1]}/${match[2]} tokens (${match[3]})`;
+            console.log(`[auto-context-debug] Found context via original regex: ${result}`);
+            return result;
           }
 
           // Try alternative format
@@ -258,8 +259,9 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
         // Try original regex
         const match = line.match(CONTEXT_USAGE_REGEX);
         if (match) {
-          console.log(`[auto-context-debug] Found context in stdout via original regex: ${match[1]}`);
-          return match[1].replace(/\s+/g, ' ').trim();
+          const result = `${match[1]}/${match[2]} tokens (${match[3]})`;
+          console.log(`[auto-context-debug] Found context in stdout via original regex: ${result}`);
+          return result;
         }
 
         // Try alternative format
