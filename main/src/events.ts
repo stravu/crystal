@@ -452,16 +452,15 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
     sessionManager.clearAutoContextCapture(panelId);
     sessionManager.beginAutoContextCapture(panelId);
 
-    let modelOverride: string | undefined;
-    const currentState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
-    if (typeof currentState.model === 'string' && currentState.model.trim().length > 0) {
-      modelOverride = currentState.model;
-    }
+    // Use the configured auto-context model (defaults to 'haiku' for cost-effectiveness)
+    const config = configManager.getConfig();
+    const modelOverride = config.autoContextModel || 'haiku';
+    console.log(`[auto-context-debug] Using configured model for auto-context: ${modelOverride}`);
 
     const conversationHistory = sessionManager.getPanelConversationMessages
       ? sessionManager.getPanelConversationMessages(panelId)
       : [];
-    console.log(`[auto-context-debug] conversation history length: ${conversationHistory.length}, model: ${modelOverride || 'default'}`);
+    console.log(`[auto-context-debug] conversation history length: ${conversationHistory.length}, model: ${modelOverride}`);
 
     console.log(`[auto-context-debug] Setting autoContextRunState to 'running'`);
     await updateClaudePanelCustomState(panelId, (state) => ({

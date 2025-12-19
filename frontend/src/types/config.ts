@@ -54,4 +54,6 @@ export interface AppConfig {
   };
   // Auto-context tracking setting (enabled by default)
   disableAutoContext?: boolean;
+  // Model to use for auto-context runs (defaults to 'haiku' for cost-effectiveness)
+  autoContextModel?: 'auto' | 'sonnet' | 'opus' | 'haiku';
 }

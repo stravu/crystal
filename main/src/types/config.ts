@@ -18,6 +18,8 @@ export interface AppConfig {
   autoCheckUpdates?: boolean;
   // Disable automatic context tracking after Claude responses
   disableAutoContext?: boolean;
+  // Model to use for auto-context runs (defaults to 'haiku' for cost-effectiveness)
+  autoContextModel?: 'auto' | 'sonnet' | 'opus' | 'haiku';
   // Stravu MCP integration
   stravuApiKey?: string;
   stravuServerUrl?: string;
@@ -84,6 +86,7 @@ export interface UpdateConfigRequest {
   defaultModel?: string;
   autoCheckUpdates?: boolean;
   disableAutoContext?: boolean;
+  autoContextModel?: 'auto' | 'sonnet' | 'opus' | 'haiku';
   stravuApiKey?: string;
   stravuServerUrl?: string;
   theme?: 'light' | 'dark';

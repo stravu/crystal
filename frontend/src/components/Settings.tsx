@@ -44,6 +44,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   const [platform, setPlatform] = useState<string>('darwin');
   const [enableCrystalFooter, setEnableCrystalFooter] = useState(true);
   const [disableAutoContext, setDisableAutoContext] = useState(false);
+  const [autoContextModel, setAutoContextModel] = useState<'auto' | 'sonnet' | 'opus' | 'haiku'>('haiku');
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: true,
     playSound: true,
@@ -83,7 +84,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
       setDevMode(data.devMode || false);
       setEnableCrystalFooter(data.enableCrystalFooter !== false); // Default to true
       setDisableAutoContext(data.disableAutoContext || false);
-      
+      setAutoContextModel(data.autoContextModel || 'haiku');
+
       // Load additional paths
       const paths = data.additionalPaths || [];
       setAdditionalPathsText(paths.join('\n'));
@@ -146,6 +148,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
         enableCrystalFooter,
         additionalPaths: parsedPaths,
         disableAutoContext,
+        autoContextModel,
         notifications: notificationSettings,
         analytics: {
           enabled: analyticsEnabled
@@ -377,6 +380,27 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 <p className="text-xs text-text-tertiary mt-1">
                   When checked, Crystal will not automatically run /context after each Claude response. This reduces wait time and Claude quota usage.
                 </p>
+
+                {!disableAutoContext && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-text-primary mb-2">
+                      Model for auto-context runs
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 bg-background-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+                      value={autoContextModel}
+                      onChange={(e) => setAutoContextModel(e.target.value as 'auto' | 'sonnet' | 'opus' | 'haiku')}
+                    >
+                      <option value="auto">Auto: Let Claude decide</option>
+                      <option value="haiku">Haiku: Fast & cost-effective (recommended)</option>
+                      <option value="sonnet">Sonnet: Balanced performance</option>
+                      <option value="opus">Opus: Most capable but slower</option>
+                    </select>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Choose which model to use for automatic /context runs. Haiku is recommended for cost-effectiveness.
+                    </p>
+                  </div>
+                )}
               </SettingsSection>
             </CollapsibleCard>
 
