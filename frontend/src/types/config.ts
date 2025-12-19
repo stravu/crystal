@@ -52,4 +52,6 @@ export interface AppConfig {
     posthogApiKey?: string;
     posthogHost?: string;
   };
+  // Auto-context tracking setting (enabled by default)
+  disableAutoContext?: boolean;
 }

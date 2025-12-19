@@ -22,6 +22,7 @@ import type { GitStatus } from './types/session';
 
 export function setupEventListeners(services: AppServices, getMainWindow: () => BrowserWindow | null): void {
   const {
+    configManager,
     sessionManager,
     claudeCodeManager,
     executionTracker,
@@ -997,8 +998,12 @@ export function setupEventListeners(services: AppServices, getMainWindow: () => 
               skipSessionSummary = true;
               await finalizeAutoContextRun(panelId);
             } else if (exitCode === 0) {
+              if (configManager.isAutoContextDisabled()) {
+                console.log(`[auto-context-debug] Auto-context disabled in settings - skipping`);
+              } else {
               console.log(`[auto-context-debug] Starting auto context run for panel ${panelId}`);
               await startAutoContextRun(panelId, sessionId);
+              }
             } else {
               console.log(`[auto-context-debug] Skipping auto context - exitCode is ${exitCode}, not 0`);
             }

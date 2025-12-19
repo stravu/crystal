@@ -31,13 +31,16 @@ export const ClaudePanel: React.FC<AIPanelProps> = React.memo(({ panel, isActive
   const transformer = React.useMemo(() => new ClaudeMessageTransformer(), []);
   const activeSession = hook.activeSession;
   const devModeEnabled = useConfigStore((state) => state.config?.devMode ?? false);
+  const autoContextDisabled = useConfigStore((state) => state.config?.disableAutoContext ?? false);
   const showDebugTabs = devModeEnabled;
 
   const claudePanelState = (panel.state.customState as ClaudePanelState | undefined) ?? {};
   const contextUsage = claudePanelState.contextUsage ?? null;
   const autoContextRunState = claudePanelState.autoContextRunState ?? 'idle';
   const isContextUpdating = autoContextRunState === 'running';
-  const contextDisplay = contextUsage ?? '-- tokens (--%)';
+  const contextDisplay = autoContextDisabled
+    ? 'auto-context disabled'
+    : (contextUsage ?? '-- tokens (--%)');
 
   // Extract and store slash commands when we get JSON messages with init
   useEffect(() => {

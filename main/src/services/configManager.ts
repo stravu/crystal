@@ -215,6 +215,10 @@ export class ConfigManager extends EventEmitter {
     return this.config.analytics?.distinctId;
   }
 
+
+  isAutoContextDisabled(): boolean {
+    return this.config.disableAutoContext === true;
+  }
   async setAnalyticsDistinctId(distinctId: string): Promise<void> {
     if (!this.config.analytics) {
       this.config.analytics = {
