@@ -104,3 +104,6 @@ shared/*.js
 shared/*.js.map
 shared/*.d.ts
 shared/*.d.ts.map
+
+# Claude Code local rules (not checked in)
+.claude/
