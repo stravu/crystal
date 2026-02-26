@@ -21,16 +21,12 @@
   <p><a href="https://nimbalyst.com/">https://nimbalyst.com/</a></p>
 </div>
 
-## Main Video
+## Lead Image
 
 <div align="center">
-  <a href="https://nimbalyst.com/videos/demo-1min-light.mp4">
-    <img src="https://nimbalyst.com/og-image.png" alt="Watch the Nimbalyst demo video" width="960" />
+  <a href="https://nimbalyst.com/">
+    <img src="https://nimbalyst.com/_astro/ai-agent-transcript.Bd8j1G0q_BQpgv.webp" alt="Nimbalyst Agent Window" width="960" />
   </a>
-  <p>
-    GitHub-safe preview. Click to watch:
-    <a href="https://nimbalyst.com/videos/demo-1min-light.mp4">Main demo video</a>
-  </p>
 </div>
 
 ## Migration
