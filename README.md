@@ -2,9 +2,10 @@
   <h1>Crystal Is Now Nimbalyst</h1>
 </div>
 
-Crystal (formerly a multi-session AI code assistant manager) is now **Nimbalyst**.
-
-Deprecated: February 2026.
+<div align="center">
+  <p>Crystal (formerly a multi-session AI code assistant manager) is now <strong>Nimbalyst</strong>.</p>
+  <p>Deprecated: February 2026.</p>
+</div>
 
 <div align="center">
   <a href="https://nimbalyst.com/">
@@ -15,9 +16,10 @@ Deprecated: February 2026.
   </a>
 </div>
 
-Crystal has been deprecated and replaced by **Nimbalyst**.
-
-Website: https://nimbalyst.com/
+<div align="center">
+  <p>Crystal has been deprecated and replaced by <strong>Nimbalyst</strong>.</p>
+  <p><a href="https://nimbalyst.com/">https://nimbalyst.com/</a></p>
+</div>
 
 ## Main Video
 
