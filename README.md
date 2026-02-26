@@ -1,4 +1,6 @@
-# Crystal Is Now Nimbalyst
+<div align="center">
+  <h1>Crystal Is Now Nimbalyst</h1>
+</div>
 
 <div align="center">
   <a href="https://nimbalyst.com/">
@@ -15,11 +17,11 @@ Crystal has been deprecated and replaced by **Nimbalyst**.
 ## Main Video
 
 <div align="center">
-  <video controls muted playsinline width="960" poster="https://nimbalyst.com/og-image.png">
-    <source src="https://nimbalyst.com/videos/demo-1min-light.mp4" type="video/mp4" />
-  </video>
+  <a href="https://nimbalyst.com/videos/demo-1min-light.mp4">
+    <img src="https://nimbalyst.com/og-image.png" alt="Watch the Nimbalyst demo video" width="960" />
+  </a>
   <p>
-    If the embed does not load, open it directly:
+    GitHub-safe preview. Click to watch:
     <a href="https://nimbalyst.com/videos/demo-1min-light.mp4">Main demo video</a>
   </p>
 </div>
