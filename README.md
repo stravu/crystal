@@ -4,15 +4,20 @@
 
 <div align="center">
   <a href="https://nimbalyst.com/">
-    <img src="frontend/public/nimbalyst-logo.svg" alt="Nimbalyst Logo" width="260" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://nimbalyst.com/nimbalyst-logo-white.svg" />
+      <img src="https://nimbalyst.com/nimbalyst-logo.svg" alt="Nimbalyst Logo" width="260" />
+    </picture>
   </a>
 </div>
 
-Crystal has been deprecated and replaced by **Nimbalyst**.
+<div align="center">
+  Crystal has been deprecated and replaced by <strong>Nimbalyst</strong>.
+</div>
 
-- Product: **Nimbalyst**
-- Company: **Nimbalyst**
-- Website: **https://nimbalyst.com/**
+<div align="center">
+  <a href="https://nimbalyst.com/">https://nimbalyst.com/</a>
+</div>
 
 ## Main Video
 
