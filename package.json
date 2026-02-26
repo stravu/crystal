@@ -92,6 +92,7 @@
     },
     "files": [
       "main/dist/**/*",
+      "main/assets/**/*",
       "frontend/dist/**/*",
       "package.json",
       "node_modules/**/*",
