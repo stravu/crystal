@@ -2,6 +2,10 @@
   <h1>Crystal Is Now Nimbalyst</h1>
 </div>
 
+Crystal (formerly a multi-session AI code assistant manager) is now **Nimbalyst**.
+
+Deprecated: February 2026.
+
 <div align="center">
   <a href="https://nimbalyst.com/">
     <picture>
@@ -11,13 +15,9 @@
   </a>
 </div>
 
-<div align="center">
-  Crystal has been deprecated and replaced by <strong>Nimbalyst</strong>.
-</div>
+Crystal has been deprecated and replaced by **Nimbalyst**.
 
-<div align="center">
-  <a href="https://nimbalyst.com/">https://nimbalyst.com/</a>
-</div>
+Website: https://nimbalyst.com/
 
 ## Main Video
 
@@ -30,6 +30,12 @@
     <a href="https://nimbalyst.com/videos/demo-1min-light.mp4">Main demo video</a>
   </p>
 </div>
+
+## Migration
+
+- Download Nimbalyst: https://nimbalyst.com/
+- Documentation: https://docs.nimbalyst.com/
+- GitHub repository: https://github.com/Nimbalyst/nimbalyst
 
 ## Nimbalyst Features
 
@@ -50,5 +56,11 @@
 - Auto-save and file watching for reliable local development workflows
 - Project-level workspace management and AI session tracking
 - Built on production-grade desktop foundations with Electron
+
+## FAQ
+
+- **Is Crystal discontinued?** Yes. Crystal is deprecated and replaced by Nimbalyst.
+- **Can I still use Crystal?** Yes. You can continue using Crystal, but we recommend moving to Nimbalyst for active updates.
+- **Where is Nimbalyst?** https://nimbalyst.com/
 
 For downloads, documentation, and updates, go to **https://nimbalyst.com/**.
