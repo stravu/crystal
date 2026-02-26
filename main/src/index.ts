@@ -98,25 +98,28 @@ const originalInfo: typeof console.info = console.info;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 const NIMBALYST_URL = 'https://nimbalyst.com/';
+const NIMBALYST_DOWNLOAD_URL = 'https://nimbalyst.com/download/';
 
 async function showNimbalystMigrationPopup(): Promise<void> {
   const popupOptions = {
     type: 'info' as const,
     title: 'Crystal Is Now Nimbalyst',
-    message: 'You can still continue to use Crystal, but we recommend moving to Nimbalyst.',
-    detail: 'Nimbalyst is the replacement product and company. Visit nimbalyst.com for downloads, documentation, and updates.',
-    buttons: ['Continue with Crystal', 'Try Nimbalyst'],
-    defaultId: 1,
-    cancelId: 0,
-    noLink: true
+    message: 'Crystal is now Nimbalyst.',
+    detail: `You can still continue to use Crystal, but we recommend moving to Nimbalyst.\n\nWebsite: ${NIMBALYST_URL}\nDownload: ${NIMBALYST_DOWNLOAD_URL}`,
+    buttons: ['Open Website', 'Download Nimbalyst', 'Continue with Crystal'],
+    defaultId: 2,
+    cancelId: 2,
+    noLink: false
   };
 
   const result = mainWindow
     ? await dialog.showMessageBox(mainWindow, popupOptions)
     : await dialog.showMessageBox(popupOptions);
 
-  if (result.response === 1) {
+  if (result.response === 0) {
     await shell.openExternal(NIMBALYST_URL);
+  } else if (result.response === 1) {
+    await shell.openExternal(NIMBALYST_DOWNLOAD_URL);
   }
 }
 
