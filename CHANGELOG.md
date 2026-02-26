@@ -1,6 +1,12 @@
 
 All notable changes to Crystal will be documented in this file.
 
+## [0.3.5] - 2026-02-26
+
+### We recommend migrating to Nimbalyst, our successor product to Crystal.
+https://nimbalyst.com/
+You may continue to use Crystal but it will not be updated in the future.
+
 ## [0.3.4] - 2025-12-19
 
 ### Added
