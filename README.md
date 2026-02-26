@@ -1,27 +1,19 @@
 <div align="center">
-  <h1>Crystal Is Now Nimbalyst</h1>
-</div>
-
-<div align="center">
-  <p>Crystal (formerly a multi-session AI code assistant manager) is now <strong>Nimbalyst</strong>.</p>
-  <p>Deprecated: February 2026.</p>
-</div>
-
-<div align="center">
   <a href="https://nimbalyst.com/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://nimbalyst.com/nimbalyst-logo-white.svg" />
       <img src="https://nimbalyst.com/nimbalyst-logo.svg" alt="Nimbalyst Logo" width="260" />
     </picture>
   </a>
+  <p><a href="https://nimbalyst.com/">https://nimbalyst.com/</a></p>
+  <p><a href="https://nimbalyst.com/download/">Download here</a></p>
 </div>
 
 <div align="center">
-  <p>Crystal has been deprecated and replaced by <strong>Nimbalyst</strong>.</p>
-  <p><a href="https://nimbalyst.com/">https://nimbalyst.com/</a></p>
+  <h1>Crystal Is Now Nimbalyst</h1>
+  <p>Crystal (formerly a multi-session AI code assistant manager) has been deprecated and replaced by <strong>Nimbalyst</strong>.</p>
+  <p>Deprecated: February 2026.</p>
 </div>
-
-## Lead Image
 
 <div align="center">
   <a href="https://nimbalyst.com/">
