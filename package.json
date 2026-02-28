@@ -24,7 +24,9 @@
   },
   "scripts": {
     "dev": "pnpm run electron-dev",
+    "preelectron-dev": "pnpm run build:main",
     "electron-dev": "concurrently \"pnpm run --filter frontend dev\" \"wait-on http://localhost:4521 && electron .\"",
+    "preelectron-dev:custom": "pnpm run build:main",
     "electron-dev:custom": "concurrently \"pnpm run --filter frontend dev\" \"wait-on http://localhost:4521 && electron .\"",
     "build": "pnpm run build:frontend && pnpm run build:main && pnpm run build:electron",
     "build:frontend": "pnpm run --filter frontend build",
@@ -33,7 +35,7 @@
     "build:mac": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --publish never",
     "build:mac:universal": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --universal --publish never",
     "build:mac:x64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --x64 --publish never",
-    "build:mac:arm64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --arm64 --publish never",
+    "build:mac:arm64": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --mac --arm64 --publish never",
     "build:linux": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
     "build:linux:ci": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && electron-builder --linux --publish never",
     "build:mac:ci": "pnpm run build:frontend && pnpm run build:main && pnpm run inject-build-info && pnpm run generate-notices && node scripts/configure-build.js && electron-builder --mac --publish never",
@@ -197,5 +199,5 @@
       "repo": "crystal"
     }
   },
-  "packageManager": "pnpm@10.11.1+sha512.e519b9f7639869dc8d5c3c5dfef73b3f091094b0a006d7317353c72b124e80e1afd429732e28705ad6bfa1ee879c1fce46c128ccebd3192101f43dd67c667912"
+  "packageManager": "pnpm@10.19.0+sha512.c9fc7236e92adf5c8af42fd5bf1612df99c2ceb62f27047032f4720b33f8eacdde311865e91c411f2774f618d82f320808ecb51718bfa82c060c4ba7c76a32b8"
 }
