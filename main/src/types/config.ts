@@ -16,6 +16,8 @@ export interface AppConfig {
   defaultModel?: string;
   // Auto-check for updates
   autoCheckUpdates?: boolean;
+  // Disable automatic context tracking after Claude responses
+  disableAutoContext?: boolean;
   // Stravu MCP integration
   stravuApiKey?: string;
   stravuServerUrl?: string;
@@ -81,6 +83,7 @@ export interface UpdateConfigRequest {
   defaultPermissionMode?: 'approve' | 'ignore';
   defaultModel?: string;
   autoCheckUpdates?: boolean;
+  disableAutoContext?: boolean;
   stravuApiKey?: string;
   stravuServerUrl?: string;
   theme?: 'light' | 'dark';
